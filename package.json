@@ -1,0 +1,62 @@
+{
+  "name": "crossauth",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "typings": "./dist/index.d.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js",
+      "require": "./dist/client.cjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    },
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*",
+    "./dist/server/*": "./dist/server/*",
+    "./dist/client/*": "./dist/client/*",
+    "./*": "./*"
+  },
+  "files": [
+    "dist/*"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:index && npm run build:client && npm run build:server && npm run build:indexiife && npm run build:clientiife",
+    "build:noniife": "npm run build:index && npm run build:client npm run build:server",
+    "build:index": "LIB_NAME=index vite build",
+    "build:indexiife": "LIB_NAME=indexiife vite build",
+    "build:client": "LIB_NAME=client vite build",
+    "build:clientiife": "LIB_NAME=clientiife vite build",
+    "build:server": "LIB_NAME=server NODE_ENV=production vite build",
+    "build:express": "LIB_NAME=express vite build",
+    "preview": "vite preview",
+    "test": "LIB_NAME=index vitest"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.5",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8",
+    "vite-plugin-dts": "^3.6.4",
+    "vitest": "^1.1.0"
+  },
+  "dependencies": {
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
+    "@prisma/client": "^5.7.1",
+    "express": "^4.18.2",
+    "prisma": "^5.7.1"
+  }
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>Contact App</title>
+    <link rel="shortcut icon" href="#" />
+
+    <link rel="stylesheet" href="./style.css" />
+    <script src="../../dist/client/index.iife.js"></script>
+    <script>
+      function add() {
+        console.log("Add")
+        const a = Number(document.getElementById("ainput").value);
+        const b = Number(document.getElementById("binput").value);
+        document.getElementById("a").innerHTML = a;
+        document.getElementById("b").innerHTML = b;
+        document.getElementById("sum").innerHTML = crossauth_client.sum(a, b);
+      }
+    </script>
+  </head>
+  <body>
+    <p>a <input type="input" id="ainput" size="10"/></p>
+    <b>b <input type="input" id="binput" size="10"/></p>
+    <p><button onClick="add()">Add</button></p>
+    <p><span id="a"></span> + <span id="b"></span> = <span id="sum"></span></p>
+  </body>
+</html>
