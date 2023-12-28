@@ -1,5 +1,6 @@
 import express, { Express, Request, Response } from "express";
 import { CookieSessionManager } from './cookieauth';
+import { CrossauthError, ErrorCode } from "..";
 
 export interface ExpressCookieAuthServerOptions {
     app? : Express,
@@ -48,7 +49,7 @@ export class ExpressCookieAuthServer {
         router.post('/login', async (req : Request, res : Response) =>  {
             const username = req.body.username;
             const password = req.body.password;
-            let cookie = await this.sessionManager.login(username, password);
+            let { cookie } = await this.sessionManager.login(username, password);
 
             res.cookie(cookie.name, cookie.value, cookie.options);
             res.redirect(this.loginRedirect);
@@ -63,7 +64,35 @@ export class ExpressCookieAuthServer {
             res.redirect(this.logoutRedirect);
         });
 
-        this.app.use(this.prefix, router)
+        router.post('/api/login', async (req : Request, res : Response) =>  {
+            const username = req.body.username;
+            const password = req.body.password;
+            let { cookie, user } = await this.sessionManager.login(username, password);
+
+            res.cookie(cookie.name, cookie.value, cookie.options);
+            res.json({status: "ok", user : user});
+        });
+
+        router.get('/api/logout', async (req : Request, res : Response) => {
+            let cookies = req.cookies;
+            if (this.sessionManager.cookieName in cookies) {
+                await this.sessionManager.logout(this.sessionManager.cookieName);
+            }
+            res.clearCookie(this.sessionManager.cookieName);
+            res.json({status: "ok"})
+        });
+
+        router.post('/api/userforsessionkey', async (req : Request, res : Response) =>  {
+            let cookies = req.cookies;
+            if (!(this.sessionManager.cookieName in cookies)) {
+                throw new CrossauthError(ErrorCode.InvalidSessionId);
+            }
+            let user = this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName]);
+
+            res.json({status: "ok", user : user});
+        });
+
+        this.app.use(this.prefix, router);
     }
     
     

@@ -20,5 +20,10 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "typedocOptions":{
+    "entryPoints": ["src/index.ts", "src/client.ts", "src/server.ts"],
+    "out": "docs"
+}
+
 }

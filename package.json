@@ -43,11 +43,13 @@
     "build:server": "LIB_NAME=server NODE_ENV=production vite build",
     "build:express": "LIB_NAME=express vite build",
     "preview": "vite preview",
-    "test": "LIB_NAME=index vitest"
+    "test": "LIB_NAME=index vitest",
+    "doc": "typedoc"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.5",
+    "typedoc": "^0.25.4",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
     "vite-plugin-dts": "^3.6.4",
