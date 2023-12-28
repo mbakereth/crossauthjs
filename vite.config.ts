@@ -51,7 +51,7 @@ export default defineConfig({
     rollupOptions: {
       // make sure to externalize deps that shouldn't be bundled
       // into your library
-      external: ['prisma', '@prisma/client', 'express', 'node:crypto' ],
+      external: ['prisma', '@prisma/client', 'express', '@types/express', 'nunjucks', '@types/nunjucls', 'node:crypto' ],
       output: {
         // Provide global variables to use in the UMD build
         // for externalized deps

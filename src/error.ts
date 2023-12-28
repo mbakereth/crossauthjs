@@ -9,6 +9,10 @@ export enum ErrorCode {
     /** Thrown when a password does not match, eg during login */
     PasswordNotMatch,
 
+    /** For endpoints provided by servers in this package, this is returned instead of 
+      * UserNotExist or PasswordNotMatch, for security reasons */
+    UsernameOrPasswordInvalid,
+
     /** Thrown on login attempt with a user account marked inactive */
     UserNotActive,
 
@@ -38,6 +42,8 @@ export enum ErrorCode {
  * Thrown by Crossauth functions whenever it encounters an error.
  */
 export class CrossauthError extends Error {
+
+    readonly code : ErrorCode;
 
     /**
      * Creates a new error to throw,
@@ -73,6 +79,7 @@ export class CrossauthError extends Error {
             }    
         }
         super(_message); // 'Error' breaks prototype chain here
+        this.code = code;
         this.name = 'CrossauthError';
         //Object.setPrototypeOf(this, new.target.prototype); // restore prototype chain
     }
