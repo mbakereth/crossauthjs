@@ -33,6 +33,7 @@
     "dist/*"
   ],
   "scripts": {
+    "postinstall": "npx prisma generate && npx prisma db push --force-reset",
     "dev": "vite",
     "build": "npm run build:index && npm run build:client && npm run build:server && npm run build:indexiife && npm run build:clientiife",
     "build:noniife": "npm run build:index && npm run build:client npm run build:server",
@@ -41,7 +42,6 @@
     "build:client": "LIB_NAME=client vite build",
     "build:clientiife": "LIB_NAME=clientiife vite build",
     "build:server": "LIB_NAME=server NODE_ENV=production vite build",
-    "build:express": "LIB_NAME=express vite build",
     "preview": "vite preview",
     "test": "LIB_NAME=index vitest",
     "doc": "typedoc"

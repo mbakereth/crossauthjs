@@ -203,7 +203,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
         if (salt == undefined) {
             const len = this.saltChars.length;
             salt = Array.from({length: this.saltLength}, 
-                () => this.saltChars.charAt(Math.floor(Math.random() * len))).join();
+                () => this.saltChars.charAt(Math.floor(Math.random() * len))).join("");
     
         }
         if (iterations == undefined) {

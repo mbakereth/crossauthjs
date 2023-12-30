@@ -88,7 +88,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
 
     private async getUser(key : string, value : string | number) : Promise<UserWithPassword> {
         try {
-            let prismaUser =  this.prismaClient[this.userTable].findUniqueOrThrow({
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            let prismaUser = await this.prismaClient[this.userTable].findUniqueOrThrow({
                 where: {
                     [key]: value
                 }
@@ -113,7 +114,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
         }
 
     }
-    
+
     /**
      * Returns a {@link UserWithPassword } instance matching the given username, or throws an Exception.
      * @param username the username to look up
@@ -195,7 +196,8 @@ export class PrismaSessionStorage extends SessionStorage {
     async getUserForSessionKey(sessionKey : string) : Promise<{user: User, expires : Date | undefined}> {
         let prismaSession;
         try {
-            prismaSession =  this.prismaClient[this.sessionTable].findUniqueOrThrow({
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            prismaSession =  await this.prismaClient[this.sessionTable].findUniqueOrThrow({
                 where: {
                     sessionKey: sessionKey
                 }
@@ -204,10 +206,11 @@ export class PrismaSessionStorage extends SessionStorage {
             throw new CrossauthError(ErrorCode.InvalidSessionId);
         }
         try {
-            let user = await this.userStorage.getUserByUsername(prismaSession.username);
+            let user = await this.userStorage.getUserById(prismaSession.user_id);
             let expires = prismaSession.expires;
             return { user, expires };
-        }  catch {
+        }  catch(e) {
+            console.error(e);
             throw new CrossauthError(ErrorCode.UserNotExist); 
         }
     }
@@ -225,9 +228,10 @@ export class PrismaSessionStorage extends SessionStorage {
                       sessionKey : string, dateCreated : Date, 
                       expires : Date | undefined) : Promise<void> {
         try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
             await this.prismaClient[this.sessionTable].create({
                 data: {
-                    userId : uniqueUserId,
+                    user_id : uniqueUserId,
                     sessionKey : sessionKey,
                     created : dateCreated,
                     expires : expires
@@ -245,7 +249,8 @@ export class PrismaSessionStorage extends SessionStorage {
      * @throws {@link index!CrossauthError } if the key could not be deleted.
      */
     async deleteSession(sessionKey : string) : Promise<void> {
-        this.prismaClient[this.sessionTable].delete({
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            await this.prismaClient[this.sessionTable].delete({
             where: {
                 sessionKey: sessionKey
             }
