@@ -108,7 +108,7 @@ export class CookieAuth {
         let expires : Date | undefined = undefined;
         if (this.maxAge > 0) {
             expires = new Date();
-            expires.setSeconds(dateCreated.getSeconds() + this.maxAge);
+            expires.setTime(dateCreated.getTime() + this.maxAge*1000);
         }
         return expires;
     }
