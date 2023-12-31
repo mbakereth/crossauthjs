@@ -3,6 +3,7 @@ import nunjucks from "nunjucks";
 import { CookieSessionManager } from './cookieauth';
 import { CrossauthError, ErrorCode } from "..";
 import cookieParser from 'cookie-parser';
+import { User } from '../interfaces';
 
 /**
  * Options for {@link ExpressCookieAuthServer }.
@@ -146,116 +147,19 @@ export class ExpressCookieAuthServer {
         }
 
         router.post('/login', async (req : Request, res : Response) =>  {
-            const username = req.body.username;
-            const password = req.body.password;
-            try {
-                let { cookie } = await this.sessionManager.login(username, password);
-
-                res.cookie(cookie.name, cookie.value, cookie.options);
-                res.redirect(this.loginRedirect);
-            } catch (e) {
-                let error = "Unknown error";
-                let code = ErrorCode.UnknownError;
-                if (e instanceof CrossauthError) {
-                    let ce = e as CrossauthError;
-                    code = ce.code;
-                    switch (ce.code) {
-                        case ErrorCode.Connection:
-                            error = "Couldn't make a connection to the database";
-                            break;
-                        case ErrorCode.UserNotExist:
-                        case ErrorCode.PasswordNotMatch:
-                            error = "Invalid username or password";
-                            code = ErrorCode.UsernameOrPasswordInvalid;
-                            break;
-                        case ErrorCode.UserNotActive:
-                            error = "User has been deactivated";
-                            break;
-                        case ErrorCode.EmailNotVerified:
-                            error = "Email has not been validated";
-                            break;
-                    }
-                }
-                if (this.loginPage) {
-                    res.render(this.loginPage, {error: error, code: code});
-                } else if (this.errorPage) {
-                    res.render(this.errorPage, {error: error, code: code});
-                } else {
-                    res.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
-                }
-            } 
+            await this.login(req, res, (res, _user) => {res.redirect(this.loginRedirect)});
         });
 
         router.get('/logout', async (req : Request, res : Response) => {
-            let cookies = req.cookies;
-            try {
-                if (this.sessionManager.cookieName in cookies) {
-                    await this.sessionManager.logout(this.sessionManager.cookieName);
-                }
-                res.clearCookie(this.sessionManager.cookieName);
-                res.redirect(this.logoutRedirect);
-            } catch (e) {
-                let error = "Unknown error";
-                let code = ErrorCode.UnknownError;
-                if (e instanceof CrossauthError) {
-                    let ce = e as CrossauthError;
-                    code = ce.code;
-                }
-                if (this.errorPage) {
-                    res.render(this.errorPage, {error: error, code: code});
-                } else {
-                    res.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
-                }
-            }
+            this.logout(req, res, (res) => {res.redirect(this.logoutRedirect);});
         });
 
         router.post('/api/login', async (req : Request, res : Response) =>  {
-            const username = req.body.username;
-            const password = req.body.password;
-
-            try {
-                let { cookie, user } = await this.sessionManager.login(username, password);
-
-                res.cookie(cookie.name, cookie.value, cookie.options);
-                res.json({status: "ok", user : user});
-            } catch (e) {
-                let error = "Unknown error";
-                let code = ErrorCode.UnknownError;
-                if (e instanceof CrossauthError) {
-                    let ce = e as CrossauthError;
-                    code = ce.code;
-                    switch (ce.code) {
-                        case ErrorCode.UserNotExist:
-                        case ErrorCode.PasswordNotMatch:
-                            error = "Invalid username or password";
-                            code = ErrorCode.UsernameOrPasswordInvalid;
-                            break;
-                        default:
-                            error = ce.message;
-                    }
-                }
-
-                res.json({status: "error", error : error, code: code});
-            }
+            this.login(req, res, (res, user) => {res.json({status: "ok", user : user});})
         });
 
         router.post('/api/logout', async (req : Request, res : Response) => {
-            let cookies = req.cookies;
-            try {
-                if (cookies && this.sessionManager.cookieName in cookies) {
-                    await this.sessionManager.logout(this.sessionManager.cookieName);
-                }
-                res.clearCookie(this.sessionManager.cookieName);
-                res.json({status: "ok"});
-            } catch (e) {
-                let error = "Unknown error";
-                let code = ErrorCode.UnknownError
-                if (e instanceof CrossauthError) {
-                    let ce = e as CrossauthError;
-                    error = ce.message;
-                }
-                res.json({status: "error", error : error, code: code});
-            }
+            this.logout(req, res, (res) => {res.json({status: "ok"});});
         });
 
         router.get('/api/userforsessionkey', async (req : Request, res : Response) =>  {
@@ -288,6 +192,57 @@ export class ExpressCookieAuthServer {
         this.app.use(this.prefix, router);
     }
     
+    private async login(req : Request, res : Response, successFn : (res : Response, user? : User) => void) {
+        const username = req.body.username;
+        const password = req.body.password;
+
+        try {
+            let { cookie, user } = await this.sessionManager.login(username, password);
+
+            res.cookie(cookie.name, cookie.value, cookie.options);
+            res.json({status: "ok", user : user});
+        } catch (e) {
+            let error = "Unknown error";
+            let code = ErrorCode.UnknownError;
+            if (e instanceof CrossauthError) {
+                let ce = e as CrossauthError;
+                code = ce.code;
+                switch (ce.code) {
+                    case ErrorCode.UserNotExist:
+                    case ErrorCode.PasswordNotMatch:
+                        error = "Invalid username or password";
+                        code = ErrorCode.UsernameOrPasswordInvalid;
+                        break;
+                    default:
+                        error = ce.message;
+                }
+            }
+
+            res.json({status: "error", error : error, code: code});
+        }
+    };
+
+    private async logout(req : Request, res : Response, successFn : (res : Response) => void) {
+        let cookies = req.cookies;
+        try {
+            if (cookies && this.sessionManager.cookieName in cookies) {
+                await this.sessionManager.logout(this.sessionManager.cookieName);
+            }
+            res.clearCookie(this.sessionManager.cookieName);
+            //res.json({status: "ok"});
+            successFn(res);
+        } catch (e) {
+            let error = "Unknown error";
+            let code = ErrorCode.UnknownError
+            if (e instanceof CrossauthError) {
+                let ce = e as CrossauthError;
+                error = ce.message;
+            }
+            res.json({status: "error", error : error, code: code});
+        }
+
+    }
+
     /**
      * Starts the Express app on the given port.  
      * @param port the port to listen on

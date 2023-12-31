@@ -110,7 +110,7 @@ export class InMemorySessionStorage extends SessionStorage {
      * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
     async getUserForSessionKey(sessionKey : string) : Promise<{user: User, expires : Date | undefined}> {
-        if (sessionKey in this.sessionByKey) {
+        if (this.sessionByKey && sessionKey in this.sessionByKey) {
             let userId = this.sessionByKey[sessionKey].userId;
             let user = await this.userStorage.getUserById(userId);
             user = {...user};
