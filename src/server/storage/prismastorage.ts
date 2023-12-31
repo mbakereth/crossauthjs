@@ -101,7 +101,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             let user : UserWithPassword = {
-                uniqueId : prismaUser[this.idColumn],
+                id : prismaUser[this.idColumn],
                 username : prismaUser.username,
                 passwordHash : prismaUser.passwordHash
             }

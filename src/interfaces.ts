@@ -20,7 +20,7 @@ export interface SessionKey {
  * You may want to do this if you want to pass additional user data back to the caller, eg real name.
  */
 export interface User {
-    uniqueId : string | number,
+    id : string | number,
     username : string,
     [ key : string ] : any,
 }

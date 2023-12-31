@@ -23,7 +23,7 @@ export interface InMemoryUserStorageOptions {
  * the user table to also have an `emailVerified Boolean` field.
 */
 export class InMemoryUserStorage extends UserPasswordStorage {
-    private usersByUsername : { [key : string]: UserWithPassword } = {};
+    usersByUsername : { [key : string]: UserWithPassword } = {};
     private checkActive : boolean = false;
     private checkEmailVerified : boolean = false;
 
@@ -45,7 +45,8 @@ export class InMemoryUserStorage extends UserPasswordStorage {
     }
 
     addUser(user : UserWithPassword) : void {
-        this.usersByUsername[user.username] = user;
+        this.usersByUsername[user.username] = {...user};
+        user.passwordHash = "ABC";
     }
 
     /**
@@ -64,7 +65,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
             if ('emailVerified' in user && user['emailVerified'] == false && this.checkEmailVerified) {
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
-            return user;
+            return {...user};
         }
 
         throw new CrossauthError(ErrorCode.UserNotExist);
@@ -113,7 +114,10 @@ export class InMemorySessionStorage extends SessionStorage {
             let userId = this.sessionByKey[sessionKey].userId;
             let user = await this.userStorage.getUserById(userId);
             let expires = this.sessionByKey[sessionKey].expires;
-            return {user, expires};
+            if (expires) {
+                expires = new Date(expires.getTime());
+            }
+            return {user: {...user}, expires};
         }
         throw new CrossauthError(ErrorCode.InvalidSessionId); 
     }

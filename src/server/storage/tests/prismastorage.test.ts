@@ -34,9 +34,9 @@ beforeAll(async () => {
 test('PrismaUserStorage.getUser', async () => {
     const bob = await userStorage.getUserByUsername("bob");
     expect(bob.username).toBe("bob");
-    const id = bob.uniqueId;
+    const id = bob.id;
     const bob2 = await userStorage.getUserById(id);
-    expect(bob2.uniqueId).toBe(id);
+    expect(bob2.id).toBe(id);
     await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
 });
 
@@ -47,7 +47,7 @@ test('PrismaSessionStorage.createGetAndDeleteSession', async () => {
     const now = new Date();
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
-    await sessionStorage.saveSession(bob.uniqueId, sessionId, now, expiry);
+    await sessionStorage.saveSession(bob.id, sessionId, now, expiry);
     let { user, expires} = await sessionStorage.getUserForSessionKey(sessionId);
     expect(user.username).toBe(bob.username);
     expect(expires).toStrictEqual(expiry);

@@ -223,8 +223,6 @@ export class CookieAuth {
  * See constructor of that class for details.
  */
 export interface CookieSessionManagerOptions {
-    userStorage : UserStorage,
-    sessionStorage : SessionStorage;
     cookieAuthOptions? : CookieAuthOptions;
     authenticatorOptions? : UsernamePasswordAuthenticatorOptions;
 }
@@ -236,23 +234,23 @@ export interface CookieSessionManagerOptions {
  * this class in the endpoints, returning the cookies it creates in your HTTP headers.
  */
 export class CookieSessionManager {
-    private userStorage : UserStorage;
-    private sessionStorage : SessionStorage;
+    userStorage : UserStorage;
+    sessionStorage : SessionStorage;
     private auth : CookieAuth;
     private authenticator : HashedPasswordAuthenticator;
 
     /**
      * Constructor
-     * @param userStorage the {@link UserStorage} instance to use, eg {@link PrismaUserStorage}.  Must be given.
-     * @param sessionStorage  the {@link SessionStorage} instance to use, eg {@link PrismaSessionStorage}.  Must be given.
+     * @param userStorage the {@link UserStorage} instance to use, eg {@link PrismaUserStorage}.
+     * @param sessionStorage  the {@link SessionStorage} instance to use, eg {@link PrismaSessionStorage}.
      * @param cookieAuthOptions optional parameters for authentication. See {@link CookieAuthOptions }.
      * @param authenticatorOptions optional parameters for username/password authentication.  See {@link UsernamePasswordAuthenticatorOptions }.
      */
-    constructor({
-        userStorage, 
-        sessionStorage, 
-        cookieAuthOptions, 
-        authenticatorOptions }: CookieSessionManagerOptions) {
+    constructor(
+        userStorage : UserStorage, 
+        sessionStorage : SessionStorage, 
+        {cookieAuthOptions, 
+        authenticatorOptions } : CookieSessionManagerOptions = {}) {
         this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
         this.auth = new CookieAuth(this.sessionStorage, cookieAuthOptions);

@@ -14,9 +14,9 @@ beforeAll(async () => {
 test('InMemoryUserStorage.getUser', async () => {
     const bob = await userStorage.getUserByUsername("bob");
     expect(bob.username).toBe("bob");
-    const id = bob.uniqueId;
+    const id = bob.id;
     const bob2 = await userStorage.getUserById(bob.username);
-    expect(bob2.uniqueId).toBe(id);
+    expect(bob2.id).toBe(id);
     await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
 });
 

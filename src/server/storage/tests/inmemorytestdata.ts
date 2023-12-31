@@ -5,12 +5,12 @@ export function getTestUserStorage() : InMemoryUserStorage {
     let userStorage = new InMemoryUserStorage();
     let authenticator = new HashedPasswordAuthenticator(userStorage);
     userStorage.addUser({
-        uniqueId: 'bob',
+        id: 'bob',
         username: 'bob',
         passwordHash: authenticator.createPasswordHash("bobPass123", true),
     });
     userStorage.addUser({
-        uniqueId: 'alice',
+        id: 'alice',
         username: 'alice',
         passwordHash: authenticator.createPasswordHash("bobPass123", true),
     });
