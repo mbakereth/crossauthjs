@@ -45,6 +45,7 @@ test('ExpressCookieAuthServer.loginGetKeyLogout', async () => {
         .expect(200)
         .then((res) => {
             expect(res.body.status).toBe("ok");
+            expect(res.body.user.username).toBe("bob");
         });
 
         // check logout

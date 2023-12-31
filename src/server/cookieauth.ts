@@ -308,8 +308,9 @@ export class CookieSessionManager {
          * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
          *         `UserNotExist` or `Expired`.
          */
-        async userForSessionKey(sessionKey : string) {
-            return this.auth.getUserForSessionKey(sessionKey);
+        async userForSessionKey(sessionKey : string) : Promise<User> {
+            let user = await this.auth.getUserForSessionKey(sessionKey);
+            return user;
         }
     
 

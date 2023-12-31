@@ -113,11 +113,15 @@ export class InMemorySessionStorage extends SessionStorage {
         if (sessionKey in this.sessionByKey) {
             let userId = this.sessionByKey[sessionKey].userId;
             let user = await this.userStorage.getUserById(userId);
+            user = {...user};
             let expires = this.sessionByKey[sessionKey].expires;
             if (expires) {
                 expires = new Date(expires.getTime());
             }
-            return {user: {...user}, expires};
+            if ("passwordHash" in user) {
+                delete user.passwordHash;
+            }
+            return {user, expires};
         }
         throw new CrossauthError(ErrorCode.InvalidSessionId); 
     }

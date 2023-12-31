@@ -264,8 +264,7 @@ export class ExpressCookieAuthServer {
                 if (!cookies || !(this.sessionManager.cookieName in cookies)) {
                     throw new CrossauthError(ErrorCode.InvalidSessionId);
                 }
-                let user = this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName]);
-
+                let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName]);
                 res.json({status: "ok", user : user});
             } catch (e) {
                 let error = "Unknown error";
