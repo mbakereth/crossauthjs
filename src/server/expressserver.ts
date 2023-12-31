@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from "express";
 import nunjucks from "nunjucks";
 import { CookieSessionManager } from './cookieauth';
 import { CrossauthError, ErrorCode } from "..";
+import cookieParser from 'cookie-parser';
 
 /**
  * Options for {@link ExpressCookieAuthServer }.
@@ -63,7 +64,7 @@ export interface ExpressCookieAuthServerOptions {
  * pass in your own Express app.
  */
 export class ExpressCookieAuthServer {
-    private app : Express;
+    readonly app : Express;
     private prefix : string;
     private loginRedirect = "/";
     private logoutRedirect : string = "/";
@@ -134,6 +135,7 @@ export class ExpressCookieAuthServer {
         const router = express.Router();
         router.use(express.json());
         router.use(express.urlencoded({ extended: true }));
+        router.use(cookieParser());
 
         if (views && loginPage) {
             router.get('/login', async (_req : Request, res : Response) =>  {
@@ -240,7 +242,7 @@ export class ExpressCookieAuthServer {
         router.post('/api/logout', async (req : Request, res : Response) => {
             let cookies = req.cookies;
             try {
-                if (this.sessionManager.cookieName in cookies) {
+                if (cookies && this.sessionManager.cookieName in cookies) {
                     await this.sessionManager.logout(this.sessionManager.cookieName);
                 }
                 res.clearCookie(this.sessionManager.cookieName);
@@ -259,7 +261,7 @@ export class ExpressCookieAuthServer {
         router.get('/api/userforsessionkey', async (req : Request, res : Response) =>  {
             let cookies = req.cookies;
             try {
-                if (!(this.sessionManager.cookieName in cookies)) {
+                if (!cookies || !(this.sessionManager.cookieName in cookies)) {
                     throw new CrossauthError(ErrorCode.InvalidSessionId);
                 }
                 let user = this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName]);
@@ -278,7 +280,7 @@ export class ExpressCookieAuthServer {
                             error = ce.message;
                     }
                 }
-
+                console.log(e);
                 res.json({status: "error", error : error});
 
             }
