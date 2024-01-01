@@ -145,16 +145,19 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
     decodePasswordHash(hash : string) : PasswordHash {
         const parts = hash.split(':');
         let error : CrossauthError|undefined = undefined;
-        if (parts.length != 5) {
+        if (parts.length != 6) {
             throw new CrossauthError(ErrorCode.InvalidHash);
+            if (parts[0] != "pbkdf2") {
+                throw new CrossauthError(ErrorCode.UnsupportedAlgorithm);
+            }
         }
         try {
             return {
-                hashedPassword : parts[4],
-                salt : parts[3],
-                iterations : Number(parts[2]),
-                keyLen : Number(parts[1]),
-                digest : parts[0]
+                hashedPassword : parts[5],
+                salt : parts[4],
+                iterations : Number(parts[3]),
+                keyLen : Number(parts[2]),
+                digest : parts[1]
             };
         } catch (e) {
             error = new CrossauthError(ErrorCode.InvalidHash);
@@ -186,7 +189,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
                        iterations : number, 
                        keyLen : number, 
                        digest : string) : string {
-        return digest + ":" + String(keyLen) + ":" + String(iterations) + ":" + salt + ":" + hashedPassword;
+        return "pbkdf2" + ":" + digest + ":" + String(keyLen) + ":" + String(iterations) + ":" + salt + ":" + hashedPassword;
     }
 
     /**

@@ -36,6 +36,9 @@ export enum ErrorCode {
 
     /** Thrown for an condition not convered above. */
     UnknownError,
+
+    /** Thrown when an algorithm is requested but not supported, eg hashing algorithm */
+    UnsupportedAlgorithm,
 }
 
 /**
@@ -74,6 +77,8 @@ export class CrossauthError extends Error {
                 _message = "Password hash is not in a valid format";
             } else if (code == ErrorCode.InvalidKey) {
                 _message = "Key is not valid";
+            } else if (code == ErrorCode.UnsupportedAlgorithm) {
+                _message = "Algorithm not supported";
             } else {
                 _message = "Unknown error";
             }    
