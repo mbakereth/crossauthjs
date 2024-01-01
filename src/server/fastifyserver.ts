@@ -1,4 +1,4 @@
-import fastify, { FastifyInstance, FastifyRequest, FastifyReply, DoneFuncWithErrOrRes } from 'fastify';
+import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import view from '@fastify/view';
 import type { FastifyCookieOptions } from '@fastify/cookie'
 import cookie from '@fastify/cookie'
@@ -212,7 +212,7 @@ export class FastifyCookieAuthServer {
         this.app.post(this.prefix+'api/login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
             try {
                 await this.login(request, reply, 
-                (reply, _user) => {reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
+                (reply, user) => {reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user})});
             } catch (e) {
                 console.log(e);
                 this.handleError(e, reply, (reply, code, error) => {
@@ -238,7 +238,7 @@ export class FastifyCookieAuthServer {
             let cookies = request.cookies;
             try {
                 if (!cookies || !(this.sessionManager.cookieName in cookies)) {
-                    throw new CrossauthError(ErrorCode.InvalidSessionId);
+                    throw new CrossauthError(ErrorCode.InvalidKey);
                 }
                 if (cookies[this.sessionManager.cookieName] != undefined) {
                     let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName] || "");

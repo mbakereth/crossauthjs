@@ -15,15 +15,15 @@ model User {
     username            String      @unique
     passwordHash        String
 
-    session Session[]
+    session Key[]
 
     @@index([id])
     @@index([username])
 }
 
-model Session {
+model Key {
     id             Int       @id @unique @default(autoincrement())
-    sessionKey     String    @unique
+    key            String    @unique
     user_id        Int
     created        DateTime
     expires        DateTime

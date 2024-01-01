@@ -1,4 +1,4 @@
-import { UserStorage, UserPasswordStorage, SessionStorage } from '../storage';
+import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
 import { User, UserWithPassword } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 
@@ -83,13 +83,13 @@ export class InMemoryUserStorage extends UserPasswordStorage {
 }
 
 /**
- * Implementation of {@link SessionStorage } where session keys stored in memory.  Intended for testing.
+ * Implementation of {@link KeyStorage } where keys stored in memory.  Intended for testing.
  */
-export class InMemorySessionStorage extends SessionStorage {
+export class InMemoryKeyStorage extends KeyStorage {
     private userStorage : UserStorage
-    private sessionByKey : { [key : string]: {
+    private keys : { [key : string]: {
         userId : string,
-        sessionKey : string,
+        key : string,
         expires? : Date
     } } = {};
 
@@ -104,17 +104,17 @@ export class InMemorySessionStorage extends SessionStorage {
     }
 
     /**
-     * Returns the {@link User } and expiry date of the user matching the given session key, or throws an exception.
-     * @param sessionKey the session key to look up in the session storage.
-     * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
-     * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
+     * Returns the {@link User } and expiry date of the user matching the given key, or throws an exception.
+     * @param key the key to look up in the key storage.
+     * @returns the {@link User } object for the user with the given key, with the password hash removed, as well as the expiry date/time of the key.
+     * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
-    async getUserForSessionKey(sessionKey : string) : Promise<{user: User, expires : Date | undefined}> {
-        if (this.sessionByKey && sessionKey in this.sessionByKey) {
-            let userId = this.sessionByKey[sessionKey].userId;
+    async getUserForKey(key : string) : Promise<{user: User, expires : Date | undefined}> {
+        if (this.keys && key in this.keys) {
+            let userId = this.keys[key].userId;
             let user = await this.userStorage.getUserById(userId);
             user = {...user};
-            let expires = this.sessionByKey[sessionKey].expires;
+            let expires = this.keys[key].expires;
             if (expires) {
                 expires = new Date(expires.getTime());
             }
@@ -123,23 +123,23 @@ export class InMemorySessionStorage extends SessionStorage {
             }
             return {user, expires};
         }
-        throw new CrossauthError(ErrorCode.InvalidSessionId); 
+        throw new CrossauthError(ErrorCode.InvalidKey); 
     }
 
     /**
      * Saves a session key in the session table.
      * 
      * @param uniqueUserId user ID to store with the session key.  See {@link InMemoryUserStorage} for how this may differ from `username`.
-     * @param sessionKey the session key to store.
+     * @param key the session key to store.
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @throws {@link index!CrossauthError } if the key could not be stored.
      */
-    async saveSession(uniqueUserId : string, 
-                      sessionKey : string, _dateCreated : Date, 
+    async saveKey(uniqueUserId : string, 
+                      key : string, _dateCreated : Date, 
                       expires : Date | undefined) : Promise<void> {
-        this.sessionByKey[sessionKey] = {
-            sessionKey : sessionKey,
+        this.keys[key] = {
+            key : key,
             userId : uniqueUserId,
             expires: expires
         };
@@ -147,11 +147,11 @@ export class InMemorySessionStorage extends SessionStorage {
 
     /**
      * 
-     * @param sessionKey the key to delete
+     * @param key the key to delete
      */
-    async deleteSession(sessionKey : string) : Promise<void> {
-        if (sessionKey in this.sessionByKey) {
-            delete this.sessionByKey[sessionKey];
+    async deleteKey(key : string) : Promise<void> {
+        if (key in this.keys) {
+            delete this.keys[key];
         }
     }
 

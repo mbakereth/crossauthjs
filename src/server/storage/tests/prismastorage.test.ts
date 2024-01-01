@@ -1,5 +1,5 @@
 import { test, expect, beforeAll, afterAll } from 'vitest';
-import { PrismaUserStorage, PrismaSessionStorage } from '../prismastorage';
+import { PrismaUserStorage, PrismaKeyStorage } from '../prismastorage';
 import { CrossauthError } from '../../..';
 import { PrismaClient } from '@prisma/client';
 import { HashedPasswordAuthenticator } from '../../password';
@@ -11,7 +11,7 @@ export var userStorage : PrismaUserStorage;
 beforeAll(async () => {
     prismaClient = new PrismaClient();
     await prismaClient.user.deleteMany({});
-    await prismaClient.session.deleteMany({});
+    await prismaClient.key.deleteMany({});
     userStorage = new PrismaUserStorage();
     let authenticator = new HashedPasswordAuthenticator(userStorage);
     await prismaClient.user.create({
@@ -39,19 +39,19 @@ test('PrismaUserStorage.getUser', async () => {
     await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
 });
 
-test('PrismaSessionStorage.createGetAndDeleteSession', async () => {
-    const sessionId = "ABCDEF123";
-    const sessionStorage = new PrismaSessionStorage(userStorage);
+test('PrismaKeyStorage.createGetAndDeleteKey', async () => {
+    const key = "ABCDEF123";
+    const keyStorage = new PrismaKeyStorage(userStorage);
     const bob = await userStorage.getUserByUsername("bob");
     const now = new Date();
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
-    await sessionStorage.saveSession(bob.id, sessionId, now, expiry);
-    let { user, expires} = await sessionStorage.getUserForSessionKey(sessionId);
+    await keyStorage.saveKey(bob.id, key, now, expiry);
+    let { user, expires} = await keyStorage.getUserForKey(key);
     expect(user.username).toBe(bob.username);
     expect(expires).toStrictEqual(expiry);
-    await sessionStorage.deleteSession(sessionId);
-    await expect(async () => {await sessionStorage.getUserForSessionKey(sessionId)}).rejects.toThrowError(CrossauthError);
+    await keyStorage.deleteKey(key);
+    await expect(async () => {await keyStorage.getUserForKey(key)}).rejects.toThrowError(CrossauthError);
 });
 
 

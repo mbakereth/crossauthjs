@@ -1,15 +1,15 @@
 /**
- * A session key as stored in a session database table and send to the client as a cookie
+ * A key (eg session ID) as stored in a key database table and send to the client as a cookie
  */
-export interface SessionKey {
+export interface Key {
 
-    /** The session key - the value part of SESSIONID=value; options... */
+    /** The key - in a cookie, the value part of cookiename=value; options... */
     value : string,
 
-    /** The date the session key was created, in local time on the server */
+    /** The date the key was created, in local time on the server */
     dateCreated : Date,
 
-    /** The date the session key expires */
+    /** The date the key expires */
     expires : Date | undefined
 }
 

@@ -1,6 +1,6 @@
 import { test, expect, beforeAll } from 'vitest';
 import { CookieAuth, CookieSessionManager } from '../cookieauth';
-import { InMemoryUserStorage, InMemorySessionStorage } from '../storage/inmemorystorage';
+import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
 import { CrossauthError } from '../../error';
 
@@ -13,11 +13,11 @@ beforeAll(async () => {
 
 
 test('CookieAuth.createSessionKey', async () => {
-    const sessionStorage = new InMemorySessionStorage(userStorage);
+    const sessionStorage = new InMemoryKeyStorage(userStorage);
     const auth = new CookieAuth(sessionStorage);
     const bob = await userStorage.getUserByUsername("bob");
     let { value, dateCreated, expires } = await auth.createSessionKey(bob.id);
-    let { user, expires: expires2 } = await sessionStorage.getUserForSessionKey(value);
+    let { user, expires: expires2 } = await sessionStorage.getUserForKey(value);
     expect(expires2).toBeDefined();
     expect(expires).toBeDefined();
     expect(user.username).toStrictEqual(bob.username);
@@ -29,7 +29,7 @@ test('CookieAuth.createSessionKey', async () => {
 });
 
 test('CookieSessionManager.loginGetKeyLogout', async () => {
-    const sessionStorage = new InMemorySessionStorage(userStorage);
+    const sessionStorage = new InMemoryKeyStorage(userStorage);
     let manager = new CookieSessionManager(userStorage, sessionStorage);
     let {user: bob, cookie: cookie } = await manager.login("bob", "bobPass123");
     const user = await manager.userForSessionKey(cookie.value);

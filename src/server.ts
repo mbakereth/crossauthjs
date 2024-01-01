@@ -1,4 +1,4 @@
-export { UserStorage, UserPasswordStorage, SessionStorage } from './server/storage'; 
+export { UserStorage, UserPasswordStorage, KeyStorage as SessionStorage } from './server/storage'; 
 
 export { 
     UsernamePasswordAuthenticator, 
@@ -10,9 +10,9 @@ export type {
 export { CookieAuth, CookieSessionManager } from './server/cookieauth';
 export type { CookieAuthOptions, CookieOptions, Cookie,  CookieSessionManagerOptions } from './server/cookieauth';
 
-export { PrismaUserStorage, PrismaSessionStorage } from './server/storage/prismastorage';
-export type { PrismaUserStorageOptions, PrismaSessionStorageOptions } from './server/storage/prismastorage';
-export { InMemoryUserStorage, InMemorySessionStorage } from './server/storage/inmemorystorage';
+export { PrismaUserStorage, PrismaKeyStorage as PrismaSessionStorage } from './server/storage/prismastorage';
+export type { PrismaUserStorageOptions, PrismaKeyStorageOptions as PrismaSessionStorageOptions } from './server/storage/prismastorage';
+export { InMemoryUserStorage, InMemoryKeyStorage as InMemorySessionStorage } from './server/storage/inmemorystorage';
 
 export { FastifyCookieAuthServer } from './server/fastifyserver';
 export type { FastifyCookieAuthServerOptions } from './server/fastifyserver';

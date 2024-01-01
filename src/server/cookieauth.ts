@@ -1,9 +1,9 @@
 import type { 
     User,
-    SessionKey 
+    Key 
 } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
-import { UserStorage, SessionStorage } from './storage';
+import { UserStorage, KeyStorage } from './storage';
 import { HashedPasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 
@@ -62,7 +62,7 @@ export interface Cookie {
  * Class implementing cookie-based authentication.
  */
 export class CookieAuth {
-    private sessionStorage : SessionStorage;
+    private sessionStorage : KeyStorage;
 
     readonly cookieName : string = "SESSIONID";
     private maxAge : number = 1209600; // two weeks
@@ -75,10 +75,10 @@ export class CookieAuth {
     /**
      * Constructor.
      * 
-     * @param sessionStorage instance of the {@link SessionStorage} object to use, eg {@link PrismaSessionStorage}.
+     * @param sessionStorage instance of the {@link KeyStorage} object to use, eg {@link PrismaSessionStorage}.
      * @param options optional parameters.  See {@link CookieAuthOptions}.
      */
-    constructor(sessionStorage : SessionStorage, options? : CookieAuthOptions) {
+    constructor(sessionStorage : KeyStorage, options? : CookieAuthOptions) {
         this.sessionStorage = sessionStorage;
         if (options) {
             if (options.cookieName) {
@@ -121,11 +121,11 @@ export class CookieAuth {
      * @param uniqueUserId the user ID to store with the session key.
      * @returns the session key, date created and expiry.
      */
-    async createSessionKey(uniqueUserId : string | number) : Promise<SessionKey> {
+    async createSessionKey(uniqueUserId : string | number) : Promise<Key> {
         let sessionKey = crypto.randomUUID();
             const dateCreated = new Date();
             let expires = this.expiry(dateCreated);
-            await this.sessionStorage.saveSession(uniqueUserId, sessionKey, dateCreated, expires);
+            await this.sessionStorage.saveKey(uniqueUserId, sessionKey, dateCreated, expires);
         return {
             value : sessionKey,
             dateCreated : dateCreated,
@@ -139,7 +139,7 @@ export class CookieAuth {
      * @param sessionKey the session key to put in the cookie
      * @returns a string representation of the cookie and options.
      */
-    makeCookieString(sessionKey : SessionKey) : string {
+    makeCookieString(sessionKey : Key) : string {
         let cookie = this.cookieName + "=" + sessionKey.value + "; SameSite=" + this.sameSite;
         if (sessionKey.expires) {
             cookie += "; " + new Date(sessionKey.expires).toUTCString();
@@ -167,7 +167,7 @@ export class CookieAuth {
      * @param sessionKey the value of the session key
      * @returns a {@link Cookie } object,
      */
-    makeCookie(sessionKey : SessionKey) : Cookie {
+    makeCookie(sessionKey : Key) : Cookie {
         let options : CookieOptions = {}
         if (this.domain) {
             options.domain = this.domain;
@@ -207,7 +207,7 @@ export class CookieAuth {
      */
     async getUserForSessionKey(sessionKey: string) : Promise<User> {
         const now = Date.now();
-        const {user, expires} = await this.sessionStorage.getUserForSessionKey(sessionKey);
+        const {user, expires} = await this.sessionStorage.getUserForKey(sessionKey);
         if (expires) {
             if (now > expires.getTime()) {
                 throw new CrossauthError(ErrorCode.Expired);
@@ -235,20 +235,20 @@ export interface CookieSessionManagerOptions {
  */
 export class CookieSessionManager {
     userStorage : UserStorage;
-    sessionStorage : SessionStorage;
+    sessionStorage : KeyStorage;
     private auth : CookieAuth;
     private authenticator : HashedPasswordAuthenticator;
 
     /**
      * Constructor
      * @param userStorage the {@link UserStorage} instance to use, eg {@link PrismaUserStorage}.
-     * @param sessionStorage  the {@link SessionStorage} instance to use, eg {@link PrismaSessionStorage}.
+     * @param sessionStorage  the {@link KeyStorage} instance to use, eg {@link PrismaSessionStorage}.
      * @param cookieAuthOptions optional parameters for authentication. See {@link CookieAuthOptions }.
      * @param authenticatorOptions optional parameters for username/password authentication.  See {@link UsernamePasswordAuthenticatorOptions }.
      */
     constructor(
         userStorage : UserStorage, 
-        sessionStorage : SessionStorage, 
+        sessionStorage : KeyStorage, 
         {cookieAuthOptions, 
         authenticatorOptions } : CookieSessionManagerOptions = {}) {
         this.userStorage = userStorage;
@@ -260,7 +260,7 @@ export class CookieSessionManager {
         }
 
         /**
-         * Returns the name used for session ID cookies (taken from the {@link SessionStorage } instance).
+         * Returns the name used for session ID cookies (taken from the {@link KeyStorage } instance).
          */
         get cookieName() : string {
             return this.auth.cookieName;
@@ -297,7 +297,7 @@ export class CookieSessionManager {
          * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
          */
         async logout(sessionKey : string) : Promise<void> {
-            await this.sessionStorage.deleteSession(sessionKey)
+            await this.sessionStorage.deleteKey(sessionKey)
         }
 
         /**

@@ -9,7 +9,7 @@ let hasher = new HashedPasswordAuthenticator(userStorage);
 
 async function main() {
   await prisma.user.deleteMany();
-  await prisma.session.deleteMany();
+  await prisma.key.deleteMany();
 
   const item1 = await prisma.user.create({
     data: {

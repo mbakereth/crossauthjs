@@ -22,10 +22,10 @@ export enum ErrorCode {
     /** Thrown when a resource expecting authorization was access and authorization not provided or wrong */
     Unauthorized,
 
-    /** Thrown when a cookie was provided that is not in the session table */
-    InvalidSessionId,
+    /** Thrown when a session or API key was provided that is not in the key table */
+    InvalidKey,
 
-    /** Thrown when a session has expired */
+    /** Thrown when a session or API key has expired */
     Expired,
 
     /** Thrown when there is a connection error, eg to a database */
@@ -72,8 +72,8 @@ export class CrossauthError extends Error {
                 _message = "Token has expired";
             } else if (code == ErrorCode.InvalidHash) {
                 _message = "Password hash is not in a valid format";
-            } else if (code == ErrorCode.InvalidSessionId) {
-                _message = "Session ID is not valid";
+            } else if (code == ErrorCode.InvalidKey) {
+                _message = "Key is not valid";
             } else {
                 _message = "Unknown error";
             }    
