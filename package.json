@@ -47,7 +47,6 @@
     "doc": "typedoc"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
     "@types/node": "^20.10.5",
     "@types/supertest": "^6.0.2",
     "supertest": "^6.3.3",
@@ -59,11 +58,16 @@
   },
   "dependencies": {
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
+    "@fastify/cookie": "^9.2.0",
+    "@fastify/view": "^8.2.0",
     "@prisma/client": "^5.7.1",
     "@types/cookie-parser": "^1.4.6",
+    "@types/express": "^4.17.21",
     "@types/nunjucks": "^3.2.6",
     "cookie-parser": "^1.4.6",
     "express": "^4.18.2",
+    "fastify": "^4.25.2",
+    "fastify-vite": "^3.0.0-beta.27",
     "nunjucks": "^3.2.4",
     "prisma": "^5.7.1"
   }

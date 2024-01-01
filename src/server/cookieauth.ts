@@ -114,7 +114,7 @@ export class CookieAuth {
     }
 
     /**
-     * Creates a session key.  
+     * Creates a session key and saves in storage
      * 
      * Date created is the current date/time on the server.
      * 
@@ -278,11 +278,10 @@ export class CookieSessionManager {
          *         `PasswordNotMatch`.
          */
         async login(username : string, password : string) : Promise<{cookie: Cookie, user: User}> {
-
             const user = await this.authenticator.authenticateUser(username, password);
 
             const sessionKey = await this.auth.createSessionKey(user.id);
-            this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
+            //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
             let cookie = await this.auth.makeCookie(sessionKey);
             return {
                 cookie: cookie,

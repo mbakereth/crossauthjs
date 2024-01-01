@@ -2,7 +2,6 @@ import { test, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaUserStorage, PrismaSessionStorage } from '../prismastorage';
 import { CrossauthError } from '../../..';
 import { PrismaClient } from '@prisma/client';
-
 import { HashedPasswordAuthenticator } from '../../password';
 
 export var prismaClient : PrismaClient;
@@ -51,7 +50,7 @@ test('PrismaSessionStorage.createGetAndDeleteSession', async () => {
     let { user, expires} = await sessionStorage.getUserForSessionKey(sessionId);
     expect(user.username).toBe(bob.username);
     expect(expires).toStrictEqual(expiry);
-    sessionStorage.deleteSession(sessionId);
+    await sessionStorage.deleteSession(sessionId);
     await expect(async () => {await sessionStorage.getUserForSessionKey(sessionId)}).rejects.toThrowError(CrossauthError);
 });
 

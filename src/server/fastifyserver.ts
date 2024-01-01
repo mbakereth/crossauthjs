@@ -1,18 +1,21 @@
-import express, { Express, Request, Response } from "express";
+import fastify, { FastifyInstance, FastifyRequest, FastifyReply, DoneFuncWithErrOrRes } from 'fastify';
+import view from '@fastify/view';
+import type { FastifyCookieOptions } from '@fastify/cookie'
+import cookie from '@fastify/cookie'
+import { Server, IncomingMessage, ServerResponse } from 'http'
+
 import nunjucks from "nunjucks";
 import { CookieSessionManager } from './cookieauth';
 import { CrossauthError, ErrorCode } from "..";
-import cookieParser from 'cookie-parser';
 import { User } from '../interfaces';
-import { resolve } from "dns/promises";
 
 /**
- * Options for {@link ExpressCookieAuthServer }.
+ * Options for {@link FastifyCookieAuthServer }.
  * 
- * See {@link ExpressCookieAuthServer } constructor for description of parameters
+ * See {@link FastifyCookieAuthServer } constructor for description of parameters
  */
-export interface ExpressCookieAuthServerOptions {
-    app? : Express,
+export interface FastifyCookieAuthServerOptions {
+    app? : FastifyInstance<Server, IncomingMessage, ServerResponse>,
     prefix? : string,
     loginRedirect? : string;
     logoutRedirect? : string;
@@ -21,10 +24,16 @@ export interface ExpressCookieAuthServerOptions {
     errorPage? : string;
 }
 
+interface LoginBodyType {
+    username: string
+    password: string
+  }
+  
+
 /**
- * This class provides a complete (but without HTML files) auth backend server with endpoints served using Express.
+ * This class provides a complete (but without HTML files) auth backend server with endpoints served using Fastify.
  * 
- * If you do not pass an Express app to this class, it will create one.  If you set the views parameter, it
+ * If you do not pass an Fastify app to this class, it will create one.  If you set the views parameter, it
  * will also configure Nunjucks as the template engine for the login and error pages.
  * 
  * To use Nunjucks views, set the `views` option in the constructor to the directory containing the views files.
@@ -60,13 +69,13 @@ export interface ExpressCookieAuthServerOptions {
  *    * GET `/api/userforsessionke` takes the session ID in the cookie and returns the user associated with it.
  *      Returns `{status: "ok"}` or  `{"status; "error", error: message, code: code}` if there was an error.
  * 
- *    **Using your own Express app**
+ *    **Using your own Fastify app**
  * 
  * If you are serving other endpoints, or you want to use something other than Nunjucks, you can create and
- * pass in your own Express app.
+ * pass in your own Fastify app.
  */
-export class ExpressCookieAuthServer {
-    readonly app : Express;
+export class FastifyCookieAuthServer {
+    readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
     private prefix : string;
     private loginRedirect = "/";
     private logoutRedirect : string = "/";
@@ -75,10 +84,10 @@ export class ExpressCookieAuthServer {
     private sessionManager : CookieSessionManager;
 
     /**
-     * Creates the Express endpoints, optionally also the Express app.
+     * Creates the Fastify endpoints, optionally also the Fastify app.
      * @param sessionManager an instance of {@link CookieSessionManager }.  The endpoints are just wrappers
      *                       around this, adding the HTTP interaction.
-     * @param app you can pass your own Express instance.  A separate router will be added for the endpoints.  
+     * @param app you can pass your own Fastify instance.  A separate router will be added for the endpoints.  
      *            If you do not pass one, an instance will be created, with Nunjucks for rendering (see above).
      * @param prefix if not passed, the endpoints will be `/login`, `/api/login` etc.  If you pass a prefix, it
      *               is prepended to the URLs (ie it is the prefix for the router),
@@ -102,7 +111,7 @@ export class ExpressCookieAuthServer {
         logoutRedirect,
         views,
         loginPage,
-        errorPage }: ExpressCookieAuthServerOptions = {}) {
+        errorPage }: FastifyCookieAuthServerOptions = {}) {
 
         this.sessionManager = sessionManager;
         this.loginPage = loginPage;
@@ -110,15 +119,31 @@ export class ExpressCookieAuthServer {
         if (app) {
             this.app = app;
         } else {
-            this.app = express();
             if (views) {
                 nunjucks.configure(views, {
                     autoescape: true,
-                    express: app
                 });
             }
+            this.app = fastify({logger: false});
+            this.app.register(view, {
+                engine: {
+                    nunjucks: nunjucks,
+                },
+                templates: [
+                    "node_modules/shared-components",
+                    "views",
+                ],
+                });
+
 
         }
+
+        this.app.addContentTypeParser('text/json', { parseAs: 'string' }, this.app.getDefaultJsonParser('ignore', 'ignore'))
+        this.app.register(cookie, {
+            // secret: "my-secret", // for cookies signature
+            parseOptions: {}     // options for parsing cookies
+          } as FastifyCookieOptions)
+                    
         if (prefix) {
             this.prefix = prefix;
         } else {
@@ -133,87 +158,92 @@ export class ExpressCookieAuthServer {
             this.logoutRedirect = prefix + "login";
         }
         this.loginPage = loginPage;
-
-        const router = express.Router();
-        router.use(express.json());
-        router.use(express.urlencoded({ extended: true }));
-        router.use(cookieParser());
-
+                    
         if (views && loginPage) {
-            router.get('/login', async (_req : Request, res : Response) =>  {
+            this.app.get(this.prefix+'login', async (_request : FastifyRequest, reply : FastifyReply) =>  {
                 if (this.loginPage)  { // if is reduntant but VC Code complains without it
-                    res.render(this.loginPage);
+                    reply.view(this.loginPage);
                 }
             });
         }
 
-        router.post('/login', async (req : Request, res : Response) =>  {
+        this.app.setErrorHandler(function (error, request, reply) {
+            console.log(error);
+          })
+          
+
+        this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
+    
             try {
-                await this.login(req, res, (res, _user) => {res.redirect(this.loginRedirect)});
+                await this.login(request, reply, 
+                (reply, _user) => {reply.redirect(this.loginRedirect)});
             } catch (e) {
                 console.log(e);
-                this.handleError(e, res, (res, code, error) => {
+                this.handleError(e, reply, (reply, code, error) => {
                     if (this.loginPage) {
-                        res.render(this.loginPage, {error: error, code: code});
+                        reply.view(this.loginPage, {error: error, code: code});
                     } else if (this.errorPage) {
-                        res.render(this.errorPage, {error: error, code: code});
+                        reply.view(this.errorPage, {error: error, code: code});
                     } else {
-                        res.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
-                    }                
-                });
-
-            }
-        });
-
-        router.get('/logout', async (req : Request, res : Response) => {
-            try {
-                await this.logout(req, res, (res) => {res.redirect(this.logoutRedirect);});
-            } catch (e) {
-                console.log(e);
-                this.handleError(e, res, (reply, code, error) => {
-                    if (this.errorPage) {
-                        res.render(this.errorPage, {error: error, code: code});
-                    } else {
-                        res.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
+                        reply.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
                     }
+                    
                 });
-
             }
         });
 
-        router.post('/api/login', async (req : Request, res : Response) =>  {
+        this.app.post(this.prefix+'/logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
             try {
-                await this.login(req, res, (res, user) => {res.json({status: "ok", user : user});});
+                await this.logout(request, reply, 
+                (reply) => {reply.redirect(this.logoutRedirect)});
             } catch (e) {
                 console.log(e);
-                this.handleError(e, res, (reply, code, error) => {
-                    reply.json({status: "error", error: error, code: code});                    
+                this.handleError(e, reply, (reply, code, error) => {
+                    if (this.errorPage) {
+                        reply.view(this.errorPage, {error: error, code: code});
+                    } else {
+                        reply.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
+                    }
+                    
+                });
+            }
+        });
+
+        this.app.post(this.prefix+'api/login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
+            try {
+                await this.login(request, reply, 
+                (reply, _user) => {reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
+            } catch (e) {
+                console.log(e);
+                this.handleError(e, reply, (reply, code, error) => {
+                    reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: code});                    
                 });
                 //this.handleException(e, reply, (reply, code, error) => {console.log("Error")});
-
             }
         });
 
-        router.post('/api/logout', async (req : Request, res : Response) => {
+        this.app.post(this.prefix+'api/logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
             try {
-                await this.logout(req, res, (res) => {res.json({status: "ok"});});
+                await this.logout(request, reply, 
+                (reply) => {reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
             } catch (e) {
                 console.log(e);
-                this.handleError(e, res, (res, code, error) => {
-                    res.json({status: "error", error: error, code: code});                    
+                this.handleError(e, reply, (reply, code, error) => {
+                    reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: code});                    
                 });
-
             }
         });
 
-        router.get('/api/userforsessionkey', async (req : Request, res : Response) =>  {
-            let cookies = req.cookies;
+        this.app.get(this.prefix+'/api/userforsessionkey', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
+            let cookies = request.cookies;
             try {
                 if (!cookies || !(this.sessionManager.cookieName in cookies)) {
                     throw new CrossauthError(ErrorCode.InvalidSessionId);
                 }
-                let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName]);
-                res.json({status: "ok", user : user});
+                if (cookies[this.sessionManager.cookieName] != undefined) {
+                    let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName] || "");
+                    reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user});
+                }
             } catch (e) {
                 let error = "Unknown error";
                 if (e instanceof CrossauthError) {
@@ -228,56 +258,36 @@ export class ExpressCookieAuthServer {
                     }
                 }
                 console.log(e);
-                res.json({status: "error", error : error});
+                reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error : error});
 
             }
         });
-
-        this.app.use(this.prefix, router);
     }
     
-    private async login(req : Request, res : Response, successFn : (res : Response, user? : User) => void) {
-        const username = req.body.username;
-        const password = req.body.password;
+    private async login(request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply, 
+        successFn : (res : FastifyReply, user? : User) => void) {
+        const username = request.body.username;
+        const password = request.body.password;
 
-        try {
-            let { cookie, user } = await this.sessionManager.login(username, password);
+        let { cookie, user } = await this.sessionManager.login(username, password);
+        reply.cookie(cookie.name, cookie.value, cookie.options);
+        successFn(reply, user);
+    }
 
-            res.cookie(cookie.name, cookie.value, cookie.options);
-            res.json({status: "ok", user : user});
-        } catch (e) {
-            let error = "Unknown error";
-            let code = ErrorCode.UnknownError;
-            if (e instanceof CrossauthError) {
-                let ce = e as CrossauthError;
-                code = ce.code;
-                switch (ce.code) {
-                    case ErrorCode.UserNotExist:
-                    case ErrorCode.PasswordNotMatch:
-                        error = "Invalid username or password";
-                        code = ErrorCode.UsernameOrPasswordInvalid;
-                        break;
-                    default:
-                        error = ce.message;
+    private async logout(_request : FastifyRequest, reply : FastifyReply, 
+        successFn : (reply : FastifyReply) => void) {
+        let cookies = reply.cookies;
+            if (cookies && this.sessionManager.cookieName in cookies) {
+                if (cookies[this.sessionManager.cookieName] != undefined) {
+                    await this.sessionManager.logout(reply.cookies[this.sessionManager.cookieName] || "");
                 }
             }
-
-            res.json({status: "error", error : error, code: code});
-        }
-    };
-
-    private async logout(req : Request, res : Response, successFn : (res : Response) => void) {
-        let cookies = req.cookies;
-        if (cookies && this.sessionManager.cookieName in cookies) {
-            await this.sessionManager.logout(this.sessionManager.cookieName);
-        }
-        res.clearCookie(this.sessionManager.cookieName);
-        //res.json({status: "ok"});
-        successFn(res);
+            reply.clearCookie(this.sessionManager.cookieName);
+            successFn(reply);
 
     }
 
-    private handleError(e : any, res : Response, errorFn : (res : Response, code : ErrorCode, error : string) => void) {
+    private handleError(e : any, reply : FastifyReply, errorFn : (reply : FastifyReply, code : ErrorCode, error : string) => void) {
         let error = "Unknown error";
         let code = ErrorCode.UnknownError;
         if (e instanceof CrossauthError) {
@@ -295,17 +305,17 @@ export class ExpressCookieAuthServer {
         }
         console.log(error);
 
-        errorFn(res, code, error);
+        errorFn(reply, code, error);
 
     }
 
     /**
-     * Starts the Express app on the given port.  
+     * Starts the Fastify app on the given port.  
      * @param port the port to listen on
      */
     start(port : number = 3000) {
-        this.app.listen(port, () =>
-            console.log(`Starting express server on port ${port} with prefix '${this.prefix}'`),
+        this.app.listen({ port: port}, () =>
+            console.log(`Starting fastify server on port ${port} with prefix '${this.prefix}'`),
         );
 
     }

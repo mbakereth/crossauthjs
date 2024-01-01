@@ -12,6 +12,10 @@ export type { CookieAuthOptions, CookieOptions, Cookie,  CookieSessionManagerOpt
 
 export { PrismaUserStorage, PrismaSessionStorage } from './server/storage/prismastorage';
 export type { PrismaUserStorageOptions, PrismaSessionStorageOptions } from './server/storage/prismastorage';
+export { InMemoryUserStorage, InMemorySessionStorage } from './server/storage/inmemorystorage';
+
+export { FastifyCookieAuthServer } from './server/fastifyserver';
+export type { FastifyCookieAuthServerOptions } from './server/fastifyserver';
 
 export { ExpressCookieAuthServer } from './server/expressserver';
 export type { ExpressCookieAuthServerOptions } from './server/expressserver';

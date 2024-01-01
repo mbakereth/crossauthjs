@@ -3,6 +3,7 @@
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
+import { join, dirname } from 'path'
 
 const config = {
   index: {
@@ -51,14 +52,7 @@ export default defineConfig({
     rollupOptions: {
       // make sure to externalize deps that shouldn't be bundled
       // into your library
-      external: ['prisma', '@prisma/client', 'express', '@types/express', 'nunjucks', '@types/nunjucls', 'node:crypto' ],
-      output: {
-        // Provide global variables to use in the UMD build
-        // for externalized deps
-        globals: {
-          vue: 'Vue',
-        },
-      },
+      external: ['prisma', '@prisma/client', 'express', '@types/express', 'nunjucks', '@types/nunjucks', 'node:crypto', 'fastify', '@fastify/cookie', '@fastify/view' ],
     },
   },
   plugins: [

@@ -218,29 +218,30 @@ export class PrismaSessionStorage extends SessionStorage {
     /**
      * Saves a session key in the session table.
      * 
-     * @param uniqueUserId user ID to store with the session key.  See {@link PrismaUserStorage} for how this may differ from `username`.
+     * @param userId user ID to store with the session key.  See {@link PrismaUserStorage} for how this may differ from `username`.
      * @param sessionKey the session key to store.
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @throws {@link index!CrossauthError } if the key could not be stored.
      */
-    async saveSession(uniqueUserId : string | number, 
+    async saveSession(userId : string | number, 
                       sessionKey : string, dateCreated : Date, 
                       expires : Date | undefined) : Promise<void> {
+        let error : CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             await this.prismaClient[this.sessionTable].create({
                 data: {
-                    user_id : uniqueUserId,
+                    user_id : userId,
                     sessionKey : sessionKey,
                     created : dateCreated,
                     expires : expires
                 }
-            });
+            })
         } catch (e) {
-            throw new CrossauthError(ErrorCode.Connection, String(e));
+            error = new CrossauthError(ErrorCode.Connection, String(e));
         }
-
+        if (error) throw error;
     }
 
     /**
@@ -250,7 +251,7 @@ export class PrismaSessionStorage extends SessionStorage {
      */
     async deleteSession(sessionKey : string) : Promise<void> {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
-            await this.prismaClient[this.sessionTable].delete({
+            await this.prismaClient[this.sessionTable].deleteMany({
             where: {
                 sessionKey: sessionKey
             }
