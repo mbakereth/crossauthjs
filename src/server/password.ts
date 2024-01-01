@@ -144,6 +144,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      */
     decodePasswordHash(hash : string) : PasswordHash {
         const parts = hash.split(':');
+        let error : CrossauthError|undefined = undefined;
         if (parts.length != 5) {
             throw new CrossauthError(ErrorCode.InvalidHash);
         }
@@ -156,8 +157,16 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
                 digest : parts[0]
             };
         } catch (e) {
-            throw new CrossauthError(ErrorCode.InvalidHash);
+            error = new CrossauthError(ErrorCode.InvalidHash);
         }
+        if (error) throw error;
+        return {
+            hashedPassword : "",
+            salt : ",",
+            iterations : 0,
+            keyLen : 0,
+            digest : ""
+        }; // never reached but needed to shut typescript up
     }
 
     /**

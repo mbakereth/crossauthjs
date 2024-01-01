@@ -87,6 +87,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
     }
 
     private async getUser(key : string, value : string | number) : Promise<UserWithPassword> {
+        let error: CrossauthError|undefined = undefined;
+
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             let prismaUser = await this.prismaClient[this.userTable].findUniqueOrThrow({
@@ -110,9 +112,10 @@ export class PrismaUserStorage extends UserPasswordStorage {
             });
             return user;
         }  catch {
-            throw new CrossauthError(ErrorCode.UserNotExist); 
+            error = new CrossauthError(ErrorCode.UserNotExist); 
         }
-
+        if (error) throw error;
+        return {id: 0, username: "", passwordHash: ""}; // never reached but needed to shut typescript up
     }
 
     /**
@@ -195,6 +198,7 @@ export class PrismaSessionStorage extends SessionStorage {
      */
     async getUserForSessionKey(sessionKey : string) : Promise<{user: User, expires : Date | undefined}> {
         let prismaSession;
+        let error : CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             prismaSession =  await this.prismaClient[this.sessionTable].findUniqueOrThrow({
@@ -203,16 +207,19 @@ export class PrismaSessionStorage extends SessionStorage {
                 }
             });
         } catch {
-            throw new CrossauthError(ErrorCode.InvalidSessionId);
+            error = new CrossauthError(ErrorCode.InvalidSessionId);
         }
+        if (error) throw error;
         try {
             let user = await this.userStorage.getUserById(prismaSession.user_id);
             let expires = prismaSession.expires;
             return { user, expires };
         }  catch(e) {
             console.error(e);
-            throw new CrossauthError(ErrorCode.UserNotExist); 
+            error = new CrossauthError(ErrorCode.UserNotExist); 
         }
+        if (error) throw error;
+        return {user: {id: 0, username: ""}, expires: undefined}; // never reached but needed to shut typescript up.
     }
 
     /**
