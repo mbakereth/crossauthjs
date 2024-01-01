@@ -37,7 +37,7 @@ export interface UsernamePasswordAuthenticatorOptions {
     /** The digest algorithm to use, eg `sha512` */
     digest? : string,
 
-    /** The number of random characters to generate for the password hash */
+    /** The number of random characters to generate for the password hash, using only Base64 characters */
     saltLength?: number;
 }
 
@@ -61,11 +61,11 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
     private iterations = 100000;
     private keyLen = 64;
     private digest = 'sha512';
-    private saltLength = 16;
+    private saltLength = 22; // 128 bits, base64-encoded
 
-    private saltChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
+    private saltChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         + "abcdefghijklmnopqrstuvwxyz"
-        + "0123456789"
+        + "01234567890+/";
 
     /**
      * Create a new authenticator.
@@ -199,7 +199,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      * 
      * @param password the password to hash
      * @param encode if true, encode this as a string including the salt, algorith, etc (see {@link decodePasswordHash}).  Otherwise just returns the Base64-encoded hash.
-     * @param salt the salt to use.  If undefined, a random one will be generated
+     * @param salt the salt to use.  If undefined, a random one will be generated.
      * @param iterations the number of PBKDF2 iterations to use 
      * @param keyLen the length of hash to generate, before Base64
      * @param digest the digest algorithm, eg `sha512`
