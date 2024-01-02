@@ -3,9 +3,7 @@ export { UserStorage, UserPasswordStorage, KeyStorage as SessionStorage } from '
 export { 
     UsernamePasswordAuthenticator, 
     HashedPasswordAuthenticator } from './server/password';
-export type { 
-    PasswordHash, 
-    UsernamePasswordAuthenticatorOptions } from './server/password';
+export type { UsernamePasswordAuthenticatorOptions } from './server/password';
 
 export { CookieAuth, CookieSessionManager } from './server/cookieauth';
 export type { CookieAuthOptions, CookieOptions, Cookie,  CookieSessionManagerOptions } from './server/cookieauth';
@@ -19,3 +17,6 @@ export type { FastifyCookieAuthServerOptions } from './server/fastifyserver';
 
 export { ExpressCookieAuthServer } from './server/expressserver';
 export type { ExpressCookieAuthServerOptions } from './server/expressserver';
+
+export { Hasher } from './server/hasher';
+export type { HasherOptions, PasswordHash } from './server/hasher';
