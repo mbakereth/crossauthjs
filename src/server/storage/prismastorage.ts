@@ -14,6 +14,7 @@ export interface PrismaUserStorageOptions {
     checkActive? : boolean,
     checkEmailVerified? : boolean,
     prismaClient? : PrismaClient,
+    extraFields? : string[],
 }
 
 /**
@@ -39,6 +40,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
     private checkActive : boolean = false;
     private checkEmailVerified : boolean = false;
     private prismaClient : PrismaClient;
+    private extraFields? : string[];
 
     /**
      * Creates a PrismaUserStorage object, optionally overriding defaults.
@@ -47,12 +49,14 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @param checkActive if set to `true`, a user will only be returned as valid if the `active` field is `true`.  See explaination above.
      * @param checkEmailVerified if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
+    * @param extraFields if given, these additional fields will be selected from the table into the returned Key.
     */
     constructor({userTable,
                 idColumn, 
                 checkActive,
                 checkEmailVerified,
-                prismaClient} : PrismaUserStorageOptions = {}) {
+                prismaClient,
+                extraFields} : PrismaUserStorageOptions = {}) {
         super();
         if (userTable) {
             this.userTable = userTable;
@@ -75,9 +79,10 @@ export class PrismaUserStorage extends UserPasswordStorage {
         } else {
             this.prismaClient = new PrismaClient();
         }
+        this.extraFields = extraFields;
     }
 
-    private async getUser(key : string, value : string | number, extraFields: string[]=[]) : Promise<UserWithPassword> {
+    private async getUser(key : string, value : string | number) : Promise<UserWithPassword> {
         let error: CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -98,9 +103,11 @@ export class PrismaUserStorage extends UserPasswordStorage {
                 username : prismaUser.username,
                 passwordHash : prismaUser.passwordHash
             }
-            extraFields.forEach((key : string) => {
-                user[key] = prismaUser[key];
-            });
+            if (this.extraFields) {
+                this.extraFields.forEach((key : string) => {
+                    user[key] = prismaUser[key];
+                });
+            }
 
             return user;
         }  catch (e) {
@@ -117,8 +124,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
-    async getUserByUsername(username : string, extraFields: string[]=[]) : Promise<UserWithPassword> {
-        return this.getUser("username", username, extraFields);
+    async getUserByUsername(username : string) : Promise<UserWithPassword> {
+        return this.getUser("username", username);
     }
 
     /**
@@ -128,8 +135,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
-    async getUserById(id : string | number, extraFields : string[]=[]) : Promise<UserWithPassword> {
-        return this.getUser(this.idColumn, id, extraFields);
+    async getUserById(id : string | number) : Promise<UserWithPassword> {
+        return this.getUser(this.idColumn, id);
     }
 }
 
@@ -141,6 +148,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
 export interface PrismaKeyStorageOptions {
     keyTable? : string,
     prismaClient? : PrismaClient,
+    extraFields? : string[],
 }
 
 /**
@@ -161,6 +169,7 @@ export class PrismaKeyStorage extends KeyStorage {
     private keyTable : string = "key";
     private userStorage : UserStorage
     private prismaClient : PrismaClient;
+    private extraFields? : string[];
 
     /**
      * Constructor with user storage object to use plus optional parameters.
@@ -168,10 +177,12 @@ export class PrismaKeyStorage extends KeyStorage {
      * @param userStorage an instance of {@link UserStorage } for fetching users.  If also in Prisma, this may be an instance of {@link PrismaUserStorage } but any can be used.
      * @param keyTable the (Prisma, lowercased) name of the session table.  Defaults to `session`.
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
+     * @param extraFields if given, these additional fields will be selected from the table into the returned Key.
      */
     constructor(userStorage : UserStorage,
                 {keyTable, 
-                 prismaClient} : PrismaKeyStorageOptions = {}) {
+                 prismaClient,
+                extraFields} : PrismaKeyStorageOptions = {}) {
         super();
         if (keyTable) {
             this.keyTable = keyTable;
@@ -182,19 +193,16 @@ export class PrismaKeyStorage extends KeyStorage {
         } else {
             this.prismaClient = prismaClient;
         }
+        this.extraFields = extraFields;
     }
     // throws UserNotExist, Connection
     /**
      * Returns the {@link User } and expiry date of the user matching the given session key, or throws an exception.
      * @param key the session key to look up in the session storage.
-     * @param extraUserFields these will be selected from the user table row and returned in the User object
-     * @param extraKeyFields these will be selected from the key table row and returned in the User object
      * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
      * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
-    async getUserForKey(key : string, 
-        extraUserFields : string[] = [], 
-        extraKeyFields : string[] = []) : Promise<{user: User|undefined, key : Key}> {
+    async getUserForKey(key : string) : Promise<{user: User|undefined, key : Key}> {
         let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
         let error : CrossauthError|undefined = undefined;
         try {
@@ -210,9 +218,11 @@ export class PrismaKeyStorage extends KeyStorage {
                 created: prismaKey.created,
                 expires: prismaKey.expires,
             }
-            extraKeyFields.forEach((key : string) => {
-                returnKey[key] = prismaKey[key];
-            });
+            if (this.extraFields) {
+                this.extraFields.forEach((key : string) => {
+                    returnKey[key] = prismaKey[key];
+                });
+            }
         } catch {
             error = new CrossauthError(ErrorCode.InvalidKey);
         }
@@ -220,7 +230,7 @@ export class PrismaKeyStorage extends KeyStorage {
         try {
             let user : User|undefined = undefined;
             if (returnKey.userId) {
-                user = await this.userStorage.getUserById(returnKey.userId, extraUserFields);
+                user = await this.userStorage.getUserById(returnKey.userId);
             }
             return { user, key: returnKey };
         }  catch(e) {

@@ -12,10 +12,9 @@ export abstract class UserStorage {
     /**
      * Returns user matching the given username, or throws an exception
      * @param username the username to return the user of
-     * @apram extraFields these will be selected from the user storage entry and returned in the User object
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
-    abstract getUserByUsername(username : string, extraFields? : string[]) : Promise<User>;
+    abstract getUserByUsername(username : string) : Promise<User>;
 
     /**
      * Returns user matching the given user id, or throws an exception.
@@ -24,10 +23,9 @@ export abstract class UserStorage {
      * or can simply be `username`.
      * 
      * @param id the user ID to return the user of
-     * @apram extraFields these will be selected from the user storage entry and returned in the User object
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
-    abstract getUserById(id : string | number, extraFields? : string[]) : Promise<User>;
+    abstract getUserById(id : string | number) : Promise<User>;
 }
 
 /**
@@ -38,15 +36,14 @@ export abstract class UserPasswordStorage extends UserStorage {
     /**
      * Same as for base class but returns {@link UserWithPassword} instead.
      * @param username the username to match
-     * @param extraFields these will be selected from the user storage entry and returned in the User object
      */
-    abstract getUserByUsername(username : string, extraFields? : string[]) : Promise<UserWithPassword>;
+    abstract getUserByUsername(username : string) : Promise<UserWithPassword>;
 
     /**
      * Same as for base class but returns {@link UserWithPassword} instead.
      * @param id the user ID to match
      */
-    abstract getUserById(id : string | number, extraFields? : string[]) : Promise<UserWithPassword>;
+    abstract getUserById(id : string | number) : Promise<UserWithPassword>;
 
 }
 
@@ -70,9 +67,7 @@ export abstract class KeyStorage {
      * @returns An object containing the user and the date the session key expires (if it exists).  The password hash will not be returned,
      * @throws {@link index!CrossauthError } with {@link index!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
-    abstract getUserForKey(key : string, 
-        extraUserFields? : string[],
-        extraKeyFields? : string[]) : Promise<{user: User|undefined, key : Key}>;
+    abstract getUserForKey(key : string) : Promise<{user: User|undefined, key : Key}>;
 
     /**
      * Saves a session key in the session storage (eg database).

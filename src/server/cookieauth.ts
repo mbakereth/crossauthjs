@@ -51,6 +51,12 @@ export interface CookieAuthOptions {
 
     /** If hashSessionIDs is true, make the hash this length in bytes.  Default 32 */
     hashLength? : number;
+
+    /** 
+     * This will be called with the session key to filter sessions 
+     * before returning.  Function should return true if the session is valid or false otherwise.
+     */
+    filterFunction? : (sessionKey : Key) => boolean;
 }
 
 /**
@@ -96,7 +102,7 @@ export class CookieAuth {
     private iterations = 10000;
     private hashLength = 32;
     private digest = 'sha512';
-
+    private filterFunction? : (sessionKey : Key) => boolean;
     /**
      * Constructor.
      * 
@@ -144,6 +150,7 @@ export class CookieAuth {
             if (options.hashLength) {
                 this.hashLength = options.hashLength;
             }
+            this.filterFunction = options.filterFunction;
 
         }
     }
@@ -266,6 +273,8 @@ export class CookieAuth {
      * 
      * Looks the user up in the {@link UserStorage} instance passed to the constructor.
      * 
+     * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
+     * 
      * @param sessionKey the session key to look up
      * @returns a {@link User } object, with the password hash removed.
      * @throws a {@link index!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
@@ -280,6 +289,9 @@ export class CookieAuth {
             if (now > key.expires.getTime()) {
                 throw new CrossauthError(ErrorCode.Expired);
             }
+        }
+        if (this.filterFunction) {
+            if (!this.filterFunction(key)) throw new CrossauthError(ErrorCode.InvalidKey);
         }
         return user;
     }

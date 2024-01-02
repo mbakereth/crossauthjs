@@ -54,11 +54,10 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * Returns a {@link UserWithPassword } instance matching the given username, or throws an Exception.
      * 
      * @param username the username to look up
-     * @param extraFields ignored because all fields are returned
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
-    async getUserByUsername(username : string, _extraFields? : string[]) : Promise<UserWithPassword> {
+    async getUserByUsername(username : string) : Promise<UserWithPassword> {
         if (username in this.usersByUsername) {
 
             const user = this.usersByUsername[username];
@@ -77,11 +76,10 @@ export class InMemoryUserStorage extends UserPasswordStorage {
     /**
      * Same as {@link getUserByUsername } - userId is the username in this model,
      * @param id the user ID to match 
-     * @param extraFields ignored because all fields are returned
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
-    async getUserById(id : string, _extraFields? : string[]) : Promise<UserWithPassword> {
+    async getUserById(id : string) : Promise<UserWithPassword> {
         return await this.getUserByUsername(id);
     }
 }
@@ -106,14 +104,10 @@ export class InMemoryKeyStorage extends KeyStorage {
     /**
      * Returns the {@link User } and expiry date of the user matching the given key, or throws an exception.
      * @param key the key to look up in the key storage.
-     * @param extraUserFields: ignored because all fields are returned
-     * @param extraKeyFields: ignored because all fields are returned
      * @returns the {@link User } object for the user with the given key, with the password hash removed, as well as the expiry date/time of the key.
      * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
-    async getUserForKey(key : string, 
-        _extraUserFields? : string[],
-        _extraKeyFields? : string[]) : Promise<{user: User|undefined, key : Key}> {
+    async getUserForKey(key : string) : Promise<{user: User|undefined, key : Key}> {
         if (this.keys && key in this.keys) {
             let userId = this.keys[key].userId;
             let user : User|undefined = undefined;
