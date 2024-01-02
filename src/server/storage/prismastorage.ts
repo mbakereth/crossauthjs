@@ -150,7 +150,7 @@ export interface PrismaKeyStorageOptions {
  * By default, the Prisma name (ie the lowercased version) is called `session`.  It must have at least three fields:
  *    * `key String \@unique`
  *    * `user_id String or Int`
- *    * `dateCreated DateTime`
+ *    * `created DateTime`
  *    * `expires DateTime`
  * `key` must have `\@unique`.  It may also contain an ID column, which is not used.  If in the schema,
  * it must be autoincrement.  THe `userId` may be a `String` or `Int`.  If a database table is used for
@@ -195,7 +195,7 @@ export class PrismaKeyStorage extends KeyStorage {
     async getUserForKey(key : string, 
         extraUserFields : string[] = [], 
         extraKeyFields : string[] = []) : Promise<{user: User|undefined, key : Key}> {
-        let returnKey : Key = {userId: 0, value: "", dateCreated: new Date(), expires: undefined};
+        let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
         let error : CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -207,10 +207,9 @@ export class PrismaKeyStorage extends KeyStorage {
             returnKey = {
                 userId: prismaKey.user_id,
                 value: prismaKey.key,
-                dateCreated: prismaKey.dateCreated,
+                created: prismaKey.created,
                 expires: prismaKey.expires,
             }
-
             extraKeyFields.forEach((key : string) => {
                 returnKey[key] = prismaKey[key];
             });
@@ -236,13 +235,13 @@ export class PrismaKeyStorage extends KeyStorage {
      * 
      * @param userId user ID to store with the session key.  See {@link PrismaUserStorage} for how this may differ from `username`.
      * @param key the key to store.
-     * @param dateCreated the date/time the key was created.
+     * @param created the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will be stored in the key table row
      * @throws {@link index!CrossauthError } if the key could not be stored.
      */
     async saveKey(userId : string | number, 
-                      key : string, dateCreated : Date, 
+                      key : string, created : Date, 
                       expires : Date | undefined,
                       extraFields : {[key : string]: any} = {}) : Promise<void> {
         let error : CrossauthError|undefined = undefined;
@@ -250,7 +249,7 @@ export class PrismaKeyStorage extends KeyStorage {
             let data : {[key : string] : any} = {
                 user_id : userId,
                 key : key,
-                created : dateCreated,
+                created : created,
                 expires : expires,
                 ...extraFields,
             };
@@ -279,4 +278,30 @@ export class PrismaKeyStorage extends KeyStorage {
         });
     }
 
+    /**
+     * Deletes all keys from storage for the given user ID
+     * 
+     * @param userId : user ID to delete keys for
+     */
+    async deleteAllForUser(userId : string | number, except : string|undefined = undefined) : Promise<void> {
+        if (except) {
+            // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
+            await this.prismaClient[this.keyTable].deleteMany({
+                where: {
+                    AND: [
+                        { user_id: userId },
+                        { key: { not: except } }
+                    ]
+                }
+            });
+
+        } else {
+            // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
+            await this.prismaClient[this.keyTable].deleteMany({
+                where: {
+                    user_id: userId 
+                }
+            });
+        }
+    }     
 }

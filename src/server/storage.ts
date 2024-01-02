@@ -92,5 +92,12 @@ export abstract class KeyStorage {
      * @param key the key to delete
      */
     abstract deleteKey(key : string) : Promise<void>;
+
+    /**
+     * Deletes all keys from storage for the given user ID
+     * 
+     * @param userId : user ID to delete keys for
+     */
+    abstract deleteAllForUser(userId : string | number, except? : string) : Promise<void>;
 }
 

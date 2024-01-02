@@ -16,7 +16,7 @@ test('CookieAuth.createSessionKey', async () => {
     const sessionStorage = new InMemoryKeyStorage(userStorage);
     const auth = new CookieAuth(sessionStorage);
     const bob = await userStorage.getUserByUsername("bob");
-    let { value, dateCreated, expires } = await auth.createSessionKey(bob.id);
+    let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
     let { user, key } = await sessionStorage.getUserForKey(value);
     expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
@@ -33,7 +33,7 @@ test('CookieAuth.createSessionKey.encrypted', async () => {
     const sessionStorage = new InMemoryKeyStorage(userStorage);
     const auth = new CookieAuth(sessionStorage, { hashSessionIDs: true });
     const bob = await userStorage.getUserByUsername("bob");
-    let { value, dateCreated, expires } = await auth.createSessionKey(bob.id);
+    let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
     let { user, key } = await sessionStorage.getUserForKey(value);
     expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
@@ -56,3 +56,16 @@ test('CookieSessionManager.loginGetKeyLogout', async () => {
     await manager.logout(cookie.value);
     await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError(CrossauthError);
 });
+
+test('CookieSessionManager.logoutFromAll', async() => {
+    const sessionStorage = new InMemoryKeyStorage(userStorage);
+    let manager = new CookieSessionManager(userStorage, sessionStorage);
+    let {user: bob, cookie: cookie } = await manager.login("bob", "bobPass123");
+    const user = await manager.userForSessionKey(cookie.value);
+    expect(user).toBeDefined();
+    if (user) {
+        expect(user.username).toBe(bob.username);
+        await manager.logoutFromAll(user.username);
+        await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError(CrossauthError);
+    }
+})

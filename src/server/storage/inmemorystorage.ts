@@ -113,16 +113,19 @@ export class InMemoryKeyStorage extends KeyStorage {
      */
     async getUserForKey(key : string, 
         _extraUserFields? : string[],
-        _extraKeyFields? : string[]) : Promise<{user: User, key : Key}> {
+        _extraKeyFields? : string[]) : Promise<{user: User|undefined, key : Key}> {
         if (this.keys && key in this.keys) {
             let userId = this.keys[key].userId;
-            let user = await this.userStorage.getUserById(userId);
-            user = {...user};
+            let user : User|undefined = undefined;
+            if (userId) {
+                user = await this.userStorage.getUserById(userId);
+                user = {...user};
+            }
             let expires = this.keys[key].expires;
             if (expires) {
                 expires = new Date(expires.getTime());
             }
-            if ("passwordHash" in user) {
+            if (user && "passwordHash" in user) {
                 delete user.passwordHash;
             }
             return {user, key: this.keys[key]};
@@ -147,7 +150,7 @@ export class InMemoryKeyStorage extends KeyStorage {
         this.keys[key] = {
             value : key,
             userId : uniqueUserId,
-            dateCreated: dateCreated,
+            created: dateCreated,
             expires: expires,
             ...extraFields
         };
@@ -162,6 +165,17 @@ export class InMemoryKeyStorage extends KeyStorage {
         if (key in this.keys) {
             delete this.keys[key];
         }
+    }
+
+    /**
+     * Deletes all keys from storage for the given user ID
+     * 
+     * @param userId : user ID to delete keys for
+     */
+    async deleteAllForUser(userId : string | number, except : string|undefined = undefined) : Promise<void> {
+       for (const key in this.keys) {
+            if (this.keys[key].userId == userId && (!except || key != except)) delete  this.keys[key];
+       }
     }
 
 }

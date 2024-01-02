@@ -7,7 +7,7 @@ export interface Key {
     value : string,
 
     /** The date the key was created, in local time on the server */
-    dateCreated : Date,
+    created : Date,
 
     /** The date the key expires */
     expires : Date | undefined

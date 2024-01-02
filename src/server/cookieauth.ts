@@ -193,7 +193,7 @@ export class CookieAuth {
         return {
             userId : userId,
             value : sessionKey,
-            dateCreated : dateCreated,
+            created : dateCreated,
             expires : expires
         }
     }
@@ -283,6 +283,18 @@ export class CookieAuth {
         }
         return user;
     }
+
+    /**
+     * Deletes all keys for the given user
+     * @param userId the user to delete keys for
+     * @param except if defined, don't delete this key
+     */
+    async deleteAllForUser(userId : string | number, except: string|undefined) {
+        if (except && this.hashSessionIDs) {
+            except = this.hashSessionKey(except);
+        }
+        await this.sessionStorage.deleteAllForUser(userId, except);
+    }
 }
 
 /**
@@ -368,6 +380,17 @@ export class CookieSessionManager {
             await this.sessionStorage.deleteKey(sessionKey)
         }
 
+        /**
+         * Logs a user out from all sessions.
+         * 
+         * Removes the given session ID from the session storage.
+         * @param except Don't log out from the matching session.
+         * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
+         */
+        async logoutFromAll(userId : string | number, except? : string|undefined) : Promise<void> {
+            await this.auth.deleteAllForUser(userId, except);
+        }
+        
         /**
          * Returns the user (without password hash) matching the given session key, or undefined if there isn't one
          * @param sessionKey the session key to look up in session storage
