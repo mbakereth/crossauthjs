@@ -4,7 +4,6 @@ import { CookieSessionManager } from './cookieauth';
 import { CrossauthError, ErrorCode } from "..";
 import cookieParser from 'cookie-parser';
 import { User } from '../interfaces';
-import { resolve } from "dns/promises";
 
 /**
  * Options for {@link ExpressCookieAuthServer }.
@@ -168,7 +167,7 @@ export class ExpressCookieAuthServer {
                 await this.logout(req, res, (res) => {res.redirect(this.logoutRedirect);});
             } catch (e) {
                 console.log(e);
-                this.handleError(e, res, (reply, code, error) => {
+                this.handleError(e, res, (res, code, error) => {
                     if (this.errorPage) {
                         res.render(this.errorPage, {error: error, code: code});
                     } else {
@@ -242,7 +241,8 @@ export class ExpressCookieAuthServer {
             let { cookie, user } = await this.sessionManager.login(username, password);
 
             res.cookie(cookie.name, cookie.value, cookie.options);
-            res.json({status: "ok", user : user});
+            //res.json({status: "ok", user : user});
+            return successFn(res, user);
         } catch (e) {
             let error = "Unknown error";
             let code = ErrorCode.UnknownError;

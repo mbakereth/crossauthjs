@@ -6,6 +6,7 @@ import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
 import { HashedPasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
+import { pbkdf2Sync }  from 'node:crypto';
 
 /**
  * Optional parameters to {@link CookieAuth }.  
@@ -32,6 +33,24 @@ export interface CookieAuthOptions {
 
     /** Sets the cookie `SameSite`.  Default `lax` if not defined, which means all cookies will have SameSite set. */
     sameSite : boolean | "lax" | "strict" | "none" | undefined,
+
+    /** Length in bytes of random session IDs to create.  Actual key will be longer as it is Base64-encoded. Defaults to 16 */
+    keyLength : number,
+
+    /** If true, session IDs will be PBKDF2-hashed in the session storage. Defaults to false. */
+    hashSessionIDs : boolean,
+
+    /** If hashSessionIDs is true, create salts of this length.  Defaults to 16 */
+    saltLength : number,
+
+    /** If hashSessionIDs is true, use this number of iterations when generating the PBKDF2 hash.  Default 100000 */
+    iterations : number;
+
+    /** If hashSessionIDs is true, use this HMAC digest algorithm.  Default 'sha512' */
+    digest: string;
+
+    /** If hashSessionIDs is true, make the hash this length in bytes.  Default 32 */
+    hashLength: number;
 }
 
 /**
@@ -46,7 +65,7 @@ export interface CookieOptions {
     httpOnly? : boolean,
     path? : string,
     secure? : boolean,
-    sameSite? : boolean | "lax" | "strict" | "none" | undefined
+    sameSite? : boolean | "lax" | "strict" | "none" | undefined,
 }
 
 /**
@@ -71,6 +90,12 @@ export class CookieAuth {
     private domain : string | undefined = undefined;
     private path : string | undefined = undefined;
     private sameSite : boolean | "lax" | "strict" | "none" = 'lax';
+    private keyLength : number = 16;
+    private hashSessionID : boolean = false;
+    private saltLength : number = 16;
+    private iterations = 10000;
+    private hashLength = 32;
+    private digest = 'sha512';
 
     /**
      * Constructor.
@@ -101,6 +126,25 @@ export class CookieAuth {
             } else {
                 this.sameSite = 'lax';
             }
+            if (options.keyLength) {
+                this.keyLength = options.keyLength;
+            }
+            if (options.hashSessionIDs) {
+                this.hashSessionID = options.hashSessionIDs;
+            }
+            if (options.saltLength) {
+                this.saltLength = options.saltLength;
+            }
+            if (options.iterations) {
+                this.iterations = options.iterations;
+            }
+            if (options.digest) {
+                this.digest = options.digest;
+            }
+            if (options.hashLength) {
+                this.hashLength = options.hashLength;
+            }
+
         }
     }
 
@@ -113,6 +157,21 @@ export class CookieAuth {
         return expires;
     }
 
+    private hashSessionKey(sessionKey : string) : string {
+        const array = new Uint8Array(this.saltLength);
+        crypto.getRandomValues(array);
+        let salt = Buffer.from(array).toString('base64');
+        let sessionKeyHash = pbkdf2Sync(
+            sessionKey, 
+            salt, 
+            this.iterations, 
+            this.hashLength,
+            this.digest 
+        ).toString('base64');
+        return "pbkdf2" + ":" + this.digest + ":" + String(this.hashLength) 
+            + ":" + String(this.iterations) + ":" + salt + ":" + sessionKeyHash;
+            
+    }
     /**
      * Creates a session key and saves in storage
      * 
@@ -121,12 +180,18 @@ export class CookieAuth {
      * @param uniqueUserId the user ID to store with the session key.
      * @returns the session key, date created and expiry.
      */
-    async createSessionKey(uniqueUserId : string | number) : Promise<Key> {
-        let sessionKey = crypto.randomUUID();
-            const dateCreated = new Date();
-            let expires = this.expiry(dateCreated);
-            await this.sessionStorage.saveKey(uniqueUserId, sessionKey, dateCreated, expires);
+    async createSessionKey(userId : string | number | undefined) : Promise<Key> {
+        const array = new Uint8Array(this.keyLength);
+        crypto.getRandomValues(array);
+        let sessionKey = Buffer.from(array).toString('base64');
+        if (this.hashSessionID) {
+            sessionKey = this.hashSessionKey(sessionKey);
+        }
+        const dateCreated = new Date();
+        let expires = this.expiry(dateCreated);
+        await this.sessionStorage.saveKey(userId, sessionKey, dateCreated, expires);
         return {
+            userId : userId,
             value : sessionKey,
             dateCreated : dateCreated,
             expires : expires
@@ -205,8 +270,11 @@ export class CookieAuth {
      * @returns a {@link User } object, with the password hash removed.
      * @throws a {@link index!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
      */
-    async getUserForSessionKey(sessionKey: string) : Promise<User> {
+    async getUserForSessionKey(sessionKey: string) : Promise<User|undefined> {
         const now = Date.now();
+        if (this.hashSessionID) {
+            sessionKey = this.hashSessionKey(sessionKey);
+        }
         const {user, key} = await this.sessionStorage.getUserForKey(sessionKey);
         if (key.expires) {
             if (now > key.expires.getTime()) {
@@ -301,13 +369,13 @@ export class CookieSessionManager {
         }
 
         /**
-         * Returns the user (without password hash) matching the given session key, or throws an Exception
+         * Returns the user (without password hash) matching the given session key, or undefined if there isn't one
          * @param sessionKey the session key to look up in session storage
          * @returns the {@link User} (without password hash) matching the  session key
          * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
          *         `UserNotExist` or `Expired`.
          */
-        async userForSessionKey(sessionKey : string) : Promise<User> {
+        async userForSessionKey(sessionKey : string) : Promise<User|undefined> {
             let user = await this.auth.getUserForSessionKey(sessionKey);
             return user;
         }

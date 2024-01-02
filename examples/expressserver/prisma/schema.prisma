@@ -24,10 +24,10 @@ model User {
 model Key {
     id             Int       @id @unique @default(autoincrement())
     key            String    @unique
-    user_id        Int
+    user_id        Int?
     created        DateTime
     expires        DateTime
-    user           User      @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    user           User?     @relation(references: [id], fields: [user_id], onDelete: Cascade)
 
     @@index([id])
     @@index([user_id])

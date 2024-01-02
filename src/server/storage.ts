@@ -60,7 +60,7 @@ export abstract class KeyStorage {
     // throws InvalidSessionId
 
     /**
-     * Returns the user matching the given session key, or throws an exception
+     * Returns the user matching the given session key, which may be null, or throws an exception
      * @param key the key to look up
      * @param extraUserFields these will be selected from the user storage entry and returned in the User object
      * @param extraKeyFields these will be selected from the key storage entry and returned in the Key object
@@ -69,7 +69,7 @@ export abstract class KeyStorage {
      */
     abstract getUserForKey(key : string, 
         extraUserFields? : string[],
-        extraKeyFields? : string[]) : Promise<{user: User, key : Key}>;
+        extraKeyFields? : string[]) : Promise<{user: User|undefined, key : Key}>;
 
     /**
      * Saves a session key in the session storage (eg database).
@@ -80,7 +80,7 @@ export abstract class KeyStorage {
      * @param expires the date/time the key expires.
      * @param extraFields these will be stored in the key storage entryt
      */
-    abstract saveKey(userId : string | number, 
+    abstract saveKey(userId : string | number | undefined, 
                          key : string, 
                          dateCreated : Date, 
                          expires : Date | undefined, 

@@ -61,11 +61,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
     private iterations = 100000;
     private keyLen = 64;
     private digest = 'sha512';
-    private saltLength = 22; // 128 bits, base64-encoded
-
-    private saltChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        + "abcdefghijklmnopqrstuvwxyz"
-        + "01234567890+/";
+    private saltLength = 16; 
 
     /**
      * Create a new authenticator.
@@ -213,9 +209,9 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
                         digest? : string} = {}) : string {
         
         if (salt == undefined) {
-            const len = this.saltChars.length;
-            salt = Array.from({length: this.saltLength}, 
-                () => this.saltChars.charAt(Math.floor(Math.random() * len))).join("");
+            const array = new Uint8Array(this.saltLength);
+            crypto.getRandomValues(array);
+            salt = Buffer.from(array).toString('base64');
     
         }
         if (iterations == undefined) {

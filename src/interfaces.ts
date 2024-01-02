@@ -12,6 +12,8 @@ export interface Key {
     /** The date the key expires */
     expires : Date | undefined
 
+    userId : string | number | undefined;
+
     [ key : string ] : any,
 }
 

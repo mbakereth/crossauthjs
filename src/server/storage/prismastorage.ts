@@ -194,10 +194,9 @@ export class PrismaKeyStorage extends KeyStorage {
      */
     async getUserForKey(key : string, 
         extraUserFields : string[] = [], 
-        extraKeyFields : string[] = []) : Promise<{user: User, key : Key}> {
-        let returnKey : Key = {value: "", dateCreated: new Date(), expires: undefined};
+        extraKeyFields : string[] = []) : Promise<{user: User|undefined, key : Key}> {
+        let returnKey : Key = {userId: 0, value: "", dateCreated: new Date(), expires: undefined};
         let error : CrossauthError|undefined = undefined;
-        let userId = 0;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             let prismaKey =  await this.prismaClient[this.keyTable].findUniqueOrThrow({
@@ -206,11 +205,11 @@ export class PrismaKeyStorage extends KeyStorage {
                 }
             });
             returnKey = {
+                userId: prismaKey.user_id,
                 value: prismaKey.key,
                 dateCreated: prismaKey.dateCreated,
                 expires: prismaKey.expires,
             }
-            userId = prismaKey.user_id;
 
             extraKeyFields.forEach((key : string) => {
                 returnKey[key] = prismaKey[key];
@@ -220,7 +219,10 @@ export class PrismaKeyStorage extends KeyStorage {
         }
         if (error) throw error;
         try {
-            let user = await this.userStorage.getUserById(userId, extraUserFields);
+            let user : User|undefined = undefined;
+            if (returnKey.userId) {
+                user = await this.userStorage.getUserById(returnKey.userId, extraUserFields);
+            }
             return { user, key: returnKey };
         }  catch(e) {
             error = new CrossauthError(ErrorCode.UserNotExist); 
