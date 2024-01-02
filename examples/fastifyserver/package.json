@@ -25,11 +25,13 @@
   },
   "dependencies": {
     "@fastify/cookie": "^9.2.0",
+    "@fastify/formbody": "^7.4.0",
     "@fastify/view": "^8.2.0",
     "@prisma/client": "^5.7.1",
     "docenv": "^2.0.6",
     "dotenv": "^16.3.1",
     "fastify": "^4.25.2",
+    "fastify-static": "^4.7.0",
     "tsx": "^4.7.0"
   }
 }

@@ -1,0 +1,11 @@
+body {
+    background-color: #27272a;
+    color: #e4e4e7;
+    margin: 20px;
+    font-family: sans-serif;
+    
+}
+
+p.error {
+    color: #dc2626;
+}

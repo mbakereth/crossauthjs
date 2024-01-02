@@ -1,5 +1,6 @@
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import view from '@fastify/view';
+import fastifyFormBody from '@fastify/formbody';
 import type { FastifyCookieOptions } from '@fastify/cookie'
 import cookie from '@fastify/cookie'
 import { Server, IncomingMessage, ServerResponse } from 'http'
@@ -139,6 +140,7 @@ export class FastifyCookieAuthServer {
         }
 
         this.app.addContentTypeParser('text/json', { parseAs: 'string' }, this.app.getDefaultJsonParser('ignore', 'ignore'))
+        this.app.register(fastifyFormBody);
         this.app.register(cookie, {
             // secret: "my-secret", // for cookies signature
             parseOptions: {}     // options for parsing cookies
@@ -165,7 +167,7 @@ export class FastifyCookieAuthServer {
             });
         }
 
-        this.app.setErrorHandler(function (error, request, reply) {
+        this.app.setErrorHandler(function (error, _request, _reply) {
             console.log(error);
           })
           
@@ -177,13 +179,13 @@ export class FastifyCookieAuthServer {
                 (reply, _user) => {reply.redirect(this.loginRedirect)});
             } catch (e) {
                 console.log(e);
-                this.handleError(e, reply, (reply, code, error) => {
+                return this.handleError(e, reply, (reply, code, error) => {
                     if (this.loginPage) {
-                        reply.view(this.loginPage, {error: error, code: code});
+                        return reply.view(this.loginPage, {error: error, code: code});
                     } else if (this.errorPage) {
-                        reply.view(this.errorPage, {error: error, code: code});
+                        return reply.view(this.errorPage, {error: error, code: code});
                     } else {
-                        reply.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
+                        return reply.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
                     }
                     
                 });
@@ -198,9 +200,9 @@ export class FastifyCookieAuthServer {
                 console.log(e);
                 this.handleError(e, reply, (reply, code, error) => {
                     if (this.errorPage) {
-                        reply.view(this.errorPage, {error: error, code: code});
+                        return reply.view(this.errorPage, {error: error, code: code});
                     } else {
-                        reply.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
+                       return reply.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
                     }
                     
                 });
@@ -303,7 +305,7 @@ export class FastifyCookieAuthServer {
         }
         console.log(error);
 
-        errorFn(reply, code, error);
+        return errorFn(reply, code, error);
 
     }
 
@@ -316,6 +318,30 @@ export class FastifyCookieAuthServer {
             console.log(`Starting fastify server on port ${port} with prefix '${this.prefix}'`),
         );
 
+    }
+
+    /**
+     * Looks the cookie up in session storage.  If it matches a user, that user is returned.  Otherwise
+     * undefined is returned.
+     * 
+     * If the cookie exists but is not valid, it is deleted.
+     * @param request the fastify request object (to get the cookie from).
+     * @param reply  the fastify reply object (for clearing the cookie).
+     * @returns the user matching the session ID or undefined.
+     */
+    async getUserFromCookie(request : FastifyRequest, reply : FastifyReply) : Promise<User|undefined> {
+        try {
+            if (request.cookies && this.sessionManager.cookieName in request.cookies) {
+                return await this.sessionManager.userForSessionKey(request.cookies[this.sessionManager.cookieName]||"");
+            }
+        } catch (e) {
+            console.log(e);
+        }
+        if (request.cookies && this.sessionManager.cookieName in request.cookies) {
+            try {
+                reply.clearCookie(this.sessionManager.cookieName);
+            } catch {}
+        }
     }
         
 }

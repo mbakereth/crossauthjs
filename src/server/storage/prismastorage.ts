@@ -223,7 +223,6 @@ export class PrismaKeyStorage extends KeyStorage {
             let user = await this.userStorage.getUserById(userId, extraUserFields);
             return { user, key: returnKey };
         }  catch(e) {
-            console.error(e);
             error = new CrossauthError(ErrorCode.UserNotExist); 
         }
         if (error) throw error;

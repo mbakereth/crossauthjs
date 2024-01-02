@@ -59,6 +59,7 @@
   "dependencies": {
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "@fastify/cookie": "^9.2.0",
+    "@fastify/formbody": "^7.4.0",
     "@fastify/view": "^8.2.0",
     "@prisma/client": "^5.7.1",
     "@types/cookie-parser": "^1.4.6",

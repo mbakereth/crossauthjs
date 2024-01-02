@@ -25,4 +25,4 @@ docs
 *.sw?
 **/vite.config.ts.*
 **/*.db
-
+**/test.db-journal
