@@ -339,6 +339,7 @@ export class FastifyCookieAuthServer {
         }
         if (request.cookies && this.sessionManager.cookieName in request.cookies) {
             try {
+                // TODO: this should be logged as a security warning
                 reply.clearCookie(this.sessionManager.cookieName);
             } catch {}
         }

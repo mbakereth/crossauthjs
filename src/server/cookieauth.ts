@@ -14,43 +14,43 @@ import { pbkdf2Sync }  from 'node:crypto';
 export interface CookieAuthOptions {
 
     /** name of the name to use for the cookie.  Defaults to `SESSIONID` */
-    cookieName : string | undefined,
+    cookieName? : string,
 
     /** Maximum age of the cookie in seconds.  Cookie and session storage table will get an expiry date based on this.  Defaults to one month. */
-    maxAge : number | undefined,
+    maxAge? : number,
 
     /** Set the `httpOnly` cookie flag.  Default false. */
-    httpOnly : boolean | undefined,
+    httpOnly? : boolean,
 
     /** Set the `secure` cookie flag.  Default false. */
-    secure : boolean | undefined,
+    secure? : boolean,
 
     /** Sets the cookie domain.  Default, no domain */
-    domain : string | undefined
+    domain? : string
  
     /** Sets the cookie path.  Default, no path */
-    path : string | undefined,
+    path? : string,
 
     /** Sets the cookie `SameSite`.  Default `lax` if not defined, which means all cookies will have SameSite set. */
-    sameSite : boolean | "lax" | "strict" | "none" | undefined,
+    sameSite? : boolean | "lax" | "strict" | "none" | undefined,
 
     /** Length in bytes of random session IDs to create.  Actual key will be longer as it is Base64-encoded. Defaults to 16 */
-    keyLength : number,
+    keyLength? : number,
 
     /** If true, session IDs will be PBKDF2-hashed in the session storage. Defaults to false. */
-    hashSessionIDs : boolean,
+    hashSessionIDs? : boolean,
 
     /** If hashSessionIDs is true, create salts of this length.  Defaults to 16 */
-    saltLength : number,
+    saltLength? : number,
 
     /** If hashSessionIDs is true, use this number of iterations when generating the PBKDF2 hash.  Default 100000 */
-    iterations : number;
+    iterations? : number | undefined;
 
     /** If hashSessionIDs is true, use this HMAC digest algorithm.  Default 'sha512' */
-    digest: string;
+    digest? : string;
 
     /** If hashSessionIDs is true, make the hash this length in bytes.  Default 32 */
-    hashLength: number;
+    hashLength? : number;
 }
 
 /**
@@ -91,7 +91,7 @@ export class CookieAuth {
     private path : string | undefined = undefined;
     private sameSite : boolean | "lax" | "strict" | "none" = 'lax';
     private keyLength : number = 16;
-    private hashSessionID : boolean = false;
+    private hashSessionIDs : boolean = false;
     private saltLength : number = 16;
     private iterations = 10000;
     private hashLength = 32;
@@ -130,7 +130,7 @@ export class CookieAuth {
                 this.keyLength = options.keyLength;
             }
             if (options.hashSessionIDs) {
-                this.hashSessionID = options.hashSessionIDs;
+                this.hashSessionIDs = options.hashSessionIDs;
             }
             if (options.saltLength) {
                 this.saltLength = options.saltLength;
@@ -184,7 +184,7 @@ export class CookieAuth {
         const array = new Uint8Array(this.keyLength);
         crypto.getRandomValues(array);
         let sessionKey = Buffer.from(array).toString('base64');
-        if (this.hashSessionID) {
+        if (this.hashSessionIDs) {
             sessionKey = this.hashSessionKey(sessionKey);
         }
         const dateCreated = new Date();
@@ -272,7 +272,7 @@ export class CookieAuth {
      */
     async getUserForSessionKey(sessionKey: string) : Promise<User|undefined> {
         const now = Date.now();
-        if (this.hashSessionID) {
+        if (this.hashSessionIDs) {
             sessionKey = this.hashSessionKey(sessionKey);
         }
         const {user, key} = await this.sessionStorage.getUserForKey(sessionKey);
