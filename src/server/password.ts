@@ -1,29 +1,7 @@
-import type { 
-    User, 
-} from '../interfaces.ts';
-import { pbkdf2Sync }  from 'node:crypto';
+import type { User } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error';
 import { UserStorage } from './storage'
-
-/**
- * An object that contains all components of a hashed password.  Hashing is done with PBKDF2
- */
-export interface PasswordHash {
-    /** The actual hashed password in Base64 format */
-    hashedPassword : string,
-
-    /** The random salt used to create the hashed password */
-    salt : string,
-
-    /** Number of iterations for PBKDF2*/
-    iterations: number,
-
-    /** The key length parameter passed to PBKDF2 - hash will be this number of characters long */
-    keyLen : number,
-
-    /** The digest algorithm to use, eg `sha512` */
-    digest : string
-}
+import { Hasher } from './hasher';
 
 /** Optional parameters to pass to {@link UsernamePasswordAuthenticator} constructor. */
 export interface UsernamePasswordAuthenticatorOptions {
@@ -59,7 +37,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
 
     private userStorage : UserStorage;
     private iterations = 100000;
-    private keyLen = 64;
+    private keyLength = 64;
     private digest = 'sha512';
     private saltLength = 16; 
 
@@ -86,7 +64,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
             this.iterations = iterations;
         }
         if (keyLen) {
-            this.keyLen = keyLen;
+            this.keyLength = keyLen;
         }
         if (digest) {
             this.digest = digest;
@@ -110,82 +88,21 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      */
     async authenticateUser(username : string, password : string) : Promise<User> {
         let user = await this.userStorage.getUserByUsername(username);
-        let storedPasswordHash = await this.decodePasswordHash(await user.passwordHash);
+        let storedPasswordHash = Hasher.decodePasswordHash(await user.passwordHash);
 
-        let inputPasswordHash = pbkdf2Sync(
-            password, 
-            storedPasswordHash.salt, 
-            storedPasswordHash.iterations, 
-            storedPasswordHash.keyLen,
-             storedPasswordHash.digest 
-        ).toString('base64');
+        const hasher = new Hasher({
+            digest: storedPasswordHash.digest,
+            iterations: storedPasswordHash.iterations, 
+            keyLength: storedPasswordHash.keyLen,
+            saltLength: this.saltLength,
+        });
+        let inputPasswordHash = hasher.hash(password, {salt: storedPasswordHash.salt});
         if (storedPasswordHash.hashedPassword != inputPasswordHash)
             throw new CrossauthError(ErrorCode.PasswordNotMatch);
         if ("passwordHash" in user) {
             delete user.passwordHash;
         }
         return user;
-    }
-
-    /**
-     * Splits a hashed password into its component parts.  Return it as a {@link PasswordHash }.
-     * 
-     * The format of the hash should be
-     * ```
-     * digest:keyLen:iterations:salt:hashedPassword
-     * ```
-     * The hashed password part is the Base64 encoding of the PBKDF2 password.
-     * @param hash the hassed password to decode.  See above for format
-     * @returns 
-     */
-    decodePasswordHash(hash : string) : PasswordHash {
-        const parts = hash.split(':');
-        let error : CrossauthError|undefined = undefined;
-        if (parts.length != 6) {
-            throw new CrossauthError(ErrorCode.InvalidHash);
-            if (parts[0] != "pbkdf2") {
-                throw new CrossauthError(ErrorCode.UnsupportedAlgorithm);
-            }
-        }
-        try {
-            return {
-                hashedPassword : parts[5],
-                salt : parts[4],
-                iterations : Number(parts[3]),
-                keyLen : Number(parts[2]),
-                digest : parts[1]
-            };
-        } catch (e) {
-            error = new CrossauthError(ErrorCode.InvalidHash);
-        }
-        if (error) throw error;
-        return {
-            hashedPassword : "",
-            salt : ",",
-            iterations : 0,
-            keyLen : 0,
-            digest : ""
-        }; // never reached but needed to shut typescript up
-    }
-
-    /**
-     * Encodes a hashed password into the string format it is stored as.  
-     * 
-     * See {@link decodePasswordHash } for the format it is stored in.
-     * 
-     * @param hashedPassword the Base64-encoded PBKDF2 hash of the password
-     * @param salt the salt used for the password.
-     * @param iterations the number of PBKDF2 iterations
-     * @param keyLen the key length PBKDF2 parameter - results in a hashed password this length, before Base64,
-     * @param digest The digest algorithm, eg `pbkdf2`
-     * @returns a string encode the above parameters.
-     */
-    private encodePasswordHash(hashedPassword : string, 
-                       salt : string, 
-                       iterations : number, 
-                       keyLen : number, 
-                       digest : string) : string {
-        return "pbkdf2" + ":" + digest + ":" + String(keyLen) + ":" + String(iterations) + ":" + salt + ":" + hashedPassword;
     }
 
     /**
@@ -202,38 +119,19 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      * @returns either a string of the Base64-encoded hash, or the fully qualified hash, depending on `encode`.  See above.
      */
     createPasswordHash(password : string, encode = false, 
-                       {salt, iterations, keyLen, digest} :
+                       {salt, iterations, keyLength: keyLen, digest} :
                        {salt? : string, 
                         iterations? : number, 
-                        keyLen? : number, 
+                        keyLength? : number, 
                         digest? : string} = {}) : string {
         
-        if (salt == undefined) {
-            const array = new Uint8Array(this.saltLength);
-            crypto.getRandomValues(array);
-            salt = Buffer.from(array).toString('base64');
-    
-        }
-        if (iterations == undefined) {
-            iterations = this.iterations;
-        }
-        if (keyLen == undefined) {
-            keyLen = this.keyLen;
-        }
-        if (digest == undefined) {
-            digest = this.digest;
-        }
-        let passwordHash = pbkdf2Sync(
-            password, 
-            salt, 
-            iterations, 
-            keyLen,
-            digest 
-        ).toString('base64');
-        if (!encode) {
-            return passwordHash;
-        } else {
-            return this.encodePasswordHash(passwordHash, salt, iterations, keyLen, digest);
-        }
+        const hasher = new Hasher({
+            digest: digest||this.digest,
+            iterations: iterations||this.iterations,
+            keyLength: keyLen||this.keyLength,
+            saltLength: this.saltLength||this.saltLength
+        });
+
+        return hasher.hash(password, {salt: salt, encode: encode});
     }
 }

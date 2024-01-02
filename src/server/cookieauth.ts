@@ -6,7 +6,7 @@ import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
 import { HashedPasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
-import { pbkdf2Sync }  from 'node:crypto';
+import { Hasher } from './hasher';
 
 /**
  * Optional parameters to {@link CookieAuth }.  
@@ -112,44 +112,18 @@ export class CookieAuth {
     constructor(sessionStorage : KeyStorage, options? : CookieAuthOptions) {
         this.sessionStorage = sessionStorage;
         if (options) {
-            if (options.cookieName) {
-                this.cookieName = options.cookieName;
-            }
-            if (options.maxAge) {
-                this.maxAge = options.maxAge;
-            }
-            if (options.httpOnly) {
-                this.httpOnly = options.httpOnly;
-            }
-            if (options.secure) {
-                this.secure = options.secure;
-            }
-            if (options.domain) {
-                this.domain = options.domain;
-            }
-            if (options.sameSite) {
-                this.sameSite = options.sameSite;
-            } else {
-                this.sameSite = 'lax';
-            }
-            if (options.keyLength) {
-                this.keyLength = options.keyLength;
-            }
-            if (options.hashSessionIDs) {
-                this.hashSessionIDs = options.hashSessionIDs;
-            }
-            if (options.saltLength) {
-                this.saltLength = options.saltLength;
-            }
-            if (options.iterations) {
-                this.iterations = options.iterations;
-            }
-            if (options.digest) {
-                this.digest = options.digest;
-            }
-            if (options.hashLength) {
-                this.hashLength = options.hashLength;
-            }
+            if (options.cookieName) this.cookieName = options.cookieName;
+            if (options.maxAge) this.maxAge = options.maxAge;
+            if (options.httpOnly) this.httpOnly = options.httpOnly;
+            if (options.secure) this.secure = options.secure;
+            if (options.domain) this.domain = options.domain;
+            if (options.sameSite) this.sameSite = options.sameSite;
+            if (options.keyLength) this.keyLength = options.keyLength;
+            if (options.hashSessionIDs) this.hashSessionIDs = options.hashSessionIDs;
+            if (options.saltLength) this.saltLength = options.saltLength;
+            if (options.iterations) this.iterations = options.iterations;
+            if (options.digest)this.digest = options.digest;
+            if (options.hashLength) this.hashLength = options.hashLength;
             this.filterFunction = options.filterFunction;
 
         }
@@ -165,18 +139,13 @@ export class CookieAuth {
     }
 
     private hashSessionKey(sessionKey : string) : string {
-        const array = new Uint8Array(this.saltLength);
-        crypto.getRandomValues(array);
-        let salt = Buffer.from(array).toString('base64');
-        let sessionKeyHash = pbkdf2Sync(
-            sessionKey, 
-            salt, 
-            this.iterations, 
-            this.hashLength,
-            this.digest 
-        ).toString('base64');
-        return "pbkdf2" + ":" + this.digest + ":" + String(this.hashLength) 
-            + ":" + String(this.iterations) + ":" + salt + ":" + sessionKeyHash;
+        const hasher = new Hasher({
+            digest: this.digest,
+            iterations: this.iterations, 
+            keyLength: this.hashLength,
+            saltLength: this.saltLength,
+        });
+        return hasher.hash(sessionKey, {encode: true});
             
     }
     /**
