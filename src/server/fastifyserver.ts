@@ -176,7 +176,7 @@ export class FastifyCookieAuthServer {
     
             try {
                 await this.login(request, reply, 
-                (reply, _user) => {reply.redirect(this.loginRedirect)});
+                (reply, _user) => {return reply.redirect(this.loginRedirect)});
             } catch (e) {
                 console.log(e);
                 return this.handleError(e, reply, (reply, code, error) => {
@@ -195,7 +195,7 @@ export class FastifyCookieAuthServer {
         this.app.post(this.prefix+'logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
             try {
                 await this.logout(request, reply, 
-                (reply) => {reply.redirect(this.logoutRedirect)});
+                (reply) => {return reply.redirect(this.logoutRedirect)});
             } catch (e) {
                 console.log(e);
                 this.handleError(e, reply, (reply, code, error) => {
@@ -212,7 +212,7 @@ export class FastifyCookieAuthServer {
         this.app.post(this.prefix+'api/login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
             try {
                 await this.login(request, reply, 
-                (reply, user) => {reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user})});
+                (reply, user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user})});
             } catch (e) {
                 console.log(e);
                 this.handleError(e, reply, (reply, code, error) => {
@@ -225,7 +225,7 @@ export class FastifyCookieAuthServer {
         this.app.post(this.prefix+'api/logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
             try {
                 await this.logout(request, reply, 
-                (reply) => {reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
+                (reply) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
             } catch (e) {
                 console.log(e);
                 this.handleError(e, reply, (reply, code, error) => {
@@ -242,7 +242,7 @@ export class FastifyCookieAuthServer {
                 }
                 if (cookies[this.sessionManager.cookieName] != undefined) {
                     let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName] || "");
-                    reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user});
+                    return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user});
                 }
             } catch (e) {
                 let error = "Unknown error";
@@ -258,7 +258,7 @@ export class FastifyCookieAuthServer {
                     }
                 }
                 console.log(e);
-                reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error : error});
+                return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error : error});
 
             }
         });
@@ -271,7 +271,7 @@ export class FastifyCookieAuthServer {
 
         let { cookie, user } = await this.sessionManager.login(username, password);
         reply.cookie(cookie.name, cookie.value, cookie.options);
-        successFn(reply, user);
+        return successFn(reply, user);
     }
 
     private async logout(_request : FastifyRequest, reply : FastifyReply, 
@@ -283,7 +283,7 @@ export class FastifyCookieAuthServer {
                 }
             }
             reply.clearCookie(this.sessionManager.cookieName);
-            successFn(reply);
+            return successFn(reply);
 
     }
 
