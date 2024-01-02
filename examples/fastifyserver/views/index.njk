@@ -4,6 +4,14 @@
         <link rel="stylesheet" href="/public/style.css"/>
         </head>
     <body>
-        <h1>Welcome {{username}}</h1>
+        <h1>Welcome {{ username | default('nobody') }}</h1>
+
+        {% if username %}
+            <form method="POST" action="/logout">
+                <button type="submit">Logout</button>
+            </form>
+        {% else %}
+            <button onClick="document.location='/login';">Login</button>
+        {% endif %}
     </body>
 </html>

@@ -392,15 +392,37 @@ export class CookieSessionManager {
         }
         
         /**
-         * Returns the user (without password hash) matching the given session key, or undefined if there isn't one
+         * Returns the user (without password hash) matching the given session key.
+         * 
+         * If the user is undefined, or the key has expired, returns undefined.
+         * 
          * @param sessionKey the session key to look up in session storage
          * @returns the {@link User} (without password hash) matching the  session key
          * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
          *         `UserNotExist` or `Expired`.
          */
         async userForSessionKey(sessionKey : string) : Promise<User|undefined> {
-            let user = await this.auth.getUserForSessionKey(sessionKey);
-            return user;
+            let error : CrossauthError | undefined;
+            try {
+                let user = await this.auth.getUserForSessionKey(sessionKey);
+                return user;
+            } catch (e) {
+                if (e instanceof CrossauthError) {
+                    let ce = e as CrossauthError;
+                    switch (ce.code) {
+                        case ErrorCode.Expired:
+                            return undefined;
+                            break;
+                        default:
+                            error = ce;
+                    }
+                }
+                else {
+                    console.log(e);
+                }
+                error = new CrossauthError(ErrorCode.UnknownError);
+            }
+            if (error) throw error;
         }
     
 

@@ -60,7 +60,10 @@ export abstract class KeyStorage {
     // throws InvalidSessionId
 
     /**
-     * Returns the user matching the given session key, which may be null, or throws an exception
+     * Returns the user matching the given session key.
+     * 
+     * If there is no user, it returns undefined.  If the key has expired, it returns still returns the key.
+     * 
      * @param key the key to look up
      * @param extraUserFields these will be selected from the user storage entry and returned in the User object
      * @param extraKeyFields these will be selected from the key storage entry and returned in the Key object

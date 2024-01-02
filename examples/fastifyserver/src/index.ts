@@ -53,7 +53,7 @@ let server = new FastifyCookieAuthServer(sessionManager, {
 // create our home page
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
     let user = await server.getUserFromCookie(request, reply);
-    let username = user? user.username : "nobody";
+    let username = user? user.username : undefined;
     return reply.view('index.njk', {username});
 }
 );

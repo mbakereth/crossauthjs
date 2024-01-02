@@ -60,8 +60,8 @@ test("InMemoryKeyStorage.deleteAllKeysForUserExcept", async() => {
     const now = new Date();
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
-    await keyStorage.saveKey(bob.id, key1, now, expiry);
-    await keyStorage.saveKey(bob.id, key2, now, expiry);
+    await keyStorage.saveKey(bob.username, key1, now, expiry);
+    await keyStorage.saveKey(bob.username, key2, now, expiry);
     await keyStorage.deleteAllForUser(bob.id, key1 );
     let bob2 = await keyStorage.getUserForKey(key1);
     expect(bob2).toBeDefined();
