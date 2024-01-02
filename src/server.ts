@@ -10,7 +10,7 @@ export type {
 export { CookieAuth, CookieSessionManager } from './server/cookieauth';
 export type { CookieAuthOptions, CookieOptions, Cookie,  CookieSessionManagerOptions } from './server/cookieauth';
 
-export { PrismaUserStorage, PrismaKeyStorage as PrismaSessionStorage } from './server/storage/prismastorage';
+export { PrismaUserStorage, PrismaKeyStorage } from './server/storage/prismastorage';
 export type { PrismaUserStorageOptions, PrismaKeyStorageOptions as PrismaSessionStorageOptions } from './server/storage/prismastorage';
 export { InMemoryUserStorage, InMemoryKeyStorage as InMemorySessionStorage } from './server/storage/inmemorystorage';
 

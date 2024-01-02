@@ -47,9 +47,9 @@ test('PrismaKeyStorage.createGetAndDeleteKey', async () => {
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await keyStorage.saveKey(bob.id, key, now, expiry);
-    let { user, expires} = await keyStorage.getUserForKey(key);
+    let { user, key: sessionKey} = await keyStorage.getUserForKey(key);
     expect(user.username).toBe(bob.username);
-    expect(expires).toStrictEqual(expiry);
+    expect(sessionKey.expires).toStrictEqual(expiry);
     await keyStorage.deleteKey(key);
     await expect(async () => {await keyStorage.getUserForKey(key)}).rejects.toThrowError(CrossauthError);
 });

@@ -129,8 +129,6 @@ export class ExpressCookieAuthServer {
         }
         if (logoutRedirect) {
             this.logoutRedirect = logoutRedirect;
-        } else {
-            this.logoutRedirect = prefix + "login";
         }
         this.loginPage = loginPage;
 

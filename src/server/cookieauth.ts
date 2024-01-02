@@ -207,9 +207,9 @@ export class CookieAuth {
      */
     async getUserForSessionKey(sessionKey: string) : Promise<User> {
         const now = Date.now();
-        const {user, expires} = await this.sessionStorage.getUserForKey(sessionKey);
-        if (expires) {
-            if (now > expires.getTime()) {
+        const {user, key} = await this.sessionStorage.getUserForKey(sessionKey);
+        if (key.expires) {
+            if (now > key.expires.getTime()) {
                 throw new CrossauthError(ErrorCode.Expired);
             }
         }

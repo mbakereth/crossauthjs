@@ -28,9 +28,9 @@ test('InMemorySessionStorage.createGetAndDeleteSession', async () => {
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await sessionStorage.saveKey(bob.username, sessionId, now, expiry);
-    let { user, expires} = await sessionStorage.getUserForKey(sessionId);
+    let { user, key: sessionKey} = await sessionStorage.getUserForKey(sessionId);
     expect(user.username).toBe(bob.username);
-    expect(expires).toStrictEqual(expiry);
+    expect(sessionKey.expires).toStrictEqual(expiry);
     sessionStorage.deleteKey(sessionId);
     await expect(async () => {await sessionStorage.getUserForKey(sessionId)}).rejects.toThrowError(CrossauthError);
 });

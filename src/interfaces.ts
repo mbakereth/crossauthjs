@@ -11,6 +11,8 @@ export interface Key {
 
     /** The date the key expires */
     expires : Date | undefined
+
+    [ key : string ] : any,
 }
 
 /**

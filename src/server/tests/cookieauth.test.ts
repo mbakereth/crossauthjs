@@ -17,13 +17,13 @@ test('CookieAuth.createSessionKey', async () => {
     const auth = new CookieAuth(sessionStorage);
     const bob = await userStorage.getUserByUsername("bob");
     let { value, dateCreated, expires } = await auth.createSessionKey(bob.id);
-    let { user, expires: expires2 } = await sessionStorage.getUserForKey(value);
-    expect(expires2).toBeDefined();
+    let { user, key } = await sessionStorage.getUserForKey(value);
+    expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
     expect(user.username).toStrictEqual(bob.username);
-    expect(expires2?.getTime()).toBe(expires?.getTime());
-    if (expires2 != undefined && expires != undefined) {
-        expect(expires2?.getTime()-dateCreated.getTime()).toBe(expires?.getTime()-dateCreated.getTime());
+    expect(key.expires?.getTime()).toBe(expires?.getTime());
+    if (key.expires != undefined && expires != undefined) {
+        expect(key.expires?.getTime()-dateCreated.getTime()).toBe(expires?.getTime()-dateCreated.getTime());
     }
 
 });

@@ -154,9 +154,7 @@ export class FastifyCookieAuthServer {
         }
         if (logoutRedirect) {
             this.logoutRedirect = logoutRedirect;
-        } else {
-            this.logoutRedirect = prefix + "login";
-        }
+        } 
         this.loginPage = loginPage;
                     
         if (views && loginPage) {
@@ -192,7 +190,7 @@ export class FastifyCookieAuthServer {
             }
         });
 
-        this.app.post(this.prefix+'/logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
+        this.app.post(this.prefix+'logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
             try {
                 await this.logout(request, reply, 
                 (reply) => {reply.redirect(this.logoutRedirect)});
