@@ -1,5 +1,5 @@
 import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
-import { User, UserWithPassword, Key } from '../../interfaces';
+import { UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 
 /**
@@ -88,7 +88,6 @@ export class InMemoryUserStorage extends UserPasswordStorage {
  * Implementation of {@link KeyStorage } where keys stored in memory.  Intended for testing.
  */
 export class InMemoryKeyStorage extends KeyStorage {
-    private userStorage : UserStorage
     private keys : { [key : string]: Key } = {};
 
     /**
@@ -96,9 +95,8 @@ export class InMemoryKeyStorage extends KeyStorage {
      * 
      * @param userStorage an instance of {@link UserStorage } for fetching users.  If also in in memory, this may be an instance of {@link InMemoryUserStorage } but any can be used.
      */
-    constructor(userStorage : UserStorage) {
+    constructor() {
         super();
-        this.userStorage = userStorage;
     }
 
     /**

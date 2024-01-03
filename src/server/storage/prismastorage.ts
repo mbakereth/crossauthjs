@@ -167,7 +167,6 @@ export interface PrismaKeyStorageOptions {
  */
 export class PrismaKeyStorage extends KeyStorage {
     private keyTable : string = "key";
-    private userStorage : UserStorage
     private prismaClient : PrismaClient;
     private extraFields? : string[];
 
@@ -179,15 +178,13 @@ export class PrismaKeyStorage extends KeyStorage {
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
      * @param extraFields if given, these additional fields will be selected from the table into the returned Key.
      */
-    constructor(userStorage : UserStorage,
-                {keyTable, 
+    constructor({keyTable, 
                  prismaClient,
                 extraFields} : PrismaKeyStorageOptions = {}) {
         super();
         if (keyTable) {
             this.keyTable = keyTable;
         }
-        this.userStorage = userStorage;
         if (prismaClient == undefined) {
             this.prismaClient = new PrismaClient();
         } else {
@@ -240,7 +237,7 @@ export class PrismaKeyStorage extends KeyStorage {
      * @param extraFields these will be stored in the key table row
      * @throws {@link index!CrossauthError } if the key could not be stored.
      */
-    async saveKey(userId : string | number, 
+    async saveKey(userId : string | number | undefined, 
                       key : string, created : Date, 
                       expires : Date | undefined,
                       extraFields : {[key : string]: any} = {}) : Promise<void> {

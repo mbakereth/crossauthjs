@@ -13,7 +13,7 @@ beforeAll(async () => {
 
 
 test('CookieAuth.createSessionKey', async () => {
-    const sessionStorage = new InMemoryKeyStorage(userStorage);
+    const sessionStorage = new InMemoryKeyStorage();
     const auth = new CookieAuth(userStorage, sessionStorage);
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
@@ -29,7 +29,7 @@ test('CookieAuth.createSessionKey', async () => {
 });
 
 test('CookieAuth.createSessionKey.encrypted', async () => {
-    const sessionStorage = new InMemoryKeyStorage(userStorage);
+    const sessionStorage = new InMemoryKeyStorage();
     const auth = new CookieAuth(userStorage, sessionStorage, { hashSessionIDs: true });
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
@@ -45,7 +45,7 @@ test('CookieAuth.createSessionKey.encrypted', async () => {
 });
 
 test('CookieSessionManager.loginGetKeyLogout', async () => {
-    const sessionStorage = new InMemoryKeyStorage(userStorage);
+    const sessionStorage = new InMemoryKeyStorage();
     let manager = new CookieSessionManager(userStorage, sessionStorage);
     let {user: bob, cookie: cookie } = await manager.login("bob", "bobPass123");
     const user = await manager.userForSessionKey(cookie.value);
@@ -56,7 +56,7 @@ test('CookieSessionManager.loginGetKeyLogout', async () => {
 });
 
 test('CookieSessionManager.logoutFromAll', async() => {
-    const sessionStorage = new InMemoryKeyStorage(userStorage);
+    const sessionStorage = new InMemoryKeyStorage();
     let manager = new CookieSessionManager(userStorage, sessionStorage);
     let {user: bob, cookie: cookie } = await manager.login("bob", "bobPass123");
     const user = await manager.userForSessionKey(cookie.value);
