@@ -14,14 +14,13 @@ beforeAll(async () => {
 
 test('CookieAuth.createSessionKey', async () => {
     const sessionStorage = new InMemoryKeyStorage(userStorage);
-    const auth = new CookieAuth(sessionStorage);
+    const auth = new CookieAuth(userStorage, sessionStorage);
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
-    let { user, key } = await sessionStorage.getUserForKey(value);
+    let key = await sessionStorage.getKey(value);
     expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
-    expect(user).toBeDefined();
-    if (user) expect(user.username).toStrictEqual(bob.username);
+    expect(key.userId).toStrictEqual(bob.id);
     expect(key.expires?.getTime()).toBe(expires?.getTime());
     if (key.expires != undefined && expires != undefined) {
         expect(key.expires?.getTime()-dateCreated.getTime()).toBe(expires?.getTime()-dateCreated.getTime());
@@ -31,14 +30,13 @@ test('CookieAuth.createSessionKey', async () => {
 
 test('CookieAuth.createSessionKey.encrypted', async () => {
     const sessionStorage = new InMemoryKeyStorage(userStorage);
-    const auth = new CookieAuth(sessionStorage, { hashSessionIDs: true });
+    const auth = new CookieAuth(userStorage, sessionStorage, { hashSessionIDs: true });
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
-    let { user, key } = await sessionStorage.getUserForKey(value);
+    let key = await sessionStorage.getKey(value);
     expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
-    expect(user).toBeDefined();
-    if (user) expect(user.username).toStrictEqual(bob.username);
+    expect(key.userId).toStrictEqual(bob.id);
     expect(key.expires?.getTime()).toBe(expires?.getTime());
     if (key.expires != undefined && expires != undefined) {
         expect(key.expires?.getTime()-dateCreated.getTime()).toBe(expires?.getTime()-dateCreated.getTime());

@@ -195,51 +195,41 @@ export class PrismaKeyStorage extends KeyStorage {
         }
         this.extraFields = extraFields;
     }
-    // throws UserNotExist, Connection
+
     /**
-     * Returns the {@link User } and expiry date of the user matching the given session key, or throws an exception.
+     * Returns the matching Key record, or throws an exception if it doesn't exist
      * @param key the session key to look up in the session storage.
      * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
      * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
-    async getUserForKey(key : string) : Promise<{user: User|undefined, key : Key}> {
-        let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
-        let error : CrossauthError|undefined = undefined;
-        try {
-            // @ts-ignore  (because types only exist when do prismaClient.table...)
-            let prismaKey =  await this.prismaClient[this.keyTable].findUniqueOrThrow({
-                where: {
-                    key: key
-                }
-            });
-            returnKey = {
-                userId: prismaKey.user_id,
-                value: prismaKey.key,
-                created: prismaKey.created,
-                expires: prismaKey.expires,
-            }
-            if (this.extraFields) {
-                this.extraFields.forEach((key : string) => {
-                    returnKey[key] = prismaKey[key];
+        async getKey(key : string) : Promise<Key> {
+            let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
+            let error : CrossauthError|undefined = undefined;
+            try {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                let prismaKey =  await this.prismaClient[this.keyTable].findUniqueOrThrow({
+                    where: {
+                        key: key
+                    }
                 });
+                returnKey = {
+                    userId: prismaKey.user_id,
+                    value: prismaKey.key,
+                    created: prismaKey.created,
+                    expires: prismaKey.expires,
+                }
+                if (this.extraFields) {
+                    this.extraFields.forEach((key : string) => {
+                        returnKey[key] = prismaKey[key];
+                    });
+                }
+            } catch {
+                error = new CrossauthError(ErrorCode.InvalidKey);
             }
-        } catch {
-            error = new CrossauthError(ErrorCode.InvalidKey);
+            if (error) throw error;
+            return returnKey;
         }
-        if (error) throw error;
-        try {
-            let user : User|undefined = undefined;
-            if (returnKey.userId) {
-                user = await this.userStorage.getUserById(returnKey.userId);
-            }
-            return { user, key: returnKey };
-        }  catch(e) {
-            error = new CrossauthError(ErrorCode.UserNotExist); 
-        }
-        if (error) throw error;
-        return {user: {id: 0, username: ""}, key: returnKey}; // never reached but needed to shut typescript up.
-    }
-
+    
     /**
      * Saves a key in the session table.
      * 

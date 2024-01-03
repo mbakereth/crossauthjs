@@ -45,6 +45,19 @@ export abstract class UserPasswordStorage extends UserStorage {
      */
     abstract getUserById(id : string | number) : Promise<UserWithPassword>;
 
+    /**
+     * Removes the passwordHash field from the user object
+     * 
+     * Doesn't change the passed user object, just removes it from a copy.
+     * 
+     * @param user the user object to remove password from
+     * @returns a new User object without passwordHash
+     */
+    static removePasswordHash(user : User) {
+        const { passwordHash, ...rest} = user;
+        return rest;
+    }
+
 }
 
 /**
@@ -57,17 +70,13 @@ export abstract class KeyStorage {
     // throws InvalidSessionId
 
     /**
-     * Returns the user matching the given session key.
-     * 
-     * If there is no user, it returns undefined.  If the key has expired, it returns still returns the key.
+     * Returns the matching key in the session storage or throws an exception if it doesn't exist.
      * 
      * @param key the key to look up
-     * @param extraUserFields these will be selected from the user storage entry and returned in the User object
-     * @param extraKeyFields these will be selected from the key storage entry and returned in the Key object
-     * @returns An object containing the user and the date the session key expires (if it exists).  The password hash will not be returned,
+     * @returns The matching Key record.
      * @throws {@link index!CrossauthError } with {@link index!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
-    abstract getUserForKey(key : string) : Promise<{user: User|undefined, key : Key}>;
+    abstract getKey(key : string) : Promise<Key>;
 
     /**
      * Saves a session key in the session storage (eg database).

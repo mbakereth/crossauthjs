@@ -47,12 +47,11 @@ test('PrismaKeyStorage.createGetAndDeleteKey', async () => {
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await keyStorage.saveKey(bob.id, key, now, expiry);
-    let { user, key: sessionKey} = await keyStorage.getUserForKey(key);
-    expect(user).toBeDefined();
-    if (user) expect(user.username).toBe(bob.username);
+    let sessionKey = await keyStorage.getKey(key);
+    expect(sessionKey.userId).toBe(bob.id);
     expect(sessionKey.expires).toStrictEqual(expiry);
     await keyStorage.deleteKey(key);
-    await expect(async () => {await keyStorage.getUserForKey(key)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key)}).rejects.toThrowError(CrossauthError);
 });
 
 test("PrismaKeyStorage.deleteAllKeysForUser", async() => {
@@ -66,8 +65,8 @@ test("PrismaKeyStorage.deleteAllKeysForUser", async() => {
     await keyStorage.saveKey(bob.id, key1, now, expiry);
     await keyStorage.saveKey(bob.id, key2, now, expiry);
     await keyStorage.deleteAllForUser(bob.id);
-    await expect(async () => {await keyStorage.getUserForKey(key1)}).rejects.toThrowError(CrossauthError);
-    await expect(async () => {await keyStorage.getUserForKey(key2)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key1)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
 
 });
 
@@ -82,9 +81,9 @@ test("PrismaKeyStorage.deleteAllKeysForUserExcept", async() => {
     await keyStorage.saveKey(bob.id, key1, now, expiry);
     await keyStorage.saveKey(bob.id, key2, now, expiry);
     await keyStorage.deleteAllForUser(bob.id, key1 );
-    let bob2 = await keyStorage.getUserForKey(key1);
-    expect(bob2).toBeDefined();
-    await expect(async () => {await keyStorage.getUserForKey(key2)}).rejects.toThrowError(CrossauthError);
+    let bobkey2 = await keyStorage.getKey(key1);
+    expect(bobkey2.userId).toBe(bob.id);
+    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
 
 });
 

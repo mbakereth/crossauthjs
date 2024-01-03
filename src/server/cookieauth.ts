@@ -3,7 +3,7 @@ import type {
     Key 
 } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
-import { UserStorage, KeyStorage } from './storage';
+import { UserStorage, UserPasswordStorage, KeyStorage } from './storage';
 import { HashedPasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 import { Hasher } from './hasher';
@@ -87,6 +87,7 @@ export interface Cookie {
  * Class implementing cookie-based authentication.
  */
 export class CookieAuth {
+    private userStorage : UserStorage;
     private sessionStorage : KeyStorage;
 
     readonly cookieName : string = "SESSIONID";
@@ -106,10 +107,12 @@ export class CookieAuth {
     /**
      * Constructor.
      * 
+     * @param userStorage instance of the {@link UserStorage} object to use, eg {@link PrismaUserStorage}.
      * @param sessionStorage instance of the {@link KeyStorage} object to use, eg {@link PrismaSessionStorage}.
      * @param options optional parameters.  See {@link CookieAuthOptions}.
      */
-    constructor(sessionStorage : KeyStorage, options? : CookieAuthOptions) {
+    constructor(userStorage : UserStorage, sessionStorage : KeyStorage, options? : CookieAuthOptions) {
+        this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
         if (options) {
             if (options.cookieName) this.cookieName = options.cookieName;
@@ -253,7 +256,7 @@ export class CookieAuth {
         if (this.hashSessionIDs) {
             sessionKey = this.hashSessionKey(sessionKey);
         }
-        const {user, key} = await this.sessionStorage.getUserForKey(sessionKey);
+        const key = await this.sessionStorage.getKey(sessionKey);
         if (key.expires) {
             if (now > key.expires.getTime()) {
                 throw new CrossauthError(ErrorCode.Expired);
@@ -262,7 +265,13 @@ export class CookieAuth {
         if (this.filterFunction) {
             if (!this.filterFunction(key)) throw new CrossauthError(ErrorCode.InvalidKey);
         }
-        return user;
+        if (key.userId) {
+            let user = await this.userStorage.getUserById(key.userId);
+            user = await UserPasswordStorage.removePasswordHash(user);
+            return user;
+        } else {
+            return undefined;
+        }
     }
 
     /**
@@ -314,7 +323,7 @@ export class CookieSessionManager {
         authenticatorOptions } : CookieSessionManagerOptions = {}) {
         this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
-        this.auth = new CookieAuth(this.sessionStorage, cookieAuthOptions);
+        this.auth = new CookieAuth(this.userStorage, this.sessionStorage, cookieAuthOptions);
 
         this.authenticator = new HashedPasswordAuthenticator(this.userStorage, authenticatorOptions);
 

@@ -102,27 +102,14 @@ export class InMemoryKeyStorage extends KeyStorage {
     }
 
     /**
-     * Returns the {@link User } and expiry date of the user matching the given key, or throws an exception.
+     * Returns the matching key recortd, with additional, or throws an exception.
      * @param key the key to look up in the key storage.
-     * @returns the {@link User } object for the user with the given key, with the password hash removed, as well as the expiry date/time of the key.
+     * @returns the matching Key record
      * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
-    async getUserForKey(key : string) : Promise<{user: User|undefined, key : Key}> {
+    async getKey(key : string) : Promise<Key> {
         if (this.keys && key in this.keys) {
-            let userId = this.keys[key].userId;
-            let user : User|undefined = undefined;
-            if (userId) {
-                user = await this.userStorage.getUserById(userId);
-                user = {...user};
-            }
-            let expires = this.keys[key].expires;
-            if (expires) {
-                expires = new Date(expires.getTime());
-            }
-            if (user && "passwordHash" in user) {
-                delete user.passwordHash;
-            }
-            return {user, key: this.keys[key]};
+            return this.keys[key];
         }
         throw new CrossauthError(ErrorCode.InvalidKey); 
     }
