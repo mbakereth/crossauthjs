@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
 import { User, UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
+import { crossauthLogger } from '../..';
 
 /**
  * Optional parameters for {@link PrismaUserStorage}.
@@ -93,9 +94,11 @@ export class PrismaUserStorage extends UserPasswordStorage {
             });
 
             if (this.checkActive && !prismaUser["active"]) {
+                crossauthLogger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if (this.checkEmailVerified && !prismaUser["emailVerified"]) {
+                crossauthLogger.debug("User has not verified email");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             let user : UserWithPassword = {
@@ -113,7 +116,10 @@ export class PrismaUserStorage extends UserPasswordStorage {
         }  catch (e) {
             error = new CrossauthError(ErrorCode.UserNotExist); 
         }
-        if (error) throw error;
+        if (error) {
+            crossauthLogger.error(error);
+            throw error;
+        }
         return {id: 0, username: "", passwordHash: ""}; // never reached but needed to shut typescript up
     }
 
@@ -223,7 +229,10 @@ export class PrismaKeyStorage extends KeyStorage {
             } catch {
                 error = new CrossauthError(ErrorCode.InvalidKey);
             }
-            if (error) throw error;
+            if (error) {
+                crossauthLogger.error(error);
+                throw error;
+            }
             return returnKey;
         }
     
@@ -258,7 +267,10 @@ export class PrismaKeyStorage extends KeyStorage {
         } catch (e) {
             error = new CrossauthError(ErrorCode.Connection, String(e));
         }
-        if (error) throw error;
+        if (error) {
+            crossauthLogger.error(error);
+            throw error;
+        }
     }
 
     /**

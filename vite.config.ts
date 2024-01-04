@@ -3,6 +3,7 @@
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
+//import pinoplugin from 'esbuild-plugin-pino';
 import { join, dirname } from 'path'
 
 const config = {
@@ -40,6 +41,19 @@ if (process.env.LIB_NAME === undefined) {
 }
 const currentConfig = config[process.env.LIB_NAME];
 
+/*const pathToPino = resolve('./node_modules/pino')
+console.log(pathToPino)
+  // @ts-ignore
+  globalThis.__bundlerPathsOverrides = {
+    'pino-worker': pathToPino+'/lib/worker.js',
+    'pino-pipeline-worker': pathToPino+'/lib/worker-pipeline.js',
+    'thread-stream-worker': pathToPino+'/../thread-stream/lib/worker.js',
+    'pino/file': pathToPino+'/file.ts',
+}
+globalThis.__bundlerPathsOverrides['pino-pretty'] =  pathToPino+'/../pino-pretty/index.js'
+globalThis.__bundlerPathsOverrides['pino-opentelemetry-transport'] = pathToPino+'/../pino-opentelemetry-transport/pino-opentelemetry-transport.js'
+*/
+
 // https://vitejs.dev/guide/build.html#library-mode
 export default defineConfig({
   build: {
@@ -57,8 +71,9 @@ export default defineConfig({
   },
   plugins: [
     dts(),
+    //pinoplugin({ transports: ['pino-pretty'] })
   ],
   test: {
     // ...
   },
-});
+  });

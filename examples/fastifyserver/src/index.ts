@@ -8,7 +8,9 @@ import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { crossauthLogger, CrossauthLogLevel } from 'crossauth';
 
+crossauthLogger.level = CrossauthLogLevel.Debug;
 
 dotenv.config();
 

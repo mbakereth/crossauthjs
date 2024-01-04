@@ -38,10 +38,10 @@
     "build": "npm run build:index && npm run build:client && npm run build:server && npm run build:indexiife && npm run build:clientiife",
     "build:noniife": "npm run build:index && npm run build:client npm run build:server",
     "build:index": "LIB_NAME=index vite build",
-    "build:indexiife": "LIB_NAME=indexiife vite build",
-    "build:client": "LIB_NAME=client vite build",
-    "build:clientiife": "LIB_NAME=clientiife vite build",
-    "build:server": "LIB_NAME=server NODE_ENV=production vite build",
+    "build:indexiife": "LIB_NAME=indexiife vite build --emptyOutDir=false",
+    "build:client": "LIB_NAME=client vite build --emptyOutDir=false",
+    "build:clientiife": "LIB_NAME=clientiife vite build --emptyOutDir=false",
+    "build:server": "LIB_NAME=server vite build --emptyOutDir=false",
     "preview": "vite preview",
     "test": "LIB_NAME=index vitest",
     "doc": "typedoc"
@@ -66,10 +66,12 @@
     "@types/express": "^4.17.21",
     "@types/nunjucks": "^3.2.6",
     "cookie-parser": "^1.4.6",
+    "events": "^3.3.0",
     "express": "^4.18.2",
     "fastify": "^4.25.2",
     "fastify-vite": "^3.0.0-beta.27",
     "nunjucks": "^3.2.4",
-    "prisma": "^5.7.1"
+    "prisma": "^5.7.1",
+    "sonic-boom": "^3.7.0"
   }
 }

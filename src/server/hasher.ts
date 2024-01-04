@@ -1,5 +1,6 @@
 import { pbkdf2Sync }  from 'node:crypto';
 import { ErrorCode, CrossauthError } from '../error';
+import { crossauthLogger } from '..';
 
 /**
  * Optional parameters for {@link HasherOptions}.
@@ -60,17 +61,20 @@ export class Hasher {
 
     }
 
-    base64ToBase64Url(base64 : string) : string{
+    static base64ToBase64Url(base64 : string) : string{
         return base64.replace(/=+/g,"").replace(/\//g,"_").replace(/\+/g,"-");
     }
 
-    base64UrlToBase64(base64Url : string) : string {
+    static base64UrlToBase64(base64Url : string) : string {
         let s = base64Url.replace(/_/g,"/").replace(/-/g,"+");
         let mod = s.length % 4;
         if (mod == 0) {
             return s;
         } else if (mod == 1) {
-            throw new CrossauthError(ErrorCode.InvalidHash);
+            crossauthLogger.error("Invalid hash length.  Stack trace follows");
+            let err = new CrossauthError(ErrorCode.InvalidHash);
+            crossauthLogger.error(err.stack);
+            throw err;
         } else if (mod == 2) {
             return s + "==";
         } else {
@@ -108,6 +112,8 @@ export class Hasher {
             };
         } catch (e) {
             error = new CrossauthError(ErrorCode.InvalidHash);
+            crossauthLogger.error("Attempt to decode invalid hash.  Stack trace follows");
+            crossauthLogger.error(error.stack);
         }
         if (error) throw error;
         return {
@@ -157,7 +163,7 @@ export class Hasher {
             this.keyLength,
             this.digest 
         ).toString('base64');
-        if (charset == "base64url") passwordHash = this.base64ToBase64Url(passwordHash);
+        if (charset == "base64url") passwordHash = Hasher.base64ToBase64Url(passwordHash);
         if (encode) passwordHash = this.encodePasswordHash(
             passwordHash, salt, this.iterations, this.keyLength, this.digest);
         return passwordHash;

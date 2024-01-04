@@ -1,7 +1,7 @@
 import express, { Express, Request, Response } from "express";
 import nunjucks from "nunjucks";
 import { CookieSessionManager } from './cookieauth';
-import { CrossauthError, ErrorCode } from "..";
+import { CrossauthError, ErrorCode, crossauthLogger } from "..";
 import cookieParser from 'cookie-parser';
 import { User } from '../interfaces';
 
@@ -206,10 +206,11 @@ export class ExpressCookieAuthServer {
         router.get('/api/userforsessionkey', async (req : Request, res : Response) =>  {
             let cookies = req.cookies;
             try {
-                if (!cookies || !(this.sessionManager.cookieName in cookies)) {
+                if (!cookies || !(this.sessionManager.sessionCookieName in cookies)) {
+                    crossauthLogger.debug("User requested but no session ID cookie passed");
                     throw new CrossauthError(ErrorCode.InvalidKey);
                 }
-                let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName]);
+                let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.sessionCookieName]);
                 res.json({status: "ok", user : user});
             } catch (e) {
                 let error = "Unknown error";
@@ -224,7 +225,7 @@ export class ExpressCookieAuthServer {
                             error = ce.message;
                     }
                 }
-                console.log(e);
+                crossauthLogger.error(e);
                 res.json({status: "error", error : error});
 
             }
@@ -266,10 +267,10 @@ export class ExpressCookieAuthServer {
 
     private async logout(req : Request, res : Response, successFn : (res : Response) => void) {
         let cookies = req.cookies;
-        if (cookies && this.sessionManager.cookieName in cookies) {
-            await this.sessionManager.logout(this.sessionManager.cookieName);
+        if (cookies && this.sessionManager.sessionCookieName in cookies) {
+            await this.sessionManager.logout(this.sessionManager.sessionCookieName);
         }
-        res.clearCookie(this.sessionManager.cookieName);
+        res.clearCookie(this.sessionManager.sessionCookieName);
         //res.json({status: "ok"});
         successFn(res);
 
@@ -291,7 +292,7 @@ export class ExpressCookieAuthServer {
                     error = ce.message;
             }
         }
-        console.log(error);
+        crossauthLogger.error(e);
 
         errorFn(res, code, error);
 
@@ -303,7 +304,7 @@ export class ExpressCookieAuthServer {
      */
     start(port : number = 3000) {
         this.app.listen(port, () =>
-            console.log(`Starting express server on port ${port} with prefix '${this.prefix}'`),
+            crossauthLogger.info(`Starting express server on port ${port} with prefix '${this.prefix}'`),
         );
 
     }

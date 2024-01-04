@@ -9,6 +9,7 @@ import nunjucks from "nunjucks";
 import { CookieSessionManager } from './cookieauth';
 import { CrossauthError, ErrorCode } from "..";
 import { User } from '../interfaces';
+import { crossauthLogger } from '..';
 
 /**
  * Options for {@link FastifyCookieAuthServer }.
@@ -170,6 +171,17 @@ export class FastifyCookieAuthServer {
         this.app.setErrorHandler(function (error, _request, _reply) {
             console.log(error);
           })
+
+        this.app.addHook('onRequest', async (request : FastifyRequest, reply : FastifyReply) => {
+            let cookies = request.cookies;
+            if (!cookies || !(this.sessionManager.sessionCookieName in cookies)) {
+                // no session cookie created - create one
+                let cookie = await this.sessionManager.createAnonymousSessionKey();
+                crossauthLogger.debug("Anonymous cookie set cookie " + cookie.name + " opts " + JSON.stringify(cookie.options));
+                reply.cookie(cookie.name, cookie.value, cookie.options);
+            }
+        });
+          
           
 
         this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
@@ -178,7 +190,7 @@ export class FastifyCookieAuthServer {
                 await this.login(request, reply, 
                 (reply, _user) => {return reply.redirect(this.loginRedirect)});
             } catch (e) {
-                console.log(e);
+                crossauthLogger.error(e);
                 return this.handleError(e, reply, (reply, code, error) => {
                     if (this.loginPage) {
                         return reply.view(this.loginPage, {error: error, code: code});
@@ -197,7 +209,7 @@ export class FastifyCookieAuthServer {
                 await this.logout(request, reply, 
                 (reply) => {return reply.redirect(this.logoutRedirect)});
             } catch (e) {
-                console.log(e);
+                crossauthLogger.error(e);
                 this.handleError(e, reply, (reply, code, error) => {
                     if (this.errorPage) {
                         return reply.view(this.errorPage, {error: error, code: code});
@@ -214,7 +226,7 @@ export class FastifyCookieAuthServer {
                 await this.login(request, reply, 
                 (reply, user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user})});
             } catch (e) {
-                console.log(e);
+                crossauthLogger.error(e);
                 this.handleError(e, reply, (reply, code, error) => {
                     reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: code});                    
                 });
@@ -227,7 +239,7 @@ export class FastifyCookieAuthServer {
                 await this.logout(request, reply, 
                 (reply) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
             } catch (e) {
-                console.log(e);
+                crossauthLogger.error(e);
                 this.handleError(e, reply, (reply, code, error) => {
                     reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: code});                    
                 });
@@ -237,11 +249,11 @@ export class FastifyCookieAuthServer {
         this.app.get(this.prefix+'/api/userforsessionkey', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
             let cookies = request.cookies;
             try {
-                if (!cookies || !(this.sessionManager.cookieName in cookies)) {
+                if (!cookies || !(this.sessionManager.sessionCookieName in cookies)) {
                     throw new CrossauthError(ErrorCode.InvalidKey);
                 }
-                if (cookies[this.sessionManager.cookieName] != undefined) {
-                    let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.cookieName] || "");
+                if (cookies[this.sessionManager.sessionCookieName] != undefined) {
+                    let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.sessionCookieName] || "");
                     return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user});
                 }
             } catch (e) {
@@ -257,7 +269,7 @@ export class FastifyCookieAuthServer {
                             error = ce.message;
                     }
                 }
-                console.log(e);
+                crossauthLogger.error(e);
                 return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error : error});
 
             }
@@ -270,6 +282,7 @@ export class FastifyCookieAuthServer {
         const password = request.body.password;
 
         let { cookie, user } = await this.sessionManager.login(username, password);
+        crossauthLogger.debug("Login: set cookie " + cookie.name + " opts " + JSON.stringify(cookie.options));
         reply.cookie(cookie.name, cookie.value, cookie.options);
         return successFn(reply, user);
     }
@@ -277,12 +290,13 @@ export class FastifyCookieAuthServer {
     private async logout(_request : FastifyRequest, reply : FastifyReply, 
         successFn : (reply : FastifyReply) => void) {
         let cookies = reply.cookies;
-            if (cookies && this.sessionManager.cookieName in cookies) {
-                if (cookies[this.sessionManager.cookieName] != undefined) {
-                    await this.sessionManager.logout(reply.cookies[this.sessionManager.cookieName] || "");
+            if (cookies && this.sessionManager.sessionCookieName in cookies) {
+                if (cookies[this.sessionManager.sessionCookieName] != undefined) {
+                    await this.sessionManager.logout(reply.cookies[this.sessionManager.sessionCookieName] || "");
                 }
             }
-            reply.clearCookie(this.sessionManager.cookieName);
+            crossauthLogger.debug("Logout: clear cookie " + this.sessionManager.sessionCookieName);
+            reply.clearCookie(this.sessionManager.sessionCookieName);
             return successFn(reply);
 
     }
@@ -303,7 +317,7 @@ export class FastifyCookieAuthServer {
                     error = ce.message;
             }
         }
-        console.log(error);
+        crossauthLogger.error(e);
 
         return errorFn(reply, code, error);
 
@@ -315,7 +329,7 @@ export class FastifyCookieAuthServer {
      */
     start(port : number = 3000) {
         this.app.listen({ port: port}, () =>
-            console.log(`Starting fastify server on port ${port} with prefix '${this.prefix}'`),
+            crossauthLogger.info(`Starting fastify server on port ${port} with prefix '${this.prefix}'`),
         );
 
     }
@@ -331,16 +345,17 @@ export class FastifyCookieAuthServer {
      */
     async getUserFromCookie(request : FastifyRequest, reply : FastifyReply) : Promise<User|undefined> {
         try {
-            if (request.cookies && this.sessionManager.cookieName in request.cookies) {
-                return await this.sessionManager.userForSessionKey(request.cookies[this.sessionManager.cookieName]||"");
+            if (request.cookies && this.sessionManager.sessionCookieName in request.cookies) {
+                return await this.sessionManager.userForSessionKey(request.cookies[this.sessionManager.sessionCookieName]||"");
             }
         } catch (e) {
-            console.log(e);
+            crossauthLogger.error(e);
         }
-        if (request.cookies && this.sessionManager.cookieName in request.cookies) {
+        if (request.cookies && this.sessionManager.sessionCookieName in request.cookies) {
             try {
                 // TODO: this should be logged as a security warning
-                reply.clearCookie(this.sessionManager.cookieName);
+                crossauthLogger.info("Clearing invalid cookie " + this.sessionManager.sessionCookieName);
+                reply.clearCookie(this.sessionManager.sessionCookieName);
             } catch {}
         }
     }

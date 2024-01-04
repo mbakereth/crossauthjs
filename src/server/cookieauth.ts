@@ -13,8 +13,8 @@ import { Hasher } from './hasher';
  */
 export interface CookieAuthOptions {
 
-    /** name of the name to use for the cookie.  Defaults to `SESSIONID` */
-    cookieName? : string,
+    /** name to use for the session cookie.  Defaults to `SESSIONID` */
+    sessionCookieName? : string,
 
     /** Maximum age of the cookie in seconds.  Cookie and session storage table will get an expiry date based on this.  Defaults to one month. */
     maxAge? : number,
@@ -28,7 +28,7 @@ export interface CookieAuthOptions {
     /** Sets the cookie domain.  Default, no domain */
     domain? : string
  
-    /** Sets the cookie path.  Default, no path */
+    /** Sets the cookie path.  Default, "/"" */
     path? : string,
 
     /** Sets the cookie `SameSite`.  Default `lax` if not defined, which means all cookies will have SameSite set. */
@@ -90,12 +90,12 @@ export class CookieAuth {
     private userStorage : UserStorage;
     private sessionStorage : KeyStorage;
 
-    readonly cookieName : string = "SESSIONID";
+    readonly sessionCookieName : string = "SESSIONID";
     private maxAge : number = 1209600; // two weeks
     private httpOnly : boolean = false;
     private secure : boolean = false;
     private domain : string | undefined = undefined;
-    private path : string | undefined = undefined;
+    private path : string | undefined = "/";
     private sameSite : boolean | "lax" | "strict" | "none" = 'lax';
     private keyLength : number = 16;
     private hashSessionIDs : boolean = false;
@@ -115,7 +115,7 @@ export class CookieAuth {
         this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
         if (options) {
-            if (options.cookieName) this.cookieName = options.cookieName;
+            if (options.sessionCookieName) this.sessionCookieName = options.sessionCookieName;
             if (options.maxAge) this.maxAge = options.maxAge;
             if (options.httpOnly) this.httpOnly = options.httpOnly;
             if (options.secure) this.secure = options.secure;
@@ -162,7 +162,7 @@ export class CookieAuth {
     async createSessionKey(userId : string | number | undefined) : Promise<Key> {
         const array = new Uint8Array(this.keyLength);
         crypto.getRandomValues(array);
-        let sessionKey = Buffer.from(array).toString('base64');
+        let sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
         if (this.hashSessionIDs) {
             sessionKey = this.hashSessionKey(sessionKey);
         }
@@ -184,7 +184,7 @@ export class CookieAuth {
      * @returns a string representation of the cookie and options.
      */
     makeCookieString(sessionKey : Key) : string {
-        let cookie = this.cookieName + "=" + sessionKey.value + "; SameSite=" + this.sameSite;
+        let cookie = this.sessionCookieName + "=" + sessionKey.value + "; SameSite=" + this.sameSite;
         if (sessionKey.expires) {
             cookie += "; " + new Date(sessionKey.expires).toUTCString();
         }
@@ -233,7 +233,7 @@ export class CookieAuth {
             options.secure = this.secure;
         }
         return {
-            name : this.cookieName,
+            name : this.sessionCookieName,
             value : sessionKey.value,
             options: options
         }
@@ -332,8 +332,8 @@ export class CookieSessionManager {
         /**
          * Returns the name used for session ID cookies (taken from the {@link KeyStorage } instance).
          */
-        get cookieName() : string {
-            return this.auth.cookieName;
+        get sessionCookieName() : string {
+            return this.auth.sessionCookieName;
         }
 
         /**
@@ -357,6 +357,18 @@ export class CookieSessionManager {
                 cookie: cookie,
                 user: user
             }
+        }
+
+        /**
+         * Creates and stores a session key that is not associated with a user.
+         * 
+         * Called when the user is not logged in.  We need this for CSRF tokens
+         * @returns a cookie with the session ID.
+         */
+        async createAnonymousSessionKey() : Promise<Cookie> {
+            const sessionKey = await this.auth.createSessionKey(undefined);
+            //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
+            return this.auth.makeCookie(sessionKey);
         }
 
         /**

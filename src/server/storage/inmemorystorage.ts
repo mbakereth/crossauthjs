@@ -1,6 +1,7 @@
 import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
 import { UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
+import { crossauthLogger } from '../..';
 
 /**
  * Optional parameters for {@link InMemoryUserStorage}.
@@ -62,14 +63,17 @@ export class InMemoryUserStorage extends UserPasswordStorage {
 
             const user = this.usersByUsername[username];
             if ('active' in user && user['active'] == false && this.checkActive) {
+                crossauthLogger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if ('emailVerified' in user && user['emailVerified'] == false && this.checkEmailVerified) {
+                crossauthLogger.debug("User email not verified");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             return {...user};
         }
 
+        crossauthLogger.debug("User does not exist");
         throw new CrossauthError(ErrorCode.UserNotExist);
     }
 
@@ -109,7 +113,10 @@ export class InMemoryKeyStorage extends KeyStorage {
         if (this.keys && key in this.keys) {
             return this.keys[key];
         }
-        throw new CrossauthError(ErrorCode.InvalidKey); 
+        crossauthLogger.debug("Key does not exist in key storage.  Stack trace follows");
+        let err = new CrossauthError(ErrorCode.InvalidKey); 
+        crossauthLogger.debug(err.stack);
+        throw err;
     }
 
     /**
