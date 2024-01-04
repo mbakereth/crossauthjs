@@ -9,12 +9,32 @@ export enum CrossauthLogLevel {
     Debug
   }
 
+export interface CrossauthLoggerInterface {
+    error(output: any) : void;
+    warn(output: any) : void;
+    info(output: any) : void;
+    debug(output: any) : void;
+}
 /**
+ * 
  * A very simple logging class with no dependencies.
  * 
  * Logs to console. 
  */
-class CrossauthLogger {
+export class CrossauthLogger {
+
+    private static instance : CrossauthLoggerInterface;
+
+    /**
+     * Return the singleton instance of the logger.
+     * @returns the logger
+     */
+    static getInstance() : CrossauthLoggerInterface { 
+        if (!CrossauthLogger.instance) {
+            CrossauthLogger.instance = new CrossauthLogger(CrossauthLogLevel.Debug);
+        }
+        return CrossauthLogger.instance;
+    }
 
     /** the log level. This can be set dynamically */
     level : CrossauthLogLevel;
@@ -53,16 +73,8 @@ class CrossauthLogger {
     debug(output: any) {
         this.log(CrossauthLogLevel.Debug, output);
     }
-}
 
-/**
- * Default Crossauth logger.  Change it to something else wiht {@link setCrossauthLogger}.
- * 
- * You can set the logger to anything that has the functions error(any), warn(any), 
- * info(any) and debug(any)
- */
-export var crossauthLogger : any = new CrossauthLogger(CrossauthLogLevel.None);
-
-export function setCrossauthLogger(newLogger : any) {
-    crossauthLogger = newLogger;
+    setCrossauthLogger(logger : CrossauthLoggerInterface) {
+        CrossauthLogger.instance = logger;
+    }
 }

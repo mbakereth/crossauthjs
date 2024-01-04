@@ -1,7 +1,7 @@
 import express, { Express, Request, Response } from "express";
 import nunjucks from "nunjucks";
 import { CookieSessionManager } from './cookieauth';
-import { CrossauthError, ErrorCode, crossauthLogger } from "..";
+import { CrossauthError, ErrorCode, CrossauthLogger } from "..";
 import cookieParser from 'cookie-parser';
 import { User } from '../interfaces';
 
@@ -207,7 +207,7 @@ export class ExpressCookieAuthServer {
             let cookies = req.cookies;
             try {
                 if (!cookies || !(this.sessionManager.sessionCookieName in cookies)) {
-                    crossauthLogger.debug("User requested but no session ID cookie passed");
+                    CrossauthLogger.getInstance().debug("User requested but no session ID cookie passed");
                     throw new CrossauthError(ErrorCode.InvalidKey);
                 }
                 let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.sessionCookieName]);
@@ -225,7 +225,7 @@ export class ExpressCookieAuthServer {
                             error = ce.message;
                     }
                 }
-                crossauthLogger.error(e);
+                CrossauthLogger.getInstance().error(e);
                 res.json({status: "error", error : error});
 
             }
@@ -292,7 +292,7 @@ export class ExpressCookieAuthServer {
                     error = ce.message;
             }
         }
-        crossauthLogger.error(e);
+        CrossauthLogger.getInstance().error(e);
 
         errorFn(res, code, error);
 
@@ -304,7 +304,7 @@ export class ExpressCookieAuthServer {
      */
     start(port : number = 3000) {
         this.app.listen(port, () =>
-            crossauthLogger.info(`Starting express server on port ${port} with prefix '${this.prefix}'`),
+            CrossauthLogger.getInstance().info(`Starting express server on port ${port} with prefix '${this.prefix}'`),
         );
 
     }

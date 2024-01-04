@@ -99,7 +99,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
         });
         let inputPasswordHash = hasher.hash(password, {salt: storedPasswordHash.salt});
         if (storedPasswordHash.hashedPassword != inputPasswordHash) {
-            crossauthLogger.debug("Invalid password " + password + " " + storedPasswordHash + " " + inputPasswordHash);
+            CrossauthLogger.getInstance().getInstance().debug("Invalid password " + password + " " + storedPasswordHash + " " + inputPasswordHash);
             throw new CrossauthError(ErrorCode.PasswordNotMatch);
         }
         if ("passwordHash" in user) {

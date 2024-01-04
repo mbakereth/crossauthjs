@@ -71,9 +71,9 @@ export class Hasher {
         if (mod == 0) {
             return s;
         } else if (mod == 1) {
-            crossauthLogger.error("Invalid hash length.  Stack trace follows");
+            CrossauthLogger.getInstance().error("Invalid hash length.  Stack trace follows");
             let err = new CrossauthError(ErrorCode.InvalidHash);
-            crossauthLogger.error(err.stack);
+            CrossauthLogger.getInstance().error(err.stack);
             throw err;
         } else if (mod == 2) {
             return s + "==";
@@ -112,8 +112,8 @@ export class Hasher {
             };
         } catch (e) {
             error = new CrossauthError(ErrorCode.InvalidHash);
-            crossauthLogger.error("Attempt to decode invalid hash.  Stack trace follows");
-            crossauthLogger.error(error.stack);
+            CrossauthLogger.getInstance().error("Attempt to decode invalid hash.  Stack trace follows");
+            CrossauthLogger.getInstance().error(error.stack);
         }
         if (error) throw error;
         return {

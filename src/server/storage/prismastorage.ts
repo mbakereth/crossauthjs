@@ -94,11 +94,11 @@ export class PrismaUserStorage extends UserPasswordStorage {
             });
 
             if (this.checkActive && !prismaUser["active"]) {
-                crossauthLogger.debug("User has active set to false");
+                CrossauthLogger.getInstance().debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if (this.checkEmailVerified && !prismaUser["emailVerified"]) {
-                crossauthLogger.debug("User has not verified email");
+                CrossauthLogger.getInstance().debug("User has not verified email");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             let user : UserWithPassword = {
@@ -117,7 +117,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
             error = new CrossauthError(ErrorCode.UserNotExist); 
         }
         if (error) {
-            crossauthLogger.error(error);
+            CrossauthLogger.getInstance().error(error);
             throw error;
         }
         return {id: 0, username: "", passwordHash: ""}; // never reached but needed to shut typescript up
@@ -230,7 +230,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 error = new CrossauthError(ErrorCode.InvalidKey);
             }
             if (error) {
-                crossauthLogger.error(error);
+                CrossauthLogger.getInstance().error(error);
                 throw error;
             }
             return returnKey;
@@ -268,7 +268,7 @@ export class PrismaKeyStorage extends KeyStorage {
             error = new CrossauthError(ErrorCode.Connection, String(e));
         }
         if (error) {
-            crossauthLogger.error(error);
+            CrossauthLogger.getInstance().error(error);
             throw error;
         }
     }

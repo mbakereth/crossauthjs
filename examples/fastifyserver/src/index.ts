@@ -8,9 +8,9 @@ import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { crossauthLogger, CrossauthLogLevel } from 'crossauth';
+import { CrossauthLogger, CrossauthLogLevel } from 'crossauth';
 
-crossauthLogger.level = CrossauthLogLevel.Debug;
+CrossauthLogger.getInstance().level = CrossauthLogLevel.Debug;
 
 dotenv.config();
 
@@ -57,6 +57,15 @@ app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
     let user = await server.getUserFromCookie(request, reply);
     let username = user? user.username : undefined;
     return reply.view('index.njk', {username});
+}
+);
+
+// create a sample login-protected page
+app.get('/protected', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    let user = await server.getUserFromCookie(request, reply);
+    if (!user) return reply.redirect(302, "/login?next=/protected");
+    let username = user? user.username : undefined;
+    return reply.view('protected.njk', {username});
 }
 );
 

@@ -9,3 +9,9 @@ body {
 p.error {
     color: #dc2626;
 }
+
+a,
+a:visited {
+    color: #4d7c0f;
+    text-decoration: none;
+}
