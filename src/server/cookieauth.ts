@@ -72,7 +72,7 @@ export interface CookieAuthOptions {
     saltLength? : number,
 
     /** If hashSessionIDs is true, use this number of iterations when generating the PBKDF2 hash.  Default 100000 */
-    iterations? : number | undefined;
+    iterations? : number;
 
     /** If hashSessionIDs is true, use this HMAC digest algorithm.  Default 'sha512' */
     digest? : string;
@@ -86,6 +86,13 @@ export interface CookieAuthOptions {
      * before returning.  Function should return true if the session is valid or false otherwise.
      */
     filterFunction? : (sessionKey : Key) => boolean;
+
+    /**
+     * If true, a session ID will be created even the user is not logged in.
+     * Setting this to false means you will also not get CSRF tokens when the user it not logged in,
+     * Default true
+     */
+    anonymousSessions? : boolean;
 }
 
 /**
@@ -508,6 +515,7 @@ export class CookieSessionManager {
     sessionStorage : KeyStorage;
     private auth : CookieAuth;
     private authenticator : HashedPasswordAuthenticator;
+    private anonymousSessions : boolean = true;
 
     /**
      * Constructor
@@ -526,6 +534,7 @@ export class CookieSessionManager {
         this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
         this.auth = new CookieAuth(this.userStorage, this.sessionStorage, secret, cookieAuthOptions);
+        if (cookieAuthOptions && cookieAuthOptions.anonymousSessions) this.anonymousSessions = cookieAuthOptions.anonymousSessions;
 
         this.authenticator = new HashedPasswordAuthenticator(this.userStorage, authenticatorOptions);
 

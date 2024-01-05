@@ -24,6 +24,7 @@ export interface FastifyCookieAuthServerOptions {
     views? : string;
     loginPage? : string;
     errorPage? : string;
+    anonymousSessions? : boolean,
 }
 
 interface LoginBodyType {
@@ -88,6 +89,7 @@ export class FastifyCookieAuthServer {
     private loginPage? : string;
     private errorPage? : string;
     private sessionManager : CookieSessionManager;
+    private anonymousSessions = true;
 
     /**
      * Creates the Fastify endpoints, optionally also the Fastify app.
@@ -108,6 +110,8 @@ export class FastifyCookieAuthServer {
      *                   documentation above for full description.
      * @param errorPage? Page to render error messages, including failed login.  See the class
      *                   documentation above for full description.
+     * @param anonymousSessions: if true, a session ID will be created even when the user is not logged in.
+     *                           setting this to false means you will also not get CSRF tokens if the user is not logged in.
      */
     constructor(
         sessionManager : CookieSessionManager, {
@@ -117,11 +121,14 @@ export class FastifyCookieAuthServer {
         logoutRedirect,
         views,
         loginPage,
-        errorPage }: FastifyCookieAuthServerOptions = {}) {
+        errorPage,
+        anonymousSessions }: FastifyCookieAuthServerOptions = {}) {
 
         this.sessionManager = sessionManager;
         this.loginPage = loginPage;
         this.errorPage = errorPage;
+        if (anonymousSessions != undefined) this.anonymousSessions = anonymousSessions;
+
         if (app) {
             this.app = app;
         } else {
@@ -181,7 +188,7 @@ export class FastifyCookieAuthServer {
           })
 
         this.app.addHook('onRequest', async (request : FastifyRequest, reply : FastifyReply) => {
-            await this.createAnonymousSessionID(request, reply);
+            if (this.anonymousSessions) await this.createAnonymousSessionID(request, reply);
         });
           
         this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
@@ -240,7 +247,7 @@ export class FastifyCookieAuthServer {
             try {
                 await this.logout(request, reply, 
                 (reply) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
-                await this.createAnonymousSessionID(request, reply);
+                if (this.anonymousSessions) await this.createAnonymousSessionID(request, reply);
             } catch (e) {
                 CrossauthLogger.logger.error(e);
                 this.handleError(e, reply, (reply, code, error) => {
