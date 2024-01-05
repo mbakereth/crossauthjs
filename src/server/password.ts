@@ -18,6 +18,9 @@ export interface UsernamePasswordAuthenticatorOptions {
 
     /** The number of random characters to generate for the password hash, using only Base64 characters */
     saltLength?: number;
+
+    /** If defined, this will be used as an application password when hashing passwords (appended to salt) */
+    pepper? : string
 }
 
 /**
@@ -41,6 +44,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
     private keyLength = 64;
     private digest = 'sha512';
     private saltLength = 16; 
+    private pepper : string|undefined = undefined;
 
     /**
      * Create a new authenticator.
@@ -57,22 +61,16 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
                 {iterations,
                 keyLen,
                 digest,
-                saltLength
+                saltLength,
+                pepper
         } : UsernamePasswordAuthenticatorOptions = {}) {
         super();
         this.userStorage = userStorage;
-        if (iterations) {
-            this.iterations = iterations;
-        }
-        if (keyLen) {
-            this.keyLength = keyLen;
-        }
-        if (digest) {
-            this.digest = digest;
-        }
-        if (saltLength) {
-            this.saltLength = saltLength;
-        }
+        if (iterations) this.iterations = iterations;
+        if (keyLen) this.keyLength = keyLen;
+        if (digest) this.digest = digest;
+        if (saltLength) this.saltLength = saltLength;
+        if (pepper) this.pepper = pepper;
     }
 
     /**
@@ -96,6 +94,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
             iterations: storedPasswordHash.iterations, 
             keyLength: storedPasswordHash.keyLen,
             saltLength: this.saltLength,
+            pepper: this.pepper,
         });
         let inputPasswordHash = hasher.hash(password, {salt: storedPasswordHash.salt});
         if (storedPasswordHash.hashedPassword != inputPasswordHash) {
@@ -132,7 +131,8 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
             digest: digest||this.digest,
             iterations: iterations||this.iterations,
             keyLength: keyLen||this.keyLength,
-            saltLength: this.saltLength||this.saltLength
+            saltLength: this.saltLength||this.saltLength,
+            pepper: this.pepper,
         });
 
         return hasher.hash(password, {salt: salt, encode: encode});

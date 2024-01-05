@@ -12,11 +12,12 @@ import { CrossauthLogger } from 'crossauth';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
 CrossauthLogger.logger.level = CrossauthLogger.Debug;
-//CrossauthLogger.setCrossauthLogger(Pino.pino({level: "debug"}));  // replace default logger with Pino
+//CrossauthLogger.setLogger(Pino.pino({level: "debug"}));  // replace default logger with Pino
 
 dotenv.config();
 
 const port = Number(process.env.PORT || 3000);
+const secret = process.env.SECRET;
 const __filename = new URL('', import.meta.url).pathname;
 const __dirname = new URL('.', import.meta.url).pathname;
 
@@ -45,7 +46,7 @@ app.register(view, {
 const prisma = new PrismaClient();
 let userStorage = new PrismaUserStorage({prismaClient : prisma});
 let sessionStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
-let sessionManager = new CookieSessionManager(userStorage, sessionStorage);
+let sessionManager = new CookieSessionManager(userStorage, sessionStorage, secret);
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyCookieAuthServer(sessionManager, {

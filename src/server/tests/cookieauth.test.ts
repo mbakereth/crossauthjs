@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 test('CookieAuth.createSessionKey', async () => {
     const sessionStorage = new InMemoryKeyStorage();
-    const auth = new CookieAuth(userStorage, sessionStorage);
+    const auth = new CookieAuth(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX");
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
     let key = await sessionStorage.getKey(value);
@@ -28,9 +28,22 @@ test('CookieAuth.createSessionKey', async () => {
 
 });
 
+test('CookieAuth.createAndValidateCSRFToken', async () => {
+    const sessionStorage = new InMemoryKeyStorage();
+    const auth = new CookieAuth(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX");
+    let sessionID = "0123456789ABCDEFGHIJKL";
+    let token = await auth.createCSRFToken(sessionID);
+    let valid = false;
+    try {
+        auth.validateCSRFToken(token, sessionID);
+        valid = true;
+    } catch {}
+    expect(valid).toBe(true);
+});
+
 test('CookieAuth.createSessionKey.encrypted', async () => {
     const sessionStorage = new InMemoryKeyStorage();
-    const auth = new CookieAuth(userStorage, sessionStorage, { hashSessionIDs: true });
+    const auth = new CookieAuth(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX", { hashSessionIDs: true });
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
     let key = await sessionStorage.getKey(value);
@@ -46,8 +59,8 @@ test('CookieAuth.createSessionKey.encrypted', async () => {
 
 test('CookieSessionManager.loginGetKeyLogout', async () => {
     const sessionStorage = new InMemoryKeyStorage();
-    let manager = new CookieSessionManager(userStorage, sessionStorage);
-    let {user: bob, cookie: cookie } = await manager.login("bob", "bobPass123");
+    let manager = new CookieSessionManager(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX");
+    let {user: bob, sessionCookie: cookie } = await manager.login("bob", "bobPass123");
     const user = await manager.userForSessionKey(cookie.value);
     expect(user).toBeDefined();
     if (user) expect(user.username).toBe(bob.username);
@@ -57,8 +70,8 @@ test('CookieSessionManager.loginGetKeyLogout', async () => {
 
 test('CookieSessionManager.logoutFromAll', async() => {
     const sessionStorage = new InMemoryKeyStorage();
-    let manager = new CookieSessionManager(userStorage, sessionStorage);
-    let {user: bob, cookie: cookie } = await manager.login("bob", "bobPass123");
+    let manager = new CookieSessionManager(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX");
+    let {user: bob, sessionCookie: cookie } = await manager.login("bob", "bobPass123");
     const user = await manager.userForSessionKey(cookie.value);
     expect(user).toBeDefined();
     if (user) {
@@ -67,3 +80,18 @@ test('CookieSessionManager.logoutFromAll', async() => {
         await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError(CrossauthError);
     }
 })
+
+test('CookieSessionManager.createAndValidateCSRFToken', async() => {
+    const sessionStorage = new InMemoryKeyStorage();
+    let manager = new CookieSessionManager(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX");
+    let sessionID = "0123456789ABCDEFGHIJKL";
+    let cookie = await manager.createCSRFToken(sessionID);
+    let valid = false;
+    try {
+        manager.validateCSRFToken(cookie.value, sessionID);
+        valid = true;
+    } catch {}
+    expect(valid).toBe(true);
+
+});
+

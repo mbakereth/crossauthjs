@@ -4,10 +4,12 @@ import { CrossauthError } from '../../..';
 import { getTestUserStorage }  from './inmemorytestdata';
 
 export var userStorage : InMemoryUserStorage;
+export var pepperUserStorage : InMemoryUserStorage;
 
 // for all these tests, the database will have two users: bob and alice
 beforeAll(async () => {
     userStorage = getTestUserStorage();
+    pepperUserStorage = getTestUserStorage("ABCDEFGHIJKLMNOPQRSTUV");
 });
 
 // test getting a user by username and by id
@@ -68,3 +70,8 @@ test("InMemoryKeyStorage.deleteAllKeysForUserExcept", async() => {
 
 });
 
+test("InMemoryKeyStorage.pepperedHashDifferentFromUnpeppered", async() => {
+    const bob = await userStorage.getUserByUsername("bob");
+    const pepperedBob = await pepperUserStorage.getUserByUsername("bob");
+    expect(bob.passwordHash).not.toBe(pepperedBob.passwordHash);
+});

@@ -12,6 +12,7 @@ export interface HasherOptions {
     iterations? : number,
     keyLength? : number,
     saltLength? : number,
+    pepper? : string,
 }
 
 /**
@@ -27,6 +28,9 @@ export interface PasswordHash {
     /** Number of iterations for PBKDF2*/
     iterations: number,
 
+    /** If true, pepper (application secret) is also used to hash the password*/
+    usePepper: boolean,
+
     /** The key length parameter passed to PBKDF2 - hash will be this number of characters long */
     keyLen : number,
 
@@ -38,9 +42,9 @@ export interface PasswordHash {
  * Option parameters for {@link Hasher.hash}
  */
 export interface HashOptions {
-    salt? : string,
+    salt? : string;
     charset? : "base64"|"base64url";
-    encode? : boolean,
+    encode? : boolean;
 }
 
 export class Hasher {
@@ -48,16 +52,19 @@ export class Hasher {
     private iterations : number = 100000
     private keyLength : number = 32;
     private saltLength : number = 32;
+    private pepper : string|undefined= undefined;
 
     constructor({digest,
         iterations, 
         keyLength,
-        saltLength} : HasherOptions = {}) {
+        saltLength,
+        pepper} : HasherOptions = {}) {
         
         if (digest) this.digest = digest;
         if (iterations) this.iterations = iterations;
         if (keyLength) this.keyLength = keyLength
         if (saltLength) this.saltLength = saltLength;
+        if (pepper) this.pepper = pepper;
 
     }
 
@@ -96,7 +103,7 @@ export class Hasher {
     static decodePasswordHash(hash : string) : PasswordHash {
         const parts = hash.split(':');
         let error : CrossauthError|undefined = undefined;
-        if (parts.length != 6) {
+        if (parts.length != 7) {
             throw new CrossauthError(ErrorCode.InvalidHash);
             if (parts[0] != "pbkdf2") {
                 throw new CrossauthError(ErrorCode.UnsupportedAlgorithm);
@@ -104,8 +111,9 @@ export class Hasher {
         }
         try {
             return {
-                hashedPassword : parts[5],
-                salt : parts[4],
+                hashedPassword : parts[6],
+                salt : parts[5],
+                usePepper : parts[4] != "0",
                 iterations : Number(parts[3]),
                 keyLen : Number(parts[2]),
                 digest : parts[1]
@@ -120,6 +128,7 @@ export class Hasher {
             hashedPassword : "",
             salt : ",",
             iterations : 0,
+            usePepper: false,
             keyLen : 0,
             digest : ""
         }; // never reached but needed to shut typescript up
@@ -135,6 +144,7 @@ export class Hasher {
      * @param iterations the number of PBKDF2 iterations
      * @param keyLen the key length PBKDF2 parameter - results in a hashed password this length, before Base64,
      * @param digest The digest algorithm, eg `pbkdf2`
+     * @param pepper If defined, this will be appended to the salt when creating the hash
      * @returns a string encode the above parameters.
      */
     encodePasswordHash(hashedPassword : string, 
@@ -142,7 +152,8 @@ export class Hasher {
                        iterations : number, 
                        keyLen : number, 
                        digest : string) : string {
-        return "pbkdf2" + ":" + digest + ":" + String(keyLen) + ":" + String(iterations) + ":" + salt + ":" + hashedPassword;
+        let usePepper : number = this.pepper != undefined ? 1 : 0;
+        return "pbkdf2" + ":" + digest + ":" + String(keyLen) + ":" + String(iterations) + ":" + usePepper + ":" + salt + ":" + hashedPassword;
     }
 
     randomSalt() : string {
@@ -151,14 +162,17 @@ export class Hasher {
         return Buffer.from(array).toString('base64');
 
     }
+
     hash(plaintext : string, {salt, charset, encode} : HashOptions = {}) {
         if (salt == undefined) salt = this.randomSalt();
+        let usePepper = this.pepper != undefined;
+        let saltAndPepper = usePepper ? salt + "!" + this.pepper : salt;
         
         if (charset == undefined) charset = "base64";
         if (encode == undefined) encode = false;
         let passwordHash = pbkdf2Sync(
             plaintext, 
-            salt, 
+            saltAndPepper, 
             this.iterations, 
             this.keyLength,
             this.digest 

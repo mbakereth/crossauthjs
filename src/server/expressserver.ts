@@ -239,9 +239,9 @@ export class ExpressCookieAuthServer {
         const password = req.body.password;
 
         try {
-            let { cookie, user } = await this.sessionManager.login(username, password);
+            let { sessionCookie, user } = await this.sessionManager.login(username, password);
 
-            res.cookie(cookie.name, cookie.value, cookie.options);
+            res.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
             //res.json({status: "ok", user : user});
             return successFn(res, user);
         } catch (e) {

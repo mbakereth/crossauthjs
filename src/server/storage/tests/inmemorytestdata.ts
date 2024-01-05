@@ -1,9 +1,9 @@
 import { InMemoryUserStorage } from '../inmemorystorage';
 import { HashedPasswordAuthenticator } from '../../password';
 
-export function getTestUserStorage() : InMemoryUserStorage {
+export function getTestUserStorage(pepper? : string|undefined) : InMemoryUserStorage {
     let userStorage = new InMemoryUserStorage();
-    let authenticator = new HashedPasswordAuthenticator(userStorage);
+    let authenticator = new HashedPasswordAuthenticator(userStorage, {pepper: pepper});
     userStorage.addUser({
         id: 'bob',
         username: 'bob',

@@ -79,7 +79,7 @@ export class CrossauthLogger {
         this.log(CrossauthLogger.Debug, output);
     }
 
-    static setCrossauthLogger(logger : CrossauthLoggerInterface) {
+    static setLogger(logger : CrossauthLoggerInterface) {
         globalThis.crossauthLogger = logger;
     }
 }
