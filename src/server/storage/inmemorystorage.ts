@@ -164,6 +164,11 @@ export class InMemoryKeyStorage extends KeyStorage {
        }
     }
 
+    /**
+     * If the given session key exist in the database, update it with the passed values.  If it doesn't
+     * exist, throw a CreossauthError with InvalidKey.
+     * @param key 
+     */
     async updateKey(key : Key) : Promise<void> {
         if (key.value in this.keys) {
             this.keys[key.value] = {...key};

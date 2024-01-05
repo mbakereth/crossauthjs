@@ -11,6 +11,8 @@ import { CrossauthError, ErrorCode } from "..";
 import { User } from '../interfaces';
 import { CrossauthLogger } from '..';
 
+const CSRFHEADER = "X-CROSSAUTH-CSRF";
+
 /**
  * Options for {@link FastifyCookieAuthServer }.
  * 
@@ -32,6 +34,11 @@ interface LoginBodyType {
     username: string;
     password: string;
     next? : string;
+    csrfToken: string;
+}
+
+interface CSRFBodyType {
+    csrfToken : string;
 }
 
 interface LoginParamsType {
@@ -181,8 +188,9 @@ export class FastifyCookieAuthServer {
                     
         if (views && loginPage) {
             this.app.get(this.prefix+'login', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) =>  {
-                if (this.loginPage)  { // if is reduntant but VC Code complains without it
-                    let data : {next? : any} = {};
+                let csrfToken = this.getCSRFToken(request);
+                if (this.loginPage)  { // if is redundant but VC Code complains without it
+                    let data : {next? : any, csrfToken: string} = {csrfToken: csrfToken};
                     if (request.query.next) {
                         data["next"] = request.query.next;
                     }
@@ -202,6 +210,7 @@ export class FastifyCookieAuthServer {
         this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
     
             let next = request.body.next || this.loginRedirect;
+            let csrfToken = this.getCSRFToken(request);
             try {
                 CrossauthLogger.logger.debug("Next page " + next);
 
@@ -211,9 +220,9 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.error(e);
                 return this.handleError(e, reply, (reply, code, error) => {
                     if (this.loginPage) {
-                        return reply.view(this.loginPage, {error: error, code: code, next: next});
+                        return reply.view(this.loginPage, {error: error, code: code, next: next, csrfToken: csrfToken});
                     } else if (this.errorPage) {
-                        return reply.view(this.errorPage, {error: error, code: code});
+                        return reply.view(this.errorPage, {error: error, code: code, csrfToken: csrfToken});
                     } else {
                         return reply.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
                     }
@@ -297,6 +306,7 @@ export class FastifyCookieAuthServer {
     
     private async login(request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
+        this.validateCSRFToken(request, reply)
         const username = request.body.username;
         const password = request.body.password;
         let sessionID = undefined;
@@ -372,7 +382,9 @@ export class FastifyCookieAuthServer {
 
     }
 
-    async validateCSRFToken(request : FastifyRequest, _reply : FastifyReply, sessionID? : string) {
+    async validateCSRFToken(request : FastifyRequest<{ Body: CSRFBodyType }>, 
+                            _reply : FastifyReply,
+                            sessionID? : string) {
         let cookies = request.cookies;
         if (!sessionID) {
             if (!cookies || !(this.sessionManager.sessionCookieName in cookies 
@@ -382,6 +394,18 @@ export class FastifyCookieAuthServer {
             }
             sessionID = cookies[this.sessionManager.sessionCookieName]||"";
         } 
+        let formOrHeaderToken  : string = "";
+        if (request.body.csrfToken) {
+            formOrHeaderToken = request.body.csrfToken;
+        } else if (request.headers[CSRFHEADER]) {
+            let headers = request.headers[CSRFHEADER]
+            if (headers && Array.isArray(headers)) {
+                formOrHeaderToken = headers[0];
+            } else {
+                formOrHeaderToken = headers;
+            }            
+        }
+
         if (!sessionID) {
             CrossauthLogger.logger.debug("validateCSRFToken: sessionID not passed and not in cookie.  Stack tracer follows");
             let error = new CrossauthError(ErrorCode.InvalidKey);
@@ -393,7 +417,7 @@ export class FastifyCookieAuthServer {
             throw new CrossauthError(ErrorCode.InvalidKey);
         }
         let csrfToken = cookies[this.sessionManager.csrfCookieName]||"";
-        this.sessionManager.validateCSRFToken(csrfToken, sessionID);
+        this.sessionManager.validateCSRFToken(csrfToken, sessionID, formOrHeaderToken);
     }
 
     /**
@@ -432,4 +456,27 @@ export class FastifyCookieAuthServer {
             } catch {}
         }
     }  
+
+    /**
+     * Returns the CSRF token from the cookie so that you can add it to form fields
+     * 
+     * Put this in the data you pass to the template containing the form.  Call the form field "csrfToken".
+     * 
+     * If your CSRF cookie is set to httpOnly, this is the only way to pass it through your form to
+     * the form handler.  If your  CSRF cookie does not have httpOnly, you can use JavaScript code it put
+     * it in the X-CROSSAUTH-CSRF header.
+     * 
+     * @param request the fastify request object
+     * @returns 
+     */
+    getCSRFToken(request : FastifyRequest) : string {
+        if (request.cookies && this.sessionManager.csrfCookieName in request.cookies) {
+            let csrfToken = request.cookies[this.sessionManager.csrfCookieName];
+            if (csrfToken == undefined) return "";
+            let parts = csrfToken?.split(".");
+            if (parts.length != 2) return "";
+            return parts[1];
+        }
+        return "";
+    }
 }

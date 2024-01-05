@@ -127,9 +127,13 @@ export interface Cookie {
  * Session IDs are random strings and stored in session storage. They can optionally be stored as a PBKDF2 hash 
  * (default is not to).
  * 
- * CSRF tokens use the signed cookie pattern (often called the double-submit cookie pattern, but not to be confused with
- * the less secure naiive double-submit cookie pattern).  The CSRF token is sent as a cookie, as a random string concatenated
+ * CSRF tokens use the signed double-submit cookie pattern.  The CSRF token is sent as a cookie, as a random string concatenated
  * with the session ID.  Concatenated with this is a PBKDF2 signature based on the secret.
+ * 
+ * Form handling code shoudl check that the unsigned part matches either a form field called `csrdToken`
+ * or a header called `X-CROSSAUTH-CSRF`.  Either your code making the form submission should extract the
+ * unsigned part of the CSRF token from the cookie, or else the code creating the form page should send
+ * it in the `csrfToken` hidden form field.
  */
 export class CookieAuth {
     private userStorage : UserStorage;
@@ -217,14 +221,14 @@ export class CookieAuth {
 
     ///// Session IDs
 
-    private hashSessionKey(sessionKey : string) : string {
+    hashSessionKey(sessionKey : string) : string {
         const hasher = new Hasher({
             digest: this.digest,
             iterations: this.iterations, 
             keyLength: this.keyLength,
             saltLength: this.saltLength,
         });
-        return hasher.hash(sessionKey, {encode: true});
+        return hasher.hash(this.secret, {encode: false, charset: "base64url", salt: sessionKey});
     }
 
     /**
@@ -505,7 +509,7 @@ export class CookieAuth {
      * 
      * @param token the token (with signature) to validate.
      */
-    validateCSRFToken(token : string, sessionID : string) : void {
+    validateCSRFToken(token : string, sessionID : string, formOfHeaderValue?: string|undefined) : void {
         let parts = token.split(".");
         if (parts.length != 2) {
             // TODO: this should raise a security issue
@@ -514,6 +518,13 @@ export class CookieAuth {
         }
         let signature = parts[0];
         let message = parts[1];
+        if (formOfHeaderValue && message != formOfHeaderValue) {
+            // TODO: this should raise a security issue
+            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - form/header cvalue does not match.  Stack trace follows");
+            let error = new CrossauthError(ErrorCode.InvalidKey);
+            CrossauthLogger.logger.debug(error);
+            throw error;
+        }
         if (this.csrfTokenSignature(message) != signature) {
             // TODO: this should raise a security issue
             CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - signature does not match.  Stack trace follows");
@@ -737,8 +748,8 @@ export class CookieSessionManager {
          * session ID.  Otherwise returns without error
          * @param token 
          */
-        validateCSRFToken(token : string, sessionID : string) {
-            this.auth.validateCSRFToken(token, sessionID);
+        validateCSRFToken(token : string, sessionID : string, formOrHeaderValue? : string) {
+            this.auth.validateCSRFToken(token, sessionID, formOrHeaderValue);
         }
 
 }
