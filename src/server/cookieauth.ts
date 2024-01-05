@@ -43,9 +43,6 @@ export interface CookieAuthOptions {
     /** If true, session IDs will be PBKDF2-hashed in the session storage. Defaults to false. */
     hashSessionIDs? : boolean,
 
-    /** If true, a pepper will be used to hash the session ID in addition to the password.  IF true, the value in secret will be used */
-    usePepperForSessionIDs? : boolean,
-
     ///////// CSRF token settings
 
     /** name to use for the session cookie.  Defaults to `CSRFTOKEN` */
@@ -142,7 +139,6 @@ export class CookieAuth {
     private sessionSameSite : boolean | "lax" | "strict" | "none" = 'lax';
     private sessionIDLength : number = 16;
     private hashSessionIDs : boolean = false;
-    private usePepperForSessionIDs : boolean = false;
 
     // CSRF token settings
     readonly csrfCookieName : string = "CSRFTOKEN";
@@ -185,7 +181,6 @@ export class CookieAuth {
             if (options.sessionSameSite) this.sessionSameSite = options.sessionSameSite;
             if (options.sessionIDLength) this.sessionIDLength = options.sessionIDLength;
             if (options.hashSessionIDs) this.hashSessionIDs = options.hashSessionIDs;
-            if (options.usePepperForSessionIDs) this.usePepperForSessionIDs = options.usePepperForSessionIDs;
 
             // CSRF
             if (options.csrfCookieName) this.csrfCookieName = options.csrfCookieName;
