@@ -235,23 +235,41 @@ export class CookieAuth {
      * In the unlikely event of the key already existing, it is retried up to 10 times before throwing
      * an error with ErrorCode.KeyExists
      * 
-     * @param uniqueUserId the user ID to store with the session key.
+     * @param userId the user ID to store with the session key.
+     * @param existingSessionID if passed, this will be used instead of a random one.  The expiry will be renewed
      * @returns the session key, date created and expiry.
      */
-    async createSessionKey(userId : string | number | undefined) : Promise<Key> {
+    async createSessionKey(userId : string | number | undefined, existingSessionID? : string) : Promise<Key> {
         const maxTries = 10;
         let numTries = 0;
+        const keepSessionID =  existingSessionID != undefined;
         while (true) {
-            const array = new Uint8Array(this.sessionIDLength);
-            crypto.getRandomValues(array);
-            let sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
-            if (this.hashSessionIDs) {
-                sessionKey = this.hashSessionKey(sessionKey);
+            let sessionKey;
+            let hashedSessionKey = "";
+            if (numTries == 0 && existingSessionID) {
+                sessionKey = existingSessionID;
+                hashedSessionKey = sessionKey;
+            } else {
+                const array = new Uint8Array(this.sessionIDLength);
+                crypto.getRandomValues(array);
+                sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
+                hashedSessionKey = sessionKey;
             }
+            if (this.hashSessionIDs) {
+                hashedSessionKey = this.hashSessionKey(sessionKey);
+            }    
             const dateCreated = new Date();
             let expires = this.expiry(dateCreated);
             try {
-                await this.sessionStorage.saveKey(userId, sessionKey, dateCreated, expires);
+                if (keepSessionID && numTries == 0) {
+                    // check the key exists.  If not, an error will be throws
+                    let {key} = await this.getUserForSessionKey(hashedSessionKey);
+                    key.expiry = this.expiry(key.created);
+                    await this.updateSessionKey(key);
+                } else {
+                    // save the new session - if it exists, an error will be thrown
+                    await this.sessionStorage.saveKey(userId, hashedSessionKey, dateCreated, expires);
+                }
                 return {
                     userId : userId,
                     value : sessionKey,
@@ -261,7 +279,7 @@ export class CookieAuth {
                 } catch (e) {
                 if (e instanceof CrossauthError) {
                     let ce = e as CrossauthError;
-                    if (ce.code == ErrorCode.KeyExists) {
+                    if (ce.code == ErrorCode.KeyExists || ce.code == ErrorCode.InvalidKey) {
                         numTries++;
                         if (numTries > maxTries) {
                             CrossauthLogger.logger.debug(e);
@@ -341,6 +359,10 @@ export class CookieAuth {
         return cookie;
     }
     
+    async updateSessionKey(sessionKey : Key) : Promise<void> {
+        this.sessionStorage.updateKey(sessionKey);
+    }
+
     /**
      * Returns the user matching the given session key in session storage, or throws an exception.
      * 
@@ -585,14 +607,15 @@ export class CookieSessionManager {
          *    * Returns the user (without the password hash) and the session cookie.
          * @param username the username to validate
          * @param password the password to validate
+         * @param existingSessionID if this is passed, the it will be used for the new sessionID.  If not, a new random one will be created
          * @returns the user (without the password hash) and session cookie.
          * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
          *         `PasswordNotMatch`.
          */
-        async login(username : string, password : string) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
+        async login(username : string, password : string, existingSessionID? : string) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
             const user = await this.authenticator.authenticateUser(username, password);
 
-            const sessionKey = await this.auth.createSessionKey(user.id);
+            const sessionKey = await this.auth.createSessionKey(user.id, existingSessionID);
             //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
             let sessionCookie = await this.auth.makeSessionCookie(sessionKey);
             let csrfCookie = this.auth.makeCSRFCookie(await this.auth.createCSRFToken(sessionKey.value));

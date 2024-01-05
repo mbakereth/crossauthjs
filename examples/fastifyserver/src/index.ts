@@ -53,7 +53,8 @@ let server = new FastifyCookieAuthServer(sessionManager, {
     app: app,
     views: path.join(__dirname, '../views'),
     loginPage: "login.njk",
-    anonymousSessions: false,
+    anonymousSessions: true,
+    keepAnonymousSessionID: false
 });
 
 // create our home page

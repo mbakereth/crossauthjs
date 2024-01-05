@@ -43,7 +43,7 @@ export class CrossauthLogger {
 
     /** the log level. This can be set dynamically */
     level : 0 | 1 | 2 | 3 | 4;
-    static levelName = ["NONE", "ERRRO", "WARN", "INFO", "DEBUG"];
+    static levelName = ["NONE", "ERROR", "WARN", "INFO", "DEBUG"];
 
     /**
      * Create a logger with the given level

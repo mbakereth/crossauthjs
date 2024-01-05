@@ -25,6 +25,7 @@ export interface FastifyCookieAuthServerOptions {
     loginPage? : string;
     errorPage? : string;
     anonymousSessions? : boolean,
+    keepAnonymousSessionID? : false,
 }
 
 interface LoginBodyType {
@@ -90,6 +91,7 @@ export class FastifyCookieAuthServer {
     private errorPage? : string;
     private sessionManager : CookieSessionManager;
     private anonymousSessions = true;
+    private keepAnonymousSessionID = false;
 
     /**
      * Creates the Fastify endpoints, optionally also the Fastify app.
@@ -110,8 +112,12 @@ export class FastifyCookieAuthServer {
      *                   documentation above for full description.
      * @param errorPage? Page to render error messages, including failed login.  See the class
      *                   documentation above for full description.
-     * @param anonymousSessions: if true, a session ID will be created even when the user is not logged in.
-     *                           setting this to false means you will also not get CSRF tokens if the user is not logged in.
+     * @param anonymousSessions if true, a session ID will be created even when the user is not logged in.
+     *                          setting this to false means you will also not get CSRF tokens if the user is not logged in.
+     * @param keepAnonymousSessionID if using anonymous sessions and this flag is set to true, the same session ID will
+     *                               be kept after login.  By default this is false, and a new session ID is
+     *                               created.  If, for example, you have a shopping basket that was created before
+     *                               login, you may wish to set this to true.
      */
     constructor(
         sessionManager : CookieSessionManager, {
@@ -122,12 +128,14 @@ export class FastifyCookieAuthServer {
         views,
         loginPage,
         errorPage,
-        anonymousSessions }: FastifyCookieAuthServerOptions = {}) {
+        anonymousSessions,
+        keepAnonymousSessionID }: FastifyCookieAuthServerOptions = {}) {
 
         this.sessionManager = sessionManager;
         this.loginPage = loginPage;
         this.errorPage = errorPage;
         if (anonymousSessions != undefined) this.anonymousSessions = anonymousSessions;
+        if (keepAnonymousSessionID != undefined) this.keepAnonymousSessionID = keepAnonymousSessionID;
 
         if (app) {
             this.app = app;
@@ -193,16 +201,17 @@ export class FastifyCookieAuthServer {
           
         this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
     
+            let next = request.body.next || this.loginRedirect;
             try {
-                let next = request.body.next || this.loginRedirect;
                 CrossauthLogger.logger.debug("Next page " + next);
+
                 await this.login(request, reply, 
                 (reply, _user) => {return reply.redirect(next)});
             } catch (e) {
                 CrossauthLogger.logger.error(e);
                 return this.handleError(e, reply, (reply, code, error) => {
                     if (this.loginPage) {
-                        return reply.view(this.loginPage, {error: error, code: code});
+                        return reply.view(this.loginPage, {error: error, code: code, next: next});
                     } else if (this.errorPage) {
                         return reply.view(this.errorPage, {error: error, code: code});
                     } else {
@@ -290,8 +299,14 @@ export class FastifyCookieAuthServer {
         successFn : (res : FastifyReply, user? : User) => void) {
         const username = request.body.username;
         const password = request.body.password;
+        let sessionID = undefined;
+        let cookies = request.cookies;
+        if (this.anonymousSessions && this.keepAnonymousSessionID 
+            && cookies && this.sessionManager.sessionCookieName in cookies) {
+            sessionID = cookies[this.sessionManager.sessionCookieName];
+        }
 
-        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password);
+        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, sessionID);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
@@ -302,15 +317,15 @@ export class FastifyCookieAuthServer {
     private async logout(_request : FastifyRequest, reply : FastifyReply, 
         successFn : (reply : FastifyReply) => void) {
         let cookies = reply.cookies;
-            if (cookies && this.sessionManager.sessionCookieName in cookies) {
-                if (cookies[this.sessionManager.sessionCookieName] != undefined) {
-                    await this.sessionManager.logout(reply.cookies[this.sessionManager.sessionCookieName] || "");
-                }
+        if (cookies && this.sessionManager.sessionCookieName in cookies) {
+            if (cookies[this.sessionManager.sessionCookieName] != undefined) {
+                await this.sessionManager.logout(reply.cookies[this.sessionManager.sessionCookieName] || "");
             }
-            CrossauthLogger.logger.debug("Logout: clear cookie " + this.sessionManager.sessionCookieName);
-            reply.clearCookie(this.sessionManager.sessionCookieName);
-            reply.clearCookie(this.sessionManager.csrfCookieName);
-            return successFn(reply);
+        }
+        CrossauthLogger.logger.debug("Logout: clear cookie " + this.sessionManager.sessionCookieName);
+        reply.clearCookie(this.sessionManager.sessionCookieName);
+        reply.clearCookie(this.sessionManager.csrfCookieName);
+        return successFn(reply);
 
     }
 

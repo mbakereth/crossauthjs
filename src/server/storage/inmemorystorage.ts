@@ -164,4 +164,11 @@ export class InMemoryKeyStorage extends KeyStorage {
        }
     }
 
+    async updateKey(key : Key) : Promise<void> {
+        if (key.value in this.keys) {
+            this.keys[key.value] = {...key};
+        }
+    }
+
+
 }

@@ -205,36 +205,36 @@ export class PrismaKeyStorage extends KeyStorage {
      * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
      * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
-        async getKey(key : string) : Promise<Key> {
-            let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
-            let error : CrossauthError|undefined = undefined;
-            try {
-                // @ts-ignore  (because types only exist when do prismaClient.table...)
-                let prismaKey =  await this.prismaClient[this.keyTable].findUniqueOrThrow({
-                    where: {
-                        key: key
-                    }
+    async getKey(key : string) : Promise<Key> {
+        let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
+        let error : CrossauthError|undefined = undefined;
+        try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            let prismaKey =  await this.prismaClient[this.keyTable].findUniqueOrThrow({
+                where: {
+                    key: key
+                }
+            });
+            returnKey = {
+                userId: prismaKey.user_id,
+                value: prismaKey.key,
+                created: prismaKey.created,
+                expires: prismaKey.expires,
+            }
+            if (this.extraFields) {
+                this.extraFields.forEach((key : string) => {
+                    returnKey[key] = prismaKey[key];
                 });
-                returnKey = {
-                    userId: prismaKey.user_id,
-                    value: prismaKey.key,
-                    created: prismaKey.created,
-                    expires: prismaKey.expires,
-                }
-                if (this.extraFields) {
-                    this.extraFields.forEach((key : string) => {
-                        returnKey[key] = prismaKey[key];
-                    });
-                }
-            } catch {
-                error = new CrossauthError(ErrorCode.InvalidKey);
             }
-            if (error) {
-                CrossauthLogger.logger.error(error);
-                throw error;
-            }
-            return returnKey;
+        } catch {
+            error = new CrossauthError(ErrorCode.InvalidKey);
         }
+        if (error) {
+            CrossauthLogger.logger.error(error);
+            throw error;
+        }
+        return returnKey;
+    }
     
     /**
      * Saves a key in the session table.
@@ -324,4 +324,34 @@ export class PrismaKeyStorage extends KeyStorage {
             });
         }
     }     
+
+    /**
+     * If the given session key exist in the database, update it with the passed values.  If it doesn't
+     * exist, throw a CreossauthError with InvalidKey.
+     * @param key 
+     */
+    async updateKey(key : Key) : Promise<void> {
+        let error : CrossauthError|undefined = undefined;
+        try {
+            let data : {[key : string] : any} = {
+                user_id : key.userId,
+                created : key.created,
+                expires : key.expires,
+            };
+
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            await this.prismaClient[this.keyTable].update({
+                where: {
+                    key: key.value,
+                },
+                data: data
+            });
+        } catch (e) {
+            error = new CrossauthError(ErrorCode.Connection, String(e));
+        }
+        if (error) {
+            CrossauthLogger.logger.error(error);
+            throw error;
+        }
+    }
 }

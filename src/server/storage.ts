@@ -93,6 +93,14 @@ export abstract class KeyStorage {
                          expires : Date | undefined, 
                          extraFields? : {[key : string]: any}) : Promise<void>;
 
+
+    /**
+     * If the given session key exist in the database, update it with the passed values.  If it doesn't
+     * exist, throw a CreossauthError with InvalidKey.
+     * @param key 
+     */
+    abstract updateKey(key : Key) : Promise<void>;
+
     /**
      * Deletes a key from storage (eg the database).
      * 
