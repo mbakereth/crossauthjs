@@ -207,7 +207,7 @@ export class ExpressCookieAuthServer {
             let cookies = req.cookies;
             try {
                 if (!cookies || !(this.sessionManager.sessionCookieName in cookies)) {
-                    CrossauthLogger.getInstance().debug("User requested but no session ID cookie passed");
+                    CrossauthLogger.logger.debug("User requested but no session ID cookie passed");
                     throw new CrossauthError(ErrorCode.InvalidKey);
                 }
                 let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.sessionCookieName]);
@@ -225,7 +225,7 @@ export class ExpressCookieAuthServer {
                             error = ce.message;
                     }
                 }
-                CrossauthLogger.getInstance().error(e);
+                CrossauthLogger.logger.error(e);
                 res.json({status: "error", error : error});
 
             }
@@ -292,7 +292,7 @@ export class ExpressCookieAuthServer {
                     error = ce.message;
             }
         }
-        CrossauthLogger.getInstance().error(e);
+        CrossauthLogger.logger.error(e);
 
         errorFn(res, code, error);
 
@@ -304,7 +304,7 @@ export class ExpressCookieAuthServer {
      */
     start(port : number = 3000) {
         this.app.listen(port, () =>
-            CrossauthLogger.getInstance().info(`Starting express server on port ${port} with prefix '${this.prefix}'`),
+            CrossauthLogger.logger.info(`Starting express server on port ${port} with prefix '${this.prefix}'`),
         );
 
     }

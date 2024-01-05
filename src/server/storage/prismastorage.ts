@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
 import { User, UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
-import { crossauthLogger } from '../..';
+import { CrossauthLogger } from '../..';
 
 /**
  * Optional parameters for {@link PrismaUserStorage}.
@@ -94,11 +94,11 @@ export class PrismaUserStorage extends UserPasswordStorage {
             });
 
             if (this.checkActive && !prismaUser["active"]) {
-                CrossauthLogger.getInstance().debug("User has active set to false");
+                CrossauthLogger.logger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if (this.checkEmailVerified && !prismaUser["emailVerified"]) {
-                CrossauthLogger.getInstance().debug("User has not verified email");
+                CrossauthLogger.logger.debug("User has not verified email");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             let user : UserWithPassword = {
@@ -117,7 +117,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
             error = new CrossauthError(ErrorCode.UserNotExist); 
         }
         if (error) {
-            CrossauthLogger.getInstance().error(error);
+            CrossauthLogger.logger.error(error);
             throw error;
         }
         return {id: 0, username: "", passwordHash: ""}; // never reached but needed to shut typescript up
@@ -230,7 +230,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 error = new CrossauthError(ErrorCode.InvalidKey);
             }
             if (error) {
-                CrossauthLogger.getInstance().error(error);
+                CrossauthLogger.logger.error(error);
                 throw error;
             }
             return returnKey;
@@ -268,7 +268,7 @@ export class PrismaKeyStorage extends KeyStorage {
             error = new CrossauthError(ErrorCode.Connection, String(e));
         }
         if (error) {
-            CrossauthLogger.getInstance().error(error);
+            CrossauthLogger.logger.error(error);
             throw error;
         }
     }

@@ -1,7 +1,7 @@
 import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
 import { UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
-import { crossauthLogger } from '../..';
+import { CrossauthLogger } from '../..';
 
 /**
  * Optional parameters for {@link InMemoryUserStorage}.
@@ -63,17 +63,17 @@ export class InMemoryUserStorage extends UserPasswordStorage {
 
             const user = this.usersByUsername[username];
             if ('active' in user && user['active'] == false && this.checkActive) {
-                CrossauthLogger.getInstance().debug("User has active set to false");
+                CrossauthLogger.logger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if ('emailVerified' in user && user['emailVerified'] == false && this.checkEmailVerified) {
-                CrossauthLogger.getInstance().debug("User email not verified");
+                CrossauthLogger.logger.debug("User email not verified");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             return {...user};
         }
 
-        CrossauthLogger.getInstance().debug("User does not exist");
+        CrossauthLogger.logger.debug("User does not exist");
         throw new CrossauthError(ErrorCode.UserNotExist);
     }
 
@@ -113,9 +113,9 @@ export class InMemoryKeyStorage extends KeyStorage {
         if (this.keys && key in this.keys) {
             return this.keys[key];
         }
-        CrossauthLogger.getInstance().debug("Key does not exist in key storage.  Stack trace follows");
+        CrossauthLogger.logger.debug("Key does not exist in key storage.  Stack trace follows");
         let err = new CrossauthError(ErrorCode.InvalidKey); 
-        CrossauthLogger.getInstance().debug(err.stack);
+        CrossauthLogger.logger.debug(err.stack);
         throw err;
     }
 

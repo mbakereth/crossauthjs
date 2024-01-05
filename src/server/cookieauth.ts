@@ -19,10 +19,10 @@ export interface CookieAuthOptions {
     /** Maximum age of the cookie in seconds.  Cookie and session storage table will get an expiry date based on this.  Defaults to one month. */
     maxAge? : number,
 
-    /** Set the `httpOnly` cookie flag.  Default false. */
+    /** Set the `httpOnly` cookie flag.  Default true. */
     httpOnly? : boolean,
 
-    /** Set the `secure` cookie flag.  Default false. */
+    /** Set the `secure` cookie flag.  Default false, though in production with HTTPS enabled you should set it to true. */
     secure? : boolean,
 
     /** Sets the cookie domain.  Default, no domain */
@@ -34,8 +34,8 @@ export interface CookieAuthOptions {
     /** Sets the cookie `SameSite`.  Default `lax` if not defined, which means all cookies will have SameSite set. */
     sameSite? : boolean | "lax" | "strict" | "none" | undefined,
 
-    /** Length in bytes of random session IDs to create.  Actual key will be longer as it is Base64-encoded. Defaults to 16 */
-    keyLength? : number,
+    /** Length in bytes of random string to create for session IDs.  Actual key will be longer as it is Base64-encoded. Defaults to 16 */
+    sessionIDLength? : number,
 
     /** If true, session IDs will be PBKDF2-hashed in the session storage. Defaults to false. */
     hashSessionIDs? : boolean,
@@ -49,8 +49,8 @@ export interface CookieAuthOptions {
     /** If hashSessionIDs is true, use this HMAC digest algorithm.  Default 'sha512' */
     digest? : string;
 
-    /** If hashSessionIDs is true, make the hash this length in bytes.  Default 32 */
-    hashLength? : number;
+    /** If hashSessionIDs is true, make the hash this length in bytes.  Default 16 */
+    keyLength? : number;
 
     /** 
      * This will be called with the session key to filter sessions 
@@ -92,16 +92,16 @@ export class CookieAuth {
 
     readonly sessionCookieName : string = "SESSIONID";
     private maxAge : number = 1209600; // two weeks
-    private httpOnly : boolean = false;
+    private httpOnly : boolean = true;
     private secure : boolean = false;
     private domain : string | undefined = undefined;
     private path : string | undefined = "/";
     private sameSite : boolean | "lax" | "strict" | "none" = 'lax';
-    private keyLength : number = 16;
+    private sessionIDLength : number = 16;
     private hashSessionIDs : boolean = false;
     private saltLength : number = 16;
     private iterations = 10000;
-    private hashLength = 32;
+    private keyLength = 16;
     private digest = 'sha512';
     private filterFunction? : (sessionKey : Key) => boolean;
     /**
@@ -121,12 +121,12 @@ export class CookieAuth {
             if (options.secure) this.secure = options.secure;
             if (options.domain) this.domain = options.domain;
             if (options.sameSite) this.sameSite = options.sameSite;
-            if (options.keyLength) this.keyLength = options.keyLength;
+            if (options.sessionIDLength) this.sessionIDLength = options.sessionIDLength;
             if (options.hashSessionIDs) this.hashSessionIDs = options.hashSessionIDs;
             if (options.saltLength) this.saltLength = options.saltLength;
             if (options.iterations) this.iterations = options.iterations;
             if (options.digest)this.digest = options.digest;
-            if (options.hashLength) this.hashLength = options.hashLength;
+            if (options.keyLength) this.keyLength = options.keyLength;
             this.filterFunction = options.filterFunction;
 
         }
@@ -145,7 +145,7 @@ export class CookieAuth {
         const hasher = new Hasher({
             digest: this.digest,
             iterations: this.iterations, 
-            keyLength: this.hashLength,
+            keyLength: this.keyLength,
             saltLength: this.saltLength,
         });
         return hasher.hash(sessionKey, {encode: true});
@@ -160,7 +160,7 @@ export class CookieAuth {
      * @returns the session key, date created and expiry.
      */
     async createSessionKey(userId : string | number | undefined) : Promise<Key> {
-        const array = new Uint8Array(this.keyLength);
+        const array = new Uint8Array(this.sessionIDLength);
         crypto.getRandomValues(array);
         let sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
         if (this.hashSessionIDs) {

@@ -1,3 +1,3 @@
-export * from './interfaces';
-export * from './error';
-export { CrossauthLogger, CrossauthLogLevel, type CrossauthLoggerInterface } from './logger';
+export type { Key, User, UserWithPassword } from './interfaces';
+export { CrossauthError, ErrorCode } from './error';
+export { CrossauthLogger, type CrossauthLoggerInterface } from './logger';

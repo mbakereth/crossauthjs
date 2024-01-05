@@ -1,20 +1,11 @@
-/**
- * The log level for {@link CrossauthLogger}
- */
-export enum CrossauthLogLevel {
-    None = 0,
-    Error,
-    Warn,
-    Info,
-    Debug
-  }
-
 export interface CrossauthLoggerInterface {
     error(output: any) : void;
     warn(output: any) : void;
     info(output: any) : void;
     debug(output: any) : void;
+    level? : number|string;
 }
+
 /**
  * 
  * A very simple logging class with no dependencies.
@@ -23,32 +14,46 @@ export interface CrossauthLoggerInterface {
  */
 export class CrossauthLogger {
 
-    private static instance : CrossauthLoggerInterface;
+    /** Don't log anything */
+    static readonly None = 0;
+
+    /** Only log errors */
+    static readonly Error = 1;
+
+    /** Log errors and warning */
+    static readonly Warn = 2;
+
+    /** Log errors, warnings and info messages */
+    static  readonly Info = 3;
+
+    /** Log everything */
+    static readonly Debug = 4; 
 
     /**
      * Return the singleton instance of the logger.
      * @returns the logger
      */
-    static getInstance() : CrossauthLoggerInterface { 
-        if (!CrossauthLogger.instance) {
-            CrossauthLogger.instance = new CrossauthLogger(CrossauthLogLevel.Debug);
+    static get logger() : CrossauthLoggerInterface { 
+        /*if (!CrossauthLogger.instance) {
+            CrossauthLogger.instance = new CrossauthLogger(CrossauthLogger.None);
         }
-        return CrossauthLogger.instance;
+        return CrossauthLogger.instance;*/
+        return globalThis.crossauthLogger;
     }
 
     /** the log level. This can be set dynamically */
-    level : CrossauthLogLevel;
+    level : 0 | 1 | 2 | 3 | 4;
     static levelName = ["NONE", "ERRRO", "WARN", "INFO", "DEBUG"];
 
     /**
      * Create a logger with the given level
      * @param level the level to report to
      */
-    constructor(level: CrossauthLogLevel = CrossauthLogLevel.Error) {
+    constructor(level: 0 | 1 | 2 | 3 | 4 = CrossauthLogger.Error) {
         this.level = level;
     }
 
-    private log(level: CrossauthLogLevel, output: any) {
+    private log(level: 0 | 1 | 2 | 3 | 4 , output: any) {
         if (level <= this.level) {
             console.log("Crossauth " + CrossauthLogger.levelName[level] + " " + new Date().toISOString(), output);
         }
@@ -59,22 +64,28 @@ export class CrossauthLogger {
      * @param output object to output
      */
     error(output: any) {
-        this.log(CrossauthLogLevel.Error, output);
+        this.log(CrossauthLogger.Error, output);
     }
 
     warn(output: any) {
-        this.log(CrossauthLogLevel.Warn, output);
+        this.log(CrossauthLogger.Warn, output);
     }
 
     info(output: any) {
-        this.log(CrossauthLogLevel.Info, output);
+        this.log(CrossauthLogger.Info, output);
     }
 
     debug(output: any) {
-        this.log(CrossauthLogLevel.Debug, output);
+        this.log(CrossauthLogger.Debug, output);
     }
 
-    setCrossauthLogger(logger : CrossauthLoggerInterface) {
-        CrossauthLogger.instance = logger;
+    static setCrossauthLogger(logger : CrossauthLoggerInterface) {
+        globalThis.crossauthLogger = logger;
     }
 }
+
+declare global {
+    var crossauthLogger : CrossauthLoggerInterface;
+};
+
+globalThis.crossauthLogger = new CrossauthLogger(CrossauthLogger.None);

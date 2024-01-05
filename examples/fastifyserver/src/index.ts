@@ -8,9 +8,11 @@ import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { CrossauthLogger, CrossauthLogLevel } from 'crossauth';
+import { CrossauthLogger } from 'crossauth';
+//import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
-CrossauthLogger.getInstance().level = CrossauthLogLevel.Debug;
+CrossauthLogger.logger.level = CrossauthLogger.Debug;
+//CrossauthLogger.setCrossauthLogger(Pino.pino({level: "debug"}));  // replace default logger with Pino
 
 dotenv.config();
 
