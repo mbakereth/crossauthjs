@@ -232,24 +232,50 @@ export class CookieAuth {
      * 
      * Date created is the current date/time on the server.
      * 
+     * In the unlikely event of the key already existing, it is retried up to 10 times before throwing
+     * an error with ErrorCode.KeyExists
+     * 
      * @param uniqueUserId the user ID to store with the session key.
      * @returns the session key, date created and expiry.
      */
     async createSessionKey(userId : string | number | undefined) : Promise<Key> {
-        const array = new Uint8Array(this.sessionIDLength);
-        crypto.getRandomValues(array);
-        let sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
-        if (this.hashSessionIDs) {
-            sessionKey = this.hashSessionKey(sessionKey);
-        }
-        const dateCreated = new Date();
-        let expires = this.expiry(dateCreated);
-        await this.sessionStorage.saveKey(userId, sessionKey, dateCreated, expires);
-        return {
-            userId : userId,
-            value : sessionKey,
-            created : dateCreated,
-            expires : expires
+        const maxTries = 10;
+        let numTries = 0;
+        while (true) {
+            const array = new Uint8Array(this.sessionIDLength);
+            crypto.getRandomValues(array);
+            let sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
+            if (this.hashSessionIDs) {
+                sessionKey = this.hashSessionKey(sessionKey);
+            }
+            const dateCreated = new Date();
+            let expires = this.expiry(dateCreated);
+            try {
+                await this.sessionStorage.saveKey(userId, sessionKey, dateCreated, expires);
+                return {
+                    userId : userId,
+                    value : sessionKey,
+                    created : dateCreated,
+                    expires : expires
+                }
+                } catch (e) {
+                if (e instanceof CrossauthError) {
+                    let ce = e as CrossauthError;
+                    if (ce.code == ErrorCode.KeyExists) {
+                        numTries++;
+                        if (numTries > maxTries) {
+                            CrossauthLogger.logger.debug(e);
+                            throw e;
+                        }
+                    } else {
+                        CrossauthLogger.logger.debug(e);
+                        throw e;
+                    }
+                } else {
+                    CrossauthLogger.logger.debug(e);
+                    throw e;
+                }
+            }    
         }
     }
 
@@ -515,7 +541,6 @@ export class CookieSessionManager {
     sessionStorage : KeyStorage;
     private auth : CookieAuth;
     private authenticator : HashedPasswordAuthenticator;
-    private anonymousSessions : boolean = true;
 
     /**
      * Constructor
@@ -534,7 +559,6 @@ export class CookieSessionManager {
         this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
         this.auth = new CookieAuth(this.userStorage, this.sessionStorage, secret, cookieAuthOptions);
-        if (cookieAuthOptions && cookieAuthOptions.anonymousSessions) this.anonymousSessions = cookieAuthOptions.anonymousSessions;
 
         this.authenticator = new HashedPasswordAuthenticator(this.userStorage, authenticatorOptions);
 

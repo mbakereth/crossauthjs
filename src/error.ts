@@ -39,6 +39,9 @@ export enum ErrorCode {
 
     /** Thrown when an algorithm is requested but not supported, eg hashing algorithm */
     UnsupportedAlgorithm,
+
+    /** Thrown if you try to create a key which already exists in key storage */
+    KeyExists,
 }
 
 /**
@@ -79,6 +82,8 @@ export class CrossauthError extends Error {
                 _message = "Key is not valid";
             } else if (code == ErrorCode.UnsupportedAlgorithm) {
                 _message = "Algorithm not supported";
+            } else if (code == ErrorCode.KeyExists) {
+                _message = "Attempt to create a key that already exists";
             } else {
                 _message = "Unknown error";
             }    

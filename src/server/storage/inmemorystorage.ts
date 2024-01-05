@@ -15,7 +15,7 @@ export interface InMemoryUserStorageOptions {
 
 /**
  * Implementation of {@link UserStorage} where username and password is stored in memory.  It is really only
- * intended for testing.
+ * intended for testing and is not thread safe.
  * 
  * There is no separate ID field - it is set to username.
  *  

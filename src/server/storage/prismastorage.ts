@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
 import { User, UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
@@ -265,7 +265,18 @@ export class PrismaKeyStorage extends KeyStorage {
                 data: data
             })
         } catch (e) {
+            if (e instanceof Prisma.PrismaClientKnownRequestError) {
+                const pe = e as Prisma.PrismaClientKnownRequestError;
+                if (pe.code == 'P2002') {
+                    CrossauthLogger.logger.debug("Attempt to create key that already exists. Stack trace follows");
+                    CrossauthLogger.logger.debug(pe);
+                    error = new CrossauthError(ErrorCode.KeyExists);
+                } else {
+                    CrossauthLogger.logger.debug(e);
+                    error = new CrossauthError(ErrorCode.Connection, String(e));
+                }
             error = new CrossauthError(ErrorCode.Connection, String(e));
+            }
         }
         if (error) {
             CrossauthLogger.logger.error(error);
