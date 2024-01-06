@@ -6,11 +6,14 @@ export interface Key {
     /** The key - in a cookie, the value part of cookiename=value; options... */
     value : string,
 
-    /** The date the key was created, in local time on the server */
+    /** The date/time the key was created, in local time on the server */
     created : Date,
 
-    /** The date the key expires */
+    /** The date/time the key expires */
     expires : Date | undefined
+
+    /** The /time the session was last active */
+    lastActive? : Date,
 
     userId : string | number | undefined;
 

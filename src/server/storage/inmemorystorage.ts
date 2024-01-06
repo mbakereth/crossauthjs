@@ -169,9 +169,12 @@ export class InMemoryKeyStorage extends KeyStorage {
      * exist, throw a CreossauthError with InvalidKey.
      * @param key 
      */
-    async updateKey(key : Key) : Promise<void> {
-        if (key.value in this.keys) {
-            this.keys[key.value] = {...key};
+    async updateKey(key : Partial<Key>) : Promise<void> {
+        if (key.value && key.value in this.keys) {
+            let value : string = key.value||"";
+            for (let field in key) {
+                this.keys[value] = key[field];
+            }
         }
     }
 

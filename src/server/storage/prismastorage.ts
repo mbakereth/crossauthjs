@@ -330,21 +330,25 @@ export class PrismaKeyStorage extends KeyStorage {
      * exist, throw a CreossauthError with InvalidKey.
      * @param key 
      */
-    async updateKey(key : Key) : Promise<void> {
+    async updateKey(key : Partial<Key>) : Promise<void> {
         let error : CrossauthError|undefined = undefined;
+        if (!(key.value)) throw new CrossauthError(ErrorCode.InvalidKey);
         try {
-            let data : {[key : string] : any} = {
+            /*let data : {[key : string] : any} = {
                 user_id : key.userId,
                 created : key.created,
                 expires : key.expires,
             };
+            if ("lastActive" in key) {
+                data = {...data, lastActive: key.lastActive};
+            }*/
 
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             await this.prismaClient[this.keyTable].update({
                 where: {
                     key: key.value,
                 },
-                data: data
+                data: key
             });
         } catch (e) {
             error = new CrossauthError(ErrorCode.Connection, String(e));

@@ -99,7 +99,7 @@ export abstract class KeyStorage {
      * exist, throw a CreossauthError with InvalidKey.
      * @param key 
      */
-    abstract updateKey(key : Key) : Promise<void>;
+    abstract updateKey(key : Partial<Key>) : Promise<void>;
 
     /**
      * Deletes a key from storage (eg the database).

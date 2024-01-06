@@ -40,6 +40,9 @@ export interface CookieAuthOptions {
     /** Length in bytes of random string to create for session IDs.  Actual key will be longer as it is Base64-encoded. Defaults to 16 */
     sessionIdLength? : number,
 
+    /** If greater than zero, non-anonymous sessions will expire after this number of sessions. Must have the `lastActive` field in key storage  */
+    sessionIdleTimeout? : number,
+
     /** If true, session IDs will be PBKDF2-hashed in the session storage. Defaults to false. */
     hashSessionIds? : boolean,
 
@@ -150,6 +153,7 @@ export class CookieAuth {
     private sessionSameSite : boolean | "lax" | "strict" | "none" = 'lax';
     private sessionIdLength : number = 16;
     private hashSessionIds : boolean = false;
+    readonly sessionIdleTimeout : number = 0;
 
     // CSRF token settings
     readonly csrfCookieName : string = "CSRFTOKEN";
@@ -192,6 +196,7 @@ export class CookieAuth {
             if (options.sessionSameSite) this.sessionSameSite = options.sessionSameSite;
             if (options.sessionIdLength) this.sessionIdLength = options.sessionIdLength;
             if (options.hashSessionIds) this.hashSessionIds = options.hashSessionIds;
+            if (options.sessionIdleTimeout) this.sessionIdleTimeout = options.sessionIdleTimeout;
 
             // CSRF
             if (options.csrfCookieName) this.csrfCookieName = options.csrfCookieName;
@@ -269,10 +274,17 @@ export class CookieAuth {
                     // check the key exists.  If not, an error will be throws
                     let {key} = await this.getUserForSessionKey(hashedSessionKey);
                     key.expiry = this.expiry(key.created);
+                    if (this.sessionIdleTimeout > 0) {
+                        key.lastActive = new Date();
+                    }
                     await this.updateSessionKey(key);
                 } else {
                     // save the new session - if it exists, an error will be thrown
-                    await this.sessionStorage.saveKey(userId, hashedSessionKey, dateCreated, expires);
+                    let extraFields = {};
+                    if (this.sessionIdleTimeout > 0) {
+                        extraFields = {lastActivity: new Date()};
+                    }
+                    await this.sessionStorage.saveKey(userId, hashedSessionKey, dateCreated, expires, extraFields);
                 }
                 return {
                     userId : userId,
@@ -363,7 +375,7 @@ export class CookieAuth {
         return cookie;
     }
     
-    async updateSessionKey(sessionKey : Key) : Promise<void> {
+    async updateSessionKey(sessionKey : Partial<Key>) : Promise<void> {
         this.sessionStorage.updateKey(sessionKey);
     }
 
@@ -390,6 +402,12 @@ export class CookieAuth {
                 CrossauthLogger.logger.debug(error);
                 throw error;
             }
+        }
+        if (this.sessionIdleTimeout > 0 && key.lastActive 
+            && now > key.lastActive.getTime() + this.sessionIdleTimeout*1000) {
+                let error = new CrossauthError(ErrorCode.Expired);
+                CrossauthLogger.logger.debug(error);
+                throw error;
         }
         if (this.filterFunction) {
             if (!this.filterFunction(key)) {
@@ -832,4 +850,12 @@ export class CookieSessionManager {
             this.auth.validateDoubleSubmitCsrfToken(token, sessionId, formOrHeaderValue);
         }
 
+    async updateSessionActivity(sessionId : string) : Promise<void> {
+        if (this.auth.sessionIdleTimeout > 0) {
+            this.auth.updateSessionKey({
+                value: sessionId,
+                lastActive: new Date(),
+            });
+        }
+    }
 }
