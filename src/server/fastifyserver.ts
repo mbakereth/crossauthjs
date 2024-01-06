@@ -214,6 +214,12 @@ export class FastifyCookieAuthServer {
                     await this.createAnonymousSessionIdIfNoneExists(request, reply);
                 csrfToken = csrfCookie.value;
                 loggedInUser = user;
+            } else {
+                let {csrfCookie, user} = 
+                    await this.getValidatedCsrfTokenAndUser(request, reply);
+                    csrfToken = csrfCookie ? csrfCookie.value : undefined;
+                    loggedInUser = user;
+    
             }
             request.user = loggedInUser;
             request.csrfToken = csrfToken?csrfToken.split(".")[1]:undefined; // already validated so this will work;
@@ -317,7 +323,9 @@ export class FastifyCookieAuthServer {
     
     private async login(request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
-        await this.validateCsrfToken(request, reply)
+        if (this.anonymousSessions) {
+            await this.validateCsrfToken(request, reply)
+        }
         const username = request.body.username;
         const password = request.body.password;
         let sessionId = undefined;
@@ -367,6 +375,29 @@ export class FastifyCookieAuthServer {
             reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         }
         if (csrfToken != csrfCookie.value) {
+            CrossauthLogger.logger.debug("Creating CSRF Token");
+            reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
+        }        
+        return {sessionCookie, csrfCookie, user};
+    };
+
+    private async getValidatedCsrfTokenAndUser(request : FastifyRequest, reply : FastifyReply) 
+        : Promise<{sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, user : User|undefined}> {
+        let cookies = request.cookies;
+        let sessionId : string|undefined = undefined;
+        let csrfToken : string|undefined = undefined;
+        if (cookies && this.sessionManager.sessionCookieName in cookies) {
+            sessionId = cookies[this.sessionManager.sessionCookieName]||""
+        };
+        if (cookies && this.sessionManager.csrfCookieName in cookies) {
+            csrfToken = cookies[this.sessionManager.csrfCookieName]||"";
+        }
+        let {sessionCookie, csrfCookie, user} = await this.sessionManager.getValidatedSessionAndCsrf(sessionId, csrfToken);
+        if (sessionCookie && sessionId != sessionCookie.value) {
+            CrossauthLogger.logger.debug("Creating session ID");
+            reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
+        }
+        if (csrfCookie && csrfToken != csrfCookie.value) {
             CrossauthLogger.logger.debug("Creating CSRF Token");
             reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         }        

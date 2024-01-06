@@ -681,7 +681,7 @@ export class CookieSessionManager {
         }
 
         /**
-         * IF a valid session key does not exist, create and store an anonymous one.
+         * If a valid session key does not exist, create and store an anonymous one.
          * 
          * If the session ID and/or csrfToken are passed, they are validated.  If invalid, they are recrated.
          * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
@@ -689,6 +689,33 @@ export class CookieSessionManager {
          */
         async createAnonymousSessionKeyIfNoneExists(sessionId? : string, csrfToken? : string) 
         : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user : User|undefined}> {
+            let {sessionKey, sessionCookie, csrfCookie, user} = await this.getValidatedSessionAndCsrf(sessionId, csrfToken);
+
+            if (!sessionKey) {
+                sessionKey = await this.auth.createSessionKey(undefined);
+            }
+            if (!sessionCookie) {
+                sessionCookie = this.auth.makeSessionCookie(sessionKey);
+            }  
+            if (!csrfCookie) {
+                csrfToken = await this.auth.createCsrfToken(sessionKey.value);
+                csrfCookie = this.auth.makeCsrfCookie(csrfToken);
+            }
+            return {
+                sessionCookie,
+                csrfCookie,
+                user
+            };
+        }
+
+        /**
+         * Validate the sessionId and csrfToken.  Return them and the user if they are valid.  Return undefined otherwise.
+         * 
+         * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
+         *          each of these was newly created and the user, which may be undefined.
+         */
+        async getValidatedSessionAndCsrf(sessionId? : string, csrfToken? : string) 
+            : Promise<{sessionKey : Key|undefined, sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, user : User|undefined}> {
             let sessionKey : Key|undefined = undefined;
             let user : User|undefined = undefined;
             if (sessionId) {
@@ -709,11 +736,10 @@ export class CookieSessionManager {
                     csrfToken = undefined;
                 }
             }
-            if (!sessionKey)  sessionKey = await this.auth.createSessionKey(undefined);
-            if (!csrfToken) csrfToken = await this.auth.createCsrfToken(sessionKey.value);
-            const sessionCookie = await this.auth.makeSessionCookie(sessionKey);
-            const csrfCookie = this.auth.makeCsrfCookie(csrfToken);
+            let sessionCookie = sessionKey ? await this.auth.makeSessionCookie(sessionKey) : undefined;         
+            const csrfCookie = csrfToken? this.auth.makeCsrfCookie(csrfToken) : undefined;
             return {
+                sessionKey,
                 sessionCookie,
                 csrfCookie,
                 user
