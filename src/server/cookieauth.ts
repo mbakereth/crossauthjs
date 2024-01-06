@@ -281,7 +281,7 @@ export class CookieAuth {
                 } else {
                     // save the new session - if it exists, an error will be thrown
                     let extraFields = {};
-                    if (this.sessionIdleTimeout > 0) {
+                    if (this.sessionIdleTimeout > 0 && userId) {
                         extraFields = {lastActivity: new Date()};
                     }
                     await this.sessionStorage.saveKey(userId, hashedSessionKey, dateCreated, expires, extraFields);

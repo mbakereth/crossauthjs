@@ -220,7 +220,7 @@ export class FastifyCookieAuthServer {
                     csrfToken = csrfCookie ? csrfCookie.value : undefined;
                     loggedInUser = user;
                 let sessionId = this.getSessionIdFromCookie(request);
-                if (sessionId) this.sessionManager.updateSessionActivity(sessionId);
+                if (sessionId && loggedInUser) this.sessionManager.updateSessionActivity(sessionId);
             }
             request.user = loggedInUser;
             request.csrfToken = csrfToken?csrfToken.split(".")[1]:undefined; // already validated so this will work;
