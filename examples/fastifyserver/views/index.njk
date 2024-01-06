@@ -4,9 +4,9 @@
         <link rel="stylesheet" href="/public/style.css"/>
         </head>
     <body>
-        <h1>Welcome {{ username | default('nobody') }}</h1>
+        <h1>Welcome {{ user.username | default('nobody') }}</h1>
 
-        {% if username %}
+        {% if user.username %}
             <form method="POST" action="/logout">
                 <button type="submit">Logout</button>
             </form>

@@ -13,10 +13,23 @@ export type { PrismaUserStorageOptions, PrismaKeyStorageOptions as PrismaSession
 export { InMemoryUserStorage, InMemoryKeyStorage as InMemorySessionStorage } from './server/storage/inmemorystorage';
 
 export { FastifyCookieAuthServer } from './server/fastifyserver';
-export type { FastifyCookieAuthServerOptions } from './server/fastifyserver';
+export type { FastifyCookieAuthServerOptions  } from './server/fastifyserver';
 
 export { ExpressCookieAuthServer } from './server/expressserver';
 export type { ExpressCookieAuthServerOptions } from './server/expressserver';
 
 export { Hasher } from './server/hasher';
 export type { HasherOptions, PasswordHash } from './server/hasher';
+
+import type { User } from '..';
+
+declare module 'fastify' {
+    export interface FastifyRequest {
+      user: User|undefined,
+      csrfToken: string|undefined,
+    }
+    /*interface FastifyReply {
+      myPluginProp: number
+    }*/
+  }
+

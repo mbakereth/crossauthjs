@@ -54,23 +54,19 @@ let server = new FastifyCookieAuthServer(sessionManager, {
     views: path.join(__dirname, '../views'),
     loginPage: "login.njk",
     anonymousSessions: true,
-    keepAnonymousSessionID: false
+    keepAnonymousSessionId: false
 });
 
 // create our home page
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    let user = await server.getUserFromCookie(request, reply);
-    let username = user? user.username : undefined;
-    return reply.view('index.njk', {username});
+    return reply.view('index.njk', {user: request.user});
 }
 );
 
 // create a sample login-protected page
 app.get('/protected', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    let user = await server.getUserFromCookie(request, reply);
-    if (!user) return reply.redirect(302, "/login?next=/protected");
-    let username = user? user.username : undefined;
-    return reply.view('protected.njk', {username});
+    if (!request.user) return reply.redirect(302, "/login?next=/protected");
+    return reply.view('protected.njk', {user: request.user});
 }
 );
 

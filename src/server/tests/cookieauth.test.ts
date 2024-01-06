@@ -28,14 +28,14 @@ test('CookieAuth.createSessionKey', async () => {
 
 });
 
-test('CookieAuth.createAndValidateCSRFToken', async () => {
+test('CookieAuth.createAndValidateCsrfToken', async () => {
     const sessionStorage = new InMemoryKeyStorage();
     const auth = new CookieAuth(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX");
-    let sessionID = "0123456789ABCDEFGHIJKL";
-    let token = await auth.createCSRFToken(sessionID);
+    let sessionId = "0123456789ABCDEFGHIJKL";
+    let token = await auth.createCsrfToken(sessionId);
     let valid = false;
     try {
-        auth.validateCSRFToken(token, sessionID);
+        auth.validateCsrfToken(token, sessionId);
         valid = true;
     } catch {}
     expect(valid).toBe(true);
@@ -43,7 +43,7 @@ test('CookieAuth.createAndValidateCSRFToken', async () => {
 
 test('CookieAuth.createSessionKey.encrypted', async () => {
     const sessionStorage = new InMemoryKeyStorage();
-    const auth = new CookieAuth(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX", { hashSessionIDs: true });
+    const auth = new CookieAuth(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX", { hashSessionIds: true });
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
     let hashedValue = auth.hashSessionKey(value);
@@ -82,14 +82,14 @@ test('CookieSessionManager.logoutFromAll', async() => {
     }
 })
 
-test('CookieSessionManager.createAndValidateCSRFToken', async() => {
+test('CookieSessionManager.createAndValidateCsrfToken', async() => {
     const sessionStorage = new InMemoryKeyStorage();
     let manager = new CookieSessionManager(userStorage, sessionStorage, "ABCDEFGHIJKLMNOPQRSTUVWX");
-    let sessionID = "0123456789ABCDEFGHIJKL";
-    let cookie = await manager.createCSRFToken(sessionID);
+    let sessionId = "0123456789ABCDEFGHIJKL";
+    let cookie = await manager.createCsrfToken(sessionId);
     let valid = false;
     try {
-        manager.validateCSRFToken(cookie.value, sessionID);
+        manager.validateCsrfToken(cookie.value, sessionId);
         valid = true;
     } catch {}
     expect(valid).toBe(true);

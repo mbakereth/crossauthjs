@@ -38,10 +38,10 @@ export interface CookieAuthOptions {
     sessionSameSite? : boolean | "lax" | "strict" | "none" | undefined,
 
     /** Length in bytes of random string to create for session IDs.  Actual key will be longer as it is Base64-encoded. Defaults to 16 */
-    sessionIDLength? : number,
+    sessionIdLength? : number,
 
     /** If true, session IDs will be PBKDF2-hashed in the session storage. Defaults to false. */
-    hashSessionIDs? : boolean,
+    hashSessionIds? : boolean,
 
     ///////// CSRF token settings
 
@@ -68,16 +68,16 @@ export interface CookieAuthOptions {
 
     //////////////// PBKDF2 settings
 
-    /** If hashSessionIDs is true, create salts of this length.  Defaults to 16 */
+    /** If hashSessionIds is true, create salts of this length.  Defaults to 16 */
     saltLength? : number,
 
-    /** If hashSessionIDs is true, use this number of iterations when generating the PBKDF2 hash.  Default 100000 */
+    /** If hashSessionIds is true, use this number of iterations when generating the PBKDF2 hash.  Default 100000 */
     iterations? : number;
 
-    /** If hashSessionIDs is true, use this HMAC digest algorithm.  Default 'sha512' */
+    /** If hashSessionIds is true, use this HMAC digest algorithm.  Default 'sha512' */
     digest? : string;
 
-    /** Length of the hash.  This is for the signature on CSRF tokens and for session IDs when hashSessionIDs is true.  
+    /** Length of the hash.  This is for the signature on CSRF tokens and for session IDs when hashSessionIds is true.  
      *  In bytes, default 16.  In practice higher as it is Base64Url-encoded */
     keyLength? : number;
 
@@ -148,8 +148,8 @@ export class CookieAuth {
     private sessionDomain : string | undefined = undefined;
     private sessionPath : string | undefined = "/";
     private sessionSameSite : boolean | "lax" | "strict" | "none" = 'lax';
-    private sessionIDLength : number = 16;
-    private hashSessionIDs : boolean = false;
+    private sessionIdLength : number = 16;
+    private hashSessionIds : boolean = false;
 
     // CSRF token settings
     readonly csrfCookieName : string = "CSRFTOKEN";
@@ -190,8 +190,8 @@ export class CookieAuth {
             if (options.sessionSecure) this.sessionSecure = options.sessionSecure;
             if (options.sessionDomain) this.sessionDomain = options.sessionDomain;
             if (options.sessionSameSite) this.sessionSameSite = options.sessionSameSite;
-            if (options.sessionIDLength) this.sessionIDLength = options.sessionIDLength;
-            if (options.hashSessionIDs) this.hashSessionIDs = options.hashSessionIDs;
+            if (options.sessionIdLength) this.sessionIdLength = options.sessionIdLength;
+            if (options.hashSessionIds) this.hashSessionIds = options.hashSessionIds;
 
             // CSRF
             if (options.csrfCookieName) this.csrfCookieName = options.csrfCookieName;
@@ -240,32 +240,32 @@ export class CookieAuth {
      * an error with ErrorCode.KeyExists
      * 
      * @param userId the user ID to store with the session key.
-     * @param existingSessionID if passed, this will be used instead of a random one.  The expiry will be renewed
+     * @param existingSessionId if passed, this will be used instead of a random one.  The expiry will be renewed
      * @returns the session key, date created and expiry.
      */
-    async createSessionKey(userId : string | number | undefined, existingSessionID? : string) : Promise<Key> {
+    async createSessionKey(userId : string | number | undefined, existingSessionId? : string) : Promise<Key> {
         const maxTries = 10;
         let numTries = 0;
-        const keepSessionID =  existingSessionID != undefined;
+        const keepSessionId =  existingSessionId != undefined;
         while (true) {
             let sessionKey;
             let hashedSessionKey = "";
-            if (numTries == 0 && existingSessionID) {
-                sessionKey = existingSessionID;
+            if (numTries == 0 && existingSessionId) {
+                sessionKey = existingSessionId;
                 hashedSessionKey = sessionKey;
             } else {
-                const array = new Uint8Array(this.sessionIDLength);
+                const array = new Uint8Array(this.sessionIdLength);
                 crypto.getRandomValues(array);
                 sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
                 hashedSessionKey = sessionKey;
             }
-            if (this.hashSessionIDs) {
+            if (this.hashSessionIds) {
                 hashedSessionKey = this.hashSessionKey(sessionKey);
             }    
             const dateCreated = new Date();
             let expires = this.expiry(dateCreated);
             try {
-                if (keepSessionID && numTries == 0) {
+                if (keepSessionId && numTries == 0) {
                     // check the key exists.  If not, an error will be throws
                     let {key} = await this.getUserForSessionKey(hashedSessionKey);
                     key.expiry = this.expiry(key.created);
@@ -380,7 +380,7 @@ export class CookieAuth {
      */
     async getUserForSessionKey(sessionKey: string) : Promise<{user: User|undefined, key : Key}> {
         const now = Date.now();
-        if (this.hashSessionIDs) {
+        if (this.hashSessionIds) {
             sessionKey = this.hashSessionKey(sessionKey);
         }
         const key = await this.sessionStorage.getKey(sessionKey);
@@ -413,7 +413,7 @@ export class CookieAuth {
      * @param except if defined, don't delete this key
      */
     async deleteAllForUser(userId : string | number, except: string|undefined) {
-        if (except && this.hashSessionIDs) {
+        if (except && this.hashSessionIds) {
             except = this.hashSessionKey(except);
         }
         await this.sessionStorage.deleteAllForUser(userId, except);
@@ -438,7 +438,7 @@ export class CookieAuth {
      * @param uniqueUserId the user ID to store with the session key.
      * @returns the session key, date created and expiry.
      */
-    async createCSRFToken(sessionKey : string) : Promise<string> {
+    async createCsrfToken(sessionKey : string) : Promise<string> {
         const array = new Uint8Array(this.csrfLength);
         crypto.getRandomValues(array);
         let token = sessionKey + "!" + Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
@@ -455,7 +455,7 @@ export class CookieAuth {
      * @param token the value of the csrf token, with signature
      * @returns a {@link Cookie } object,
      */
-    makeCSRFCookie(token : string) : Cookie {
+    makeCsrfCookie(token : string) : Cookie {
         let options : CookieOptions = {}
         if (this.csrfDomain) {
             options.domain = this.csrfDomain;
@@ -486,7 +486,7 @@ export class CookieAuth {
      * @param token the session key to put in the cookie
      * @returns a string representation of the cookie and options.
      */
-    makeCSRFCookieString(token : string) : string {
+    makeCsrfCookieString(token : string) : string {
         let cookie = this.csrfCookieName + "=" + token + "; SameSite=" + this.csrfSameSite;
         if (this.csrfDomain) {
             cookie += "; " + this.csrfDomain;
@@ -504,12 +504,12 @@ export class CookieAuth {
     }
 
     /**
-     * Validates the passed CSRDF token: returns if it is valid, throws {@link index.CrossauthError} with ErrorCode.InvalidKey
-     * otherwise.
+     * Validates the passed CSRF token.  The signature must match the payload, and the payload must match the additional value from the header or form
      * 
      * @param token the token (with signature) to validate.
+     * @param formOfHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
      */
-    validateCSRFToken(token : string, sessionID : string, formOfHeaderValue?: string|undefined) : void {
+    validateDoubleSubmitCsrfToken(token : string, sessionId : string, formOfHeaderValue: string|undefined) : void {
         let parts = token.split(".");
         if (parts.length != 2) {
             // TODO: this should raise a security issue
@@ -518,7 +518,7 @@ export class CookieAuth {
         }
         let signature = parts[0];
         let message = parts[1];
-        if (formOfHeaderValue && message != formOfHeaderValue) {
+        if (message != formOfHeaderValue) {
             // TODO: this should raise a security issue
             CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - form/header cvalue does not match.  Stack trace follows");
             let error = new CrossauthError(ErrorCode.InvalidKey);
@@ -540,8 +540,51 @@ export class CookieAuth {
             CrossauthLogger.logger.debug(error);
             throw error;
         }
-        let sessionIDInToken = parts[0];
-        if (sessionIDInToken != sessionID) {
+        let sessionIdInToken = parts[0];
+        if (sessionIdInToken != sessionId) {
+            // not necessarily a security issue - session ID may have changed when user logged in
+            CrossauthLogger.logger.debug("Invalid CSRF token " + token + " received - session ID does not match.  Stack trace follows");
+            let error = new CrossauthError(ErrorCode.InvalidKey);
+            CrossauthLogger.logger.debug(error);
+            throw error;
+
+        }
+
+    }
+
+    /**
+     * Validates the passed CSRF token.  The signature must match the payload.  
+     * 
+     * Doesn't check it matches a double-submit value passed from the form or headers
+     * 
+     * @param token the token (with signature) to validate.
+     */
+    validateCsrfToken(token : string, sessionId : string,) : void {
+        let parts = token.split(".");
+        if (parts.length != 2) {
+            // TODO: this should raise a security issue
+            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received");
+            throw new CrossauthError(ErrorCode.InvalidKey);
+        }
+        let signature = parts[0];
+        let message = parts[1];
+        if (this.csrfTokenSignature(message) != signature) {
+            // TODO: this should raise a security issue
+            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - signature does not match.  Stack trace follows");
+            let error = new CrossauthError(ErrorCode.InvalidKey);
+            CrossauthLogger.logger.debug(error);
+            throw error;
+        }
+        parts = message.split("!");
+        if (parts.length != 2) {
+            // TODO: this should raise a security issue
+            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received.  Stack trace follows");
+            let error = new CrossauthError(ErrorCode.InvalidKey);
+            CrossauthLogger.logger.debug(error);
+            throw error;
+        }
+        let sessionIdInToken = parts[0];
+        if (sessionIdInToken != sessionId) {
             // not necessarily a security issue - session ID may have changed when user logged in
             CrossauthLogger.logger.debug("Invalid CSRF token " + token + " received - session ID does not match.  Stack trace follows");
             let error = new CrossauthError(ErrorCode.InvalidKey);
@@ -618,18 +661,18 @@ export class CookieSessionManager {
          *    * Returns the user (without the password hash) and the session cookie.
          * @param username the username to validate
          * @param password the password to validate
-         * @param existingSessionID if this is passed, the it will be used for the new sessionID.  If not, a new random one will be created
+         * @param existingSessionId if this is passed, the it will be used for the new sessionId.  If not, a new random one will be created
          * @returns the user (without the password hash) and session cookie.
          * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
          *         `PasswordNotMatch`.
          */
-        async login(username : string, password : string, existingSessionID? : string) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
+        async login(username : string, password : string, existingSessionId? : string) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
             const user = await this.authenticator.authenticateUser(username, password);
 
-            const sessionKey = await this.auth.createSessionKey(user.id, existingSessionID);
+            const sessionKey = await this.auth.createSessionKey(user.id, existingSessionId);
             //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
             let sessionCookie = await this.auth.makeSessionCookie(sessionKey);
-            let csrfCookie = this.auth.makeCSRFCookie(await this.auth.createCSRFToken(sessionKey.value));
+            let csrfCookie = this.auth.makeCsrfCookie(await this.auth.createCsrfToken(sessionKey.value));
             return {
                 sessionCookie: sessionCookie,
                 csrfCookie: csrfCookie,
@@ -638,40 +681,42 @@ export class CookieSessionManager {
         }
 
         /**
-         * Creates and stores a session key that is not associated with a user.
-         * 
-         * Called when the user is not logged in.  We need this for CSRF tokens
+         * IF a valid session key does not exist, create and store an anonymous one.
          * 
          * If the session ID and/or csrfToken are passed, they are validated.  If invalid, they are recrated.
-         * @returns a cookie with the session ID.
+         * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
+         *          each of these was newly created and the user, which may be undefined.
          */
-        async createAnonymousSessionKey(sessionID? : string, csrfToken? : string) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie}> {
+        async createAnonymousSessionKeyIfNoneExists(sessionId? : string, csrfToken? : string) 
+        : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user : User|undefined}> {
             let sessionKey : Key|undefined = undefined;
-            if (sessionID) {
+            let user : User|undefined = undefined;
+            if (sessionId) {
                 try {
-                    let  {key} = await this.auth.getUserForSessionKey(sessionID);
+                    let  {key} = await this.auth.getUserForSessionKey(sessionId);
                     if (key) sessionKey = key;
-                    await this.userForSessionKey(sessionID);
+                    user = await this.userForSessionKey(sessionId);
                 }
                 catch {
-                    sessionID = undefined;
+                    sessionId = undefined;
                     csrfToken = undefined;
                 }
             }
-            if (sessionID && csrfToken) {
+            if (sessionId && csrfToken) {
                 try {
-                    this.auth.validateCSRFToken(csrfToken, sessionID);
+                    this.auth.validateCsrfToken(csrfToken, sessionId);
                 } catch {
                     csrfToken = undefined;
                 }
             }
-            if (!sessionKey) sessionKey = await this.auth.createSessionKey(undefined);
-            if (!csrfToken) csrfToken = await this.auth.createCSRFToken(sessionKey.value);
+            if (!sessionKey)  sessionKey = await this.auth.createSessionKey(undefined);
+            if (!csrfToken) csrfToken = await this.auth.createCsrfToken(sessionKey.value);
             const sessionCookie = await this.auth.makeSessionCookie(sessionKey);
-            const csrfCookie = this.auth.makeCSRFCookie(csrfToken);
+            const csrfCookie = this.auth.makeCsrfCookie(csrfToken);
             return {
                 sessionCookie,
-                csrfCookie
+                csrfCookie,
+                user
             };
         }
 
@@ -736,11 +781,11 @@ export class CookieSessionManager {
     
         /**
          * Creates and returns a signed CSRF token based on the session ID
-         * @param sessionID the session ID
+         * @param sessionId the session ID
          * @returns a signed CSRF token
          */
-        async createCSRFToken(sessionID : string) : Promise<Cookie> {
-            return this.auth.makeCSRFCookie(await this.auth.createCSRFToken(sessionID));
+        async createCsrfToken(sessionId : string) : Promise<Cookie> {
+            return this.auth.makeCsrfCookie(await this.auth.createCsrfToken(sessionId));
         }
 
         /**
@@ -748,8 +793,17 @@ export class CookieSessionManager {
          * session ID.  Otherwise returns without error
          * @param token 
          */
-        validateCSRFToken(token : string, sessionID : string, formOrHeaderValue? : string) {
-            this.auth.validateCSRFToken(token, sessionID, formOrHeaderValue);
+        validateCsrfToken(token : string, sessionId : string) {
+            this.auth.validateCsrfToken(token, sessionId);
+        }
+
+        /**
+         * Throws {@link index!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
+         * session ID.  Otherwise returns without error
+         * @param token 
+         */
+        validateDoubleSubmitCsrfToken(token : string, sessionId : string, formOrHeaderValue : string) {
+            this.auth.validateDoubleSubmitCsrfToken(token, sessionId, formOrHeaderValue);
         }
 
 }

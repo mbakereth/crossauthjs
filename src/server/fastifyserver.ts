@@ -6,7 +6,7 @@ import cookie from '@fastify/cookie'
 import { Server, IncomingMessage, ServerResponse } from 'http'
 
 import nunjucks from "nunjucks";
-import { CookieSessionManager } from './cookieauth';
+import { CookieSessionManager, Cookie } from './cookieauth';
 import { CrossauthError, ErrorCode } from "..";
 import { User } from '../interfaces';
 import { CrossauthLogger } from '..';
@@ -27,7 +27,7 @@ export interface FastifyCookieAuthServerOptions {
     loginPage? : string;
     errorPage? : string;
     anonymousSessions? : boolean,
-    keepAnonymousSessionID? : false,
+    keepAnonymousSessionId? : false,
 }
 
 interface LoginBodyType {
@@ -37,7 +37,7 @@ interface LoginBodyType {
     csrfToken: string;
 }
 
-interface CSRFBodyType {
+interface CsrfBodyType {
     csrfToken : string;
 }
 
@@ -45,7 +45,7 @@ interface LoginParamsType {
     next? : string;
 }
 
-/**
+  /**
  * This class provides a complete (but without HTML files) auth backend server with endpoints served using Fastify.
  * 
  * If you do not pass an Fastify app to this class, it will create one.  If you set the views parameter, it
@@ -98,7 +98,7 @@ export class FastifyCookieAuthServer {
     private errorPage? : string;
     private sessionManager : CookieSessionManager;
     private anonymousSessions = true;
-    private keepAnonymousSessionID = false;
+    private keepAnonymousSessionId = false;
 
     /**
      * Creates the Fastify endpoints, optionally also the Fastify app.
@@ -121,7 +121,7 @@ export class FastifyCookieAuthServer {
      *                   documentation above for full description.
      * @param anonymousSessions if true, a session ID will be created even when the user is not logged in.
      *                          setting this to false means you will also not get CSRF tokens if the user is not logged in.
-     * @param keepAnonymousSessionID if using anonymous sessions and this flag is set to true, the same session ID will
+     * @param keepAnonymousSessionId if using anonymous sessions and this flag is set to true, the same session ID will
      *                               be kept after login.  By default this is false, and a new session ID is
      *                               created.  If, for example, you have a shopping basket that was created before
      *                               login, you may wish to set this to true.
@@ -136,13 +136,13 @@ export class FastifyCookieAuthServer {
         loginPage,
         errorPage,
         anonymousSessions,
-        keepAnonymousSessionID }: FastifyCookieAuthServerOptions = {}) {
+        keepAnonymousSessionId }: FastifyCookieAuthServerOptions = {}) {
 
         this.sessionManager = sessionManager;
         this.loginPage = loginPage;
         this.errorPage = errorPage;
         if (anonymousSessions != undefined) this.anonymousSessions = anonymousSessions;
-        if (keepAnonymousSessionID != undefined) this.keepAnonymousSessionID = keepAnonymousSessionID;
+        if (keepAnonymousSessionId != undefined) this.keepAnonymousSessionId = keepAnonymousSessionId;
 
         if (app) {
             this.app = app;
@@ -172,6 +172,10 @@ export class FastifyCookieAuthServer {
             // secret: "my-secret", // for cookies signature
             parseOptions: {}     // options for parsing cookies
           } as FastifyCookieOptions)
+
+        this.app.decorateRequest('user', undefined);
+        this.app.decorateRequest('csrfToken', undefined);
+
                     
         if (prefix) {
             this.prefix = prefix;
@@ -188,9 +192,8 @@ export class FastifyCookieAuthServer {
                     
         if (views && loginPage) {
             this.app.get(this.prefix+'login', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) =>  {
-                let csrfToken = this.getCSRFToken(request);
                 if (this.loginPage)  { // if is redundant but VC Code complains without it
-                    let data : {next? : any, csrfToken: string} = {csrfToken: csrfToken};
+                    let data : {next? : any, csrfToken: string|undefined} = {csrfToken: request.csrfToken};
                     if (request.query.next) {
                         data["next"] = request.query.next;
                     }
@@ -203,14 +206,22 @@ export class FastifyCookieAuthServer {
             console.log(error);
           })
 
-        this.app.addHook('onRequest', async (request : FastifyRequest, reply : FastifyReply) => {
-            if (this.anonymousSessions) await this.createAnonymousSessionID(request, reply);
+        this.app.addHook('onRequest', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+            let csrfToken : string|undefined = undefined;
+            let loggedInUser : User|undefined = undefined;
+            if (this.anonymousSessions) {
+                let {csrfCookie, user} = 
+                    await this.createAnonymousSessionIdIfNoneExists(request, reply);
+                csrfToken = csrfCookie.value;
+                loggedInUser = user;
+            }
+            request.user = loggedInUser;
+            request.csrfToken = csrfToken?csrfToken.split(".")[1]:undefined; // already validated so this will work;
         });
           
         this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
     
             let next = request.body.next || this.loginRedirect;
-            let csrfToken = this.getCSRFToken(request);
             try {
                 CrossauthLogger.logger.debug("Next page " + next);
 
@@ -220,9 +231,9 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.error(e);
                 return this.handleError(e, reply, (reply, code, error) => {
                     if (this.loginPage) {
-                        return reply.view(this.loginPage, {error: error, code: code, next: next, csrfToken: csrfToken});
+                        return reply.view(this.loginPage, {error: error, code: code, next: next, csrfToken: request.csrfToken});
                     } else if (this.errorPage) {
-                        return reply.view(this.errorPage, {error: error, code: code, csrfToken: csrfToken});
+                        return reply.view(this.errorPage, {error: error, code: code, csrfToken: request.csrfToken});
                     } else {
                         return reply.send(`<html><head><title>Error</head><body>There has been an error: ${error}</body></html>`);
                     }
@@ -265,7 +276,7 @@ export class FastifyCookieAuthServer {
             try {
                 await this.logout(request, reply, 
                 (reply) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
-                if (this.anonymousSessions) await this.createAnonymousSessionID(request, reply);
+                if (this.anonymousSessions) await this.createAnonymousSessionIdIfNoneExists(request, reply);
             } catch (e) {
                 CrossauthLogger.logger.error(e);
                 this.handleError(e, reply, (reply, code, error) => {
@@ -306,17 +317,17 @@ export class FastifyCookieAuthServer {
     
     private async login(request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
-        this.validateCSRFToken(request, reply)
+        await this.validateCsrfToken(request, reply)
         const username = request.body.username;
         const password = request.body.password;
-        let sessionID = undefined;
+        let sessionId = undefined;
         let cookies = request.cookies;
-        if (this.anonymousSessions && this.keepAnonymousSessionID 
+        if (this.anonymousSessions && this.keepAnonymousSessionId 
             && cookies && this.sessionManager.sessionCookieName in cookies) {
-            sessionID = cookies[this.sessionManager.sessionCookieName];
+            sessionId = cookies[this.sessionManager.sessionCookieName];
         }
 
-        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, sessionID);
+        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, sessionId);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
@@ -339,18 +350,19 @@ export class FastifyCookieAuthServer {
 
     }
 
-    private async createAnonymousSessionID(request : FastifyRequest, reply : FastifyReply) : Promise<void> {
+    private async createAnonymousSessionIdIfNoneExists(request : FastifyRequest, reply : FastifyReply) 
+        : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user : User|undefined}> {
         let cookies = request.cookies;
-        let sessionID : string|undefined = undefined;
+        let sessionId : string|undefined = undefined;
         let csrfToken : string|undefined = undefined;
         if (cookies && this.sessionManager.sessionCookieName in cookies) {
-            sessionID = cookies[this.sessionManager.sessionCookieName]||""
+            sessionId = cookies[this.sessionManager.sessionCookieName]||""
         };
         if (cookies && this.sessionManager.csrfCookieName in cookies) {
             csrfToken = cookies[this.sessionManager.csrfCookieName]||"";
         }
-        let {sessionCookie, csrfCookie} = await this.sessionManager.createAnonymousSessionKey(sessionID, csrfToken);
-        if (sessionID != sessionCookie.value) {
+        let {sessionCookie, csrfCookie, user} = await this.sessionManager.createAnonymousSessionKeyIfNoneExists(sessionId, csrfToken);
+        if (sessionId != sessionCookie.value) {
             CrossauthLogger.logger.debug("Creating session ID");
             reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         }
@@ -358,6 +370,7 @@ export class FastifyCookieAuthServer {
             CrossauthLogger.logger.debug("Creating CSRF Token");
             reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         }        
+        return {sessionCookie, csrfCookie, user};
     };
 
     private handleError(e : any, reply : FastifyReply, errorFn : (reply : FastifyReply, code : ErrorCode, error : string) => void) {
@@ -382,19 +395,58 @@ export class FastifyCookieAuthServer {
 
     }
 
-    async validateCSRFToken(request : FastifyRequest<{ Body: CSRFBodyType }>, 
+    private getSessionIdFromCookie(request : FastifyRequest) : string|undefined{
+        if (request.cookies && this.sessionManager.sessionCookieName in request.cookies) {       
+            return request.cookies[this.sessionManager.sessionCookieName]
+        }
+        return undefined;
+    }
+
+    private getCsrfTokenFromCookie(request : FastifyRequest) : string|undefined{
+        if (request.cookies && this.sessionManager.csrfCookieName in request.cookies) {       
+            return request.cookies[this.sessionManager.csrfCookieName]
+        }
+        return undefined;
+    }
+
+    /**
+     * Checks the CSRF token in the cookie and form field/header is valid.
+     * 
+     * Doesn't return a value.  Exits successfully if the token is present and valid.  Throws a
+     * CrossauthError with ErrorCode.InvalidKey if it is not.
+     * 
+     * The token in the cookie must have a signature that matches its payload.  The payload must match
+     * the value in the csrfToken form field or X-CROSSAUTH-CSRF header.
+     * 
+     * @param request the fastify request
+     * @param _reply the fastify reply
+     * @param sessionId if given, use this as the session ID.  If undefined, it is taken from the request cookie
+     */
+    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>, 
                             _reply : FastifyReply,
-                            sessionID? : string) {
-        let cookies = request.cookies;
-        if (!sessionID) {
-            if (!cookies || !(this.sessionManager.sessionCookieName in cookies 
-                && cookies[this.sessionManager.sessionCookieName])) {
+                            sessionId? : string) {
+        if (!sessionId) {
+            sessionId = this.getSessionIdFromCookie(request);
+            if (!sessionId) {
                 CrossauthLogger.logger.debug("No session cookie found when validating CSRF token");
                 throw new CrossauthError(ErrorCode.InvalidKey);
             }
-            sessionID = cookies[this.sessionManager.sessionCookieName]||"";
         } 
-        let formOrHeaderToken  : string = "";
+        let formOrHeaderToken = this.getCsrfTokenFromFormOrHeader(request);
+        if (!formOrHeaderToken) {
+            CrossauthLogger.logger.debug("No CSRF form or header value found when validating CSRF token");
+            throw new CrossauthError(ErrorCode.InvalidKey);
+        }
+        let csrfToken = this.getCsrfTokenFromCookie(request);
+        if (!csrfToken) {
+            CrossauthLogger.logger.debug("No CSRF cookie found when validating CSRF token");
+            throw new CrossauthError(ErrorCode.InvalidKey);
+        }
+        this.sessionManager.validateDoubleSubmitCsrfToken(csrfToken, sessionId, formOrHeaderToken);
+    }
+
+    private getCsrfTokenFromFormOrHeader(request : FastifyRequest<{ Body: CsrfBodyType }>) : string|undefined {
+        let formOrHeaderToken  : string|undefined = undefined;
         if (request.body.csrfToken) {
             formOrHeaderToken = request.body.csrfToken;
         } else if (request.headers[CSRFHEADER]) {
@@ -405,19 +457,7 @@ export class FastifyCookieAuthServer {
                 formOrHeaderToken = headers;
             }            
         }
-
-        if (!sessionID) {
-            CrossauthLogger.logger.debug("validateCSRFToken: sessionID not passed and not in cookie.  Stack tracer follows");
-            let error = new CrossauthError(ErrorCode.InvalidKey);
-            CrossauthLogger.logger.debug(error);
-            throw error;
-        }
-        if (!cookies || !(this.sessionManager.csrfCookieName in cookies)) {
-            CrossauthLogger.logger.debug("No CSRF cookie found when validating CSRF token");
-            throw new CrossauthError(ErrorCode.InvalidKey);
-        }
-        let csrfToken = cookies[this.sessionManager.csrfCookieName]||"";
-        this.sessionManager.validateCSRFToken(csrfToken, sessionID, formOrHeaderToken);
+        return formOrHeaderToken;
     }
 
     /**
@@ -429,54 +469,5 @@ export class FastifyCookieAuthServer {
             CrossauthLogger.logger.info(`Starting fastify server on port ${port} with prefix '${this.prefix}'`),
         );
 
-    }
-
-    /**
-     * Looks the cookie up in session storage.  If it matches a user, that user is returned.  Otherwise
-     * undefined is returned.
-     * 
-     * If the cookie exists but is not valid, it is deleted.
-     * @param request the fastify request object (to get the cookie from).
-     * @param reply  the fastify reply object (for clearing the cookie).
-     * @returns the user matching the session ID or undefined.
-     */
-    async getUserFromCookie(request : FastifyRequest, reply : FastifyReply) : Promise<User|undefined> {
-        try {
-            if (request.cookies && this.sessionManager.sessionCookieName in request.cookies) {
-                return await this.sessionManager.userForSessionKey(request.cookies[this.sessionManager.sessionCookieName]||"");
-            }
-        } catch (e) {
-            CrossauthLogger.logger.error(e);
-        }
-        if (request.cookies && this.sessionManager.sessionCookieName in request.cookies) {
-            try {
-                // TODO: this should be logged as a security warning
-                CrossauthLogger.logger.info("Clearing invalid cookie " + this.sessionManager.sessionCookieName);
-                reply.clearCookie(this.sessionManager.sessionCookieName);
-            } catch {}
-        }
-    }  
-
-    /**
-     * Returns the CSRF token from the cookie so that you can add it to form fields
-     * 
-     * Put this in the data you pass to the template containing the form.  Call the form field "csrfToken".
-     * 
-     * If your CSRF cookie is set to httpOnly, this is the only way to pass it through your form to
-     * the form handler.  If your  CSRF cookie does not have httpOnly, you can use JavaScript code it put
-     * it in the X-CROSSAUTH-CSRF header.
-     * 
-     * @param request the fastify request object
-     * @returns 
-     */
-    getCSRFToken(request : FastifyRequest) : string {
-        if (request.cookies && this.sessionManager.csrfCookieName in request.cookies) {
-            let csrfToken = request.cookies[this.sessionManager.csrfCookieName];
-            if (csrfToken == undefined) return "";
-            let parts = csrfToken?.split(".");
-            if (parts.length != 2) return "";
-            return parts[1];
-        }
-        return "";
     }
 }
