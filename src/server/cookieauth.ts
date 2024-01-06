@@ -403,7 +403,7 @@ export class CookieAuth {
                 throw error;
             }
         }
-        if (this.sessionIdleTimeout > 0 && key.lastActive 
+        if (key.userId && this.sessionIdleTimeout > 0 && key.lastActive 
             && now > key.lastActive.getTime() + this.sessionIdleTimeout*1000) {
                 let error = new CrossauthError(ErrorCode.Expired);
                 CrossauthLogger.logger.debug(error);
