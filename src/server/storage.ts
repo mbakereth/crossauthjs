@@ -58,6 +58,12 @@ export abstract class UserPasswordStorage extends UserStorage {
         return rest;
     }
 
+    /**
+     * If the given user exists in the database, update it with the passed values.  If it doesn't
+     * exist, throw a CrossauthError with InvalidKey.
+     * @param user  The id field must be set, but all others are optional 
+     */
+    abstract updateUser(user : Partial<User>) : Promise<void>;
 }
 
 /**
@@ -95,8 +101,8 @@ export abstract class KeyStorage {
 
 
     /**
-     * If the given session key exist in the database, update it with the passed values.  If it doesn't
-     * exist, throw a CreossauthError with InvalidKey.
+     * If the given session key exists in the database, update it with the passed values.  If it doesn't
+     * exist, throw a CrossauthError with InvalidKey.
      * @param key 
      */
     abstract updateKey(key : Partial<Key>) : Promise<void>;

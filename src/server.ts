@@ -6,7 +6,7 @@ export {
 export type { UsernamePasswordAuthenticatorOptions } from './server/password';
 
 export { CookieSessionManager } from './server/cookieauth';
-export type { CookieAuthOptions, CookieOptions, Cookie,  CookieSessionManagerOptions } from './server/cookieauth';
+export type { CookieAuthOptions, CookieOptions, Cookie } from './server/cookieauth';
 
 export { PrismaUserStorage, PrismaKeyStorage } from './server/storage/prismastorage';
 export type { PrismaUserStorageOptions, PrismaKeyStorageOptions as PrismaSessionStorageOptions } from './server/storage/prismastorage';

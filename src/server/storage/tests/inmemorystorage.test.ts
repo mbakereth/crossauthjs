@@ -22,6 +22,16 @@ test('InMemoryUserStorage.getUser', async () => {
     await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
 });
 
+// test updating a field
+test('InMemoryUserStorage.updateUser', async () => {
+    const bob = await userStorage.getUserByUsername("bob");
+    expect(bob.username).toBe("bob");
+    userStorage.updateUser({id: "bob", dummyField: "def"});
+    const bob2 = await userStorage.getUserByUsername("bob");
+    expect(bob2.dummyField).toBe("def");
+});
+
+
 test('InMemoryKeyStorage.createGetAndDeleteSession', async () => {
     const key = "ABCDEF123";
     const keyStorage = new InMemoryKeyStorage();

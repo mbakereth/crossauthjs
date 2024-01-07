@@ -26,6 +26,18 @@ export interface FastifyCookieAuthServerOptions {
     views? : string;
     loginPage? : string;
     errorPage? : string;
+    changePasswordPage? : string,
+    resetPasswordPage? : string,
+    emailVerifiedPage? : string,
+    emailVerificationTextBody? : string,
+    emailVerificationHtmlBody? : string,
+    emailVerificationSubject? : string,
+    emailFrom? : string,
+    smtpHost? : string;
+    smtpPort? : number,
+    smtpUseTLS? : boolean,
+    smtpUsername? : string,
+    smtpPassword? : string,
     anonymousSessions? : boolean,
     keepAnonymousSessionId? : false,
 }
@@ -97,6 +109,18 @@ export class FastifyCookieAuthServer {
     private logoutRedirect : string = "/";
     private loginPage? : string;
     private errorPage? : string;
+    private changePasswordPage? : string;
+    private resetPasswordPage? : string;
+    private emailVerifiedPage? : string;
+    private emailVerificationTextBody? : string;
+    private emailVerificationHtmlBody? : string;
+    private emailVerificationSubject : string = "Please verify your email address";
+    private emailFrom? : string;
+    private smtpHost? : string;
+    private smtpPort : number = 587;
+    private smtpUseTLS : boolean = true;
+    private smtpUsername : string|undefined = undefined;
+    private smtpPassword : string|undefined = undefined;
     private sessionManager : CookieSessionManager;
     private anonymousSessions = true;
     private keepAnonymousSessionId = false;
@@ -116,10 +140,27 @@ export class FastifyCookieAuthServer {
      * @param views If you do not pass your own app, passing a directory name here will cause a Nunjucks renderer
      *              to be created with this directory/URL.  See the class
      *              documentation above for full description.
-     * @param loginPage? Page to render the login page (with or without an error message).  See the class
+     * @param loginPage Page to render the login page (with or without an error message).  See the class
      *                   documentation above for full description.
-     * @param errorPage? Page to render error messages, including failed login.  See the class
+     * @param errorPage Page to render error messages, including failed login.  See the class
      *                   documentation above for full description.
+     * @param changePasswordPage Page to render password change.  This is only called if checkPasswordReset
+     *                           is enabled on user storage.
+     * @param resetPasswordPage  Page to render password reset.
+     * @param emailVerifiedPage  Page to render email verification success.  If not given, and checkEmailVerified
+     *                           is enabled on the user storage, a bare bones page will be rendered.
+     * @param emailVerificationTextBody When email verification is requested, this Nunjucks file is rendered and
+     *                               sent as text.  Only sent if checkEmailVerification set on user storage.
+     * @param emailVerificationHtmlBody When email verification is requested, this Nunjucks file is rendered and
+     *                               sent as html.  Only sent if checkEmailVerification set on user storage.
+     * @param emailVerificationSubject When email verification is requested, this the email will have this
+     *                                 subject.  Defaults to `Please verify your emaila address`
+     * @param emailFrom         From address when sending email
+     * @param emailFrom          Host for sending emails
+     * @param smtpPort          Port for sending emails
+     * @param smtpUsername      Username for sending emails
+     * @param smtpPassword      Password for sending emails
+     * @param smtpUseTLS        Whether to use TLS when connecting to SMTP server
      * @param anonymousSessions if true, a session ID will be created even when the user is not logged in.
      *                          setting this to false means you will also not get CSRF tokens if the user is not logged in.
      * @param keepAnonymousSessionId if using anonymous sessions and this flag is set to true, the same session ID will
@@ -136,12 +177,37 @@ export class FastifyCookieAuthServer {
         views,
         loginPage,
         errorPage,
+        changePasswordPage,
+        resetPasswordPage,
+        emailVerifiedPage,
+        emailVerificationTextBody,
+        emailVerificationHtmlBody,
+        emailVerificationSubject,
+        emailFrom,
+        smtpHost,
+        smtpPort,
+        smtpUsername,
+        smtpPassword,
+        smtpUseTLS,
         anonymousSessions,
         keepAnonymousSessionId }: FastifyCookieAuthServerOptions = {}) {
 
         this.sessionManager = sessionManager;
         this.loginPage = loginPage;
         this.errorPage = errorPage;
+        if (changePasswordPage) this.changePasswordPage = changePasswordPage;
+        if (resetPasswordPage) this.resetPasswordPage = resetPasswordPage;
+        if (emailVerifiedPage) this.emailVerifiedPage = emailVerifiedPage;
+        if (emailVerificationTextBody) this.emailVerificationTextBody = emailVerificationTextBody;
+        if (emailVerificationHtmlBody) this.emailVerificationHtmlBody = emailVerificationHtmlBody;
+        if (emailVerificationSubject) this.emailVerificationSubject = emailVerificationSubject;
+        if (emailVerificationSubject) this.emailVerificationSubject = emailVerificationSubject;
+        if (emailFrom) this.emailFrom = emailFrom;
+        if (smtpHost) this.smtpHost = smtpHost;
+        if (smtpPort) this.smtpPort = smtpPort;
+        if (smtpUsername) this.smtpUsername = smtpUsername;
+        if (smtpPassword) this.smtpPassword = smtpPassword;
+        if (smtpUseTLS) this.smtpUseTLS = smtpUseTLS;
         if (anonymousSessions != undefined) this.anonymousSessions = anonymousSessions;
         if (keepAnonymousSessionId != undefined) this.keepAnonymousSessionId = keepAnonymousSessionId;
 

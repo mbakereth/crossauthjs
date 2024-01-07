@@ -8,11 +8,13 @@ export function getTestUserStorage(pepper? : string|undefined) : InMemoryUserSto
         id: 'bob',
         username: 'bob',
         passwordHash: authenticator.createPasswordHash("bobPass123", true),
+        dummyField: "abc",
     });
     userStorage.addUser({
         id: 'alice',
         username: 'alice',
         passwordHash: authenticator.createPasswordHash("bobPass123", true),
+        dummyField: "def",
     });
     return userStorage;
 }

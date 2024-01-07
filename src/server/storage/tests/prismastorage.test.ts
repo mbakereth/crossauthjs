@@ -12,12 +12,13 @@ beforeAll(async () => {
     prismaClient = new PrismaClient();
     await prismaClient.user.deleteMany({});
     await prismaClient.key.deleteMany({});
-    userStorage = new PrismaUserStorage();
+    userStorage = new PrismaUserStorage({extraFields: ["dummyField"]});
     let authenticator = new HashedPasswordAuthenticator(userStorage);
     await prismaClient.user.create({
         data: {
           username: 'bob',
           passwordHash: authenticator.createPasswordHash("bobPass123", true),
+          dummyField: "abc",
         },
     });
     
@@ -25,6 +26,7 @@ beforeAll(async () => {
         data: {
             username: 'alice',
             passwordHash:  authenticator.createPasswordHash("alicePass123", true),
+            dummyField: "abc",
         },
       });
 });
@@ -38,6 +40,17 @@ test('PrismaUserStorage.getUser', async () => {
     expect(bob2.id).toBe(id);
     await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
 });
+
+// test updating a field in the user table
+test("PrismaKeyStorage.updateUser", async() => {
+    const bob = await userStorage.getUserByUsername("bob");
+    expect(bob.username).toBe("bob");
+    bob.dummyField = "def";
+    await userStorage.updateUser(bob);
+    const bob2 = await userStorage.getUserByUsername("bob");
+    expect(bob2.dummyField).toBe("def");
+})
+
 
 test('PrismaKeyStorage.createGetAndDeleteKey', async () => {
     const key = "ABCDEF123";
@@ -86,7 +99,6 @@ test("PrismaKeyStorage.deleteAllKeysForUserExcept", async() => {
     await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
 
 });
-
 
 afterAll(async () => {
     //await prismaClient.user.deleteMany({});

@@ -2,6 +2,7 @@ import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
 import { UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 import { CrossauthLogger } from '../..';
+import type { User } from '../..';
 
 /**
  * Optional parameters for {@link InMemoryUserStorage}.
@@ -85,6 +86,20 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      */
     async getUserById(id : string) : Promise<UserWithPassword> {
         return await this.getUserByUsername(id);
+    }
+
+    /**
+     * If the given session key exist in the database, update it with the passed values.  If it doesn't
+     * exist, throw a CreossauthError with InvalidKey.
+     * @param user the user to update.  The id to update is taken from this obkect, which must be present.  All other attributes are optional. 
+     */
+    async updateUser(user : Partial<User>) : Promise<void> {
+        if (user.id && user.id in this.usersByUsername) {
+            let id : string|number = user.id||"";
+            for (let field in user) {
+                this.usersByUsername[id][field] = user[field];
+            }
+        }
     }
 }
 

@@ -156,6 +156,10 @@ export class Hasher {
         return "pbkdf2" + ":" + digest + ":" + String(keyLen) + ":" + String(iterations) + ":" + usePepper + ":" + salt + ":" + hashedPassword;
     }
 
+    /**
+     * Creates a random salt
+     * @returns random salt as a base64 encoded string
+     */
     randomSalt() : string {
         const array = new Uint8Array(this.saltLength);
         crypto.getRandomValues(array);
@@ -163,6 +167,28 @@ export class Hasher {
 
     }
 
+    /**
+     * Creates a random string
+     * @param length length of the string to create
+     * @param charset base64 or base64url
+     * @returns the random value as a string.  Number of bytes will be greater as it is base64 encoded.
+     */
+    static randomValue(length : number, charset: string = "base64url") {
+        const array = new Uint8Array(length);
+        crypto.getRandomValues(array);
+        const res = Buffer.from(array).toString('base64');
+        if (charset == "base64") return res;
+        else return Hasher.base64ToBase64Url(res);
+    }
+
+    /**
+     * Hashes the password and returns it as a base64 or base64url encoded string
+     * @param plaintext password to hash
+     * @param param1 salt: salt to use.  Make a random one if not passed
+     *               charset: "base64" or "base64url"
+     *               encode: if true, returns the full string as it should be stored in the database.
+     * @returns the string containing the hash and the values to decode it
+     */
     hash(plaintext : string, {salt, charset, encode} : HashOptions = {}) {
         if (salt == undefined) salt = this.randomSalt();
         let usePepper = this.pepper != undefined;

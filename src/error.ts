@@ -42,6 +42,9 @@ export enum ErrorCode {
 
     /** Thrown if you try to create a key which already exists in key storage */
     KeyExists,
+
+    /** Thrown if the user needs to reset his or her password */
+    PasswordResetNeeded,
 }
 
 /**
@@ -84,6 +87,8 @@ export class CrossauthError extends Error {
                 _message = "Algorithm not supported";
             } else if (code == ErrorCode.KeyExists) {
                 _message = "Attempt to create a key that already exists";
+            } else if (code == ErrorCode.PasswordResetNeeded) {
+                _message = "User must reset password";
             } else {
                 _message = "Unknown error";
             }    
