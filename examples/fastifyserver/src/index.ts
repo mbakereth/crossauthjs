@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { PrismaClient } from '@prisma/client';
-import { CookieSessionManager, FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage } from 'crossauth/server';
+import { CookieSessionManager, FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage, HashedPasswordAuthenticator } from 'crossauth/server';
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import type { FastifyCookieOptions } from '@fastify/cookie'
@@ -46,7 +46,8 @@ app.register(view, {
 const prisma = new PrismaClient();
 let userStorage = new PrismaUserStorage({prismaClient : prisma});
 let sessionStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
-let sessionManager = new CookieSessionManager(userStorage, sessionStorage, secret);
+let authenticator = new HashedPasswordAuthenticator(userStorage);
+let sessionManager = new CookieSessionManager(userStorage, sessionStorage, authenticator, secret, {persistSessionId: true});
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyCookieAuthServer(sessionManager, {
@@ -54,7 +55,7 @@ let server = new FastifyCookieAuthServer(sessionManager, {
     views: path.join(__dirname, '../views'),
     loginPage: "login.njk",
     anonymousSessions: true,
-    keepAnonymousSessionId: false
+    keepAnonymousSessionId: false,
 });
 
 // create our home page

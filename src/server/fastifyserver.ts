@@ -33,12 +33,13 @@ export interface FastifyCookieAuthServerOptions {
 interface LoginBodyType {
     username: string;
     password: string;
+    persist? : boolean,
     next? : string;
-    csrfToken: string;
+    csrfToken?: string;
 }
 
 interface CsrfBodyType {
-    csrfToken : string;
+    csrfToken? : string;
 }
 
 interface LoginParamsType {
@@ -192,6 +193,7 @@ export class FastifyCookieAuthServer {
                     
         if (views && loginPage) {
             this.app.get(this.prefix+'login', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info('GET ' + this.prefix+'login ' + request.ip )
                 if (this.loginPage)  { // if is redundant but VC Code complains without it
                     let data : {next? : any, csrfToken: string|undefined} = {csrfToken: request.csrfToken};
                     if (request.query.next) {
@@ -227,7 +229,7 @@ export class FastifyCookieAuthServer {
         });
           
         this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
-    
+            CrossauthLogger.logger.info('POST ' + this.prefix+'login ' + request.ip + ' ' + request.body.username);            
             let next = request.body.next || this.loginRedirect;
             try {
                 CrossauthLogger.logger.debug("Next page " + next);
@@ -250,6 +252,7 @@ export class FastifyCookieAuthServer {
         });
 
         this.app.post(this.prefix+'logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
+            CrossauthLogger.logger.info('POST ' + this.prefix+'logout ' + request.ip + ' ' + (request.user?request.user.username:""));            
             try {
                 await this.logout(request, reply, 
                 (reply) => {return reply.redirect(this.logoutRedirect)});
@@ -267,6 +270,7 @@ export class FastifyCookieAuthServer {
         });
 
         this.app.post(this.prefix+'api/login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
+            CrossauthLogger.logger.info('POST ' + this.prefix+'api/login ' + request.ip + ' ' + request.body.username);            
             try {
                 await this.login(request, reply, 
                 (reply, user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user})});
@@ -280,6 +284,7 @@ export class FastifyCookieAuthServer {
         });
 
         this.app.post(this.prefix+'api/logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
+            CrossauthLogger.logger.info('POST ' + this.prefix+'api/logout ' + request.ip + ' ' + (request.user?request.user.username:""));            
             try {
                 await this.logout(request, reply, 
                 (reply) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
@@ -293,6 +298,7 @@ export class FastifyCookieAuthServer {
         });
 
         this.app.get(this.prefix+'api/userforsessionkey', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
+            CrossauthLogger.logger.info('POST ' + this.prefix+'api/userforsessionkey ' + request.ip + ' ' + (request.user?request.user.username:""));            
             let cookies = request.cookies;
             try {
                 if (!cookies || !(this.sessionManager.sessionCookieName in cookies)) {
@@ -329,32 +335,49 @@ export class FastifyCookieAuthServer {
         }
         const username = request.body.username;
         const password = request.body.password;
+        const persist = request.body.persist;
+
         let sessionId = undefined;
-        let cookies = request.cookies;
-        if (this.anonymousSessions && this.keepAnonymousSessionId 
-            && cookies && this.sessionManager.sessionCookieName in cookies) {
-            sessionId = cookies[this.sessionManager.sessionCookieName];
+        let oldSessionId : string|undefined = undefined;
+        if (this.anonymousSessions && !this.keepAnonymousSessionId) 
+            oldSessionId = this.getSessionIdFromCookie(request);
+        if (this.anonymousSessions && this.keepAnonymousSessionId) {
+            sessionId = this.getSessionIdFromCookie(request);
         }
 
-        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, sessionId);
+        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, sessionId, persist);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
+        if (oldSessionId) {
+            try {
+                await this.sessionManager.deleteSessionId(oldSessionId);
+            } catch (e) {
+                CrossauthLogger.logger.warn("Couldn't delete session ID from database");
+                CrossauthLogger.logger.debug(e);
+            }
+        }
         return successFn(reply, user);
     }
 
-    private async logout(_request : FastifyRequest, reply : FastifyReply, 
+    private async logout(request : FastifyRequest, reply : FastifyReply, 
         successFn : (reply : FastifyReply) => void) {
-        let cookies = reply.cookies;
-        if (cookies && this.sessionManager.sessionCookieName in cookies) {
-            if (cookies[this.sessionManager.sessionCookieName] != undefined) {
-                await this.sessionManager.logout(reply.cookies[this.sessionManager.sessionCookieName] || "");
-            }
+        let sessionId = this.getSessionIdFromCookie(request);
+        if (sessionId) {
+                await this.sessionManager.logout(sessionId||"");
         }
         CrossauthLogger.logger.debug("Logout: clear cookie " + this.sessionManager.sessionCookieName);
         reply.clearCookie(this.sessionManager.sessionCookieName);
         reply.clearCookie(this.sessionManager.csrfCookieName);
+        if (sessionId) {
+            try {
+                await this.sessionManager.deleteSessionId(sessionId);
+            } catch (e) {
+                CrossauthLogger.logger.warn("Couldn't delete session ID from database");
+                CrossauthLogger.logger.debug(e);
+            }
+        }
         return successFn(reply);
 
     }

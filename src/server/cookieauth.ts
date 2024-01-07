@@ -4,7 +4,7 @@ import type {
 } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, UserPasswordStorage, KeyStorage } from './storage';
-import { HashedPasswordAuthenticator } from "./password";
+import { UsernamePasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 import { Hasher } from './hasher';
 import { CrossauthLogger } from '../logger.ts';
@@ -21,6 +21,9 @@ export interface CookieAuthOptions {
 
     /** Maximum age of the session cookie in seconds.  Cookie and session storage table will get an expiry date based on this.  Defaults to one month. */
     sessionMaxAge? : number,
+
+    /** If true, persist the session Ids with a maxAge.  Default is true */
+    persistSessionId? : boolean,
 
     /** Set the `httpOnly` cookie flag for the session cookie.  Default true. */
     sessionHttpOnly? : boolean,
@@ -44,7 +47,7 @@ export interface CookieAuthOptions {
     sessionIdleTimeout? : number,
 
     /** If true, session IDs will be PBKDF2-hashed in the session storage. Defaults to false. */
-    hashSessionIds? : boolean,
+    hashSessionId? : boolean,
 
     ///////// CSRF token settings
 
@@ -133,19 +136,20 @@ export interface Cookie {
  * CSRF tokens use the signed double-submit cookie pattern.  The CSRF token is sent as a cookie, as a random string concatenated
  * with the session ID.  Concatenated with this is a PBKDF2 signature based on the secret.
  * 
- * Form handling code shoudl check that the unsigned part matches either a form field called `csrdToken`
+ * Form handling code should check that the unsigned part matches either a form field called `csrdToken`
  * or a header called `X-CROSSAUTH-CSRF`.  Either your code making the form submission should extract the
  * unsigned part of the CSRF token from the cookie, or else the code creating the form page should send
  * it in the `csrfToken` hidden form field.
  */
 export class CookieAuth {
-    private userStorage : UserStorage;
-    private sessionStorage : KeyStorage;
+    readonly userStorage : UserStorage;
+    readonly sessionStorage : KeyStorage;
     private secret : string;
 
     // session ID settings
     readonly sessionCookieName : string = "SESSIONID";
     private sessionMaxAge : number = 1209600; // two weeks
+    private persistSessionId : boolean = true;
     private sessionHttpOnly : boolean = true;
     private sessionSecure : boolean = false;
     private sessionDomain : string | undefined = undefined;
@@ -189,13 +193,22 @@ export class CookieAuth {
         if (options) {
             // session
             if (options.sessionCookieName) this.sessionCookieName = options.sessionCookieName;
-            if (options.sessionMaxAge) this.sessionMaxAge = options.sessionMaxAge;
-            if (options.sessionHttpOnly) this.sessionHttpOnly = options.sessionHttpOnly;
+            if (options.sessionMaxAge) {
+                if (options.sessionMaxAge && options.sessionMaxAge <= 0) {
+                    CrossauthLogger.logger.warn("maxAge <=0 ignored - setting to default")
+                } else {
+                    this.sessionMaxAge = options.sessionMaxAge;
+                }
+            }
+            if (options.persistSessionId != undefined) {
+                this.persistSessionId = options.persistSessionId;
+            }
+                if (options.sessionHttpOnly) this.sessionHttpOnly = options.sessionHttpOnly;
             if (options.sessionSecure) this.sessionSecure = options.sessionSecure;
             if (options.sessionDomain) this.sessionDomain = options.sessionDomain;
             if (options.sessionSameSite) this.sessionSameSite = options.sessionSameSite;
             if (options.sessionIdLength) this.sessionIdLength = options.sessionIdLength;
-            if (options.hashSessionIds) this.hashSessionIds = options.hashSessionIds;
+            if (options.hashSessionId) this.hashSessionIds = options.hashSessionId;
             if (options.sessionIdleTimeout) this.sessionIdleTimeout = options.sessionIdleTimeout;
 
             // CSRF
@@ -273,7 +286,7 @@ export class CookieAuth {
                 if (keepSessionId && numTries == 0) {
                     // check the key exists.  If not, an error will be throws
                     let {key} = await this.getUserForSessionKey(hashedSessionKey);
-                    key.expiry = this.expiry(key.created);
+                    key.expiry = expires;
                     if (this.sessionIdleTimeout > 0) {
                         key.lastActive = new Date();
                     }
@@ -319,14 +332,16 @@ export class CookieAuth {
      * This class is compatible, for example, with Express.
      * 
      * @param sessionKey the value of the session key
+     * @param persist if passed, overrides the persistSessionId setting
      * @returns a {@link Cookie } object,
      */
-    makeSessionCookie(sessionKey : Key) : Cookie {
+    makeSessionCookie(sessionKey : Key, persist? : boolean) : Cookie {
         let options : CookieOptions = {}
+        if (persist == undefined) persist = this.persistSessionId;
         if (this.sessionDomain) {
             options.domain = this.sessionDomain;
         }
-        if (sessionKey.expires) {
+        if (sessionKey.expires && persist) {
             options.expires = sessionKey.expires;
         }
         if (this.sessionPath) {
@@ -456,10 +471,10 @@ export class CookieAuth {
      * @param uniqueUserId the user ID to store with the session key.
      * @returns the session key, date created and expiry.
      */
-    async createCsrfToken(sessionKey : string) : Promise<string> {
+    async createCsrfToken(sessionId : string) : Promise<string> {
         const array = new Uint8Array(this.csrfLength);
         crypto.getRandomValues(array);
-        let token = sessionKey + "!" + Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
+        let token = sessionId + "!" + Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
         let signature = this.csrfTokenSignature(token);
 
         return signature + "." + token;
@@ -615,16 +630,6 @@ export class CookieAuth {
 }
 
 /**
- * Options to {@link CookieSessionManager}. 
- * 
- * See constructor of that class for details.
- */
-export interface CookieSessionManagerOptions {
-    cookieAuthOptions? : CookieAuthOptions;
-    authenticatorOptions? : UsernamePasswordAuthenticatorOptions;
-}
-
-/**
  * Class for managing sessions with session ID cookies and username/password authentication.
  * 
  * If you implement endpoints for an authentication backend (eg {@link ExpressCookieAuthServer }), you can use
@@ -634,222 +639,226 @@ export class CookieSessionManager {
     userStorage : UserStorage;
     sessionStorage : KeyStorage;
     private auth : CookieAuth;
-    private authenticator : HashedPasswordAuthenticator;
+    private authenticator : UsernamePasswordAuthenticator;
 
     /**
      * Constructor
      * @param userStorage the {@link UserStorage} instance to use, eg {@link PrismaUserStorage}.
      * @param sessionStorage  the {@link KeyStorage} instance to use, eg {@link PrismaSessionStorage}.
+     * @param authenticator authenticator used to validate users  See {@link UsernamePasswordAuthenticatorOptions }.
      * @param secret a secret password use to sign CSRF tokens and optionally for session IDs.  Must be at leat 16 bytes.  If in the Base64 character set, 22.  If in the hex charfacter set, 32.
-     * @param cookieAuthOptions optional parameters for authentication. See {@link CookieAuthOptions }.
-     * @param authenticatorOptions optional parameters for username/password authentication.  See {@link UsernamePasswordAuthenticatorOptions }.
+     * @param options optional parameters for authentication. See {@link CookieAuthOptions }.
      */
     constructor(
         userStorage : UserStorage, 
         sessionStorage : KeyStorage, 
+        authenticator : UsernamePasswordAuthenticator,
         secret : string,
-        {cookieAuthOptions, 
-        authenticatorOptions } : CookieSessionManagerOptions = {}) {
+        options? : CookieAuthOptions) {
+
         this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
-        this.auth = new CookieAuth(this.userStorage, this.sessionStorage, secret, cookieAuthOptions);
+        this.auth = new CookieAuth(this.userStorage, this.sessionStorage, secret, options);
+        this.authenticator = authenticator;
+    }
 
-        this.authenticator = new HashedPasswordAuthenticator(this.userStorage, authenticatorOptions);
+    /**
+     * Returns the name used for session ID cookies.
+     */
+    get sessionCookieName() : string {
+        return this.auth.sessionCookieName;
+    }
 
+    /**
+     * Returns the name used for CSRF token cookies.
+     */
+    get csrfCookieName() : string {
+        return this.auth.csrfCookieName;
+    }
+
+    /**
+     * Performs a user login
+     *    * Authenticates the username and password
+     *    * Creates a session key
+     *    * Returns the user (without the password hash) and the session cookie.
+     * @param username the username to validate
+     * @param password the password to validate
+     * @param existingSessionId if this is passed, the it will be used for the new sessionId.  If not, a new random one will be created
+     * @param persist if passed, overrides the persistSessionId setting.
+     * @returns the user (without the password hash) and session cookie.
+     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
+     *         `PasswordNotMatch`.
+     */
+    async login(username : string, password : string, existingSessionId? : string, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
+        const user = await this.authenticator.authenticateUser(username, password);
+
+        const sessionKey = await this.auth.createSessionKey(user.id, existingSessionId);
+        //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
+        let sessionCookie = await this.auth.makeSessionCookie(sessionKey, persist);
+        let csrfCookie = this.auth.makeCsrfCookie(await this.auth.createCsrfToken(sessionKey.value));
+        return {
+            sessionCookie: sessionCookie,
+            csrfCookie: csrfCookie,
+            user: user
         }
+    }
 
-        /**
-         * Returns the name used for session ID cookies.
-         */
-        get sessionCookieName() : string {
-            return this.auth.sessionCookieName;
+    /**
+     * If a valid session key does not exist, create and store an anonymous one.
+     * 
+     * If the session ID and/or csrfToken are passed, they are validated.  If invalid, they are recrated.
+     * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
+     *          each of these was newly created and the user, which may be undefined.
+     */
+    async createAnonymousSessionKeyIfNoneExists(sessionId? : string, csrfToken? : string) 
+    : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user : User|undefined}> {
+        let {sessionKey, sessionCookie, csrfCookie, user} = await this.getValidatedSessionAndCsrf(sessionId, csrfToken);
+
+        if (!sessionKey) {
+            sessionKey = await this.auth.createSessionKey(undefined);
         }
-
-        /**
-         * Returns the name used for CSRF token cookies.
-         */
-        get csrfCookieName() : string {
-            return this.auth.csrfCookieName;
+        if (!sessionCookie) {
+            sessionCookie = this.auth.makeSessionCookie(sessionKey);
+        }  
+        if (!csrfCookie) {
+            csrfToken = await this.auth.createCsrfToken(sessionKey.value);
+            csrfCookie = this.auth.makeCsrfCookie(csrfToken);
         }
+        return {
+            sessionCookie,
+            csrfCookie,
+            user
+        };
+    }
 
-        /**
-         * Performs a user login
-         *    * Authenticates the username and password
-         *    * Creates a session key
-         *    * Returns the user (without the password hash) and the session cookie.
-         * @param username the username to validate
-         * @param password the password to validate
-         * @param existingSessionId if this is passed, the it will be used for the new sessionId.  If not, a new random one will be created
-         * @returns the user (without the password hash) and session cookie.
-         * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
-         *         `PasswordNotMatch`.
-         */
-        async login(username : string, password : string, existingSessionId? : string) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
-            const user = await this.authenticator.authenticateUser(username, password);
-
-            const sessionKey = await this.auth.createSessionKey(user.id, existingSessionId);
-            //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
-            let sessionCookie = await this.auth.makeSessionCookie(sessionKey);
-            let csrfCookie = this.auth.makeCsrfCookie(await this.auth.createCsrfToken(sessionKey.value));
-            return {
-                sessionCookie: sessionCookie,
-                csrfCookie: csrfCookie,
-                user: user
-            }
-        }
-
-        /**
-         * If a valid session key does not exist, create and store an anonymous one.
-         * 
-         * If the session ID and/or csrfToken are passed, they are validated.  If invalid, they are recrated.
-         * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
-         *          each of these was newly created and the user, which may be undefined.
-         */
-        async createAnonymousSessionKeyIfNoneExists(sessionId? : string, csrfToken? : string) 
-        : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user : User|undefined}> {
-            let {sessionKey, sessionCookie, csrfCookie, user} = await this.getValidatedSessionAndCsrf(sessionId, csrfToken);
-
-            if (!sessionKey) {
-                sessionKey = await this.auth.createSessionKey(undefined);
-            }
-            if (!sessionCookie) {
-                sessionCookie = this.auth.makeSessionCookie(sessionKey);
-            }  
-            if (!csrfCookie) {
-                csrfToken = await this.auth.createCsrfToken(sessionKey.value);
-                csrfCookie = this.auth.makeCsrfCookie(csrfToken);
-            }
-            return {
-                sessionCookie,
-                csrfCookie,
-                user
-            };
-        }
-
-        /**
-         * Validate the sessionId and csrfToken.  Return them and the user if they are valid.  Return undefined otherwise.
-         * 
-         * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
-         *          each of these was newly created and the user, which may be undefined.
-         */
-        async getValidatedSessionAndCsrf(sessionId? : string, csrfToken? : string) 
-            : Promise<{sessionKey : Key|undefined, sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, user : User|undefined}> {
-            let sessionKey : Key|undefined = undefined;
-            let user : User|undefined = undefined;
-            if (sessionId) {
-                try {
-                    let  {key} = await this.auth.getUserForSessionKey(sessionId);
-                    if (key) sessionKey = key;
-                    user = await this.userForSessionKey(sessionId);
-                }
-                catch {
-                    sessionId = undefined;
-                    csrfToken = undefined;
-                }
-            }
-            if (sessionId && csrfToken) {
-                try {
-                    this.auth.validateCsrfToken(csrfToken, sessionId);
-                } catch {
-                    csrfToken = undefined;
-                }
-            }
-            let sessionCookie = sessionKey ? await this.auth.makeSessionCookie(sessionKey) : undefined;         
-            const csrfCookie = csrfToken? this.auth.makeCsrfCookie(csrfToken) : undefined;
-            return {
-                sessionKey,
-                sessionCookie,
-                csrfCookie,
-                user
-            };
-        }
-
-        /**
-         * Logs a user out.
-         * 
-         * Removes the given session ID from the session storage.
-         * @param sessionKey the session ID to remove.
-         * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
-         */
-        async logout(sessionKey : string) : Promise<void> {
-            await this.sessionStorage.deleteKey(sessionKey)
-        }
-
-        /**
-         * Logs a user out from all sessions.
-         * 
-         * Removes the given session ID from the session storage.
-         * @param except Don't log out from the matching session.
-         * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
-         */
-        async logoutFromAll(userId : string | number, except? : string|undefined) : Promise<void> {
-            await this.auth.deleteAllForUser(userId, except);
-        }
-        
-        /**
-         * Returns the user (without password hash) matching the given session key.
-         * 
-         * If the user is undefined, or the key has expired, returns undefined.
-         * 
-         * @param sessionKey the session key to look up in session storage
-         * @returns the {@link User} (without password hash) matching the  session key
-         * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
-         *         `UserNotExist` or `Expired`.
-         */
-        async userForSessionKey(sessionKey : string) : Promise<User|undefined> {
-            let error : CrossauthError | undefined;
+    /**
+     * Validate the sessionId and csrfToken.  Return them and the user if they are valid.  Return undefined otherwise.
+     * 
+     * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
+     *          each of these was newly created and the user, which may be undefined.
+     */
+    async getValidatedSessionAndCsrf(sessionId? : string, csrfToken? : string) 
+        : Promise<{sessionKey : Key|undefined, sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, user : User|undefined}> {
+        let sessionKey : Key|undefined = undefined;
+        let user : User|undefined = undefined;
+        if (sessionId) {
             try {
-                let {user} = await this.auth.getUserForSessionKey(sessionKey);
-                return user;
-            } catch (e) {
-                if (e instanceof CrossauthError) {
-                    let ce = e as CrossauthError;
-                    switch (ce.code) {
-                        case ErrorCode.Expired:
-                            return undefined;
-                            break;
-                        default:
-                            error = ce;
-                    }
-                }
-                else {
-                    console.log(e);
-                }
-                error = new CrossauthError(ErrorCode.UnknownError);
+                let  {key} = await this.auth.getUserForSessionKey(sessionId);
+                if (key) sessionKey = key;
+                user = await this.userForSessionKey(sessionId);
             }
-            if (error) {
-                CrossauthLogger.logger.debug(error);
-                throw error;
+            catch {
+                sessionId = undefined;
+                csrfToken = undefined;
             }
         }
+        if (sessionId && csrfToken) {
+            try {
+                this.auth.validateCsrfToken(csrfToken, sessionId);
+            } catch {
+                csrfToken = undefined;
+            }
+        }
+        let sessionCookie = sessionKey ? await this.auth.makeSessionCookie(sessionKey) : undefined;         
+        const csrfCookie = csrfToken? this.auth.makeCsrfCookie(csrfToken) : undefined;
+        return {
+            sessionKey,
+            sessionCookie,
+            csrfCookie,
+            user
+        };
+    }
+
+    /**
+     * Logs a user out.
+     * 
+     * Removes the given session ID from the session storage.
+     * @param sessionKey the session ID to remove.
+     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
+     */
+    async logout(sessionKey : string) : Promise<void> {
+        await this.sessionStorage.deleteKey(sessionKey)
+    }
+
+    /**
+     * Logs a user out from all sessions.
+     * 
+     * Removes the given session ID from the session storage.
+     * @param except Don't log out from the matching session.
+     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
+     */
+    async logoutFromAll(userId : string | number, except? : string|undefined) : Promise<void> {
+        await this.auth.deleteAllForUser(userId, except);
+    }
     
-        /**
-         * Creates and returns a signed CSRF token based on the session ID
-         * @param sessionId the session ID
-         * @returns a signed CSRF token
-         */
-        async createCsrfToken(sessionId : string) : Promise<Cookie> {
-            return this.auth.makeCsrfCookie(await this.auth.createCsrfToken(sessionId));
+    /**
+     * Returns the user (without password hash) matching the given session key.
+     * 
+     * If the user is undefined, or the key has expired, returns undefined.
+     * 
+     * @param sessionKey the session key to look up in session storage
+     * @returns the {@link User} (without password hash) matching the  session key
+     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     *         `UserNotExist` or `Expired`.
+     */
+    async userForSessionKey(sessionKey : string) : Promise<User|undefined> {
+        let error : CrossauthError | undefined;
+        try {
+            let {user} = await this.auth.getUserForSessionKey(sessionKey);
+            return user;
+        } catch (e) {
+            if (e instanceof CrossauthError) {
+                let ce = e as CrossauthError;
+                switch (ce.code) {
+                    case ErrorCode.Expired:
+                        return undefined;
+                        break;
+                    default:
+                        error = ce;
+                }
+            }
+            else {
+                console.log(e);
+            }
+            error = new CrossauthError(ErrorCode.UnknownError);
         }
-
-        /**
-         * Throws {@link index!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
-         * session ID.  Otherwise returns without error
-         * @param token 
-         */
-        validateCsrfToken(token : string, sessionId : string) {
-            this.auth.validateCsrfToken(token, sessionId);
+        if (error) {
+            CrossauthLogger.logger.debug(error);
+            throw error;
         }
+    }
+    
+    /**
+     * Creates and returns a signed CSRF token based on the session ID
+     * @param sessionId the session ID
+     * @returns a signed CSRF token
+     */
+    async createCsrfToken(sessionId : string) : Promise<Cookie> {
+        return this.auth.makeCsrfCookie(await this.auth.createCsrfToken(sessionId));
+    }
 
-        /**
-         * Throws {@link index!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
-         * session ID.  Otherwise returns without error
-         * @param token 
-         */
-        validateDoubleSubmitCsrfToken(token : string, sessionId : string, formOrHeaderValue : string) {
-            this.auth.validateDoubleSubmitCsrfToken(token, sessionId, formOrHeaderValue);
-        }
+    /**
+     * Throws {@link index!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
+     * session ID.  Otherwise returns without error
+     * @param token 
+     */
+    validateCsrfToken(token : string, sessionId : string) {
+        this.auth.validateCsrfToken(token, sessionId);
+    }
 
+    /**
+     * Throws {@link index!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
+     * session ID.  Otherwise returns without error
+     * @param token 
+     */
+    validateDoubleSubmitCsrfToken(token : string, sessionId : string, formOrHeaderValue : string) {
+        this.auth.validateDoubleSubmitCsrfToken(token, sessionId, formOrHeaderValue);
+    }
+
+    /**
+     * If sessionIdleTimeout is set, update the last activcity time in key storage to current time
+     * @param sessionId the session Id to update.
+     */
     async updateSessionActivity(sessionId : string) : Promise<void> {
         if (this.auth.sessionIdleTimeout > 0) {
             this.auth.updateSessionKey({
@@ -858,4 +867,13 @@ export class CookieSessionManager {
             });
         }
     }
+
+    /**
+     * Deletes the given session ID from the key storage (not the cookie)
+     * @param sessionId the session Id to delete
+     */
+    async deleteSessionId(sessionId : string) : Promise<void> {
+        await this.auth.sessionStorage.deleteKey(sessionId);
+    }
+
 }
