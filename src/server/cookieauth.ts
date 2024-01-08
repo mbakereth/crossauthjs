@@ -284,7 +284,7 @@ export class CookieAuth {
             let expires = this.expiry(dateCreated);
             try {
                 if (keepSessionId && numTries == 0) {
-                    // check the key exists.  If not, an error will be throws
+                    // check the key exists.  If not, an error will be thrown
                     let {key} = await this.getUserForSessionKey(hashedSessionKey);
                     key.expiry = expires;
                     if (this.sessionIdleTimeout > 0) {
@@ -433,7 +433,7 @@ export class CookieAuth {
         }
         if (key.userId) {
             let user = await this.userStorage.getUserById(key.userId);
-            user = await UserPasswordStorage.removePasswordHash(user);
+            user = UserPasswordStorage.removePasswordHash(user);
             return {user, key};
         } else {
             return {user: undefined, key};
@@ -694,7 +694,7 @@ export class CookieSessionManager {
 
         const sessionKey = await this.auth.createSessionKey(user.id, existingSessionId);
         //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
-        let sessionCookie = await this.auth.makeSessionCookie(sessionKey, persist);
+        let sessionCookie = this.auth.makeSessionCookie(sessionKey, persist);
         let csrfCookie = this.auth.makeCsrfCookie(await this.auth.createCsrfToken(sessionKey.value));
         return {
             sessionCookie: sessionCookie,
@@ -741,11 +741,12 @@ export class CookieSessionManager {
         : Promise<{sessionKey : Key|undefined, sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, user : User|undefined}> {
         let sessionKey : Key|undefined = undefined;
         let user : User|undefined = undefined;
+        let userPromise : Promise<User|undefined>|undefined = undefined;
         if (sessionId) {
             try {
                 let  {key} = await this.auth.getUserForSessionKey(sessionId);
                 if (key) sessionKey = key;
-                user = await this.userForSessionKey(sessionId);
+                userPromise = this.userForSessionKey(sessionId);
             }
             catch {
                 sessionId = undefined;
@@ -759,8 +760,9 @@ export class CookieSessionManager {
                 csrfToken = undefined;
             }
         }
-        let sessionCookie = sessionKey ? await this.auth.makeSessionCookie(sessionKey) : undefined;         
+        let sessionCookie = sessionKey ? this.auth.makeSessionCookie(sessionKey) : undefined;         
         const csrfCookie = csrfToken? this.auth.makeCsrfCookie(csrfToken) : undefined;
+        if (userPromise) user = await userPromise;
         return {
             sessionKey,
             sessionCookie,
