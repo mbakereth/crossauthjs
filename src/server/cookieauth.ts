@@ -779,7 +779,7 @@ export class CookieSessionManager {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
      */
     async logout(sessionKey : string) : Promise<void> {
-        await this.sessionStorage.deleteKey(sessionKey)
+        /*await*/ return this.sessionStorage.deleteKey(sessionKey)
     }
 
     /**
@@ -790,7 +790,7 @@ export class CookieSessionManager {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
      */
     async logoutFromAll(userId : string | number, except? : string|undefined) : Promise<void> {
-        await this.auth.deleteAllForUser(userId, except);
+        /*await*/ return this.auth.deleteAllForUser(userId, except);
     }
     
     /**
@@ -875,7 +875,7 @@ export class CookieSessionManager {
      * @param sessionId the session Id to delete
      */
     async deleteSessionId(sessionId : string) : Promise<void> {
-        await this.auth.sessionStorage.deleteKey(sessionId);
+        /*await*/ return this.auth.sessionStorage.deleteKey(sessionId);
     }
 
 }

@@ -85,7 +85,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string) : Promise<UserWithPassword> {
-        return await this.getUserByUsername(id);
+        return /*await*/ this.getUserByUsername(id);
     }
 
     /**

@@ -328,7 +328,7 @@ export class PrismaKeyStorage extends KeyStorage {
      */
     async deleteKey(key : string) : Promise<void> {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
-            await this.prismaClient[this.keyTable].deleteMany({
+            return /*await*/ this.prismaClient[this.keyTable].deleteMany({
             where: {
                 key: key
             }
@@ -343,7 +343,7 @@ export class PrismaKeyStorage extends KeyStorage {
     async deleteAllForUser(userId : string | number, except : string|undefined = undefined) : Promise<void> {
         if (except) {
             // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
-            await this.prismaClient[this.keyTable].deleteMany({
+            return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                 where: {
                     AND: [
                         { user_id: userId },
@@ -354,7 +354,7 @@ export class PrismaKeyStorage extends KeyStorage {
 
         } else {
             // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
-            await this.prismaClient[this.keyTable].deleteMany({
+            return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                 where: {
                     user_id: userId 
                 }
