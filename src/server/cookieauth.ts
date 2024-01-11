@@ -4,7 +4,7 @@ import type {
 } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, UserPasswordStorage, KeyStorage } from './storage';
-import { HashedPasswordAuthenticator, UsernamePasswordAuthenticator } from "./password";
+import { UsernamePasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 import { TokenEmailer, type TokenEmailerOptions } from './email.ts';
 import { Hasher } from './hasher';
@@ -631,22 +631,7 @@ export class CookieSessionManager {
     private auth : CookieAuth;
     private authenticator : UsernamePasswordAuthenticator;
 
-    private secret? : string;
-    private views? : string = "views";
     private enableEmailVerification? : boolean = false;
-    private emailVerifiedPage? : string = "emailverified.njk";
-    private emailVerificationTextBody? : string = "emailverificationtextbody.njk";
-    private emailVerificationHtmlBody? : string;
-    private emailVerificationSubject : string = "Please verify your email address";
-    private passwordResetTextBody? : string = "passwordresettextbody.njk";
-    private passwordResetHtmlBody? : string;
-    private passwordResetSubject : string = "Password reset";
-    private emailFrom? : string;
-    private smtpHost? : string;
-    private smtpPort : number = 25;
-    private smtpUseTls : boolean = false;
-    private smtpUsername : string|undefined = undefined;
-    private smtpPassword : string|undefined = undefined;
     private tokenEmailer? : TokenEmailer;
 
     /**
@@ -928,6 +913,16 @@ export class CookieSessionManager {
             newUser.email = newEmail;
         }
         await this.userStorage.updateUser(newUser);
+        return user;
+    }
+
+    async changePassword(username : string, oldPassword : string, newPassword : string) : Promise<User> {
+        if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
+        let user = await this.authenticator.authenticateUser(username, oldPassword);
+        await this.userStorage.updateUser({
+            id: user.id,
+            passwordHash: await this.authenticator.createPasswordForStorage(newPassword),
+        })
         return user;
     }
 

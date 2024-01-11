@@ -59,7 +59,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
-    async getUserByUsername(username : string) : Promise<UserWithPassword> {
+    async getUserByUsername(username : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
         if (username in this.usersByUsername) {
 
             const user = this.usersByUsername[username];
@@ -67,7 +67,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
                 CrossauthLogger.logger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
-            if ('emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
+            if (!skipEmailVerifiedCheck && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
                 CrossauthLogger.logger.debug("User email not verified");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
@@ -85,7 +85,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
-        return /*await*/ this.getUserByUsername(id);
+        return /*await*/ this.getUserByUsername(id, skipEmailVerifiedCheck);
     }
 
     /**

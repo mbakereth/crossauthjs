@@ -2,7 +2,6 @@ import { test, expect, beforeAll } from 'vitest';
 import { TokenEmailer } from '../email';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
-import { CrossauthError } from '../../error';
 
 export var userStorage : InMemoryUserStorage;
 

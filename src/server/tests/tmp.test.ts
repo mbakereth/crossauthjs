@@ -19,9 +19,9 @@ test('CookieAuth.createSessionKey.encrypted', async () => {
     const sessionStorage = new InMemoryKeyStorage();
     const auth = new CookieAuth(userStorage, sessionStorage, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX", hashSessionId: true});
     const bob = await userStorage.getUserByUsername("bob");
-    let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
+    let { value } = await auth.createSessionKey(bob.id);
     let hashedValue = auth.hashSessionKey(value);
-    let key = await sessionStorage.getKey(hashedValue);
+    await sessionStorage.getKey(hashedValue);
 
 });
 
