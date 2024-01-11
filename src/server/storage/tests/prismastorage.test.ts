@@ -12,12 +12,13 @@ beforeAll(async () => {
     prismaClient = new PrismaClient();
     await prismaClient.user.deleteMany({});
     await prismaClient.key.deleteMany({});
-    userStorage = new PrismaUserStorage({extraFields: ["dummyField"]});
+    userStorage = new PrismaUserStorage({extraFields: "dummyField"});
     let authenticator = new HashedPasswordAuthenticator(userStorage);
     await prismaClient.user.create({
         data: {
           username: 'bob',
           passwordHash: authenticator.createPasswordHash("bobPass123", true),
+          email: "bob@bob.com",
           dummyField: "abc",
         },
     });
@@ -26,6 +27,7 @@ beforeAll(async () => {
         data: {
             username: 'alice',
             passwordHash:  authenticator.createPasswordHash("alicePass123", true),
+            email: "alice@alice.com",
             dummyField: "abc",
         },
       });
@@ -42,7 +44,7 @@ test('PrismaUserStorage.getUser', async () => {
 });
 
 // test updating a field in the user table
-test("PrismaKeyStorage.updateUser", async() => {
+test("PrismaUserStorage.updateUser", async() => {
     const bob = await userStorage.getUserByUsername("bob");
     expect(bob.username).toBe("bob");
     bob.dummyField = "def";

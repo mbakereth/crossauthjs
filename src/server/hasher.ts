@@ -163,7 +163,7 @@ export class Hasher {
     randomSalt() : string {
         const array = new Uint8Array(this.saltLength);
         crypto.getRandomValues(array);
-        return Buffer.from(array).toString('base64');
+        return Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
 
     }
 

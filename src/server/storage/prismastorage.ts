@@ -3,6 +3,7 @@ import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
 import { User, UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 import { CrossauthLogger } from '../..';
+import { setParameter, ParamType } from '../utils';
 
 /**
  * Optional parameters for {@link PrismaUserStorage}.
@@ -10,13 +11,34 @@ import { CrossauthLogger } from '../..';
  * See {@link PrismaUserStorage.constructor} for definitions.
  */
 export interface PrismaUserStorageOptions {
+
+    /** Name of user table (to Prisma, ie lowercase).  Default `user` */
     userTable? : string,
+
+    /** Name of the id column in the user table.  Can be set to `username` if that is your primary key.
+     * Default `id`.
+     */
     idColumn? : string,
+
+    /** If true, check if the `active` field in the user table is true when fetching a user.
+     * Must add this field to your table as a boolean
+     */
     checkActive? : boolean,
-    checkEmailVerified? : boolean,
+
+    /** If true, check if the `userVerified` field in the user table is true when fetching a user.
+     * Must add this field to your table as a boolean. */
+    enableEmailVerification? : boolean,
+
+
+    /** If true, check if the `passwordReset` field in the user table is true when fetching a user.
+     * Must add this field to your table as a boolean. Intended to enable forcing a user to reset their password */
     checkPasswordReset? : boolean,
+
+    /** The prisma client instanfce.  Leave this out to have Crossauth create a default one */
     prismaClient? : PrismaClient,
-    extraFields? : string[],
+
+    /** Comma separated list of extra fields to select from the user table when querying for a user. */
+    extraFields? : string,
 }
 
 /**
@@ -42,9 +64,9 @@ export interface PrismaUserStorageOptions {
 export class PrismaUserStorage extends UserPasswordStorage {
     private userTable : string = "user";
     private idColumn : string = "id";
-    private checkActive : boolean = false;
-    private checkEmailVerified : boolean = false;
-    private checkPasswordReset : boolean = false;
+    readonly checkActive : boolean = false;
+    readonly enableEmailVerification : boolean = false;
+    readonly checkPasswordReset : boolean = false;
     private prismaClient : PrismaClient;
     private extraFields? : string[];
 
@@ -53,35 +75,36 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @param userTable the (Prisma, ie lowercase) name of the database table for storing users.  Defaults to `user`.
      * @param idColumn the column for the unique user ID.  May be a number of string.  Defaults to `id`.  May also be set to `username`.
      * @param checkActive if set to `true`, a user will only be returned as valid if the `active` field is `true`.  See explaination above.
-     * @param checkEmailVerified if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
+     * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
      * @param checkPasswordReset if set to true, a user will only be returned as valid if the "passwordReset" field is not `true`.  See explaination above.
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
      * @param extraFields if given, these additional fields will be selected from the table into the returned Key.
      */
-    constructor({userTable,
-                idColumn, 
-                checkActive,
-                checkEmailVerified,
-                checkPasswordReset,
-                prismaClient,
-                extraFields} : PrismaUserStorageOptions = {}) {
+    constructor(options : PrismaUserStorageOptions = {}) {
         super();
-        if (userTable)this.userTable = userTable;
+        setParameter("userTable", ParamType.String, this, options, "USER_TABLE");
+        setParameter("idColumn", ParamType.String, this, options, "USER_ID_COLUMN");
+        setParameter("checkActive", ParamType.Boolean, this, options, "CHECK_USER_ACTIVE");
+        setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
+        setParameter("checkPasswordReset", ParamType.String, Boolean, options, "CHECK_PASSWORD_RESET");
+        setParameter("extraFields", ParamType.StringArray, this, options, "USER_EXTRA_FIELDS", false);
 
-        if(idColumn) this.idColumn = idColumn;
-
-        if (checkActive)this.checkActive = checkActive;
-        if (checkEmailVerified) this,checkEmailVerified = checkEmailVerified;
-        if (checkPasswordReset) this,checkPasswordReset = checkPasswordReset;
-        if (prismaClient) {
-            this.prismaClient = prismaClient;
+        if (options.enableEmailVerification) {
+            if (!this.extraFields) options = {};
+            if (!this.extraFields?.includes("email")) 
+            {
+                this.extraFields?.push("email");
+                this.extraFields?.push("emailVerified");
+            }
+        }
+        if (options && options.prismaClient) {
+            this.prismaClient = options.prismaClient;
         } else {
             this.prismaClient = new PrismaClient();
         }
-        this.extraFields = extraFields;
     }
 
-    private async getUser(key : string, value : string | number) : Promise<UserWithPassword> {
+    private async getUser(key : string, value : string | number, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
         let error: CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -95,7 +118,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
                 CrossauthLogger.logger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
-            if (this.checkEmailVerified && !prismaUser["emailVerified"]) {
+            if (!skipEmailVerifiedCheck && this.enableEmailVerification && !prismaUser["emailVerified"]) {
                 CrossauthLogger.logger.debug("User has not verified email");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
@@ -109,8 +132,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
                 passwordHash : prismaUser.passwordHash
             }
             if (this.extraFields) {
-                this.extraFields.forEach((key : string) => {
-                    user[key] = prismaUser[key];
+                this.extraFields.forEach((field) => {
+                    user[field] = prismaUser[field];
                 });
             }
 
@@ -132,8 +155,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
-    async getUserByUsername(username : string) : Promise<UserWithPassword> {
-        return this.getUser("username", username);
+    async getUserByUsername(username : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
+        return this.getUser("username", username, skipEmailVerifiedCheck);
     }
 
     /**
@@ -143,8 +166,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
-    async getUserById(id : string | number) : Promise<UserWithPassword> {
-        return this.getUser(this.idColumn, id);
+    async getUserById(id : string | number, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
+        return this.getUser(this.idColumn, id, skipEmailVerifiedCheck);
     }
 
     /**
@@ -156,7 +179,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
         let error : CrossauthError|undefined = undefined;
         if (!(this.idColumn in user)) throw new CrossauthError(ErrorCode.InvalidKey);
         try {
-            const {id, ...data} = user;
+            const {id: _, ...data} = user;
             /*let data : {[key : string] : any} = {
                 user_id : key.userId,
                 created : key.created,
@@ -174,12 +197,51 @@ export class PrismaUserStorage extends UserPasswordStorage {
                 data: data
             });
         } catch (e) {
-            error = new CrossauthError(ErrorCode.Connection, String(e));
+            CrossauthLogger.logger.error(e);
+            error = new CrossauthError(ErrorCode.Connection, "Error updating user");
         }
         if (error) {
-            CrossauthLogger.logger.error(error);
             throw error;
         }
+    }
+
+    /**
+     * Create a user
+     * @param username 
+     * @param password 
+     * @param extraFields 
+     */
+    async createUser(username : string, 
+               passwordHash : string, 
+               extraFields : {[key : string]: string|number|boolean|Date|undefined})
+               : Promise<string|number> {
+        let error : CrossauthError|undefined = undefined;
+        let id = 0;
+        try {
+            let data : {[key : string] : any} = {
+                username : username,
+                passwordHash : passwordHash,
+                ...extraFields,
+            };
+
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            let user = await this.prismaClient[this.userTable].create({
+                data: data
+            });
+            id = user[this.idColumn];
+        } catch (e) {
+            CrossauthLogger.logger.error(e);
+            error = new CrossauthError(ErrorCode.Connection, "Error creating user");
+            if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
+                if (e.code === 'P2002') {
+                    error = new CrossauthError(ErrorCode.UserExists);
+                }
+            }
+        }
+        if (error) {
+            throw error;
+        }
+        return id;
     }
 }
 
@@ -267,7 +329,6 @@ export class PrismaKeyStorage extends KeyStorage {
             error = new CrossauthError(ErrorCode.InvalidKey);
         }
         if (error) {
-            CrossauthLogger.logger.error(error);
             throw error;
         }
         return returnKey;
@@ -286,37 +347,39 @@ export class PrismaKeyStorage extends KeyStorage {
     async saveKey(userId : string | number | undefined, 
                       key : string, created : Date, 
                       expires : Date | undefined,
+                      data? : string,
                       extraFields : {[key : string]: any} = {}) : Promise<void> {
         let error : CrossauthError|undefined = undefined;
         try {
-            let data : {[key : string] : any} = {
+            let prismaData : {[key : string] : any} = {
                 user_id : userId,
                 key : key,
                 created : created,
                 expires : expires,
+                data : data,
                 ...extraFields,
             };
 
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             await this.prismaClient[this.keyTable].create({
-                data: data
+                data: prismaData
             })
         } catch (e) {
-            if (e instanceof Prisma.PrismaClientKnownRequestError) {
-                const pe = e as Prisma.PrismaClientKnownRequestError;
-                if (pe.code == 'P2002') {
+            if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
+                if (e.code == 'P2002') {
                     CrossauthLogger.logger.debug("Attempt to create key that already exists. Stack trace follows");
-                    CrossauthLogger.logger.debug(pe);
+                    CrossauthLogger.logger.debug(e);
                     error = new CrossauthError(ErrorCode.KeyExists);
                 } else {
-                    CrossauthLogger.logger.debug(e);
-                    error = new CrossauthError(ErrorCode.Connection, String(e));
+                    CrossauthLogger.logger.error(e);
+                    error = new CrossauthError(ErrorCode.Connection, "Error saving key");
                 }
-            error = new CrossauthError(ErrorCode.Connection, String(e));
+            } else {
+                CrossauthLogger.logger.error(e);
+                error = new CrossauthError(ErrorCode.Connection, "Error saving key");
             }
         }
         if (error) {
-            CrossauthLogger.logger.error(error);
             throw error;
         }
     }
@@ -327,12 +390,19 @@ export class PrismaKeyStorage extends KeyStorage {
      * @throws {@link index!CrossauthError } if the key could not be deleted.
      */
     async deleteKey(key : string) : Promise<void> {
+        let error : CrossauthError;
+        try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             return /*await*/ this.prismaClient[this.keyTable].deleteMany({
             where: {
                 key: key
             }
         });
+        } catch (e) {
+            CrossauthLogger.logger.error(e);
+            error = new CrossauthError(ErrorCode.Connection, "Error deleting key");
+        } 
+        if (error) throw error;
     }
 
     /**
@@ -341,25 +411,32 @@ export class PrismaKeyStorage extends KeyStorage {
      * @param userId : user ID to delete keys for
      */
     async deleteAllForUser(userId : string | number, except : string|undefined = undefined) : Promise<void> {
-        if (except) {
-            // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
-            return /*await*/ this.prismaClient[this.keyTable].deleteMany({
-                where: {
-                    AND: [
-                        { user_id: userId },
-                        { key: { not: except } }
-                    ]
-                }
-            });
+        let error : CrossauthError;
+        try {
+            if (except) {
+                // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
+                return /*await*/ this.prismaClient[this.keyTable].deleteMany({
+                    where: {
+                        AND: [
+                            { user_id: userId },
+                            { key: { not: except } }
+                        ]
+                    }
+                });
 
-        } else {
-            // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
-            return /*await*/ this.prismaClient[this.keyTable].deleteMany({
-                where: {
-                    user_id: userId 
-                }
-            });
-        }
+            } else {
+                // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
+                return /*await*/ this.prismaClient[this.keyTable].deleteMany({
+                    where: {
+                        user_id: userId 
+                    }
+                });
+            }
+        } catch (e) {
+            CrossauthLogger.logger.error(e);
+            error = new CrossauthError(ErrorCode.Connection, "Error deleting key");
+        } 
+        if (error) throw error;
     }     
 
     /**

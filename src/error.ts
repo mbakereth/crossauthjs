@@ -6,7 +6,7 @@ export enum ErrorCode {
     /** Thrown when a given username does not exist, eg during login */
 	UserNotExist,
 
-    /** Thrown when a password does not match, eg during login */
+    /** Thrown when a password does not match, eg during login or signup */
     PasswordNotMatch,
 
     /** For endpoints provided by servers in this package, this is returned instead of 
@@ -34,9 +34,6 @@ export enum ErrorCode {
     /** Thrown when a hash, eg password, is not in the given format */
     InvalidHash,
 
-    /** Thrown for an condition not convered above. */
-    UnknownError,
-
     /** Thrown when an algorithm is requested but not supported, eg hashing algorithm */
     UnsupportedAlgorithm,
 
@@ -45,6 +42,24 @@ export enum ErrorCode {
 
     /** Thrown if the user needs to reset his or her password */
     PasswordResetNeeded,
+
+    /** Thrown when something is missing or inconsistent in configuration */
+    Configuration,
+
+    /** Thrown if an email address in invalid */
+    InvalidEmail,
+
+    /** Thrown when two passwords do not match each other (eg signup) */
+    PasswordMatch,
+
+    /** Thrown when a password does not match rules (length, uppercase/lowercase/digits) */
+    PasswordFormat,
+
+    /** Thrown when attempting to create a user that already exists */
+    UserExists,
+
+    /** Thrown for an condition not convered above. */
+    UnknownError,
 }
 
 /**
@@ -69,6 +84,8 @@ export class CrossauthError extends Error {
                 _message = "Username does not exist";
             } else if (code == ErrorCode.PasswordNotMatch) {
                 _message = "Password doesn't match"
+            } else if (code == ErrorCode.UsernameOrPasswordInvalid) {
+                _message = "Username or password incorrect"
             } else if (code == ErrorCode.UserNotActive) {
                 _message = "Account is not active"
             } else if (code == ErrorCode.EmailNotVerified) {
@@ -89,6 +106,14 @@ export class CrossauthError extends Error {
                 _message = "Attempt to create a key that already exists";
             } else if (code == ErrorCode.PasswordResetNeeded) {
                 _message = "User must reset password";
+            } else if (code == ErrorCode.Configuration) {
+                _message = "There was an error in the configuration";
+            } else if (code == ErrorCode.PasswordMatch) {
+                _message = "Passwords do not match";
+            } else if (code == ErrorCode.PasswordFormat) {
+                _message = "Password format was incorrect";
+            } else if (code == ErrorCode.UserExists) {
+                _message = "User already exists";
             } else {
                 _message = "Unknown error";
             }    

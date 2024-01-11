@@ -11,7 +11,7 @@ import type { User } from '../..';
  */
 export interface InMemoryUserStorageOptions {
     checkActive? : boolean,
-    checkEmailVerified? : boolean,
+    enableEmailVerification? : boolean,
 }
 
 /**
@@ -29,21 +29,21 @@ export interface InMemoryUserStorageOptions {
 export class InMemoryUserStorage extends UserPasswordStorage {
     usersByUsername : { [key : string]: UserWithPassword } = {};
     private checkActive : boolean = false;
-    private checkEmailVerified : boolean = false;
+    private enableEmailVerification : boolean = false;
 
     /**
      * Creates a InMemoryUserStorage object, optionally overriding defaults.
      * @param checkActive if set to `true`, a user will only be returned as valid if the `active` field is `true`.  See explaination above.
-     * @param checkEmailVerified if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
+     * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
     */
     constructor({checkActive,
-                checkEmailVerified} : InMemoryUserStorageOptions = {}) {
+        enableEmailVerification} : InMemoryUserStorageOptions = {}) {
         super();
         if (checkActive) {
             this.checkActive = checkActive;
         }
-        if (checkEmailVerified) {
-            this,checkEmailVerified = checkEmailVerified;
+        if (enableEmailVerification) {
+            this.enableEmailVerification = enableEmailVerification;
         }
     }
 
@@ -67,7 +67,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
                 CrossauthLogger.logger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
-            if ('emailVerified' in user && user['emailVerified'] == false && this.checkEmailVerified) {
+            if ('emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
                 CrossauthLogger.logger.debug("User email not verified");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
@@ -84,7 +84,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
-    async getUserById(id : string) : Promise<UserWithPassword> {
+    async getUserById(id : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
         return /*await*/ this.getUserByUsername(id);
     }
 
@@ -100,6 +100,25 @@ export class InMemoryUserStorage extends UserPasswordStorage {
                 this.usersByUsername[id][field] = user[field];
             }
         }
+    }
+
+    /**
+     * Create a user
+     * @param username 
+     * @param password 
+     * @param extraFields 
+     */
+    async createUser(username : string, 
+        passwordHash : string, 
+        extraFields : {[key : string]: string|number|boolean|Date|undefined})
+        : Promise<string|number> {
+        this.usersByUsername[username] = {
+            id: username,
+            username: username,
+            passwordHash : passwordHash,
+            ...extraFields
+        };
+        return username;
     }
 }
 
@@ -147,12 +166,14 @@ export class InMemoryKeyStorage extends KeyStorage {
     async saveKey(uniqueUserId : string, 
                       key : string, dateCreated : Date, 
                       expires : Date | undefined, 
+                      data? : string,
                       extraFields? : {[key : string]: any}) : Promise<void> {
         this.keys[key] = {
             value : key,
             userId : uniqueUserId,
             created: dateCreated,
             expires: expires,
+            data: data,
             ...extraFields
         };
         

@@ -1,0 +1,50 @@
+<html>
+    <head>
+        <title>Create an account</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+    </head>
+    <body>
+        <h1>Create An Account</h1>
+        {% if message %}
+            <p class="success">{{ message }}</p>
+        {% else %}
+            {% if error %}
+                <p>
+                {% if code == "PasswordFormat" %}
+                    Password must be at leat 8 characters, contain at least one lowercase letter, one
+                    uppercase letter and one digit.
+                {% elif code == "PasswordMatch" %}
+                    Passwords do not PasswordMatch
+                {% elif code == "UserExists" %}
+                    Username or email already exists
+                {% else %}
+                    {{ error }}
+                {% endif %}
+            {% endif %}
+            <form method="POST" action="/signup">
+                <input type="hidden" name="next" value="{{ next }}"/>
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                {% if error %}
+                    <p class="error">{{ error }}</p>
+                {% endif %}
+                <p>
+                    <label for="username">Username</label><br>
+                    <input type="text" name="username" size="20" value="{{ username }}" />
+                </p>
+                <p>
+                    <label for="password">Password</label><br>
+                    <input type="password" name="password" size="20" />
+                </p>
+                <p>
+                    <label for="repeatPassword">Repeat Password</label><br>
+                    <input type="password" name="repeatPassword" size="20" />
+                </p>
+                <p>
+                    <label for="user_email">Email</label><br>
+                    <input type="text" name="user_email" size="20" value="{{ user_email }}"/>
+                </p>
+                <button type="submit">Sign Up</button>
+            </form>
+        {% endif %}
+    </body>
+</html>

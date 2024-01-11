@@ -4,15 +4,19 @@ import type {
 } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, UserPasswordStorage, KeyStorage } from './storage';
-import { UsernamePasswordAuthenticator } from "./password";
+import { HashedPasswordAuthenticator, UsernamePasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
+import { TokenEmailer, type TokenEmailerOptions } from './email.ts';
 import { Hasher } from './hasher';
 import { CrossauthLogger } from '../logger.ts';
+import { setParameter, ParamType } from './utils.ts';
 
 /**
  * Optional parameters to {@link CookieAuth }.  
  */
-export interface CookieAuthOptions {
+export interface CookieAuthOptions extends TokenEmailerOptions {
+
+    secret?: string,
 
     ///////// session ID settings
 
@@ -72,21 +76,6 @@ export interface CookieAuthOptions {
     /** Length in bytes of random string to create for CSRF tokens.  Actual key will be longer as it is Base64-encoded. Defaults to 16 */
     csrfLength? : number,
 
-    //////////////// PBKDF2 settings
-
-    /** If hashSessionIds is true, create salts of this length.  Defaults to 16 */
-    saltLength? : number,
-
-    /** If hashSessionIds is true, use this number of iterations when generating the PBKDF2 hash.  Default 100000 */
-    iterations? : number;
-
-    /** If hashSessionIds is true, use this HMAC digest algorithm.  Default 'sha512' */
-    digest? : string;
-
-    /** Length of the hash.  This is for the signature on CSRF tokens and for session IDs when hashSessionIds is true.  
-     *  In bytes, default 16.  In practice higher as it is Base64Url-encoded */
-    keyLength? : number;
-
     /** 
      * This will be called with the session key to filter sessions 
      * before returning.  Function should return true if the session is valid or false otherwise.
@@ -99,6 +88,7 @@ export interface CookieAuthOptions {
      * Default true
      */
     anonymousSessions? : boolean;
+
 }
 
 /**
@@ -144,7 +134,7 @@ export interface Cookie {
 export class CookieAuth {
     readonly userStorage : UserStorage;
     readonly sessionStorage : KeyStorage;
-    private secret : string;
+    private secret : string = "";
 
     // session ID settings
     readonly sessionCookieName : string = "SESSIONID";
@@ -156,7 +146,7 @@ export class CookieAuth {
     private sessionPath : string | undefined = "/";
     private sessionSameSite : boolean | "lax" | "strict" | "none" = 'lax';
     private sessionIdLength : number = 16;
-    private hashSessionIds : boolean = false;
+    private hashSessionId : boolean = false;
     readonly sessionIdleTimeout : number = 0;
 
     // CSRF token settings
@@ -174,6 +164,7 @@ export class CookieAuth {
     private keyLength = 16;
     private digest = 'sha512';
     private filterFunction? : (sessionKey : Key) => boolean;
+
     /**
      * Constructor.
      * 
@@ -184,46 +175,44 @@ export class CookieAuth {
      */
     constructor(userStorage : UserStorage, 
                 sessionStorage : KeyStorage, 
-                secret : string,
                 options? : CookieAuthOptions) {
         this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
-        this.secret = secret;
-
+        
         if (options) {
+            setParameter("secret", ParamType.String, this, options, "SECRET", true);
             // session
-            if (options.sessionCookieName) this.sessionCookieName = options.sessionCookieName;
-            if (options.sessionMaxAge) {
-                if (options.sessionMaxAge && options.sessionMaxAge <= 0) {
-                    CrossauthLogger.logger.warn("maxAge <=0 ignored - setting to default")
-                } else {
-                    this.sessionMaxAge = options.sessionMaxAge;
-                }
+            setParameter("sessionCookieName", ParamType.String, this, options, "SESSION_COOKIE_NAME");
+            setParameter("sessionMaxAge", ParamType.Number, this, options, "sessionMaxAge");
+            if (this.sessionMaxAge < 0) {
+                CrossauthLogger.logger.warn("maxAge <=0 ignored - setting to default")
+                this.sessionMaxAge = 0;
             }
-            if (options.persistSessionId != undefined) {
-                this.persistSessionId = options.persistSessionId;
-            }
-                if (options.sessionHttpOnly) this.sessionHttpOnly = options.sessionHttpOnly;
-            if (options.sessionSecure) this.sessionSecure = options.sessionSecure;
-            if (options.sessionDomain) this.sessionDomain = options.sessionDomain;
-            if (options.sessionSameSite) this.sessionSameSite = options.sessionSameSite;
-            if (options.sessionIdLength) this.sessionIdLength = options.sessionIdLength;
-            if (options.hashSessionId) this.hashSessionIds = options.hashSessionId;
-            if (options.sessionIdleTimeout) this.sessionIdleTimeout = options.sessionIdleTimeout;
+            setParameter("persistSessionId", ParamType.String, this, options, "SESSION_PERSISTENT_SESSION_ID");
+            setParameter("sessionHttpOnly", ParamType.Boolean, this, options, "SESSION_HTTP_ONLY");
+            setParameter("sessionSecure", ParamType.Boolean, this, options, "SESSION_SECURE");
+            setParameter("sessionDomain", ParamType.String, this, options, "SESSION_DOMAIN");
+            setParameter("sessionPath", ParamType.String, this, options, "SESSION_PATH");
+            setParameter("sessionSameSite", ParamType.String, this, options, "SESSION_SAMESITE");
+            setParameter("sessionIdLength", ParamType.String, this, options, "SESSION_ID_LENGTH");
+            setParameter("hashSessionId", ParamType.Boolean, this, options, "HASH_SESSION_ID");
+            setParameter("sessionIdleTimeout", ParamType.Number, this, options, "SESSION_IDLE_TIMEOUT");
 
             // CSRF
-            if (options.csrfCookieName) this.csrfCookieName = options.csrfCookieName;
-            if (options.csrfHttpOnly) this.csrfHttpOnly = options.csrfHttpOnly;
-            if (options.csrfSecure) this.csrfSecure = options.csrfSecure;
-            if (options.csrfDomain) this.csrfDomain = options.csrfDomain;
-            if (options.csrfSameSite) this.csrfSameSite = options.csrfSameSite;
-            if (options.csrfLength) this.csrfLength = options.csrfLength;
+            setParameter("csrfCookieName", ParamType.String, this, options, "CSRF_COOKIE_NAME");
+            setParameter("csrfHttpOnly", ParamType.Boolean, this, options, "SESSION_HTTP_ONLY");
+            setParameter("csrfSecure", ParamType.Boolean, this, options, "SESSION_SECURE");
+            setParameter("csrfDomain", ParamType.String, this, options, "SESSION_DOMAIN");
+            setParameter("csrfPath", ParamType.String, this, options, "CSRF_PATH");
+            setParameter("csrfSameSite", ParamType.String, this, options, "CSRF_SAMESITE");
+            setParameter("csrfLength", ParamType.Number, this, options, "CSRF_LENGTH");
 
             // PBKDF2
-            if (options.saltLength) this.saltLength = options.saltLength;
-            if (options.iterations) this.iterations = options.iterations;
-            if (options.digest)this.digest = options.digest;
-            if (options.keyLength) this.keyLength = options.keyLength;
+            setParameter("saltLength",ParamType.Number,  this, options, "HASH_SALT_LENGTH");
+            setParameter("iterations", ParamType.Number, this, options, "HASHITERATIONS");
+            setParameter("digest", ParamType.String, this, options, "HASH_DIGEST");
+            setParameter("keyLength",ParamType.Number,  this, options, "HASDH_KEY_LENGTH");
+
             this.filterFunction = options.filterFunction;
         }
     }
@@ -277,7 +266,7 @@ export class CookieAuth {
                 sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
                 hashedSessionKey = sessionKey;
             }
-            if (this.hashSessionIds) {
+            if (this.hashSessionId) {
                 hashedSessionKey = this.hashSessionKey(sessionKey);
             }    
             const dateCreated = new Date();
@@ -297,7 +286,7 @@ export class CookieAuth {
                     if (this.sessionIdleTimeout > 0 && userId) {
                         extraFields = {lastActivity: new Date()};
                     }
-                    await this.sessionStorage.saveKey(userId, hashedSessionKey, dateCreated, expires, extraFields);
+                    await this.sessionStorage.saveKey(userId, hashedSessionKey, dateCreated, expires, undefined, extraFields);
                 }
                 return {
                     userId : userId,
@@ -407,7 +396,7 @@ export class CookieAuth {
      */
     async getUserForSessionKey(sessionKey: string) : Promise<{user: User|undefined, key : Key}> {
         const now = Date.now();
-        if (this.hashSessionIds) {
+        if (this.hashSessionId) {
             sessionKey = this.hashSessionKey(sessionKey);
         }
         const key = await this.sessionStorage.getKey(sessionKey);
@@ -446,7 +435,7 @@ export class CookieAuth {
      * @param except if defined, don't delete this key
      */
     async deleteAllForUser(userId : string | number, except: string|undefined) {
-        if (except && this.hashSessionIds) {
+        if (except && this.hashSessionId) {
             except = this.hashSessionKey(except);
         }
         await this.sessionStorage.deleteAllForUser(userId, except);
@@ -540,9 +529,9 @@ export class CookieAuth {
      * Validates the passed CSRF token.  The signature must match the payload, and the payload must match the additional value from the header or form
      * 
      * @param token the token (with signature) to validate.
-     * @param formOfHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
+     * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
      */
-    validateDoubleSubmitCsrfToken(token : string, sessionId : string, formOfHeaderValue: string|undefined) : void {
+    validateDoubleSubmitCsrfToken(token : string, sessionId : string, formOrHeaderValue: string|undefined) : void {
         let parts = token.split(".");
         if (parts.length != 2) {
             // TODO: this should raise a security issue
@@ -551,9 +540,10 @@ export class CookieAuth {
         }
         let signature = parts[0];
         let message = parts[1];
-        if (message != formOfHeaderValue) {
+        if (message != formOrHeaderValue) {
             // TODO: this should raise a security issue
-            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - form/header cvalue does not match.  Stack trace follows");
+            CrossauthLogger.logger.debug("Mismatch between CSRF cookie " + message + " form/header " + formOrHeaderValue);
+            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - form/header value does not match.  Stack trace follows");
             let error = new CrossauthError(ErrorCode.InvalidKey);
             CrossauthLogger.logger.debug(error);
             throw error;
@@ -641,25 +631,48 @@ export class CookieSessionManager {
     private auth : CookieAuth;
     private authenticator : UsernamePasswordAuthenticator;
 
+    private secret? : string;
+    private views? : string = "views";
+    private enableEmailVerification? : boolean = false;
+    private emailVerifiedPage? : string = "emailverified.njk";
+    private emailVerificationTextBody? : string = "emailverificationtextbody.njk";
+    private emailVerificationHtmlBody? : string;
+    private emailVerificationSubject : string = "Please verify your email address";
+    private passwordResetTextBody? : string = "passwordresettextbody.njk";
+    private passwordResetHtmlBody? : string;
+    private passwordResetSubject : string = "Password reset";
+    private emailFrom? : string;
+    private smtpHost? : string;
+    private smtpPort : number = 25;
+    private smtpUseTls : boolean = false;
+    private smtpUsername : string|undefined = undefined;
+    private smtpPassword : string|undefined = undefined;
+    private tokenEmailer? : TokenEmailer;
+
     /**
      * Constructor
      * @param userStorage the {@link UserStorage} instance to use, eg {@link PrismaUserStorage}.
      * @param sessionStorage  the {@link KeyStorage} instance to use, eg {@link PrismaSessionStorage}.
      * @param authenticator authenticator used to validate users  See {@link UsernamePasswordAuthenticatorOptions }.
-     * @param secret a secret password use to sign CSRF tokens and optionally for session IDs.  Must be at leat 16 bytes.  If in the Base64 character set, 22.  If in the hex charfacter set, 32.
      * @param options optional parameters for authentication. See {@link CookieAuthOptions }.
      */
     constructor(
         userStorage : UserStorage, 
         sessionStorage : KeyStorage, 
         authenticator : UsernamePasswordAuthenticator,
-        secret : string,
         options? : CookieAuthOptions) {
 
         this.userStorage = userStorage;
         this.sessionStorage = sessionStorage;
-        this.auth = new CookieAuth(this.userStorage, this.sessionStorage, secret, options);
+        this.auth = new CookieAuth(this.userStorage, this.sessionStorage, options);
         this.authenticator = authenticator;
+
+        if (options) {
+            setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
+        }
+        if (this.enableEmailVerification) {
+            this.tokenEmailer = new TokenEmailer(this.userStorage, this.sessionStorage, options);
+        }
     }
 
     /**
@@ -685,12 +698,13 @@ export class CookieSessionManager {
      * @param password the password to validate
      * @param existingSessionId if this is passed, the it will be used for the new sessionId.  If not, a new random one will be created
      * @param persist if passed, overrides the persistSessionId setting.
+     * @param user if this is defined, the username and password are ignored and the given user is logged in
      * @returns the user (without the password hash) and session cookie.
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, password : string, existingSessionId? : string, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
-        const user = await this.authenticator.authenticateUser(username, password);
+    async login(username : string, password : string, existingSessionId? : string, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
+        if (!user) user = await this.authenticator.authenticateUser(username, password);
 
         const sessionKey = await this.auth.createSessionKey(user.id, existingSessionId);
         //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
@@ -876,6 +890,45 @@ export class CookieSessionManager {
      */
     async deleteSessionId(sessionId : string) : Promise<void> {
         /*await*/ return this.auth.sessionStorage.deleteKey(sessionId);
+    }
+
+    /**
+     * Creates a new user, sending an email verification message if necessary
+     * 
+     * @param username username to give the user
+     * @param password password to give the user
+     * @param extraFields and extra fields to add to the user table entry
+     * @returns the userId
+     */
+    async createUser(username : string, 
+        password : string, 
+        extraFields : {[key : string]: string|number|boolean|Date|undefined})
+        : Promise<string|number> {
+            let passwordHash = await this.authenticator.createPasswordForStorage(password);
+        if (this.enableEmailVerification && this.tokenEmailer) {
+            extraFields = {...extraFields, emailVerified: false};
+        }
+            const userId = await this.userStorage.createUser(username, passwordHash, extraFields);
+        if (this.enableEmailVerification && this.tokenEmailer) {
+            await this.tokenEmailer?.sendEmailVerificationToken(userId, undefined)
+        }
+        return userId;
+    }
+
+    async applyEmailVerificationToken(token : string) : Promise<User> {
+        if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
+        let { userId, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
+        let user = await this.userStorage.getUserById(userId, true);
+
+        let newUser : Partial<User> = {
+            id: user.id,
+            emailVerified: true,
+        }
+        if (newEmail != "") {
+            newUser.email = newEmail;
+        }
+        await this.userStorage.updateUser(newUser);
+        return user;
     }
 
 }

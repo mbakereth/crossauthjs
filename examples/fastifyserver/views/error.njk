@@ -1,0 +1,14 @@
+<html>
+    <head>
+        <title>Error</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+        </head>
+    <body>
+        <h1 class="error">There has been an error</h1>
+        {% if (code == "UsernameOrPasswordInvalid") %} <!-- you can handle specific errors like this -->
+            <p>Username or password is incorrect.  Please check your input
+        {% else %}
+            {{ error }}
+        {% endif %}
+    </body>
+</html>

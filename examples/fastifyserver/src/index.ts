@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+dotenv.config();
 import { PrismaClient } from '@prisma/client';
 import { CookieSessionManager, FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage, HashedPasswordAuthenticator } from 'crossauth/server';
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
@@ -14,10 +15,7 @@ import { CrossauthLogger } from 'crossauth';
 CrossauthLogger.logger.level = CrossauthLogger.Debug;
 //CrossauthLogger.setLogger(Pino.pino({level: "debug"}));  // replace default logger with Pino
 
-dotenv.config();
-
 const port = Number(process.env.PORT || 3000);
-const secret = process.env.SECRET;
 const __filename = new URL('', import.meta.url).pathname;
 const __dirname = new URL('.', import.meta.url).pathname;
 
@@ -44,18 +42,17 @@ app.register(view, {
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
 const prisma = new PrismaClient();
-let userStorage = new PrismaUserStorage({prismaClient : prisma});
-let sessionStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
+let userStorage = new PrismaUserStorage({prismaClient : prisma, extraFields: "email"});
+let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
 let authenticator = new HashedPasswordAuthenticator(userStorage);
-let sessionManager = new CookieSessionManager(userStorage, sessionStorage, authenticator, secret, {persistSessionId: true});
 
 // create the server, pointing it at the app we created and our nunjucks views directory
-let server = new FastifyCookieAuthServer(sessionManager, {
+let server = new FastifyCookieAuthServer(userStorage, keyStorage, authenticator, {
     app: app,
     views: path.join(__dirname, '../views'),
-    loginPage: "login.njk",
-    anonymousSessions: true,
+    anonymousSessions: false,
     keepAnonymousSessionId: false,
+    secret: process.env.CROSSAUTH_SECRET,
 });
 
 // create our home page

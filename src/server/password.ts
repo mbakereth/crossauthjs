@@ -31,7 +31,16 @@ export interface UsernamePasswordAuthenticatorOptions {
 export abstract class UsernamePasswordAuthenticator {
 
     // throws Connection, UserNotExist, PasswordNotMatch
+    /**
+     * Should return the user if it exists in storage, otherwise throw {@link index!CrossauthError}:
+     * with {@link index!ErrorCode} of `Connection`, `UserNotExist` or `PasswordNotMatch`
+     * 
+     * @param username the username to authenticate
+     * @param password the password to authenticate
+     */
     abstract authenticateUser(username : string, password : string) : Promise<User>;
+
+    abstract createPasswordForStorage(password : string) : Promise<string>;
 }
 
 /**
@@ -137,4 +146,13 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
 
         return hasher.hash(password, {salt: salt, encode: encode});
     }
+
+    /**
+     * Just calls createPasswordHash with encode set to true
+     * @param password the password to hash
+     */
+    async createPasswordForStorage(password : string) : Promise<string> {
+        return this.createPasswordHash(password, true);
+    }
+
 }

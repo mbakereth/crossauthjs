@@ -10,12 +10,16 @@ export interface Key {
     created : Date,
 
     /** The date/time the key expires */
-    expires : Date | undefined
+    expires : Date | undefined,
+
+    /** the user this key is for (or undefined for an anonymous session ID) */
+    userId : string | number | undefined,
 
     /** The /time the session was last active */
     lastActive? : Date,
 
-    userId : string | number | undefined;
+    /** additional key-specific data (eg new email address for email change) */
+    data? : string,
 
     [ key : string ] : any,
 }

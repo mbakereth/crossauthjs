@@ -14,6 +14,8 @@ model User {
     id                  Int         @id @unique @default(autoincrement())
     username            String      @unique
     passwordHash        String
+    email               String      @unique
+    emailVerified       Boolean     @default(true)
 
     session Key[]
 
@@ -27,6 +29,7 @@ model Key {
     user_id        Int?
     created        DateTime
     expires        DateTime
+    data           String?
     user           User?     @relation(references: [id], fields: [user_id], onDelete: Cascade)
 
     @@index([id])

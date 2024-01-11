@@ -6,7 +6,7 @@ import dts from 'vite-plugin-dts';
 //import pinoplugin from 'esbuild-plugin-pino';
 import { join, dirname } from 'path'
 
-const config = {
+const libConfig = {
   index: {
     entry: resolve(__dirname, "./src/index.ts"),
     fileName: "index",
@@ -36,10 +36,26 @@ const config = {
   },
 };
 
+const buildConfig = {
+  index: {
+    ssr: true,
+  },
+  client: {
+  },
+  server: {
+    ssr: true,
+  },
+  indexiife: {
+  },
+  clientiife: {
+  },
+};
+
 if (process.env.LIB_NAME === undefined) {
   throw new Error('LIB_NAME is not defined or is not valid');
 }
-const currentConfig = config[process.env.LIB_NAME];
+const currentLibConfig = libConfig[process.env.LIB_NAME];
+const currentBuildConfig = buildConfig[process.env.LIB_NAME];
 
 /*const pathToPino = resolve('./node_modules/pino')
 console.log(pathToPino)
@@ -57,8 +73,9 @@ globalThis.__bundlerPathsOverrides['pino-opentelemetry-transport'] = pathToPino+
 // https://vitejs.dev/guide/build.html#library-mode
 export default defineConfig({
   build: {
+    ...currentBuildConfig,
     lib: {
-      ...currentConfig,
+      ...currentLibConfig,
     },
     /*watch: {
       // https://rollupjs.org/configuration-options/#watch
