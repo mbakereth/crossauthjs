@@ -261,8 +261,6 @@ function defaultPasswordValidator(password : string) : boolean {
  * pass in your own Fastify app.
  */
 export class FastifyCookieAuthServer {
-    private secret: string = "";
-    private siteUrl? : string;
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
     private views : string = "views";
     private prefix : string = "/";
@@ -300,7 +298,6 @@ export class FastifyCookieAuthServer {
                 authenticator: UsernamePasswordAuthenticator, 
                 options: FastifyCookieAuthServerOptions = {}) {
 
-        setParameter("secret", ParamType.String, this, options, "SECRET", true);
         setParameter("views", ParamType.String, this, options, "VIEWS");
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("endpoints", ParamType.String, this, options, "ENDPOINTS");
@@ -330,8 +327,8 @@ export class FastifyCookieAuthServer {
         if (options.app) {
             this.app = options.app;
         } else {
-            if (options.views) {
-                nunjucks.configure(options.views, {
+            if (this.views) {
+                nunjucks.configure(this.views, {
                     autoescape: true,
                 });
             }
@@ -342,7 +339,7 @@ export class FastifyCookieAuthServer {
                 },
                 templates: [
                     "node_modules/shared-components",
-                    "views",
+                    this.views,
                 ],
                 });
 
