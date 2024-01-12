@@ -28,6 +28,7 @@ export interface InMemoryUserStorageOptions {
 */
 export class InMemoryUserStorage extends UserPasswordStorage {
     usersByUsername : { [key : string]: UserWithPassword } = {};
+    usersByEmail : { [key : string]: UserWithPassword } = {};
     private checkActive : boolean = false;
     private enableEmailVerification : boolean = false;
 
@@ -47,9 +48,42 @@ export class InMemoryUserStorage extends UserPasswordStorage {
         }
     }
 
-    addUser(user : UserWithPassword) : void {
-        this.usersByUsername[user.username] = {...user};
-        user.passwordHash = "ABC";
+    /**
+     * Create a user
+     * @param username 
+     * @param password 
+     * @param extraFields 
+     */
+    async createUser(username : string, 
+        passwordHash : string, 
+        extraFields : {[key : string]: string|number|boolean|Date|undefined})
+        : Promise<string|number> {
+
+            let newUser : UserWithPassword = {
+                username: username, 
+                id: username, 
+                passwordHash: passwordHash,
+                normalizedUsername: UserStorage.normalize(username),
+                ...extraFields,
+            };
+            if ("email" in newUser && newUser.email) {
+                newUser.normalizedEmail = UserStorage.normalize(newUser.email);
+            }
+            this.usersByUsername[newUser.normalizedUsername] = newUser;
+            if ("email" in newUser && newUser.email) this.usersByEmail[newUser.normalizedEmail] = newUser;
+    
+        return username;
+    }
+
+    addUser1(user : UserWithPassword) : void {
+        let newUser = {...user};
+        newUser.normalizedUsername = UserStorage.normalize(newUser.username);
+        if ("email" in newUser && newUser.email) {
+            newUser.normalizedEmail = UserStorage.normalize(newUser.email);
+        }
+        this.usersByUsername[newUser.normalizedUsername] = newUser;
+        if ("email" in newUser && newUser.email) this.usersByEmail[newUser.normalizedEmail] = newUser;
+        console.log(this.usersByUsername);
     }
 
     /**
@@ -60,9 +94,37 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
     async getUserByUsername(username : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
-        if (username in this.usersByUsername) {
+        const normalizedUsername = UserStorage.normalize(username);
+        if (normalizedUsername in this.usersByUsername) {
 
-            const user = this.usersByUsername[username];
+            const user = this.usersByUsername[normalizedUsername];
+            if ('active' in user && user['active'] == false && this.checkActive) {
+                CrossauthLogger.logger.debug("User has active set to false");
+                throw new CrossauthError(ErrorCode.UserNotActive);
+            }
+            if (!skipEmailVerifiedCheck && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
+                CrossauthLogger.logger.debug("User email not verified");
+                throw new CrossauthError(ErrorCode.EmailNotVerified);
+            }
+            return {...user};
+        }
+
+        CrossauthLogger.logger.debug("User does not exist");
+        throw new CrossauthError(ErrorCode.UserNotExist);
+    }
+
+    /**
+     * Returns a {@link UserWithPassword } instance matching the given email address, or throws an Exception.
+     * 
+     * @param email the emaila ddress to look up
+     * @returns a {@link UserWithPassword } instance, ie including the password hash.
+     * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
+     */
+    async getUserByEmail(email : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
+        const normalizedEmail = UserStorage.normalize(email);
+        if (normalizedEmail in this.usersByEmail) {
+
+            const user = this.usersByUsername[normalizedEmail];
             if ('active' in user && user['active'] == false && this.checkActive) {
                 CrossauthLogger.logger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
@@ -94,31 +156,21 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @param user the user to update.  The id to update is taken from this obkect, which must be present.  All other attributes are optional. 
      */
     async updateUser(user : Partial<User>) : Promise<void> {
-        if (user.id && user.id in this.usersByUsername) {
-            let id : string|number = user.id||"";
-            for (let field in user) {
-                this.usersByUsername[id][field] = user[field];
+        let newUser = {...user};
+        if ("username" in newUser && newUser.username) {
+            newUser.normalizedUsername = UserStorage.normalize(newUser.username);
+        } else if ("id" in newUser && newUser.id) {
+            newUser.normalizedUsername = UserStorage.normalize(String(newUser.id));
+        }
+        if ("email" in newUser && newUser.email) {
+            newUser.normalizedEmail = UserStorage.normalize(newUser.email);
+
+        }
+        if (newUser.normalizedUsername && newUser.normalizedUsername in this.usersByUsername) {
+            for (let field in newUser) {
+                this.usersByUsername[newUser.normalizedUsername][field] = newUser[field];
             }
         }
-    }
-
-    /**
-     * Create a user
-     * @param username 
-     * @param password 
-     * @param extraFields 
-     */
-    async createUser(username : string, 
-        passwordHash : string, 
-        extraFields : {[key : string]: string|number|boolean|Date|undefined})
-        : Promise<string|number> {
-        this.usersByUsername[username] = {
-            id: username,
-            username: username,
-            passwordHash : passwordHash,
-            ...extraFields
-        };
-        return username;
     }
 }
 

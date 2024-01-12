@@ -9,7 +9,7 @@
             <p class="success">{{ message }}</p>
         {% else %}
             {% if error %}
-                <p>
+                <p class="error">
                 {% if code == "PasswordFormat" %}
                     Password must be at leat 8 characters, contain at least one lowercase letter, one
                     uppercase letter and one digit.
@@ -20,13 +20,11 @@
                 {% else %}
                     {{ error }}
                 {% endif %}
+                </p>
             {% endif %}
             <form method="POST" action="/signup">
                 <input type="hidden" name="next" value="{{ next }}"/>
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
-                {% if error %}
-                    <p class="error">{{ error }}</p>
-                {% endif %}
                 <p>
                     <label for="username">Username</label><br>
                     <input type="text" name="username" size="20" value="{{ username }}" />
@@ -41,7 +39,7 @@
                 </p>
                 <p>
                     <label for="user_email">Email</label><br>
-                    <input type="text" name="user_email" size="20" value="{{ user_email }}"/>
+                    <input type="email" name="user_email" size="20" value="{{ user_email }}"/>
                 </p>
                 <button type="submit">Sign Up</button>
             </form>

@@ -13,8 +13,10 @@ datasource db {
 model User {
     id                  Int         @id @unique @default(autoincrement())
     username            String      @unique
+    normalizedUsername  String      @unique
     passwordHash        String
     email               String      @unique
+    normalizedEmail     String      @unique
     emailVerified       Boolean     @default(true)
     dummyField          String      @default("")
 

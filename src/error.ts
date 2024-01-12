@@ -9,6 +9,9 @@ export enum ErrorCode {
     /** Thrown when a password does not match, eg during login or signup */
     PasswordNotMatch,
 
+    /** Thrown when a a password reset is requested and the email does not exist */
+    EmailNotExist,
+
     /** For endpoints provided by servers in this package, this is returned instead of 
       * UserNotExist or PasswordNotMatch, for security reasons */
     UsernameOrPasswordInvalid,
@@ -86,6 +89,8 @@ export class CrossauthError extends Error {
                 _message = "Password doesn't match"
             } else if (code == ErrorCode.UsernameOrPasswordInvalid) {
                 _message = "Username or password incorrect"
+            } else if (code == ErrorCode.EmailNotExist) {
+                _message = "No user exists with that email address"
             } else if (code == ErrorCode.UserNotActive) {
                 _message = "Account is not active"
             } else if (code == ErrorCode.EmailNotVerified) {

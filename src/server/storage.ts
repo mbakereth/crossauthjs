@@ -8,10 +8,15 @@ import type {
  * 
  * This class is subclasses for various types of user storage,  Eg {@link PrismaUserStorage } is for storing
  * username and password in a database table, managed by the Prisma ORM.
+ * 
+ * Username and email searches should be case insensitive, as should their unique constraints.  id searches
+ * need not be case insensitive .
  */
 export abstract class UserStorage {
     /**
-     * Returns user matching the given username, or throws an exception
+     * Returns user matching the given username, or throws an exception.  
+     * 
+     * The username should be matched normalized and lowercased (using normalize())
      * @param username the username to return the user of
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
@@ -23,10 +28,21 @@ export abstract class UserStorage {
      * Not that implementations are free to define what the user ID is.  It can be a number of string,
      * or can simply be `username`.
      * 
-     * @param id the user ID to return the user of
+     * @param id the user id to return the user of
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
     abstract getUserById(id : string | number, skipEmailVerifiedCheck? : boolean) : Promise<User>;
+
+    /**
+     * Returns user matching the given email address, or throws an exception.
+     * 
+     * The email should be matched normalized and lowercased (using normalize())
+     * If the email field doesn't exist, username is assumed to be the email column
+     * 
+     * @param email the email address to return the user of
+     * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
+     */
+    abstract getUserByEmail(email : string | number, skipEmailVerifiedCheck? : boolean) : Promise<User>;
 
     /**
      * If you enable signup, you will need to implement this method
@@ -42,6 +58,15 @@ export abstract class UserStorage {
      * @param user  The id field must be set, but all others are optional 
      */
     abstract updateUser(user : Partial<User>) : Promise<void>;
+
+    /**
+     * Usernames and emails are stored in lowercase, normalized format.  This function returns that normalization
+     * @param str the string to normalize
+     * @returns the normalized string, in lowercase with diacritics removed
+     */
+    static normalize(str : string) {
+        return str.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    }
 }
 
 /**

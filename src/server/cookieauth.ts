@@ -778,7 +778,7 @@ export class CookieSessionManager {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
      */
     async logout(sessionKey : string) : Promise<void> {
-        /*await*/ return this.sessionStorage.deleteKey(sessionKey)
+        return await this.sessionStorage.deleteKey(sessionKey)
     }
 
     /**
@@ -874,7 +874,7 @@ export class CookieSessionManager {
      * @param sessionId the session Id to delete
      */
     async deleteSessionId(sessionId : string) : Promise<void> {
-        /*await*/ return this.auth.sessionStorage.deleteKey(sessionId);
+         return await this.auth.sessionStorage.deleteKey(sessionId);
     }
 
     /**
@@ -900,6 +900,20 @@ export class CookieSessionManager {
         return userId;
     }
 
+    async requestPasswordReset(email : string) : Promise<void> {
+        const user = await this.userStorage.getUserByEmail(email);
+        await this.tokenEmailer?.sendPasswordResetToken(user.id);
+    }
+
+    /**
+     * Takes an email verification token as input and applies it to the user storage.
+     * 
+     * The emailVerified flag is set to true.  If the token was for changing the password, the new
+     * password is saved to the user in user storage.
+     * 
+     * @param token the token to apply
+     * @returns the new user record
+     */
     async applyEmailVerificationToken(token : string) : Promise<User> {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
         let { userId, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
@@ -913,7 +927,12 @@ export class CookieSessionManager {
             newUser.email = newEmail;
         }
         await this.userStorage.updateUser(newUser);
-        return user;
+        return {...user, ...newUser};
+    }
+
+    async userForPasswordResetToken(token : string) : Promise<User> {
+        if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
+        return await this.tokenEmailer.verifyPasswordResetToken(token);
     }
 
     async changePassword(username : string, oldPassword : string, newPassword : string) : Promise<User> {
@@ -923,6 +942,18 @@ export class CookieSessionManager {
             id: user.id,
             passwordHash: await this.authenticator.createPasswordForStorage(newPassword),
         })
+        return user;
+    }
+
+    async resetPassword(token : string, newPassword : string) : Promise<User> {
+
+        const user = await this.userForPasswordResetToken(token);
+        if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
+        await this.userStorage.updateUser({
+            id: user.id,
+            passwordHash: await this.authenticator.createPasswordForStorage(newPassword),
+        })
+        this.sessionStorage.deleteKey(token);
         return user;
     }
 

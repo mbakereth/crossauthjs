@@ -14,23 +14,14 @@ beforeAll(async () => {
     await prismaClient.key.deleteMany({});
     userStorage = new PrismaUserStorage({extraFields: "dummyField"});
     let authenticator = new HashedPasswordAuthenticator(userStorage);
-    await prismaClient.user.create({
-        data: {
-          username: 'bob',
-          passwordHash: authenticator.createPasswordHash("bobPass123", true),
-          email: "bob@bob.com",
-          dummyField: "abc",
-        },
-    });
-    
-    await prismaClient.user.create({
-        data: {
-            username: 'alice',
-            passwordHash:  authenticator.createPasswordHash("alicePass123", true),
-            email: "alice@alice.com",
-            dummyField: "abc",
-        },
-      });
+    await userStorage.createUser(
+        "bob", 
+        authenticator.createPasswordHash("bobPass123", true), 
+        {"dummyField": "abc", "email": "bob@bob.com"});
+    await userStorage.createUser(
+        "alice", 
+        authenticator.createPasswordHash("alicePass123", true), 
+        {"dummyField": "abc", "email": "alice@alice.com"});
 });
 
 // test getting a user by username and by id

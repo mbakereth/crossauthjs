@@ -45,10 +45,11 @@ export interface PrismaUserStorageOptions {
  * Implementation of {@link UserStorage} where username and password is stored in a database managed by
  * the Prisma ORM.
  * 
- * By default, the Prisma name (ie the lowercased version) is called `user`.  It must have at least two fields:
+ * By default, the Prisma name (ie the lowercased version) is called `user`.  It must have at least these fields:
  *    * `username String \@unique`
+ *    * `normalizedUsername String \@unique`
  *    * `passwordHash String`
- * `username` must have `\@unique`.  It must also contain an ID column, which is either an `Int` or `String`, eg
+ * It must also contain an ID column, which is either an `Int` or `String`, eg
  *    * `id Int \@id \@unique \@default(autoincrement())
  * Alternatively you can set it to `username` if you don't have a separate ID field.
  * 
@@ -56,7 +57,10 @@ export interface PrismaUserStorageOptions {
  * the user table to also have an `active Boolean` field.
  *
  * You can optionally check if an `emailVerified` field is set to `true` when validating users,  Enabling this requires
- * the user table to also have an `emailVerified Boolean` field.
+ * the user table to also have an `emailVerified Boolean` field.  If the username is not the email address,
+ * it must contain these extra two fields:
+ *     * `email String \@unique`
+ *     * `normalizedEmail String \@unique`
  * 
  * You can optionally check if a `passwordReset` field is set to `true` when validating users.  Enabling this requires
  * the user table to also have a `passwordReset Boolean` field.  Use this if you want to require your user to change his/her password.
@@ -104,13 +108,13 @@ export class PrismaUserStorage extends UserPasswordStorage {
         }
     }
 
-    private async getUser(key : string, value : string | number, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
+    private async getUser(normalizedKey : string, normalizedValue : string | number, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
         let error: CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             let prismaUser = await this.prismaClient[this.userTable].findUniqueOrThrow({
                 where: {
-                    [key]: value
+                    [normalizedKey]: normalizedValue
                 }
             });
 
@@ -151,18 +155,31 @@ export class PrismaUserStorage extends UserPasswordStorage {
     /**
      * Returns a {@link UserWithPassword } instance matching the given username, or throws an Exception.
      * @param username the username to look up
-     * @param extraFields these will be selected from the user table row and returned in the User object
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserByUsername(username : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
-        return this.getUser("username", username, skipEmailVerifiedCheck);
+        const normalizedValue = PrismaUserStorage.normalize(username);
+        return this.getUser("normalizedUsername", normalizedValue, skipEmailVerifiedCheck);
+    }
+
+    /**
+     * Returns a {@link UserWithPassword } instance matching the given email address, or throws an Exception.
+     * 
+     * If there is no email field in the user, the username is assumed to contain the email
+     * 
+     * @param email the email address to look up
+     * @returns a {@link UserWithPassword } instance, ie including the password hash.
+     * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
+     */
+    async getUserByEmail(email : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
+        const normalizedValue = PrismaUserStorage.normalize(email);
+        return this.getUser("normalizedEmail", normalizedValue, skipEmailVerifiedCheck);
     }
 
     /**
      * Same as {@link getUserByUsername } but matching user ID,
      * @param id the user ID to match 
-     * @param extraFields these will be selected from the user table row and returned in the User object
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
@@ -179,16 +196,13 @@ export class PrismaUserStorage extends UserPasswordStorage {
         let error : CrossauthError|undefined = undefined;
         if (!(this.idColumn in user)) throw new CrossauthError(ErrorCode.InvalidKey);
         try {
-            const {id: _, ...data} = user;
-            /*let data : {[key : string] : any} = {
-                user_id : key.userId,
-                created : key.created,
-                expires : key.expires,
-            };
-            if ("lastActive" in key) {
-                data = {...data, lastActive: key.lastActive};
-            }*/
-
+            let {id: _, ...data} = user;
+            if ("email" in data && data.email) {
+                data = {normalizedEmail: PrismaUserStorage.normalize(data.email), ...data};
+            }
+            if ("username" in data && data.username) {
+                data = {normalizedUsername: PrismaUserStorage.normalize(data.username), ...data};
+            }
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             await this.prismaClient[this.userTable].update({
                 where: {
@@ -223,6 +237,12 @@ export class PrismaUserStorage extends UserPasswordStorage {
                 passwordHash : passwordHash,
                 ...extraFields,
             };
+            if ("email" in data && data.email) {
+                data = {normalizedEmail: PrismaUserStorage.normalize(data.email), ...data};
+            }
+            if ("username" in data && data.username) {
+                data = {normalizedUsername: PrismaUserStorage.normalize(data.username), ...data};
+            }
 
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             let user = await this.prismaClient[this.userTable].create({

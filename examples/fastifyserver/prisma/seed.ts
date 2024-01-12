@@ -8,24 +8,20 @@ let userStorage = new PrismaUserStorage({prismaClient : prisma});
 let hasher = new HashedPasswordAuthenticator(userStorage);
 
 async function main() {
-  await prisma.user.deleteMany();
-  await prisma.key.deleteMany();
+    await prisma.user.deleteMany();
+    await prisma.key.deleteMany();
 
-  const item1 = await prisma.user.create({
-    data: {
-      username : "bob",
-      passwordHash: hasher.createPasswordHash("bobPass123", true),
-      email: "bob@bob.com",
-    },
-  });
-  const item2 = await prisma.user.create({
-    data: {
-      username : "alice",
-      passwordHash: hasher.createPasswordHash("alicePass123", true),
-      email: "alice@alice.com",
-    },
-  });
-  console.log({ item1, item2 })
+    const user1 = await userStorage.createUser(
+        "bob",
+        hasher.createPasswordHash("bobPass123", true),
+        {"email": "bob@bob.com", "emailVerified": true}
+    );
+    const user2 = await userStorage.createUser(
+      "alice",
+      hasher.createPasswordHash("alicePass123", true),
+      {"email": "alice@alice.com", "emailVerified": true}
+  );
+  console.log({ user1, user2 })
 }
 main()
   .then(async () => {

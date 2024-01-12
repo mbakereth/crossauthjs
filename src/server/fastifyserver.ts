@@ -176,6 +176,16 @@ interface ChangePasswordBodyType extends CsrfBodyType {
     repeatPassword?: string,
 }
 
+interface ResetPasswordBodyType extends CsrfBodyType {
+    token: string,
+    newPassword: string,
+    repeatPassword?: string,
+}
+
+interface RequestPasswordResetBodyType extends CsrfBodyType {
+    email: string,
+}
+
 interface VerifyTokenParamType {
     token : string,
 }
@@ -203,8 +213,10 @@ export const AllEndpoints = [
     "api/login",
     "api/logout",
     "api/signup",
-    "api/changepassword",
     "api/verifyemail",
+    "api/changepassword",
+    "api/requestpasswordreset",
+    "api/resetpassword",
     "api/userforsessionkey",
     "api/getcsrftoken",
 ];
@@ -217,17 +229,17 @@ function defaultPasswordValidator(password : string) : boolean {
     return true;
 }
 /**
- * This class provides a complete (but without HTML files) auth backend server with endpoints served using Fastify.
+ * This class provides a complete (but without HTML files) auth backend server with endpoints served using 
+ * Fastify.
  * 
  * If you do not pass an Fastify app to this class, it will create one.  By default, pages are rendered
- * with Nunjucks.  If you prefer another renderer that is compatible with Fastify, just create your
+ * with Nunjucks.  If you prefer another renderer that is compatible with Fastify, create your
  * own Fastify app and configure the renderer using @fastify/view.
  * 
  * By default, all views are expected to be in a directory called `views` relative to the directory the
  * server is started in.  This can be overwritten by setting the `views` option.
  * 
- * Note that `views`, `loginPage` and `errorPage` are used only by the `/login` and `/logout` endpoints.  The
- * `/api/*` endpoints only return JSON.
+ * Note that `views`, and the Nunjucls pages are not used by the API endpoints (those starting in /api).
  * 
  * **Endpoints provided**
  * 
@@ -284,16 +296,10 @@ export class FastifyCookieAuthServer {
     private loginPage : string = "login.njk";
     private errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
-    private requestPasswordReset : string = "requestpasswordreset.njk";
-    private resetPasswordPage?: string = "resetpassword.njk";
+    private resetPasswordPage: string = "resetpassword.njk";
+    private requestPasswordResetPage: string = "requestpasswordreset.njk";
     private enableEmailVerification? : boolean = false;
-    private emailVerifiedPage? : string = "emailverified.njk";
-    private emailFrom? : string;
-    private smtpHost? : string;
-    private smtpPort : number = 25;
-    private smtpUseTls : boolean = false;
-    private smtpUsername : string|undefined = undefined;
-    private smtpPassword : string|undefined = undefined;
+    private emailVerifiedPage : string = "emailverified.njk";
     private sessionManager : CookieSessionManager;
     private anonymousSessions = true;
     private keepAnonymousSessionId = false;
@@ -322,14 +328,10 @@ export class FastifyCookieAuthServer {
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
         setParameter("resetPasswordPage", ParamType.String, this, options, "RESET_PASSWORD_PAGE");
+        setParameter("requestPasswordResetPage", ParamType.String, this, options, "REQUEST_PASSWORD_RESET_PAGE");
         setParameter("emailVerifiedPage", ParamType.String, this, options, "EMAIL_VERIFIED_PAGE");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
-        setParameter("smtpHost", ParamType.String, this, options, "SMTP_HOST");
-        setParameter("smtpPort", ParamType.Number, this, options, "SMTP_PORT");
-        setParameter("smtpUsername", ParamType.String, this, options, "SMTP_USERNAME");
-        setParameter("smtpPassword", ParamType.String, this, options, "SMTP_PASSWORD");
-        setParameter("smtpUseTls", ParamType.Boolean, this, options, "SMTP_USE_TLS");
         setParameter("anonymousSessions", ParamType.Boolean, this, options, "ANONYMOUS_SESSIONS");
         setParameter("keepAnonymousSessionId", ParamType.Boolean, this, options, "KEEP_ANONYMOUS_SESSION_ID");
         setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
@@ -405,7 +407,7 @@ export class FastifyCookieAuthServer {
             });
 
             this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info('POST ' + this.prefix+'login' + request.ip + ' ' + request.body.username);            
+                CrossauthLogger.logger.info('POST ' + this.prefix+'login ' + request.ip + ' ' + request.body.username);            
                 let next = request.body.next || this.loginRedirect;
                 try {
                     CrossauthLogger.logger.debug("Next page " + next);
@@ -441,7 +443,7 @@ export class FastifyCookieAuthServer {
             });
 
             this.app.post(this.prefix+'signup', async (request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info('POST ' + this.prefix+'signup' + request.ip + ' ' + request.body.username);            
+                CrossauthLogger.logger.info('POST ' + this.prefix+'signup ' + request.ip + ' ' + request.body.username);            
                 let next = request.body.next || this.loginRedirect;
                 try {
                     CrossauthLogger.logger.debug("Next page " + next);
@@ -479,7 +481,7 @@ export class FastifyCookieAuthServer {
         if (this.activatedEndpoints.includes("changepassword")) {
             this.app.get(this.prefix+'changepassword', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) =>  {
                 if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized);
-                CrossauthLogger.logger.info('GET ' + this.prefix+'changepassword' + request.ip + ' ' + request.user.username);
+                CrossauthLogger.logger.info('GET ' + this.prefix+'changepassword ' + request.ip + ' ' + request.user.username);
                 if (this.changePasswordPage)  { // if is redundant but VC Code complains without it
                     let data : {csrfToken: string|undefined} = {csrfToken: request.csrfToken};
                     return reply.view(this.changePasswordPage, data);
@@ -488,11 +490,92 @@ export class FastifyCookieAuthServer {
 
             this.app.post(this.prefix+'changepassword', async (request : FastifyRequest<{ Body: ChangePasswordBodyType }>, reply : FastifyReply) =>  {
                 if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized);
-                CrossauthLogger.logger.info('POST ' + this.prefix+'changepassword' + request.ip + ' ' + request.user.username);           
+                CrossauthLogger.logger.info('POST ' + this.prefix+'changepassword ' + request.ip + ' ' + request.user.username);           
                 try {
                     await this.changePassword(request, reply, 
                     (reply, _user) => {
                         return reply.view(this.changePasswordPage, {
+                            csrfToken: request.csrfToken,
+                            message: "Your password has been changed."
+                        });
+                    });
+                } catch (e) {
+                    CrossauthLogger.logger.error(e);
+                    return this.handleError(e, reply, (reply, code, error) => {
+                        return reply.view(this.changePasswordPage, {
+                            error: error, 
+                            code: ErrorCode[code], 
+                            csrfToken: request.csrfToken,
+                        });
+                    });
+                }
+            });
+        }
+
+        if (this.activatedEndpoints.includes("requestpasswordreset")) {
+            this.app.get(this.prefix+'requestpasswordreset', async (request : FastifyRequest, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info('GET ' + this.prefix+'requestpasswordreset' + request.ip);
+                if (this.requestPasswordResetPage)  { // if is redundant but VC Code complains without it
+                    let data : {csrfToken: string|undefined} = {csrfToken: request.csrfToken};
+                    return reply.view(this.requestPasswordResetPage, data);
+                }
+            });
+
+            this.app.post(this.prefix+'requestpasswordreset', async (request : FastifyRequest<{ Body: RequestPasswordResetBodyType }>, reply : FastifyReply) =>  {
+                const message = "If a user with exists with the email you entered, a message with "
+                    + " a link to reset your password has been sent."; 
+                CrossauthLogger.logger.info('POST ' + this.prefix+'requestpasswordreset ' + request.ip);           
+                try {
+                    await this.requestPasswordReset(request, reply, 
+                    (reply, _user) => {
+                        return reply.view(this.requestPasswordResetPage, {
+                            csrfToken: request.csrfToken,
+                            message: message,
+                        });
+                    });
+                } catch (e) {
+                    CrossauthLogger.logger.error(e);
+                    return this.handleError(e, reply, (reply, code, error) => {
+                        if (code == ErrorCode.EmailNotExist) {
+                            return reply.view(this.requestPasswordResetPage, {
+                                csrfToken: request.csrfToken,
+                                message: message,
+                            });
+                        }
+                        return reply.view(this.requestPasswordResetPage, {
+                            error: error, 
+                            email: request.body.email,
+                            code: ErrorCode[code], 
+                            csrfToken: request.csrfToken,
+                        });
+                    });
+                }
+            });
+        }
+
+        if (this.activatedEndpoints.includes("resetpassword")) {
+            this.app.get(this.prefix+'resetpassword/:token', async (request : FastifyRequest<{Params : VerifyTokenParamType}>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info('GET ' + this.prefix+'resetpassword ' + request.ip);
+                try {
+                    await this.sessionManager.userForPasswordResetToken(request.params.token);
+                } catch (e) {
+                    let code = ErrorCode.UnknownError;
+                    let error = "Unknown error";
+                    if (e instanceof CrossauthError) {
+                        code = e.code;
+                        error = e.message;
+                    }
+                    return reply.view(this.errorPage, {error: error, code: ErrorCode[code]});
+                }
+                return reply.view(this.resetPasswordPage, {token: request.params.token, csrfToken: request.csrfToken});
+            });
+
+            this.app.post(this.prefix+'resetpassword', async (request : FastifyRequest<{ Body: ResetPasswordBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info('POST ' + this.prefix+'resetpassword ' + request.ip);           
+                try {
+                    await this.resetPassword(request, reply, 
+                    (reply, _user) => {
+                        return reply.view(this.resetPasswordPage, {
                             csrfToken: request.csrfToken,
                             message: "Your password has been changed."
                         });
@@ -585,7 +668,7 @@ export class FastifyCookieAuthServer {
 
         if (this.activatedEndpoints.includes("api/signup")) {
             this.app.post(this.prefix+'api/signup', async (request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info('POST ' + this.prefix+'api/signup' + request.ip + ' ' + request.body.username);            
+                CrossauthLogger.logger.info('POST ' + this.prefix+'api/signup ' + request.ip + ' ' + request.body.username);            
                 try {
                     await this.signup(request, reply, 
                     (reply, user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({
@@ -605,9 +688,43 @@ export class FastifyCookieAuthServer {
         if (this.activatedEndpoints.includes("api/changepassword")) {
             this.app.post(this.prefix+'api/changepassword', async (request : FastifyRequest<{ Body: ChangePasswordBodyType }>, reply : FastifyReply) =>  {
                 if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized);
-                CrossauthLogger.logger.info('POST ' + this.prefix+'api/changepassword' + request.ip + ' ' + request.user?.username);            
+                CrossauthLogger.logger.info('POST ' + this.prefix+'api/changepassword ' + request.ip + ' ' + request.user?.username);            
                 try {
                     await this.changePassword(request, reply, 
+                    (reply, _user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({
+                        status: "ok", 
+                    })});
+                } catch (e) {
+                    CrossauthLogger.logger.error(e);
+                    return this.handleError(e, reply, (reply, code, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    }, true);
+                }
+            });
+        }
+
+        if (this.activatedEndpoints.includes("api/resetpassword")) {
+            this.app.post(this.prefix+'api/resetpassword', async (request : FastifyRequest<{ Body: ResetPasswordBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info('POST ' + this.prefix+'api/resetpassword ' + request.ip);            
+                try {
+                    await this.resetPassword(request, reply, 
+                    (reply, _user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({
+                        status: "ok", 
+                    })});
+                } catch (e) {
+                    CrossauthLogger.logger.error(e);
+                    return this.handleError(e, reply, (reply, code, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    }, true);
+                }
+            });
+        }
+
+        if (this.activatedEndpoints.includes("api/requestpasswordreset")) {
+            this.app.post(this.prefix+'api/requestpasswordreset', async (request : FastifyRequest<{ Body: RequestPasswordResetBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info('POST ' + this.prefix+'api/requestpasswordreset ' + request.ip);            
+                try {
+                    await this.requestPasswordReset(request, reply, 
                     (reply, _user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({
                         status: "ok", 
                     })});
@@ -791,7 +908,22 @@ export class FastifyCookieAuthServer {
         if (repeatPassword != undefined && repeatPassword != newPassword) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
+        if (!this.passwordValidator(newPassword)) {
+            throw new CrossauthError(ErrorCode.PasswordFormat);
+        }
         await this.sessionManager.changePassword(request.user.username, oldPassword, newPassword);
+        return successFn(reply, undefined);
+    }
+
+    private async requestPasswordReset(request : FastifyRequest<{ Body: RequestPasswordResetBodyType }>, reply : FastifyReply, 
+        successFn : (res : FastifyReply, user? : User) => void) {
+
+        if (this.anonymousSessions) {
+            await this.validateCsrfToken(request, reply);
+        }
+        const email = request.body.email;
+
+        await this.sessionManager.requestPasswordReset(email);
         return successFn(reply, undefined);
     }
 
@@ -799,6 +931,24 @@ export class FastifyCookieAuthServer {
         successFn : (res : FastifyReply, user? : User) => void) {
         const token = request.params.token;
         const user = await this.sessionManager.applyEmailVerificationToken(token);
+        delete user.passwordHash;
+        return this.loginWithUser(user, request, reply, successFn);
+    }
+
+    private async resetPassword(request : FastifyRequest<{ Body: ResetPasswordBodyType }>, reply : FastifyReply, 
+        successFn : (res : FastifyReply, user? : User) => void) {
+        if (this.anonymousSessions) await this.validateCsrfToken(request, reply);
+        //const user = await this.sessionManager.userForPasswordResetToken(request.body.token);
+        const token = request.body.token;
+        const newPassword = request.body.newPassword;
+        const repeatPassword = request.body.repeatPassword;
+        if (repeatPassword != undefined && repeatPassword != newPassword) {
+            throw new CrossauthError(ErrorCode.PasswordMatch);
+        }
+        if (!this.passwordValidator(newPassword)) {
+            throw new CrossauthError(ErrorCode.PasswordFormat);
+        }
+        const user = await this.sessionManager.resetPassword(token, newPassword);
         delete user.passwordHash;
         return this.loginWithUser(user, request, reply, successFn);
     }

@@ -5,6 +5,7 @@ import { Hasher } from './hasher';
 import { CrossauthError, ErrorCode } from '../error';
 import { CrossauthLogger } from '../logger';
 import { setParameter, ParamType } from './utils';
+import { User } from '../interfaces';
 
 /**
  * Options for TokenEmailer.  
@@ -63,10 +64,10 @@ export class TokenEmailer {
     private views : string = "";
     private siteUrl? : string;
     private prefix? : string = "/";
-    private emailVerificationTextBody? : string = "emailVerificationTextBody.njk";
+    private emailVerificationTextBody? : string = "emailverificationtextbody.njk";
     private emailVerificationHtmlBody? : string;
     private emailVerificationSubject : string = "Please verify your email";
-    private passwordResetTextBody? : string = "passwordResetTextBody";
+    private passwordResetTextBody? : string = "passwordresettextbody.njk";
     private passwordResetHtmlBody? : string;
     private passwordResetSubject : string = "Password reset";
     private emailFrom : string = "";
@@ -142,6 +143,7 @@ export class TokenEmailer {
                                          expiry : Date, email : string, 
                                          newEmail : string = "", 
                                          salt?: string) : {key:string, salt:string} {
+        email = UserStorage.normalize(email);
         const message = userId + ":" + expiry.toString() + ":" + email + ":" + newEmail;
         const hasher = new Hasher({pepper: this.secret, keyLength: this.tokenLength});
         if (!salt) salt = hasher.randomSalt();
@@ -196,7 +198,7 @@ export class TokenEmailer {
                 throw error;
         }
         let user = await this.userStorage.getUserById(userId, true);
-        let email = newEmail.toLowerCase();
+        let email = newEmail;
         if (email != "") {
             // this message is to validate a new email (email change)
             TokenEmailer.validateEmail(email);
@@ -205,7 +207,7 @@ export class TokenEmailer {
             if (email) {
                 TokenEmailer.validateEmail(email);
             } else {
-                email = user.username.toLowerCase();
+                email = user.username;
                 TokenEmailer.validateEmail(email);
             }
         }
@@ -320,7 +322,7 @@ export class TokenEmailer {
      * the user exists and password has not changed in the meantime.
      * @param token the token to validate
      */
-    async verifyPasswordResetToken(token : string) : Promise<void> {
+    async verifyPasswordResetToken(token : string) : Promise<User> {
         const parts = token.split("!");
         if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidHash);
         const salt = parts[0];
@@ -340,6 +342,7 @@ export class TokenEmailer {
         if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
         const {key: newHash} = this.createPasswordResetToken(storedToken.userId, storedToken.expires, email, user.passwordHash, salt);
         if (newHash != key) throw new CrossauthError(ErrorCode.InvalidHash);
+        return user;
     }
 
     /**
@@ -363,7 +366,7 @@ export class TokenEmailer {
             email = user.username.toLowerCase();
             TokenEmailer.validateEmail(email);
         }
-        const token = this.createAndSavePasswordResetToken(userId, email, user.passwordHash);
+        const token = await this.createAndSavePasswordResetToken(userId, email, user.passwordHash);
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
         if (this.smtpPassword) auth.pass = this.smtpPassword;
