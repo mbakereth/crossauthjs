@@ -3,12 +3,12 @@ import { HashedPasswordAuthenticator } from '../password';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
 import { InMemoryUserStorage } from '../storage/inmemorystorage';
 export var userStorage : InMemoryUserStorage;
-export var pepperUserStorage : InMemoryUserStorage;
+export var secretUserStorage : InMemoryUserStorage;
 
 // for all these tests, the database will have two users: bob and alice
 beforeAll(async () => {
     userStorage = getTestUserStorage();
-    pepperUserStorage = getTestUserStorage("ABCDEFGHIJKLMNOPQRSTUV");
+    secretUserStorage = getTestUserStorage("ABCDEFGHIJKLMNOPQRSTUV");
 });
 
 test('HashedPasswordAuthenticator.authenticateUser', async () => {
@@ -17,9 +17,9 @@ test('HashedPasswordAuthenticator.authenticateUser', async () => {
     expect(user.username).toBe("bob");
 });
 
-test('HashedPasswordAuthenticator.authenticateUseWithPepper', async () => {
-    let authenticator = new HashedPasswordAuthenticator(pepperUserStorage, 
-        {pepper: "ABCDEFGHIJKLMNOPQRSTUV"});
+test('HashedPasswordAuthenticator.authenticateUseWithSecret', async () => {
+    let authenticator = new HashedPasswordAuthenticator(secretUserStorage, 
+        {secret: "ABCDEFGHIJKLMNOPQRSTUV", enableSecretForPasswordHash: true});
     let user = await authenticator.authenticateUser("bob", "bobPass123");
     expect(user.username).toBe("bob");
 });

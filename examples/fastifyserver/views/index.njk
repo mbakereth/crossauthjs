@@ -11,9 +11,11 @@
                 <button type="submit">Logout</button>
             </form>
         {% else %}
-            <button onClick="document.location='/login';">Login</button>
+            <p><button onClick="document.location='/login';">Login</button></p>
+            <p><a href="/signup">Sign up</a></p>
         {% endif %}
 
         <p><a href="/protected">Protected page</a></p>
+
     </body>
 </html>

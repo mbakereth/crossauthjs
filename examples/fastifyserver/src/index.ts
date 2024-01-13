@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import { PrismaClient } from '@prisma/client';
-import { CookieSessionManager, FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage, HashedPasswordAuthenticator } from 'crossauth/server';
+import { Backend, FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage, HashedPasswordAuthenticator } from 'crossauth/server';
 import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import type { FastifyCookieOptions } from '@fastify/cookie'

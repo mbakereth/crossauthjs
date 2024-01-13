@@ -1,6 +1,6 @@
 import express, { Express, Request, Response } from "express";
 import nunjucks from "nunjucks";
-import { CookieSessionManager } from './cookieauth';
+import { Backend } from './cookieauth';
 import { CrossauthError, ErrorCode, CrossauthLogger } from "..";
 import cookieParser from 'cookie-parser';
 import { User } from '../interfaces';
@@ -71,11 +71,11 @@ export class ExpressCookieAuthServer {
     private logoutRedirect : string = "/";
     private loginPage? : string;
     private errorPage? : string;
-    private sessionManager : CookieSessionManager;
+    private sessionManager : Backend;
 
     /**
      * Creates the Express endpoints, optionally also the Express app.
-     * @param sessionManager an instance of {@link CookieSessionManager }.  The endpoints are just wrappers
+     * @param sessionManager an instance of {@link Backend }.  The endpoints are just wrappers
      *                       around this, adding the HTTP interaction.
      * @param app you can pass your own Express instance.  A separate router will be added for the endpoints.  
      *            If you do not pass one, an instance will be created, with Nunjucks for rendering (see above).
@@ -94,7 +94,7 @@ export class ExpressCookieAuthServer {
      *                   documentation above for full description.
      */
     constructor(
-        sessionManager : CookieSessionManager, {
+        sessionManager : Backend, {
         app, 
         prefix, 
         loginRedirect, 

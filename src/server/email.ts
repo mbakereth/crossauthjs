@@ -61,7 +61,7 @@ export class TokenEmailer {
     private userStorage : UserStorage;
     private keyStorage : KeyStorage;
     private secret : string = "";
-    private views : string = "";
+    private views : string = "views";
     private siteUrl? : string;
     private prefix? : string = "/";
     private emailVerificationTextBody? : string = "emailverificationtextbody.njk";
@@ -99,7 +99,7 @@ export class TokenEmailer {
         setParameter("secret", ParamType.String, this, options, "SECRET", true);
         setParameter("siteUrl", ParamType.String, this, options, "SITE_URL", true);
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
-        setParameter("views", ParamType.String, this, options, "VIEWS", true);
+        setParameter("views", ParamType.String, this, options, "VIEWS");
         setParameter("emailVerificationTextBody", ParamType.String, this, options, "EMAIL_VERIFICATION_TEXT_BODY");
         setParameter("emailVerificationHtmlBody", ParamType.String, this, options, "EMAIL_VERIFICATION_HTML_BODY");
         setParameter("emailVerificationSubject", ParamType.String, this, options, "EMAIL_VERIFICATION_SUBJECT");
@@ -133,7 +133,7 @@ export class TokenEmailer {
     }
 
     private hashTokenForStorage(token : string, salt? : string) : string {
-        const hasher = new Hasher({pepper: this.secret, keyLength: this.tokenLength});
+        const hasher = new Hasher({secret: this.secret, keyLength: this.tokenLength});
         if (!salt) salt = hasher.randomSalt();
         return salt + "!" + hasher.hash(token, {charset: "base64url", encode: false, salt: salt});
 
@@ -145,7 +145,7 @@ export class TokenEmailer {
                                          salt?: string) : {key:string, salt:string} {
         email = UserStorage.normalize(email);
         const message = userId + ":" + expiry.toString() + ":" + email + ":" + newEmail;
-        const hasher = new Hasher({pepper: this.secret, keyLength: this.tokenLength});
+        const hasher = new Hasher({secret: this.secret, keyLength: this.tokenLength});
         if (!salt) salt = hasher.randomSalt();
         return {salt, key:hasher.hash(message, {charset: "base64url", encode: false, salt: salt})};
     }
@@ -279,7 +279,7 @@ export class TokenEmailer {
     private createPasswordResetToken(userId : string | number, expiry : Date, email: string, passwordHash : string, salt?:string) : {key:string, salt:string} {
 
             const message = userId + ":" + expiry.toString() + ":" + email + ":" + passwordHash;
-            const hasher = new Hasher({pepper: this.secret, keyLength: this.tokenLength});
+            const hasher = new Hasher({secret: this.secret, keyLength: this.tokenLength});
             if (!salt) salt = hasher.randomSalt();
             return {salt, key:hasher.hash(message, {charset: "base64url", encode: false, salt: salt})};
         }

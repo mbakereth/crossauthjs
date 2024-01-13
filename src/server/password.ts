@@ -1,26 +1,13 @@
 import type { User } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error';
 import { UserStorage } from './storage'
-import { Hasher } from './hasher';
+import { Hasher, type HasherOptions } from './hasher';
 import { CrossauthLogger } from '../logger.ts';
+import { setParameter, ParamType } from './utils.ts';
 
 /** Optional parameters to pass to {@link UsernamePasswordAuthenticator} constructor. */
-export interface UsernamePasswordAuthenticatorOptions {
-
-    /** Number of PBKDF2 iterations to use when generating password hashes */
-    iterations? : number,
-
-    /** The key length parameter passed to PBKDF2 - hash will be this number of characters long */
-    keyLen? : number,
-
-    /** The digest algorithm to use, eg `sha512` */
-    digest? : string,
-
-    /** The number of random characters to generate for the password hash, using only Base64 characters */
-    saltLength?: number;
-
-    /** If defined, this will be used as an application password when hashing passwords (appended to salt) */
-    pepper? : string
+export interface UsernamePasswordAuthenticatorOptions extends HasherOptions {
+    enableSecretForPasswordHash? : boolean,
 }
 
 /**
@@ -53,7 +40,8 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
     private keyLength = 64;
     private digest = 'sha512';
     private saltLength = 16; 
-    private pepper : string|undefined = undefined;
+    private secret : string|undefined = undefined;
+    private enableSecretForPasswordHash : boolean = false;
 
     /**
      * Create a new authenticator.
@@ -67,19 +55,16 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      * @param saltLength generate a salt with this number of characters.  Defaults to 16.
      */
     constructor(userStorage : UserStorage,
-                {iterations,
-                keyLen,
-                digest,
-                saltLength,
-                pepper
-        } : UsernamePasswordAuthenticatorOptions = {}) {
+                options : UsernamePasswordAuthenticatorOptions = {}) {
         super();
         this.userStorage = userStorage;
-        if (iterations) this.iterations = iterations;
-        if (keyLen) this.keyLength = keyLen;
-        if (digest) this.digest = digest;
-        if (saltLength) this.saltLength = saltLength;
-        if (pepper) this.pepper = pepper;
+        setParameter("iterations", ParamType.Number, this, options, "HASHER_ITERATIONS");
+        setParameter("keyLength", ParamType.Number, this, options, "HASHER_KEYLENGTH");
+        setParameter("digest", ParamType.String, this, options, "HASHER_DIGEST");
+        setParameter("saltLength", ParamType.Number, this, options, "HASHER_SALTLENGTH");
+        setParameter("secret", ParamType.String, this, options, "HASHER_SECRET");
+        setParameter("enableSecretForPasswordHash", ParamType.Boolean, this, options, "ENABLE_SECRET_FOR_PASSWORD_HASH");
+
     }
 
     /**
@@ -103,7 +88,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
             iterations: storedPasswordHash.iterations, 
             keyLength: storedPasswordHash.keyLen,
             saltLength: this.saltLength,
-            pepper: this.pepper,
+            secret: this.secret,
         });
         let inputPasswordHash = hasher.hash(password, {salt: storedPasswordHash.salt});
         if (storedPasswordHash.hashedPassword != inputPasswordHash) {
@@ -141,7 +126,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
             iterations: iterations||this.iterations,
             keyLength: keyLen||this.keyLength,
             saltLength: this.saltLength||this.saltLength,
-            pepper: this.pepper,
+            secret: this.secret,
         });
 
         return hasher.hash(password, {salt: salt, encode: encode});

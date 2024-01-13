@@ -7,34 +7,61 @@ export enum ParamType {
     StringArray,
 }
 
+function getOption(param : string, options: {[key:string]: any}) {
+    let parts = param.split(".");
+    let obj : {[key:string]: any} | any = options;
+    for (let i in parts) {
+        const part = parts[i];
+        if (!(part in obj) || obj[part] == undefined) return undefined;
+        obj = obj[part];
+    }
+    return obj;
+}
+
+function hasOption(param : string, options: {[key:string]: any}) : boolean {
+    let parts = param.split(".");
+    let obj : {[key:string]: any} | any = options;
+    for (let i in parts) {
+        const part = parts[i];
+        if (!(part in obj) || obj[part] == undefined) return false;
+        obj = obj[part];
+    }
+    return true;
+}
+
+function setFromOption(instance : any, param : string, type : ParamType, options : {[key:string]: any}) {
+    const value = getOption(param, options);
+    instance[param.replace(".", "_")] = type == ParamType.StringArray ? value.split(/ *, */) : value;
+}
+
+function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvFile : string) {
+    const key = param.replace(".", "_");
+    switch (type) {
+        case ParamType.StringArray:
+            instance[key] = (process.env[nameInEnvFile]||"")?.split(/ *, */);
+            break;
+        case ParamType.String:
+            instance[key] = process.env[nameInEnvFile];
+            break;
+        case ParamType.Number:
+            instance[key] = Number(process.env[nameInEnvFile]);
+            break;
+        case ParamType.Boolean:
+            instance[key] = Boolean(Number(process.env[nameInEnvFile]));
+            break;
+    }
+}
+
+
 export function setParameter(param : string,
                              type : ParamType,
                              instance : any, 
                              options : {[key:string]: any},
                              envName? : string, required : boolean=false) : void {
     const nameInEnvFile = "CROSSAUTH_"+envName;
-    if (required && options[param] == undefined && !(nameInEnvFile && nameInEnvFile in process.env)) {
+    if (required && !hasOption(param, options) && !(nameInEnvFile && nameInEnvFile in process.env)) {
         throw new CrossauthError(ErrorCode.Configuration, param + " is required");
     }
-    if (type == ParamType.StringArray) {
-        if (options[param] != undefined) instance[param] = options[param].split(/ *, */);
-        else if (envName && nameInEnvFile in process.env && process.env[nameInEnvFile] != undefined) instance[param] = (process.env[nameInEnvFile]||"")?.split(/ *, */);
-        
-    } else {
-        if (options[param] != undefined) instance[param] = options[param];
-        else if (envName && nameInEnvFile in process.env) {
-            switch (type) {
-                case ParamType.String:
-                    instance[param] = process.env[nameInEnvFile];
-                    break;
-                case ParamType.Number:
-                    instance[param] = Number(process.env[nameInEnvFile]);
-                    break;
-                    case ParamType.Boolean:
-                        instance[param] = Boolean(Number(process.env[nameInEnvFile]));
-                        break;
-                    }
-        }
-    }
+        if (hasOption(param, options)) setFromOption(instance, param, type, options);
+        else if (envName && nameInEnvFile in process.env && process.env[nameInEnvFile] != undefined) setFromEnv(instance, param, type, nameInEnvFile);     
 }
-
