@@ -212,7 +212,7 @@ export class TokenEmailer {
             }
         }
         TokenEmailer.validateEmail(email);
-        const token = await this.createAndSaveEmailVerificationToken(userId, email, newEmail);
+        const token = await this.createAndSaveEmailVerificationToken(userId, user.email, newEmail);
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
         if (this.smtpPassword) auth.pass = this.smtpPassword;

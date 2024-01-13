@@ -102,7 +102,7 @@ export class CrossauthError extends Error {
             } else if (code == ErrorCode.Expired) {
                 _message = "Token has expired";
             } else if (code == ErrorCode.InvalidHash) {
-                _message = "Password hash is not in a valid format";
+                _message = "Hash is not in a valid format";
             } else if (code == ErrorCode.InvalidKey) {
                 _message = "Key is not valid";
             } else if (code == ErrorCode.UnsupportedAlgorithm) {

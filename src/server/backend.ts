@@ -48,8 +48,8 @@ export class Backend {
     private session : SessionCookie|undefined = undefined;
     private authenticator : UsernamePasswordAuthenticator;
 
-    private enableEmailVerification? : boolean = false;
-    private enablePasswordReset? : boolean = false;
+    private enableEmailVerification : boolean = false;
+    private enablePasswordReset : boolean = false;
     private tokenEmailer? : TokenEmailer;
 
     /**
@@ -368,7 +368,12 @@ export class Backend {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Email verification not enabled");
         let { userId, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
         let user = await this.userStorage.getUserById(userId, true);
-
+        let oldEmail;
+        if ("email" in user && user.email != undefined) {
+            oldEmail = user.email;
+        } else {
+            oldEmail = user.username;
+        }
         let newUser : Partial<User> = {
             id: user.id,
             emailVerified: true,
@@ -377,7 +382,7 @@ export class Backend {
             newUser.email = newEmail;
         }
         await this.userStorage.updateUser(newUser);
-        return {...user, ...newUser};
+        return {...user, ...newUser, oldEmail: oldEmail};
     }
 
     async userForPasswordResetToken(token : string) : Promise<User> {
@@ -392,6 +397,42 @@ export class Backend {
             passwordHash: await this.authenticator.createPasswordForStorage(newPassword),
         })
         return user;
+    }
+
+    async updateUser(currentUser: User, newUser : User) : Promise<boolean> {
+        console.log(currentUser, newUser);
+        let newEmail = undefined;
+        if (!("id" in currentUser) || currentUser.id == undefined) {
+            throw new CrossauthError(ErrorCode.UserNotExist, "Please specify a user id");
+        }
+        if (!("username" in currentUser) || currentUser.username == undefined) {
+            throw new CrossauthError(ErrorCode.UserNotExist, "Please specify a userername");
+        }
+        let { email, username, passwordHash, ...rest} = newUser;
+        rest.userId = currentUser.userId;
+        let hasEmail = false;
+        if (email) {
+            newEmail = email;
+            TokenEmailer.validateEmail(newEmail);
+            hasEmail = true;
+        } else if (username) {
+            newEmail = username;
+            try {
+                TokenEmailer.validateEmail(currentUser.username);
+                hasEmail = true;
+            } catch {} // not in email format - can ignore
+            if (hasEmail) {
+                TokenEmailer.validateEmail(newEmail);
+            }
+        }
+        if (this.enableEmailVerification && hasEmail) {
+            await this.tokenEmailer?.sendEmailVerificationToken(currentUser.id, newEmail);
+        } else {
+            if (email) rest.email = email;
+            if (username) rest.username = username;
+        }
+        await this.userStorage.updateUser(rest)
+        return this.enableEmailVerification && hasEmail;
     }
 
     async resetPassword(token : string, newPassword : string) : Promise<User> {

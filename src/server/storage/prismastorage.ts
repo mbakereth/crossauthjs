@@ -339,6 +339,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 value: prismaKey.key,
                 created: prismaKey.created,
                 expires: prismaKey.expires,
+                data: prismaKey.data,
             }
             if (this.extraFields) {
                 this.extraFields.forEach((key : string) => {

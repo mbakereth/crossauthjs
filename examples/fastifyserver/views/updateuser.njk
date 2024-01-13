@@ -1,0 +1,33 @@
+<html>
+    <head>
+        <title>Update Your Details</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+    </head>
+    <body>
+        <h1>Update Your Details</h1>
+        {% if message %}
+            <p class="success">{{ message }}</p>
+            <p><a href="/">Home</a></p>
+        {% else %}
+            {% if error %}
+                <p class="error">
+                    {{ error }}
+                </p>
+            {% endif %}
+            <form method="POST" action="/updateuser">
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                <table>
+                    <tr>
+                        <td>Password</td>
+                        <td>************ &nbsp;<a href="/changepassword">Change...</a></td>
+                    </tr>
+                    <tr>
+                        <td><label for="user_email">Email</label></td>
+                        <td><input type="email" name="user_email" value="{{ user_email or user.email }}"></td>
+                    </tr>
+                </table>
+                <button type="submit">Update</button>
+            </form>
+        {% endif %}
+    </body>
+</html>
