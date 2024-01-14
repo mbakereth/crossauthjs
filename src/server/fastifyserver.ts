@@ -27,7 +27,7 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
     /** You can pass your own fastify instance or omit this, in which case Crossauth will create one */
     app? : FastifyInstance<Server, IncomingMessage, ServerResponse>,
 
-    /** List of endpoints to add to the server ("login", "api/login", etc, prefixed by the `prefix` parameter.  Empty or `"all"` for all.  Default all.) */
+    /** List of endpoints to add to the server ("login", "api/login", etc, prefixed by the `prefix` parameter.  Empty for all.  Default all. */
     endpoints? : string,
 
     /** Page to redirect to after successful login, default "/" */
@@ -49,10 +49,9 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
 
     /** Template file containing the signup page (with without error messages).  
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "signup.njk".
-     * You can disable this and instead have your own signup page.  Call api/signup to create the user.
      * Signup form should contain at least `username` and `password` and may also contain `repeatPassword`.  If you have additional
      * fields in your user table you want to pass from your form, prefix them with `user_`, eg `user_email`.
-     * If you want to enable email verification, set `enableEmailVerification` and `checkEmailVerified` 
+     * If you want to enable email verification, set `enableEmailVerification` and set `checkEmailVerified` 
      * on the user storage.
      */
     signupPage? : string;
@@ -280,47 +279,47 @@ function defaultUserValidator(user : User) : string[] {
  * 
  * **Endpoints provided**
  * 
- *    * GET `/login` : Renders your login page.  
- *      If there was an authentication error, this page is also rendered with `error` set to the error message
- *      (display it with `{{ error }}` in your template).
- *    * POST `/login` : processes a login.  Reads `username` and `password` from the POST parameters or JSON body.
- *      If the credentials are valid, sets a session ID cookie and sends a redirect to `loginRedirect` 
- *      (or to `/` if this wasn't set).  If there is an error, the `loginPage` is rendered with `error` set to 
- *      the error message (see GET `/login`) above.  IF `loginPage` is not set, the `errorPage` is rendered
- *      instead.  If this is also not set, a bare bones error page is displayeds.
- *    * GET `/changepassword` : Page to render
- *      for password changes.  Reads `oldPassword`, `newPassword` and `repeatPassword` fields from the form.
- *    * POST `/changepassword` : processes the password change.  If successful, the `message` variable will
- *      be set.  If unsuccessful, the `error` variable will be set.  You can only activate /changepassword
- *      if either the user storage contains an email field or else the username is in email format.
- *    * GET `/requestresetpassword` : Renders a page to request password reset.  This page should ask the user
- *      for an email address in a `email` form field.  The form should make a `POST` request to
- *      `{{ siteUrl}}{{ prefix }}resetpassword`.  Upon success, the same page will be rendered with `message`
- *      set (display it with `{{ message }}`).  On error, `error` will instead me set to be displayed
- *      with `{{ error}}`
- *    * POST `/requestresetpassword` : Called from the above `GET` method.
- *      GET `/resetpassword` : called only once the reset token has been authenticated.  Use this to ask for
- *      a new password.  Reads the `newPassword` and `repeatPassword` fields.
- *    * GET `emailVerifiedPage` : page to render when confirming user's email has been verified.  If not set,
- *      email verification will not be activated.  You should also set `checkEmailVerified` in your 
- *      {@link UserStorage} so that a user cannot log in until email has been verified.  For email verification
- *      to work, either you need an `email` field in your user storage or your username must have an email
- *      format.
- *    * POST `/api/login` takes the same parameters as POST `/login` but returns a JSON string, both upon success
- *      or failure.  If login was successful, this will be `{status: "ok"}` and the session cookie will also be
- *      sent.  If login was not successful, it will be `{"status; "error", error: message, code: code}` where
- *      code is in {@link index!ErrorCode }.  Only created if `addApiEndpoints` is true.
- *    * POST `/api/logout` logs a ser out, ie deletes the session key given in the cookie 
- *      and clears the cookie.  It returns `{status: "ok"}`.  Only created if `addApiEndpoints` is true.
- *      or  `{"status; "error", error: message, code: code}` if there was an error.
- *    * GET `/api/userforsessionke` takes the session ID in the cookie and returns the user associated with it.
- *      Returns `{status: "ok"}` or  `{"status; "error", error: message, code: code}` if there was an error.
- *      Only created if `addApiEndpoints` is true.
+ * All POST methods also take a csrfToken.  If user is logged in or anonymous sessions are enabled.
  * 
- *    **Using your own Fastify app**
+ * All POST methods are passed user, csrfToken, code, error and errors.
+ * this is checked.
  * 
- * If you are serving other endpoints, or you want to use something other than Nunjucks, you can create and
- * pass in your own Fastify app.
+ * | METHOD | ENDPOINT                   | PATH PARAMS | GET/BODY PARAMS                          | VARIABLES PASSED         | FILE               |
+ * | ------ | -------------------------- | ----------- | ---------------------------------------- | ------------------------ | ------------------ |
+ * | GET    | /login                     |             | next                                     |                          | loginPage          | 
+ * | POST   | /login                     |             | next, username, password                 | request params, message  | loginPage          | 
+ * | POST   | /api/login                 |             | next, username, password                 |                          |                    | 
+ * | POST   | /logout                    |             | next                                     |                          |                    | 
+ * | POST   | /api/logout                |             | next                                     |                          |                    | 
+ * | GET    | /signup                    |             | next                                     |                          | signupPage         |
+ * | POST   | /signup                    |             | next, username, password, user/*         | request params, message  | signupPage         | 
+ * | GET    | /changepassword            |             |                                          |                          | changePasswordPage | 
+ * | POST   | /changepassword            |             | oldPassword, newPassword, repeatPassword | request params, message  | changePasswordPage | 
+ * | POST   | /api/changepassword        |             | oldPassword, newPassword                 |                          |                    | 
+ * | GET    | /updateuser                |             |                                          |                          | changePasswordPage | 
+ * | POST   | /updateuser                |             | user_*                                   | request params, message  | changePasswordPage | 
+ * | POST   | /api/updateuser            |             | user_*                                   |                          |                    | 
+ * | GET    | /requestpasswordreset      |             |                                          |                          | changePasswordPage | 
+ * | POST   | /requestpasswordreset      |             | email                                    | email, message           | changePasswordPage | 
+ * | POST   | /api/requestpasswordreset  |             | password                                 |                          |                    | 
+ * | GET    | /resetpassword             | token       |                                          |                          | changePasswordPage | 
+ * | POST   | /resetpassword             |             | token, password, repeatPassword          | request params, message  | changePasswordPage | 
+ * | POST   | /api/resetpassword         |             | token, password                          |                          |                    | 
+ * | GET    | /verifyemail               |  token      |                                          |                          | emailVerifiedPage  | 
+ * | GET    | /verifyemail               |  token      |                                          |                          | emailVerifiedPage  | 
+ * | GET    | /api/userforsessionkey     |             |                                          |                          |                    | 
+ * | GET    | /api/getcsrctoken          |             |                                          |                          |                    | 
+ * 
+ * If you have fields other than `id`, `username` and `passwordHash` in your user table, add them in 
+ * `extraFields` when you create your {@link UserStorage} object.  In your signup and user update pages
+ * (`signupPage`, `updateUserPage`), prefix these with `user_` in field names and they will be passed
+ * into the user object when processing the form.  If there is an error processing the form, they will
+ * be back as psot parameters, again prefixed with `user_`.
+ * 
+ *  **Using your own Fastify app**
+ * 
+ * If you are serving other endpoints, or you want to use something other than Nunjucks, you can create
+ * and pass in your own Fastify app.
  */
 export class FastifyCookieAuthServer {
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
@@ -500,64 +499,7 @@ export class FastifyCookieAuthServer {
             }
 
             request.user = user;
-            request.csrfToken = csrfCookie?csrfCookie.value.split(".")[1]:undefined; // already validated so this will work;*/
-
-
-
-            /*// validate session if the cookies are already present
-            let csrfToken = this.getCsrfTokenFromCookie(request);
-            let sessionId = this.getSessionIdFromCookie(request);
-            let oldSessionId = sessionId;
-            let oldCsrfToken = csrfToken;
-            let loggedInUser : User|undefined = undefined;
-            let sessionIdValid = false;
-            let csrfTokenValid = false;
-            let sessionIdCreated = false;
-            let csrfCookieCreated = false;
-
-            // if there are session id and csrf token cookies, validate them
-            if (sessionId) 
-            {
-                // there is a session ID cookie - check if it is valid
-                try {
-                    loggedInUser = await this.sessionManager.userForSessionKey(sessionId);
-                    sessionIdValid = true;
-                } catch (e) {}
-
-                // if there is a session ID and a csrf cookie, check if the CSRF cookie is valid
-                if (sessionIdValid && csrfToken) {
-                    try {
-                        this.sessionManager.validateCsrfToken(csrfToken, sessionId);
-                        csrfTokenValid = true;
-                    } catch (e) {}
-                }
-            }
-
-            let sessionCookie : Cookie;
-            let csrfCookie: Cookie;
-            if (this.anonymousSessions && (request.method == "GET" || request.method == "HEAD" || request.method == "OPTIONS")) {
-                // with these methods, we will create new cookies if they don't exist
-                if (!sessionIdValid) {
-                    let {sessionCookie: newSessionCookie , csrfCookie: newCsrfCookie, user: newLoggedInUser} = await this.sessionManager.createAnonymousSessionKeyIfNoneExists(sessionId, csrfToken);
-                    sessionCookie = newSessionCookie;
-                    csrfCookie = newCsrfCookie;
-                    loggedInUser = newLoggedInUser;
-                    sessionIdCreated = true;
-                    csrfCookieCreated = true;
-                    csrfToken = csrfCookie.value;
-                } else if (!csrfTokenValid && oldSessionId) {
-                    csrfCookie = await this.sessionManager.createCsrfToken(oldSessionId);
-                    csrfCookieCreated = true;
-                    csrfToken = csrfCookie.value;
-                }
-            }
-            if (!sessionIdValid && !sessionIdCreated) {
-                reply.clearCookie(this.sessionManager.sessionCookieName);
-            } else if (sessionIdCreated) {
-                reply.setCookie(this.sessionManager.sessionCookieName, sessionCookie.value, sessionCookie)
-            }
-            request.user = loggedInUser;
-            request.csrfToken = csrfToken?csrfToken.split(".")[1]:undefined; // already validated so this will work;*/
+            request.csrfToken = csrfCookie?csrfCookie.value.split(".")[1]:undefined; // already validated so this will work;
         });
           
         if (this.endpoints.includes("login")) {
