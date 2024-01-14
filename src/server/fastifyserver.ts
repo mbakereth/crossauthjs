@@ -564,7 +564,7 @@ export class FastifyCookieAuthServer {
             this.app.get(this.prefix+'login', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info('GET ' + this.prefix+'login ' + request.ip )
                 if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/login enabled but sessions are not");
-                if (request.user) return reply.redirect(this.loginRedirect); // already logged in
+                if (request.user) return reply.redirect(request.query.next||this.loginRedirect); // already logged in
 
                 let data : {next? : any, csrfToken: string|undefined} = {csrfToken: request.csrfToken};
                 if (request.query.next) {
