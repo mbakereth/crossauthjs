@@ -47,7 +47,7 @@ function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvF
             instance[key] = Number(process.env[nameInEnvFile]);
             break;
         case ParamType.Boolean:
-            instance[key] = Boolean(Number(process.env[nameInEnvFile]));
+            instance[key] = ["1", "true"].includes(process.env[nameInEnvFile]?.toLowerCase()||"");
             break;
     }
 }
