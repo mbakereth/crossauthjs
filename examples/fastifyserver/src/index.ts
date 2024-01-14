@@ -50,9 +50,6 @@ let authenticator = new HashedPasswordAuthenticator(userStorage);
 let server = new FastifyCookieAuthServer(userStorage, keyStorage, authenticator, {
     app: app,
     views: path.join(__dirname, '../views'),
-    anonymousSessions: false,
-    keepAnonymousSessionId: false,
-    secret: process.env.CROSSAUTH_SECRET,
 });
 
 // create our home page

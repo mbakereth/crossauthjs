@@ -11,14 +11,11 @@ import { setParameter, ParamType } from './utils.ts';
 
 export interface BackendOptions extends TokenEmailerOptions {
 
-    /** Type of csrf tokens to use.  Options are `doublesubmit` or `none`.  Default `doublesubmit` */
-    csrfType? : string,
-
     /** options for csrf cookie manager */
     doubleSubmitCookieOptions? : DoubleSubmitCsrfTokenOptions,
 
-    /** Type of csrf tokens to use.  Options are `doublesubmit` or `none`.  Default `doublesubmit` */
-    sessionType? : string,
+    /** Whether or not to enable session management (by cookie).  Default true */
+    enableSessions? : boolean,
 
     /** options for session cookie manager */
     sessionCookieOptions? : SessionCookieOptions,
@@ -42,9 +39,8 @@ export interface BackendOptions extends TokenEmailerOptions {
 export class Backend {
     userStorage : UserStorage;
     keyStorage : KeyStorage;
-    private csrfType : string = "doublesubmit";
     private csrfTokens : DoubleSubmitCsrfToken|undefined = undefined;
-    private sessionType : string = "cookie";
+    private enableSessions : boolean = true;
     private session : SessionCookie|undefined = undefined;
     private authenticator : UsernamePasswordAuthenticator;
 
@@ -71,15 +67,12 @@ export class Backend {
 
         setParameter("secret", ParamType.String, this, options, "SECRET");
 
-        setParameter("csrfType", ParamType.String, this, options, "CSRF_TYPE");
-        if (this.csrfType != "none") {
+        setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
+        if (this.enableSessions) {
+            this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
             this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
         }
 
-        setParameter("sessionType", ParamType.String, this, options, "SESSION_TYPE");
-        if (this.sessionType != "none") {
-            this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
-        }
 
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
@@ -123,17 +116,14 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, password : string, existingSessionId? : string, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie|undefined, user: User}> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+    async login(username : string, password : string, existingSessionId? : string, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
+        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
 
         if (!user) user = await this.authenticator.authenticateUser(username, password);
         const sessionKey = await this.session.createSessionKey(user.id, existingSessionId);
         //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
         let sessionCookie = this.session.makeSessionCookie(sessionKey, persist);
-        let csrfCookie : Cookie|undefined = undefined;
-        if (this.csrfTokens) {
-            csrfCookie = this.csrfTokens.makeCsrfCookie(await this.csrfTokens.createCsrfToken(sessionKey.value));
-        }
+        let csrfCookie = this.csrfTokens.makeCsrfCookie(await this.csrfTokens.createCsrfToken(sessionKey.value));
         return {
             sessionCookie: sessionCookie,
             csrfCookie: csrfCookie,
@@ -149,25 +139,32 @@ export class Backend {
      *          each of these was newly created and the user, which may be undefined.
      */
     async createAnonymousSessionKeyIfNoneExists(sessionId? : string, csrfToken? : string) 
-    : Promise<{sessionCookie: Cookie, csrfCookie: Cookie|undefined, user : User|undefined}> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+    : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user : User|undefined, sessionCookieCreated : boolean, csrfCookieCreated : boolean}> {
+        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+
+        let sessionCookieCreated = false;
+        let csrfCookieCreated = false;
 
         let {sessionKey, sessionCookie, csrfCookie, user} = await this.getValidatedSessionAndCsrf(sessionId, csrfToken);
-
+        
         if (!sessionKey) {
             sessionKey = await this.session.createSessionKey(undefined);
+            sessionCookieCreated = true;
         }
         if (!sessionCookie) {
             sessionCookie = this.session.makeSessionCookie(sessionKey);
         }  
-        if (this.csrfTokens && !csrfCookie) {
+        if (!csrfCookie) {
             csrfToken = await this.csrfTokens.createCsrfToken(sessionKey.value);
             csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
+            csrfCookieCreated = true;
         }
         return {
             sessionCookie,
             csrfCookie,
-            user
+            user,
+            sessionCookieCreated,
+            csrfCookieCreated,
         };
     }
 
@@ -380,6 +377,8 @@ export class Backend {
         }
         if (newEmail != "") {
             newUser.email = newEmail;
+        } else {
+            oldEmail = undefined;
         }
         await this.userStorage.updateUser(newUser);
         return {...user, ...newUser, oldEmail: oldEmail};

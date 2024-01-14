@@ -39,8 +39,8 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
     passwordValidator? : (password: string) => string[];
 
-    /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
-    userValidator? : (user: User) => string|undefined;
+    /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `FormEnty` if the user doesn't confirm to local rules.  Doesn't validate passwords  */
+    userValidator? : (user: User) => string[];
 
     /** Template file containing the login page (with without error messages).  
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "login.njk".
@@ -234,6 +234,14 @@ export const AllEndpoints = [
     ...PasswordResetApiEndpoints,
 ];
 
+/**
+ * Default password validator.
+ * 
+ * Passwords must be at leat 8 characters, contain at least one lowercase character, at least one uppercase
+ * chracter and at least one digit.
+ * @param password The password to validate
+ * @returns an array of errors.  If there were no errors, returns an empty array
+ */
 function defaultPasswordValidator(password : string) : string[] {
     let errors : string[] = [];
     if (password.length < 8) errors.push("Password must be at least 8 characters");
@@ -242,6 +250,21 @@ function defaultPasswordValidator(password : string) : string[] {
     if (password.match(/[0-9]/) == null) errors.push("Password must contain at least one digit");
     return errors;
 }
+
+/**
+ * Default User validator.  Doesn't validate password
+ * 
+ * Username must be at least two characters.
+ * @param password The password to validate
+ * @returns an array of errors.  If there were no errors, returns an empty array
+ */
+function defaultUserValidator(user : User) : string[] {
+    let errors : string[] = [];
+    if (user.username == undefined) errors.push("Username must be given");
+    else if (user.username.length < 2) errors.push("Username must be at least 2 characters");
+    return errors;
+}
+
 /**
  * This class provides a complete (but without HTML files) auth backend server with endpoints served using 
  * Fastify.
@@ -301,10 +324,7 @@ function defaultPasswordValidator(password : string) : string[] {
  */
 export class FastifyCookieAuthServer {
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
-    private sessionType : string = "cookie";
-    private csrfType : string = "doublesubmit";
     private enableSessions : boolean = true;
-    private enableCsrf : boolean = true;
     private views : string = "views";
     private prefix : string = "/";
     private endpoints : string[] = [];
@@ -322,6 +342,7 @@ export class FastifyCookieAuthServer {
     private anonymousSessions = true;
     private keepAnonymousSessionId = false;
     private passwordValidator : (password : string) => string[] = defaultPasswordValidator;
+    private userValidator : (user : User) => string[] = defaultUserValidator;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
 
@@ -334,10 +355,7 @@ export class FastifyCookieAuthServer {
                 authenticator: UsernamePasswordAuthenticator, 
                 options: FastifyCookieAuthServerOptions = {}) {
 
-        setParameter("sessionType", ParamType.String, this, options, "SESSION_TYPE");
-        this.enableSessions = this.sessionType != "none";
-        setParameter("csrfType", ParamType.String, this, options, "CSRF_TYPE");
-        this.enableCsrf = this.csrfType != "none";
+        setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
 
         this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
         if (this.enableSessions) this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
@@ -361,6 +379,9 @@ export class FastifyCookieAuthServer {
         setParameter("anonymousSessions", ParamType.Boolean, this, options, "ANONYMOUS_SESSIONS");
         setParameter("keepAnonymousSessionId", ParamType.Boolean, this, options, "KEEP_ANONYMOUS_SESSION_ID");
         setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
+
+        if (options.passwordValidator) this.passwordValidator = options.passwordValidator;
+        if (options.userValidator) this.userValidator = options.userValidator;
 
         this.sessionManager = new Backend(userStorage, keyStorage, authenticator, 
             options);
@@ -402,39 +423,149 @@ export class FastifyCookieAuthServer {
             return reply.view(this.errorPage, {error: error, code: ErrorCode[ErrorCode.UnknownError], });
         })*/
             
+        // validates the session id and csrftokens, creating if necessary and putting the csrf token
+        // and user in the request object.
         this.app.addHook('onRequest', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+
+            // if sessions are not enabled, nothing to do
             if (!this.enableSessions) return;
 
-            let csrfToken : string|undefined = undefined;
+            // get existing cookies (unvalidated)
+            let sessionId = this.getSessionIdFromCookie(request);
+            let csrfToken = this.getCsrfTokenFromCookie(request);
+
+            // validate the session if and csrf token
+            let {sessionCookie, csrfCookie, user} = await this.sessionManager.getValidatedSessionAndCsrf(sessionId, csrfToken);
+
+            let safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
+            if (!sessionCookie && !safeMethod) {
+                // we don't create session ids or csrf cookies for these methods.  If the cookies
+                // are not valid, delete them and return
+                if (!sessionId) {
+                    CrossauthLogger.logger.debug("Invalid session cookie received - deleting");
+                    reply.clearCookie(this.sessionManager.sessionCookieName);
+                }
+                if (!csrfToken) {
+                    CrossauthLogger.logger.debug("Invalid csrf cookie received - deleting");
+                    reply.clearCookie(this.sessionManager.csrfCookieName);
+                }
+                return;
+            }
+            if (sessionId && !sessionCookie) {
+                // session cookie exists but is invalid - delete it
+                CrossauthLogger.logger.debug("Invalid session cookie received - deleting");
+                reply.clearCookie(this.sessionManager.sessionCookieName);   
+                if (csrfToken) {         
+                    CrossauthLogger.logger.debug("Invalid csrf cookie received - deleting");
+                    reply.clearCookie(this.sessionManager.csrfCookieName);
+                }
+            } else if (csrfToken && !csrfCookie) {
+                // session id is valid but csrf token isn't - delete it
+                CrossauthLogger.logger.debug("Invalid csrf cookie received - deleting");
+                reply.clearCookie(this.sessionManager.csrfCookieName);
+            }
+            else if (!sessionCookie && csrfToken) {
+                // csrf token exists but session is not valid - delete it
+                CrossauthLogger.logger.debug("Invalid csrf cookie received - deleting");
+                reply.clearCookie(this.sessionManager.csrfCookieName);
+            }
+
+            if (safeMethod) {
+
+                // create cookies if they don't exist already or were invalid
+                if ((!sessionCookie || !csrfToken) && this.anonymousSessions) {
+
+                    // session cookie is not valid - create one, along with the csrf token
+                    let {sessionCookie: newSessionCookie, csrfCookie: newCsrfCookie, user: newUser, sessionCookieCreated, csrfCookieCreated} = await this.sessionManager.createAnonymousSessionKeyIfNoneExists(sessionId);
+                    sessionCookie = newSessionCookie;
+                    csrfCookie = newCsrfCookie;
+                    user = newUser;
+                    if (sessionCookieCreated) {
+                        CrossauthLogger.logger.debug("Creating anonymous session cookie");
+                        reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
+                    }
+                    if (csrfCookieCreated) {
+                        CrossauthLogger.logger.debug("Creating csrf cookie");
+                        reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
+                    }
+ 
+                } else if (!csrfToken && sessionCookie) {
+
+                    // session id is valid but csrf token is not - create it
+                    CrossauthLogger.logger.debug("Creating csrf token for user " + user?.username);
+                    csrfCookie = await this.sessionManager.createCsrfToken(sessionCookie.value);
+                    reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
+                    
+                }
+            }
+
+            request.user = user;
+            request.csrfToken = csrfCookie?csrfCookie.value.split(".")[1]:undefined; // already validated so this will work;*/
+
+
+
+            /*// validate session if the cookies are already present
+            let csrfToken = this.getCsrfTokenFromCookie(request);
+            let sessionId = this.getSessionIdFromCookie(request);
+            let oldSessionId = sessionId;
+            let oldCsrfToken = csrfToken;
             let loggedInUser : User|undefined = undefined;
-            if (this.anonymousSessions && this.enableSessions) {
-                let {csrfCookie, user} = 
-                    await this.createAnonymousSessionIdIfNoneExists(request, reply);
-                if (this.enableCsrf && csrfCookie == undefined 
-                    && (request.method == "GET" || request.method == "HEAD" || request.method == "OPTIONS")) {
-                        csrfToken = await this.createCsrfCookie(request, reply);
+            let sessionIdValid = false;
+            let csrfTokenValid = false;
+            let sessionIdCreated = false;
+            let csrfCookieCreated = false;
+
+            // if there are session id and csrf token cookies, validate them
+            if (sessionId) 
+            {
+                // there is a session ID cookie - check if it is valid
+                try {
+                    loggedInUser = await this.sessionManager.userForSessionKey(sessionId);
+                    sessionIdValid = true;
+                } catch (e) {}
+
+                // if there is a session ID and a csrf cookie, check if the CSRF cookie is valid
+                if (sessionIdValid && csrfToken) {
+                    try {
+                        this.sessionManager.validateCsrfToken(csrfToken, sessionId);
+                        csrfTokenValid = true;
+                    } catch (e) {}
                 }
-                csrfToken = csrfCookie?.value;
-                loggedInUser = user;
-            } else {
-                let {csrfCookie, user} = 
-                    await this.getValidatedCsrfTokenAndUser(request, reply);
-                    csrfToken = csrfCookie ? csrfCookie.value : undefined;
-                    loggedInUser = user;
-                let sessionId = this.getSessionIdFromCookie(request);
-                if (this.enableCsrf && csrfCookie == undefined 
-                    && (request.method == "GET" || request.method == "HEAD" || request.method == "OPTIONS")) {
-                        csrfToken = await this.createCsrfCookie(request, reply);
+            }
+
+            let sessionCookie : Cookie;
+            let csrfCookie: Cookie;
+            if (this.anonymousSessions && (request.method == "GET" || request.method == "HEAD" || request.method == "OPTIONS")) {
+                // with these methods, we will create new cookies if they don't exist
+                if (!sessionIdValid) {
+                    let {sessionCookie: newSessionCookie , csrfCookie: newCsrfCookie, user: newLoggedInUser} = await this.sessionManager.createAnonymousSessionKeyIfNoneExists(sessionId, csrfToken);
+                    sessionCookie = newSessionCookie;
+                    csrfCookie = newCsrfCookie;
+                    loggedInUser = newLoggedInUser;
+                    sessionIdCreated = true;
+                    csrfCookieCreated = true;
+                    csrfToken = csrfCookie.value;
+                } else if (!csrfTokenValid && oldSessionId) {
+                    csrfCookie = await this.sessionManager.createCsrfToken(oldSessionId);
+                    csrfCookieCreated = true;
+                    csrfToken = csrfCookie.value;
                 }
-                if (sessionId && loggedInUser) this.sessionManager.updateSessionActivity(sessionId);
+            }
+            if (!sessionIdValid && !sessionIdCreated) {
+                reply.clearCookie(this.sessionManager.sessionCookieName);
+            } else if (sessionIdCreated) {
+                reply.setCookie(this.sessionManager.sessionCookieName, sessionCookie.value, sessionCookie)
             }
             request.user = loggedInUser;
-            request.csrfToken = csrfToken?csrfToken.split(".")[1]:undefined; // already validated so this will work;
+            request.csrfToken = csrfToken?csrfToken.split(".")[1]:undefined; // already validated so this will work;*/
         });
           
         if (this.endpoints.includes("login")) {
             this.app.get(this.prefix+'login', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info('GET ' + this.prefix+'login ' + request.ip )
+                if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/login enabled but sessions are not");
+                if (request.user) return reply.redirect(this.loginRedirect); // already logged in
+
                 let data : {next? : any, csrfToken: string|undefined} = {csrfToken: request.csrfToken};
                 if (request.query.next) {
                     data["next"] = request.query.next;
@@ -444,6 +575,7 @@ export class FastifyCookieAuthServer {
 
             this.app.post(this.prefix+'login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info('POST ' + this.prefix+'login ' + request.ip + ' ' + request.body.username);            
+                if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/login enabled but sessions are not");
                 let next = request.body.next || this.loginRedirect;
                 try {
                     CrossauthLogger.logger.debug("Next page " + next);
@@ -720,6 +852,8 @@ export class FastifyCookieAuthServer {
         if (this.endpoints.includes("api/login")) {
             this.app.post(this.prefix+'api/login', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info('POST ' + this.prefix+'api/login ' + request.ip + ' ' + request.body.username);            
+                if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/api/login enabled but sessions are not");
+                if (request.user) return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : request.user}); // already logged in
                 try {
                     await this.login(request, reply, 
                     (reply, user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user})});
@@ -735,6 +869,8 @@ export class FastifyCookieAuthServer {
         if (this.endpoints.includes("api/logout")) {
             this.app.post(this.prefix+'api/logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
                 CrossauthLogger.logger.info('POST ' + this.prefix+'api/logout ' + request.ip + ' ' + (request.user?request.user.username:""));            
+                if (!request.user) return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"});
+
                 try {
                     await this.logout(request, reply, 
                     (reply) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
@@ -916,7 +1052,7 @@ export class FastifyCookieAuthServer {
     private async login(request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user: User) => void) {
         if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
-        if (this.anonymousSessions && this.enableCsrf) {
+        if (this.anonymousSessions) {
             await this.validateCsrfToken(request, reply)
         }
         const username = request.body.username;
@@ -934,10 +1070,8 @@ export class FastifyCookieAuthServer {
         let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, sessionId, persist);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
-        if (this.enableCsrf && csrfCookie) {
-            CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
-            reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
-        }
+        CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
+        reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         if (oldSessionId) {
             try {
                 await this.sessionManager.deleteSessionId(oldSessionId);
@@ -963,10 +1097,8 @@ export class FastifyCookieAuthServer {
         let { sessionCookie, csrfCookie } = await this.sessionManager.login("", "", sessionId, undefined, user);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
-        if (this.enableCsrf && csrfCookie) {
-            CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
-            reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
-        }
+        CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
+        reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         if (oldSessionId) {
             try {
                 await this.sessionManager.deleteSessionId(oldSessionId);
@@ -980,7 +1112,7 @@ export class FastifyCookieAuthServer {
 
     private async signup(request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
-        if (this.anonymousSessions && this.enableCsrf) {
+        if (this.anonymousSessions) {
             await this.validateCsrfToken(request, reply)
         }
         const username = request.body.username;
@@ -991,9 +1123,16 @@ export class FastifyCookieAuthServer {
             let name = field.replace("user_", ""); 
             if (field.startsWith("user_")) extraFields[name] = request.body[field];
         }
-        let errors = this.passwordValidator(password);
+        let userToValidate : User = {
+            id: "",
+            username: username,
+            ...extraFields,
+        }
+        let passwordErrors = this.passwordValidator(password);
+        let userErrors = this.userValidator(userToValidate);
+        let errors = [...userErrors, ...passwordErrors];
         if (errors.length > 0) {
-            throw new CrossauthError(ErrorCode.PasswordFormat);
+            throw new CrossauthError(ErrorCode.FormEntry, errors);
         }
         if (repeatPassword != undefined && repeatPassword != password) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
@@ -1125,41 +1264,7 @@ export class FastifyCookieAuthServer {
             CrossauthLogger.logger.debug("Creating session ID");
             reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         }
-        if (this.enableCsrf && csrfCookie &&  csrfToken != csrfCookie.value) {
-            CrossauthLogger.logger.debug("Creating CSRF Token");
-            reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
-        }        
-        return {sessionCookie, csrfCookie, user};
-    };
-
-    private async createCsrfCookie(request : FastifyRequest, reply : FastifyReply) 
-        : Promise<string> {
-        if (!this.enableCsrf) return "";
-        let sessionId = this.getSessionIdFromCookie(request);
-        if (!sessionId) return "";
-        let csrfCookie = await this.sessionManager.createCsrfToken(sessionId);
-        CrossauthLogger.logger.debug("Creating CSRF Token");
-        reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
-        return csrfCookie.value;
-    };
-
-    private async getValidatedCsrfTokenAndUser(request : FastifyRequest, reply : FastifyReply) 
-        : Promise<{sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, user : User|undefined}> {
-        let cookies = request.cookies;
-        let sessionId : string|undefined = undefined;
-        let csrfToken : string|undefined = undefined;
-        if (cookies && this.sessionManager.sessionCookieName in cookies) {
-            sessionId = cookies[this.sessionManager.sessionCookieName]||""
-        };
-        if (cookies && this.sessionManager.csrfCookieName in cookies) {
-            csrfToken = cookies[this.sessionManager.csrfCookieName]||"";
-        }
-        let {sessionCookie, csrfCookie, user} = await this.sessionManager.getValidatedSessionAndCsrf(sessionId, csrfToken);
-        if (sessionCookie && sessionId != sessionCookie.value) {
-            CrossauthLogger.logger.debug("Creating session ID");
-            reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
-        }
-        if (csrfCookie && csrfToken != csrfCookie.value) {
+        if (csrfToken != csrfCookie.value) {
             CrossauthLogger.logger.debug("Creating CSRF Token");
             reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         }        
