@@ -691,6 +691,9 @@ export class FastifyCookieAuthServer {
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.errorPage, {
                             csrfToken: request.csrfToken,
+                            code: ErrorCode[error.code],
+                            error: error.message,
+                            errors: error.messageArray,
                         });
                     });
                 }
