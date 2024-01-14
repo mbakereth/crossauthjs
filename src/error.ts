@@ -61,6 +61,9 @@ export enum ErrorCode {
     /** Thrown when attempting to create a user that already exists */
     UserExists,
 
+    /** Thrown by user-supplied validation functions if a user details form was incorrectly filled out */
+    FormEntry,
+
     /** Thrown for an condition not convered above. */
     UnknownError,
 }
@@ -70,7 +73,14 @@ export enum ErrorCode {
  */
 export class CrossauthError extends Error {
 
+    /** All Crossauth errors have an error code */
     readonly code : ErrorCode;
+
+    /** A vector of error messages.  If there was only one, it will still be in this array.
+     * The inherited property `message` is also always available.  If there were multiple messages,
+     * it will be a concatenation of them with `". "` in between.
+     */
+    readonly messageArray : string[];
 
     /**
      * Creates a new error to throw,
@@ -78,10 +88,12 @@ export class CrossauthError extends Error {
      * @param code describes the type of error
      * @param message if provided, this error will display.  Otherwise a default one for the error code will be used.
      */
-    constructor(code : ErrorCode, message : string | undefined = undefined) {
+    constructor(code : ErrorCode, message : string | string[] | undefined = undefined) {
         let _message : string;
-        if (message != undefined) {
+        if (message != undefined && !Array.isArray(message)) {
             _message = message;
+        } else if (Array.isArray(message)) {
+            _message = message.join(". ");
         } else {
             if (code == ErrorCode.UserNotExist) {
                 _message = "Username does not exist";
@@ -123,9 +135,11 @@ export class CrossauthError extends Error {
                 _message = "Unknown error";
             }    
         }
-        super(_message); // 'Error' breaks prototype chain here
+        super(_message); 
         this.code = code;
         this.name = 'CrossauthError';
-        //Object.setPrototypeOf(this, new.target.prototype); // restore prototype chain
+        if (Array.isArray(message)) this.messageArray = message;
+        else this.messageArray = [_message];
     }
+
 }

@@ -57,7 +57,7 @@ let server = new FastifyCookieAuthServer(userStorage, keyStorage, authenticator,
 
 // create our home page
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    return reply.view('index.njk', {user: request.user});
+    return reply.view('index.njk', {user: request.user, errors: ["AAA", "BBB"]});
 }
 );
 

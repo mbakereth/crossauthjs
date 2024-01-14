@@ -4,7 +4,7 @@
         <link rel="stylesheet" href="/public/style.css"/>
         </head>
     <body>
-        <h1>Welcome {{ user.username | default('nobody') }}</h1>
+        <h1>Welcome {{ user.username or "nobody" }}</h1>
 
         {% if user.username %}
             <form method="POST" action="/logout">

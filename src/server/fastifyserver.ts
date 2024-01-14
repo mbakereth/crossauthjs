@@ -37,7 +37,10 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
     logoutRedirect? : string;
 
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
-    passwordValidator? : (password: string) => boolean;
+    passwordValidator? : (password: string) => string[];
+
+    /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
+    userValidator? : (user: User) => string|undefined;
 
     /** Template file containing the login page (with without error messages).  
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "login.njk".
@@ -231,12 +234,13 @@ export const AllEndpoints = [
     ...PasswordResetApiEndpoints,
 ];
 
-function defaultPasswordValidator(password : string) : boolean {
-    if (password.length < 8) return false;
-    if (password.match(/[a-z]/) == null) return false;
-    if (password.match(/[A-Z]/) == null) return false;
-    if (password.match(/[0-9]/) == null) return false;
-    return true;
+function defaultPasswordValidator(password : string) : string[] {
+    let errors : string[] = [];
+    if (password.length < 8) errors.push("Password must be at least 8 characters");
+    if (password.match(/[a-z]/) == null) errors.push("Password must contain at least one lowercase character");
+    if (password.match(/[A-Z]/) == null) errors.push("Password must contain at least one uppercase character");
+    if (password.match(/[0-9]/) == null) errors.push("Password must contain at least one digit");
+    return errors;
 }
 /**
  * This class provides a complete (but without HTML files) auth backend server with endpoints served using 
@@ -317,7 +321,7 @@ export class FastifyCookieAuthServer {
     private sessionManager : Backend;
     private anonymousSessions = true;
     private keepAnonymousSessionId = false;
-    private passwordValidator : (password : string) => boolean = defaultPasswordValidator;
+    private passwordValidator : (password : string) => string[] = defaultPasswordValidator;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
 
@@ -448,10 +452,11 @@ export class FastifyCookieAuthServer {
                     (reply, _user) => {return reply.redirect(next)});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
+                    return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.loginPage, {
-                            error: error, 
-                            code: ErrorCode[code], 
+                            error: error.message,
+                            errors: error.messageArray, 
+                            code: ErrorCode[error.code], 
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
@@ -490,14 +495,15 @@ export class FastifyCookieAuthServer {
                     });
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
+                    return this.handleError(e, reply, (reply, error) => {
                         let extraFields : {[key:string] : string|number|boolean|Date|undefined} = {};
                         for (let field in request.body) {
                             if (field.startsWith("user_")) extraFields[field] = request.body[field];
                         }
                         return reply.view(this.signupPage, {
-                            error: error, 
-                            code: ErrorCode[code], 
+                            error: error.message,
+                            errors: error.messageArray, 
+                            code: ErrorCode[error.code], 
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
@@ -533,10 +539,11 @@ export class FastifyCookieAuthServer {
                     });
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
+                    return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.changePasswordPage, {
-                            error: error, 
-                            code: ErrorCode[code], 
+                            error: error.message,
+                            errors: error.messageArray, 
+                            code: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                         });
                     });
@@ -571,10 +578,11 @@ export class FastifyCookieAuthServer {
                     for (let field in request.body) {
                         if (field.startsWith("user_")) extraFields[field] = request.body[field];
                     }
-                    return this.handleError(e, reply, (reply, code, error) => {
+                    return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.updateUserPage, {
-                            error: error, 
-                            code: ErrorCode[code], 
+                            error: error.message,
+                            errors: error.messageArray, 
+                            code: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                         });
                     });
@@ -605,17 +613,18 @@ export class FastifyCookieAuthServer {
                     });
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        if (code == ErrorCode.EmailNotExist) {
+                    return this.handleError(e, reply, (reply, error) => {
+                        if (error.code == ErrorCode.EmailNotExist) {
                             return reply.view(this.requestPasswordResetPage, {
                                 csrfToken: request.csrfToken,
                                 message: message,
                             });
                         }
                         return reply.view(this.requestPasswordResetPage, {
-                            error: error, 
+                            error: error.message,
+                            errors: error.messageArray, 
+                            code: ErrorCode[error.code], 
                             email: request.body.email,
-                            code: ErrorCode[code], 
                             csrfToken: request.csrfToken,
                         });
                     });
@@ -653,10 +662,11 @@ export class FastifyCookieAuthServer {
                     });
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
+                    return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.changePasswordPage, {
-                            error: error, 
-                            code: ErrorCode[code], 
+                            error: error.message,
+                            errors: error.messageArray, 
+                            code: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                         });
                     });
@@ -678,10 +688,8 @@ export class FastifyCookieAuthServer {
                     });
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
+                    return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.errorPage, {
-                            error: error, 
-                            code: ErrorCode[code], 
                             csrfToken: request.csrfToken,
                         });
                     });
@@ -697,8 +705,8 @@ export class FastifyCookieAuthServer {
                     (reply) => {return reply.redirect(this.logoutRedirect)});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        return reply.view(this.errorPage, {error: error, code: ErrorCode[code]});
+                    return this.handleError(e, reply, (reply, error) => {
+                        return reply.view(this.errorPage, {error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});
                         
                     });
                 }
@@ -714,8 +722,8 @@ export class FastifyCookieAuthServer {
                     (reply, user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user})});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    return this.handleError(e, reply, (reply, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     });
                 }
             });
@@ -730,8 +738,8 @@ export class FastifyCookieAuthServer {
                     if (this.anonymousSessions && this.enableSessions) await this.createAnonymousSessionIdIfNoneExists(request, reply);
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    return this.handleError(e, reply, (reply, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     });
                 }
             });
@@ -749,8 +757,8 @@ export class FastifyCookieAuthServer {
                     })});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    this.handleError(e, reply, (reply, code, error) => {
-                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    this.handleError(e, reply, (reply, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     });
                 }
             });
@@ -767,8 +775,8 @@ export class FastifyCookieAuthServer {
                     })});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    return this.handleError(e, reply, (reply, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     }, true);
                 }
             });
@@ -786,8 +794,8 @@ export class FastifyCookieAuthServer {
                     })});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    return this.handleError(e, reply, (reply, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     }, true);
                 }
             });
@@ -803,8 +811,8 @@ export class FastifyCookieAuthServer {
                     })});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    return this.handleError(e, reply, (reply, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     }, true);
                 }
             });
@@ -820,8 +828,8 @@ export class FastifyCookieAuthServer {
                     })});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    return this.handleError(e, reply, (reply, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     }, true);
                 }
             });
@@ -838,8 +846,8 @@ export class FastifyCookieAuthServer {
                     })});
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
-                    return this.handleError(e, reply, (reply, code, error) => {
-                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error, code: ErrorCode[code]});                    
+                    return this.handleError(e, reply, (reply, error) => {
+                        reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     });
                 }
             });
@@ -980,7 +988,8 @@ export class FastifyCookieAuthServer {
             let name = field.replace("user_", ""); 
             if (field.startsWith("user_")) extraFields[name] = request.body[field];
         }
-        if (!this.passwordValidator(password)) {
+        let errors = this.passwordValidator(password);
+        if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
         if (repeatPassword != undefined && repeatPassword != password) {
@@ -1005,7 +1014,8 @@ export class FastifyCookieAuthServer {
         if (repeatPassword != undefined && repeatPassword != newPassword) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        if (!this.passwordValidator(newPassword)) {
+        let errors = this.passwordValidator(newPassword);
+        if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
         await this.sessionManager.changePassword(request.user.username, oldPassword, newPassword);
@@ -1065,7 +1075,8 @@ export class FastifyCookieAuthServer {
         if (repeatPassword != undefined && repeatPassword != newPassword) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        if (!this.passwordValidator(newPassword)) {
+        let errors = this.passwordValidator(newPassword);
+        if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
         const user = await this.sessionManager.resetPassword(token, newPassword);
@@ -1152,25 +1163,29 @@ export class FastifyCookieAuthServer {
         return {sessionCookie, csrfCookie, user};
     };
 
-    private handleError(e : any, reply : FastifyReply, errorFn : (reply : FastifyReply, code : ErrorCode, error : string) => void, passwordInvalidOk? : boolean) {
+    private handleError(e : any, reply : FastifyReply, errorFn : (reply : FastifyReply, error : CrossauthError) => void, passwordInvalidOk? : boolean) {
         let error = "Unknown error";
         let code = ErrorCode.UnknownError;
-        if (!passwordInvalidOk && e instanceof CrossauthError) {
-            let ce = e as CrossauthError;
+        let ce;
+        if (e instanceof CrossauthError) {
+            ce = e as CrossauthError;
             code = ce.code;
-            switch (ce.code) {
-                case ErrorCode.UserNotExist:
-                case ErrorCode.PasswordNotMatch:
-                    error = "Invalid username or password";
-                    code = ErrorCode.UsernameOrPasswordInvalid;
-                    break;
-                default:
-                    error = ce.message;
+            if (!passwordInvalidOk) {
+                switch (ce.code) {
+                    case ErrorCode.UserNotExist:
+                    case ErrorCode.PasswordNotMatch:
+                        ce = new CrossauthError(ErrorCode.UsernameOrPasswordInvalid, "Invalid username or password");
+                        break;
+                    default:
+                        error = ce.message;
+                }
             }
+        } else {
+            ce = new CrossauthError(code, error);
         }
         CrossauthLogger.logger.error(e);
 
-        return errorFn(reply, code, error);
+        return errorFn(reply, ce);
 
     }
 
