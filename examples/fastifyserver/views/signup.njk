@@ -10,12 +10,12 @@
         {% else %}
             {% if error %}
                 <p class="error">
-                {% if code == "PasswordFormat" %}
+                {% if errorCode == "PasswordFormat" %}
                     Password must be at leat 8 characters, contain at least one lowercase letter, one
                     uppercase letter and one digit.
-                {% elif code == "PasswordMatch" %}
+                {% elif errorCode == "PasswordMatch" %}
                     Passwords do not PasswordMatch
-                {% elif code == "UserExists" %}
+                {% elif errorCode == "UserExists" %}
                     Username or email already exists
                 {% else %}
                     {{ error }}
@@ -41,6 +41,11 @@
                     <label for="user_email">Email</label><br>
                     <input type="email" name="user_email" size="20" value="{{ user_email }}"/>
                 </p>
+                {% if perUserTwoFactor %}
+                <p>
+                    <input type="checkbox" name="twoFactor", {% if twoFactor %}checked{% endif %}> Enable Two-Factor Authentication
+                </p>
+                {% endif %}
                 <p><button type="submit">Sign Up</button></p>
             </form>
         {% endif %}

@@ -42,7 +42,7 @@ app.register(view, {
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
 const prisma = new PrismaClient();
-let userStorage = new PrismaUserStorage({prismaClient : prisma, extraFields: "email"});
+let userStorage = new PrismaUserStorage({prismaClient : prisma, extraFields: "email, totpSecret"});
 let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
 let authenticator = new HashedPasswordAuthenticator(userStorage);
 

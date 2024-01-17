@@ -8,8 +8,13 @@ import { CrossauthLogger } from '../logger.ts';
 import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth';
 import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth';
 import { setParameter, ParamType } from './utils.ts';
+import QRCode from 'qrcode';
+import { authenticator as gAuthenticator } from 'otplib';
 
 export interface BackendOptions extends TokenEmailerOptions {
+
+    /** Application name - used for Google Authenticator igf 2FA enabled */
+    appName? : string;
 
     /** options for csrf cookie manager */
     doubleSubmitCookieOptions? : DoubleSubmitCsrfTokenOptions,
@@ -32,6 +37,9 @@ export interface BackendOptions extends TokenEmailerOptions {
 
     /** Server secret.  Needed for emailing tokens and for csrf tokens */
     secret? : string;
+
+    /** Whether to turn on 2FA.  Only Google Authenticator TOTP supported at present.  Default off */
+    twoFactor? : "off" | "all" | "peruser";
 }
 /**
  * Class for managing sessions.
@@ -44,8 +52,10 @@ export class Backend {
     private session : SessionCookie|undefined = undefined;
     private authenticator : UsernamePasswordAuthenticator;
 
+    private appName : string = "Crossauth";
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = false;
+    private twoFactor :  "off" | "all" | "peruser" = "off";
     private tokenEmailer? : TokenEmailer;
 
     /**
@@ -66,6 +76,8 @@ export class Backend {
         this.authenticator = authenticator;
 
         setParameter("secret", ParamType.String, this, options, "SECRET");
+        setParameter("twoFactor", ParamType.String, this, options, "TWO_FACTOR");
+        setParameter("appName", ParamType.String, this, options, "APP_NAME", this.twoFactor!="off");
 
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
         if (this.enableSessions) {
@@ -270,6 +282,44 @@ export class Backend {
             throw error;
         }
     }
+
+    /**
+     * Returns the data object for a session key, or undefined
+     * 
+     * If the user is undefined, or the key has expired, returns undefined.
+     * 
+     * @param sessionKey the session key to look up in session storage
+     * @returns a string from the data field
+     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     *         `UserNotExist` or `Expired`.
+     */
+    async dataForSessionKey(sessionKey : string) : Promise<string|undefined> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+        let error : CrossauthError | undefined;
+        try {
+            let {key} = await this.session.getUserForSessionKey(sessionKey);
+            return key.data;
+        } catch (e) {
+            if (e instanceof CrossauthError) {
+                let ce = e as CrossauthError;
+                switch (ce.code) {
+                    case ErrorCode.Expired:
+                        return undefined;
+                        break;
+                    default:
+                        error = ce;
+                }
+            }
+            else {
+                console.log(e);
+            }
+            error = new CrossauthError(ErrorCode.UnknownError);
+        }
+        if (error) {
+            CrossauthLogger.logger.debug(error);
+            throw error;
+        }
+    }
     
     /**
      * Creates and returns a signed CSRF token based on the session ID
@@ -347,6 +397,83 @@ export class Backend {
         return userId;
     }
 
+    async deleteUserByUsername(username : string ) {
+        this.userStorage.deleteUserByUsername(username);
+    }
+
+    /** Creates a user with 2FA enabled.
+     * 
+     * The user storage entry will be enabled and the passed session key will be updated to include the
+     * username.  The userId and QR Url are returned.
+     * @param username : the username to create
+     * @param password : the unhashed password for the new user
+     * @extraFIelds extra fields to insert into the new user entry
+     * @param sessionId the current session id (anonymous session)
+     * @return the new userId and the QR code to display
+     */
+    async createUserWith2FA(
+        username : string, 
+        password : string, 
+        extraFields : {[key : string]: string|number|boolean|Date|undefined},
+        sessionId : string) : Promise<{userId: string|number, qrUrl: string}> {
+
+        const secret = gAuthenticator.generateSecret();
+        extraFields.totpSecret = secret;
+        let qrUrl = "";
+        await QRCode.toDataURL(gAuthenticator.keyuri(username, this.appName, secret))
+            .then((url) => {
+                    qrUrl = url;
+            })
+            .catch((err) => {
+                CrossauthLogger.logger.error(err);
+                throw new CrossauthError(ErrorCode.UnknownError, "Couldn't generate TOTP URL");
+            });
+
+        this.keyStorage.updateKey({
+            value: sessionId,
+            data: JSON.stringify({username: username, secret: secret}),
+        });
+
+        let passwordHash = await this.authenticator.createPasswordForStorage(password);
+        if (this.enableEmailVerification && this.tokenEmailer) {
+            extraFields = {...extraFields, emailVerified: false};
+        }
+        const userId = await this.userStorage.createUser(username, passwordHash, extraFields);
+        return {userId, qrUrl}
+        
+    }
+
+    async verify2FA(code : string, sessionId : string) : Promise<User> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions not enabled");
+        let {user, key} = await this.session.getUserForSessionKey(sessionId);
+        let username;
+        let secret;
+        if (user) {
+            username = user.username;
+            secret = user.totpSecret;
+        } else {
+            if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
+            const data = JSON.parse(key.data||"");
+            if (!("username" in data) || !("secret" in data)) throw new CrossauthError(ErrorCode.InvalidKey, "user data not found in session");
+            username = data.username;
+            secret = data.secret;
+        }
+
+        if (!gAuthenticator.check(code, secret)) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
+        }
+        if (!user) user = await this.userStorage.getUserByUsername(username, undefined, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+        const newUser = {
+            id: user.id,
+            active: true,
+        }
+        await this.userStorage.updateUser(newUser);
+        if (this.enableEmailVerification && this.tokenEmailer) {
+            await this.tokenEmailer?.sendEmailVerificationToken(user.id, undefined)
+        }
+        return {...user, ...newUser};
+    }
+
     async requestPasswordReset(email : string) : Promise<void> {
         const user = await this.userStorage.getUserByEmail(email);
         await this.tokenEmailer?.sendPasswordResetToken(user.id);
@@ -364,7 +491,7 @@ export class Backend {
     async applyEmailVerificationToken(token : string) : Promise<User> {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Email verification not enabled");
         let { userId, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
-        let user = await this.userStorage.getUserById(userId, true);
+        let user = await this.userStorage.getUserById(userId, undefined, {skipEmailVerifiedCheck: true});
         let oldEmail;
         if ("email" in user && user.email != undefined) {
             oldEmail = user.email;
@@ -399,7 +526,6 @@ export class Backend {
     }
 
     async updateUser(currentUser: User, newUser : User) : Promise<boolean> {
-        console.log(currentUser, newUser);
         let newEmail = undefined;
         if (!("id" in currentUser) || currentUser.id == undefined) {
             throw new CrossauthError(ErrorCode.UserNotExist, "Please specify a user id");

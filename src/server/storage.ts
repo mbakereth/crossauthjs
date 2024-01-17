@@ -3,6 +3,11 @@ import type {
     User, UserWithPassword, Key
 } from '../interfaces.ts';
 
+export interface UserStorageGetOptions {
+    skipEmailVerifiedCheck? : boolean
+    skipActiveCheck? : boolean
+}
+
 /**
  * Base class for place where user details are stired,
  * 
@@ -18,9 +23,14 @@ export abstract class UserStorage {
      * 
      * The username should be matched normalized and lowercased (using normalize())
      * @param username the username to return the user of
+     * @param extraFields extra fields to select (in addition to any pre-configured ones)
+     * @param options optionally turn off checks.  Used internally
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
-    abstract getUserByUsername(username : string, skipEmailVerifiedCheck? : boolean) : Promise<User>;
+    abstract getUserByUsername(
+        username : string, 
+         extraFields? : string[],
+         options? : UserStorageGetOptions) : Promise<User>;
 
     /**
      * Returns user matching the given user id, or throws an exception.
@@ -29,9 +39,14 @@ export abstract class UserStorage {
      * or can simply be `username`.
      * 
      * @param id the user id to return the user of
+     * @param options optionally turn off checks.  Used internally
+     * @param extraFields extra fields to select (in addition to any pre-configured ones)
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
-    abstract getUserById(id : string | number, skipEmailVerifiedCheck? : boolean) : Promise<User>;
+    abstract getUserById(
+        id : string|number, 
+         extraFields? : string[],
+         options? : UserStorageGetOptions) : Promise<User>;
 
     /**
      * Returns user matching the given email address, or throws an exception.
@@ -40,9 +55,14 @@ export abstract class UserStorage {
      * If the email field doesn't exist, username is assumed to be the email column
      * 
      * @param email the email address to return the user of
+     * @param options optionally turn off checks.  Used internally
+     * @param extraFields extra fields to select (in addition to any pre-configured ones)
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
-    abstract getUserByEmail(email : string | number, skipEmailVerifiedCheck? : boolean) : Promise<User>;
+    abstract getUserByEmail(
+        email : string | number, 
+        extraFields? : string[],
+        options? : UserStorageGetOptions) : Promise<User>;
 
     /**
      * If you enable signup, you will need to implement this method
@@ -58,6 +78,12 @@ export abstract class UserStorage {
      * @param user  The id field must be set, but all others are optional 
      */
     abstract updateUser(user : Partial<User>) : Promise<void>;
+
+    /**
+     * If your storage supports this, delete the named user from storage.
+     * @param username username to delete
+     */
+    abstract deleteUserByUsername(username : string) : Promise<void>;
 
     /**
      * Usernames and emails are stored in lowercase, normalized format.  This function returns that normalization
@@ -78,13 +104,18 @@ export abstract class UserPasswordStorage extends UserStorage {
      * Same as for base class but returns {@link UserWithPassword} instead.
      * @param username the username to match
      */
-    abstract getUserByUsername(username : string, skipEmailVerifiedCheck? : boolean) : Promise<UserWithPassword>;
+    abstract getUserByUsername(
+        username : string, 
+        extraFields? : string[],
+        options? : UserStorageGetOptions) : Promise<UserWithPassword>;
 
     /**
      * Same as for base class but returns {@link UserWithPassword} instead.
      * @param id the user ID to match
      */
-    abstract getUserById(id : string | number, skipEmailVerifiedCheck? : boolean) : Promise<UserWithPassword>;
+    abstract getUserById(id : string | number, 
+        extraFields? : string[],
+        options? : UserStorageGetOptions) : Promise<UserWithPassword>;
 
     /**
      * Removes the passwordHash field from the user object

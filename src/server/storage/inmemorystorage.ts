@@ -1,4 +1,4 @@
-import { UserStorage, UserPasswordStorage, KeyStorage } from '../storage';
+import { UserStorage, UserPasswordStorage, KeyStorage, UserStorageGetOptions } from '../storage';
 import { UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 import { CrossauthLogger } from '../..';
@@ -75,17 +75,6 @@ export class InMemoryUserStorage extends UserPasswordStorage {
         return username;
     }
 
-    addUser1(user : UserWithPassword) : void {
-        let newUser = {...user};
-        newUser.normalizedUsername = UserStorage.normalize(newUser.username);
-        if ("email" in newUser && newUser.email) {
-            newUser.normalizedEmail = UserStorage.normalize(newUser.email);
-        }
-        this.usersByUsername[newUser.normalizedUsername] = newUser;
-        if ("email" in newUser && newUser.email) this.usersByEmail[newUser.normalizedEmail] = newUser;
-        console.log(this.usersByUsername);
-    }
-
     /**
      * Returns a {@link UserWithPassword } instance matching the given username, or throws an Exception.
      * 
@@ -93,7 +82,10 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
-    async getUserByUsername(username : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
+    async getUserByUsername(
+        username : string, 
+        _extraFields? : string[],
+        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
         const normalizedUsername = UserStorage.normalize(username);
         if (normalizedUsername in this.usersByUsername) {
 
@@ -102,7 +94,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
                 CrossauthLogger.logger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
-            if (!skipEmailVerifiedCheck && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
+            if (options?.skipEmailVerifiedCheck!=true && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
                 CrossauthLogger.logger.debug("User email not verified");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
@@ -120,7 +112,9 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
-    async getUserByEmail(email : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
+    async getUserByEmail(email : string, 
+        _extraFields? : string[],
+        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
         const normalizedEmail = UserStorage.normalize(email);
         if (normalizedEmail in this.usersByEmail) {
 
@@ -129,7 +123,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
                 CrossauthLogger.logger.debug("User has active set to false");
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
-            if (!skipEmailVerifiedCheck && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
+            if (options?.skipEmailVerifiedCheck!=true && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
                 CrossauthLogger.logger.debug("User email not verified");
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
@@ -146,8 +140,10 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
-    async getUserById(id : string, skipEmailVerifiedCheck=false) : Promise<UserWithPassword> {
-        return /*await*/ this.getUserByUsername(id, skipEmailVerifiedCheck);
+    async getUserById(id : string, 
+        extraFields? : string[],
+        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
+        return /*await*/ this.getUserByUsername(id, extraFields, options);
     }
 
     /**

@@ -27,6 +27,11 @@ declare module 'fastify' {
     export interface FastifyRequest {
       user: User|undefined,
       csrfToken: string|undefined,
+      twofactor: {
+        qr? : string,
+        username? : string,
+        code? : string,
+      },
     }
     /*interface FastifyReply {
       myPluginProp: number

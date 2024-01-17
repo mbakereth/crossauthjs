@@ -18,6 +18,8 @@ model User {
     email               String      @unique
     normalizedEmail     String      @unique
     emailVerified       Boolean     @default(true)
+    totpSecret          String      @default("")
+    active              Boolean     @default(true)
 
     session Key[]
 
@@ -37,3 +39,4 @@ model Key {
     @@index([id])
     @@index([user_id])
 }
+

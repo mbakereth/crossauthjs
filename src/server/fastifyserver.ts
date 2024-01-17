@@ -56,6 +56,9 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
      */
     signupPage? : string;
 
+    /** Page to set up TOTP after sign up */
+    signupTotpPage? : string;
+
     /** Page to render error messages, including failed login. 
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "error.njk".
      */
@@ -118,7 +121,14 @@ interface LoginBodyType extends CsrfBodyType {
 interface SignupBodyType extends LoginBodyType {
     repeatPassword?: string,
     email? : string,
+    twoFactor? : string,
     [key : string]: string|number|Date|boolean|undefined,
+}
+
+interface TotpBodyType extends CsrfBodyType {
+    code : string;
+    next? : string,
+    persist? : boolean,
 }
 
 interface ChangePasswordBodyType extends CsrfBodyType {
@@ -219,6 +229,21 @@ export const SignupPageEndpoints = [
 export const SignupApiEndpoints = [
     "api/signup",
 ]
+
+/**
+ * Endpoints for signing a user up that display HTML
+ */
+export const TotpPageEndpoints = [
+    "signuptotp"
+]
+
+/**
+ * API (JSON) endpoints for signing a user up that display HTML
+ */
+export const TotpApiEndpoints = [
+    "api/signuptotp"
+]
+
 /**
  * These are all the endpoints created by default by this server-
  */
@@ -231,6 +256,8 @@ export const AllEndpoints = [
     ...EmailVerificationApiEndpoints,
     ...PasswordResetPageEndpoints,
     ...PasswordResetApiEndpoints,
+    ...TotpPageEndpoints,
+    ...TotpApiEndpoints,
 ];
 
 /**
@@ -330,6 +357,7 @@ export class FastifyCookieAuthServer {
     private loginRedirect = "/";
     private logoutRedirect : string = "/";
     private signupPage : string = "signup.njk";
+    private signupTotpPage : string = "signuptotp.njk";
     private loginPage : string = "login.njk";
     private errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
@@ -344,6 +372,8 @@ export class FastifyCookieAuthServer {
     private userValidator : (user : User) => string[] = defaultUserValidator;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
+    private twoFactor :  "off" | "all" | "peruser" = "off";
+
 
     /**
      * Creates the Fastify endpoints, optionally also the Fastify app.
@@ -355,16 +385,21 @@ export class FastifyCookieAuthServer {
                 options: FastifyCookieAuthServerOptions = {}) {
 
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
+        setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
+        setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
+        setParameter("twoFactor", ParamType.String, this, options, "TWO_FACTOR");
 
         this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
         if (this.enableSessions) this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
         if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
         if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
+        if (this.twoFactor != "off") this.endpoints = [...this.endpoints, ...TotpPageEndpoints, ...TotpPageEndpoints];
         setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("signupPage", ParamType.String, this, options, "SIGNUP_PAGE");
+        setParameter("signupTotpPage", ParamType.String, this, options, "SIGNUP_TOTP_PAGE");
         setParameter("loginPage", ParamType.String, this, options, "LOGIN_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
@@ -372,8 +407,6 @@ export class FastifyCookieAuthServer {
         setParameter("resetPasswordPage", ParamType.String, this, options, "RESET_PASSWORD_PAGE");
         setParameter("requestPasswordResetPage", ParamType.String, this, options, "REQUEST_PASSWORD_RESET_PAGE");
         setParameter("emailVerifiedPage", ParamType.String, this, options, "EMAIL_VERIFIED_PAGE");
-        setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
-        setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
         setParameter("anonymousSessions", ParamType.Boolean, this, options, "ANONYMOUS_SESSIONS");
         setParameter("keepAnonymousSessionId", ParamType.Boolean, this, options, "KEEP_ANONYMOUS_SESSION_ID");
@@ -530,7 +563,7 @@ export class FastifyCookieAuthServer {
                         return reply.view(this.loginPage, {
                             error: error.message,
                             errors: error.messageArray, 
-                            code: ErrorCode[error.code], 
+                            errorCode: ErrorCode[error.code], 
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
@@ -545,7 +578,7 @@ export class FastifyCookieAuthServer {
             this.app.get(this.prefix+'signup', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info('GET ' + this.prefix+'signup' + request.ip )
                 if (this.signupPage)  { // if is redundant but VC Code complains without it
-                    let data : {next? : any, csrfToken: string|undefined} = {csrfToken: request.csrfToken};
+                    let data : {next? : any, csrfToken: string|undefined, perUserTwoFactor: boolean} = {csrfToken: request.csrfToken, perUserTwoFactor: this.twoFactor=="peruser"};
                     if (request.query.next) {
                         data["next"] = request.query.next;
                     }
@@ -561,11 +594,15 @@ export class FastifyCookieAuthServer {
 
                     await this.signup(request, reply, 
                     (reply, _user) => {
-                        return reply.view(this.signupPage, {
-                            next: next, 
-                            csrfToken: request.csrfToken,
-                            message: "Please check your email to finish signing up."
-                        });
+                        if (this.enableEmailVerification) {
+                            return reply.view(this.signupPage, {
+                                next: next, 
+                                csrfToken: request.csrfToken,
+                                message: "Please check your email to finish signing up."
+                            });
+                        } else {
+                            return reply.redirect(this.logoutRedirect);
+                        }
                     });
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
@@ -577,13 +614,52 @@ export class FastifyCookieAuthServer {
                         return reply.view(this.signupPage, {
                             error: error.message,
                             errors: error.messageArray, 
-                            code: ErrorCode[error.code], 
+                            errorCode: ErrorCode[error.code], 
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
                             csrfToken: request.csrfToken,
+                            twoFactor: request.body.twoFactor,
+                            perUserTwoFactor: this.twoFactor == "peruser",
                             ...extraFields
                             });
+                        
+                    });
+                }
+            });
+        }
+
+        if (this.endpoints.includes("signuptotp")) {
+
+            this.app.post(this.prefix+'signuptotp', async (request : FastifyRequest<{ Body: TotpBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info('POST ' + this.prefix+'signuptotp ' + request.ip);            
+                let next = request.body.next || this.loginRedirect;
+                try {
+                    CrossauthLogger.logger.debug("Next page " + next);
+
+                    await this.signuptotp(request, reply, 
+                    (reply, _user) => {
+                        if (this.enableEmailVerification) {
+                            return reply.view(this.signupPage, {
+                                next: next, 
+                                csrfToken: request.csrfToken,
+                                message: "Please check your email to finish signing up."
+                            });
+                        } else {
+                            return reply.redirect(this.logoutRedirect);
+                        }
+                    });
+                } catch (e) {
+                    CrossauthLogger.logger.error(e);
+                    return this.handleError(e, reply, (reply, error) => {
+                        return reply.view(this.signupPage, {
+                            error: error.message,
+                            errors: error.messageArray, 
+                            errorCode: ErrorCode[error.code], 
+                            next: next, 
+                            persist: request.body.persist,
+                            csrfToken: request.csrfToken,
+                        });
                         
                     });
                 }
@@ -617,7 +693,7 @@ export class FastifyCookieAuthServer {
                         return reply.view(this.changePasswordPage, {
                             error: error.message,
                             errors: error.messageArray, 
-                            code: ErrorCode[error.code], 
+                            errorCode: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                         });
                     });
@@ -656,7 +732,7 @@ export class FastifyCookieAuthServer {
                         return reply.view(this.updateUserPage, {
                             error: error.message,
                             errors: error.messageArray, 
-                            code: ErrorCode[error.code], 
+                            errorCode: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                         });
                     });
@@ -697,7 +773,7 @@ export class FastifyCookieAuthServer {
                         return reply.view(this.requestPasswordResetPage, {
                             error: error.message,
                             errors: error.messageArray, 
-                            code: ErrorCode[error.code], 
+                            errorCode: ErrorCode[error.code], 
                             email: request.body.email,
                             csrfToken: request.csrfToken,
                         });
@@ -719,7 +795,7 @@ export class FastifyCookieAuthServer {
                         code = e.code;
                         error = e.message;
                     }
-                    return reply.view(this.errorPage, {error: error, code: ErrorCode[code]});
+                    return reply.view(this.errorPage, {error: error, errorCode: ErrorCode[code]});
                 }
                 return reply.view(this.resetPasswordPage, {token: request.params.token, csrfToken: request.csrfToken});
             });
@@ -740,7 +816,7 @@ export class FastifyCookieAuthServer {
                         return reply.view(this.changePasswordPage, {
                             error: error.message,
                             errors: error.messageArray, 
-                            code: ErrorCode[error.code], 
+                            errorCode: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                         });
                     });
@@ -765,7 +841,7 @@ export class FastifyCookieAuthServer {
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.errorPage, {
                             csrfToken: request.csrfToken,
-                            code: ErrorCode[error.code],
+                            errorCode: ErrorCode[error.code],
                             error: error.message,
                             errors: error.messageArray,
                         });
@@ -1055,11 +1131,13 @@ export class FastifyCookieAuthServer {
     private async signup(request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
         if (this.anonymousSessions) {
-            await this.validateCsrfToken(request, reply)
+            await this.validateCsrfToken(request, reply);
         }
         const username = request.body.username;
         const password = request.body.password;
         const repeatPassword = request.body.repeatPassword;
+        const next = request.body.next;
+        const twoFactor = request.body.twoFactor == "on";
         const extraFields : {[key:string] : string|number|boolean|Date|undefined}= {};
         for (let field in request.body) {
             let name = field.replace("user_", ""); 
@@ -1079,11 +1157,66 @@ export class FastifyCookieAuthServer {
         if (repeatPassword != undefined && repeatPassword != password) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        await this.sessionManager.createUser(username, password, extraFields);
-        if (!this.enableEmailVerification && this.enableSessions) {
-            return this.login(request, reply, successFn);
+        if (this.twoFactor == "off" || (this.twoFactor == "peruser" && !twoFactor)) {
+            await this.sessionManager.createUser(username, password, extraFields);
+            if (!this.enableEmailVerification && this.enableSessions) {
+                return this.login(request, reply, successFn);
+            }
+            return successFn(reply, undefined);
+        } else {
+            if (!this.anonymousSessions) {
+                throw new CrossauthError(ErrorCode.Configuration, "Anonymous sessions must be enabled for TOTP");
+            }
+            const sessionId = this.getSessionIdFromCookie(request);
+            if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "Couldn't set up 2FA - please ensure cookies are enabled");
+            let { qrUrl } = await this.sessionManager.createUserWith2FA(username, password, extraFields,
+                sessionId);
+            request.twofactor = {
+                qr : qrUrl,
+                username: username,
+            }
+
+            try {
+                let data : {qr: string, next : string, csrfToken: string|undefined} = 
+                {
+                    qr: qrUrl,
+                    next: next||this.loginRedirect,
+                    csrfToken: request.csrfToken,
+                };
+                return reply.view(this.signupTotpPage, data);
+            } catch (e) {
+                CrossauthLogger.logger.error(e);
+                try {
+                    this.sessionManager.deleteUserByUsername(username);
+                } catch (e) {
+                    CrossauthLogger.logger.error(e);
+                }
+
+            }
         }
-        return successFn(reply, undefined);
+    }
+
+    private async signuptotp(request : FastifyRequest<{ Body: TotpBodyType }>, reply : FastifyReply, 
+        successFn : (res : FastifyReply, user? : User) => void) {
+        const sessionId = this.getSessionIdFromCookie(request);
+        let user;
+        try {
+            if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "No session active while enabling 2FA.  Please enable cookies");
+            const code = request.body.code;
+            user = await this.sessionManager.verify2FA(code, sessionId);
+        } catch (e) {
+            CrossauthLogger.logger.error(e);
+            try {
+                if (sessionId) {
+                    const data = await this.sessionManager.dataForSessionKey(sessionId);
+                    const dataObj = JSON.parse(data||"");
+                    if (dataObj.username)  this.sessionManager.deleteUserByUsername(dataObj.username);
+                }
+            } catch (e) {
+                CrossauthLogger.logger.error(e);
+            }
+        }
+        return successFn(reply, user);
     }
 
     private async changePassword(request : FastifyRequest<{ Body: ChangePasswordBodyType }>, reply : FastifyReply, 
@@ -1146,6 +1279,7 @@ export class FastifyCookieAuthServer {
         const token = request.params.token;
         const user = await this.sessionManager.applyEmailVerificationToken(token);
         delete user.passwordHash;
+        delete user.totpSecret;
         return this.loginWithUser(user, request, reply, successFn);
     }
 
@@ -1165,6 +1299,7 @@ export class FastifyCookieAuthServer {
         }
         const user = await this.sessionManager.resetPassword(token, newPassword);
         delete user.passwordHash;
+        delete user.totpSecret;
         return this.loginWithUser(user, request, reply, successFn);
     }
 

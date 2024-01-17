@@ -587,6 +587,24 @@ export class SessionCookie {
     }
 
     /**
+     * Returns the user matching the given session key in session storage, or throws an exception.
+     * 
+     * Looks the user up in the {@link UserStorage} instance passed to the constructor.
+     * 
+     * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
+     * 
+     * @param sessionId the session id to look up
+     * @returns a {@link Key } object.
+     * @throws a {@link index!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
+     */
+    async getSessionKey(sessionId: string) : Promise<Key> {
+        if (this.hashSessionId) {
+            sessionId = this.hashSessionKey(sessionId);
+        }
+        return await this.keyStorage.getKey(sessionId);
+    }
+
+    /**
      * Deletes all keys for the given user
      * @param userId the user to delete keys for
      * @param except if defined, don't delete this key
