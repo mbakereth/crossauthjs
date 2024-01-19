@@ -449,28 +449,26 @@ export class FastifyCookieAuthServer {
 
         this.app.decorateRequest('user', undefined);
         this.app.decorateRequest('csrfToken', undefined);
-                    
-        /*this.app.setErrorHandler(function (error, _request, reply) {
-            CrossauthLogger.logger.error(error);
-            return reply.view(this.errorPage, {error: error, code: ErrorCode[ErrorCode.UnknownError], });
-        })*/
-            
+                                
         // validates the session id and csrftokens, creating if necessary and putting the csrf token
         // and user in the request object.
-        this.app.addHook('onRequest', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+        this.app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
 
+            // check if CSRF token is in cookie (and signature is valid)
             CrossauthLogger.logger.debug("Getting csrf cookie");
-            // create CSRF cookie and token
             let cookieValue : string|undefined;
             try {
                  cookieValue = this.getCsrfTokenFromCookie(request);
-                 if (cookieValue) this.sessionManager.validatesrfCookie(cookieValue);
+                 if (cookieValue) this.sessionManager.validateCsrfCookie(cookieValue);
             }
             catch (e) {
                 CrossauthLogger.logger.warn("Invalid csrf cookie " + Hasher.hash(this.getCsrfTokenFromCookie(request)||"") + " received");
                 reply.clearCookie(this.sessionManager.csrfCookieName);
+                cookieValue = undefined;
             }
+
             if (["GET", "OPTIONS", "HEAD"].includes(request.method)) {
+            // for get methods, create a CSRF token in the request object and response header
                 try {
                     if (!cookieValue) {
                         CrossauthLogger.logger.debug("Invalid CSRF cookie - recreating");
@@ -485,10 +483,22 @@ export class FastifyCookieAuthServer {
                     reply.header(CSRFHEADER, request.csrfToken);
                 } catch (e) {
                     CrossauthLogger.logger.error("Couldn't create CSRF token");
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.debug(e);
                     reply.clearCookie(this.sessionManager.csrfCookieName);
                 }
+            } else {
+                // for other methods, create a new token only if there is already a valid one
+                if (cookieValue) {
+                    try {
+                        this.csrfToken(request, reply);
+                    } catch (e) {
+                        CrossauthLogger.logger.error("Couldn't create CSRF token");
+                        CrossauthLogger.logger.debug(e);
+                    }
+                }
             }
+
+
             let user : User|undefined;
 
             // get existing cookies (unvalidated)
@@ -532,9 +542,9 @@ export class FastifyCookieAuthServer {
                     await this.login(request, reply, 
                     (reply, _user) => {return reply.redirect(next)});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Login failure for " + request.body.username);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
-                        console.log("Passing csrf token " + request.csrfToken);
                         return reply.view(this.loginPage, {
                             error: error.message,
                             errors: error.messageArray, 
@@ -542,7 +552,7 @@ export class FastifyCookieAuthServer {
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
-                            csrfToken: this.csrfToken(request, reply)
+                            csrfToken: request.csrfToken
                         });;
                         
                     });
@@ -573,7 +583,7 @@ export class FastifyCookieAuthServer {
                         if (this.enableEmailVerification) {
                             return reply.view(this.signupPage, {
                                 next: next, 
-                                csrfToken: this.csrfToken(request, reply),
+                                csrfToken: request.csrfToken,
                                 message: "Please check your email to finish signing up."
                             });
                         } else {
@@ -581,7 +591,8 @@ export class FastifyCookieAuthServer {
                         }
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Signup failure for user " + request.body.username);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         let extraFields : {[key:string] : string|number|boolean|Date|undefined} = {};
                         for (let field in request.body) {
@@ -594,7 +605,7 @@ export class FastifyCookieAuthServer {
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                             twoFactor: request.body.twoFactor,
                             perUserTwoFactor: this.twoFactor == "peruser",
                             ...extraFields
@@ -618,7 +629,7 @@ export class FastifyCookieAuthServer {
                         if (this.enableEmailVerification) {
                             return reply.view(this.signupPage, {
                                 next: next, 
-                                csrfToken: this.csrfToken(request, reply),
+                                csrfToken: request.csrfToken,
                                 message: "Please check your email to finish signing up."
                             });
                         } else {
@@ -626,7 +637,8 @@ export class FastifyCookieAuthServer {
                         }
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("TOTP failure on session " + Hasher.hash(this.getSessionIdFromCookie(request)||""));
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.signupPage, {
                             error: error.message,
@@ -634,7 +646,7 @@ export class FastifyCookieAuthServer {
                             errorCode: ErrorCode[error.code], 
                             next: next, 
                             persist: request.body.persist,
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                         });
                         
                     });
@@ -659,18 +671,19 @@ export class FastifyCookieAuthServer {
                     await this.changePassword(request, reply, 
                     (reply, _user) => {
                         return reply.view(this.changePasswordPage, {
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                             message: "Your password has been changed."
                         });
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Change password failure for user " + request.user.username);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.changePasswordPage, {
                             error: error.message,
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                         });
                     });
                 }
@@ -694,12 +707,13 @@ export class FastifyCookieAuthServer {
                     await this.updateUser(request, reply, 
                     (reply, _user, _emailVerificationRequired) => {
                         return reply.view(this.updateUserPage, {
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                             message: "Please click on the link in your email to verify your email address."
                         });
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Update user failure for user " + request.user.username);
+                    CrossauthLogger.logger.debug(e);
                     let extraFields : { [key : string] : any }= {};
                     for (let field in request.body) {
                         if (field.startsWith("user_")) extraFields[field] = request.body[field];
@@ -709,7 +723,7 @@ export class FastifyCookieAuthServer {
                             error: error.message,
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                         });
                     });
                 }
@@ -733,16 +747,17 @@ export class FastifyCookieAuthServer {
                     await this.requestPasswordReset(request, reply, 
                     (reply, _user) => {
                         return reply.view(this.requestPasswordResetPage, {
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                             message: message,
                         });
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Request password reset faiulure user failure for email " + request.body.email);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         if (error.code == ErrorCode.EmailNotExist) {
                             return reply.view(this.requestPasswordResetPage, {
-                                csrfToken: this.csrfToken(request, reply),                                
+                                csrfToken: request.csrfToken,                                
                                 message: message,
                             });
                         }
@@ -751,7 +766,7 @@ export class FastifyCookieAuthServer {
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
                             email: request.body.email,
-                            csrfToken: this.csrfToken(request, reply),                        });
+                            csrfToken: request.csrfToken,                        });
                     });
                 }
             });
@@ -781,18 +796,19 @@ export class FastifyCookieAuthServer {
                     await this.resetPassword(request, reply, 
                     (reply, _user) => {
                         return reply.view(this.resetPasswordPage, {
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                             message: "Your password has been changed."
                         });
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Reset password failure for token " + request.body.token);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.changePasswordPage, {
                             error: error.message,
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
-                            csrfToken: this.csrfToken(request, reply),
+                            csrfToken: request.csrfToken,
                         });
                     });
                 }
@@ -812,7 +828,8 @@ export class FastifyCookieAuthServer {
                         return reply.view(this.emailVerifiedPage, {user: user});
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Verify email failed for token " + request.params.token);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.errorPage, {
                             errorCode: ErrorCode[error.code],
@@ -831,7 +848,8 @@ export class FastifyCookieAuthServer {
                     await this.logout(request, reply, 
                     (reply) => {return reply.redirect(this.logoutRedirect)});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Logout failed for session " + Hasher.hash(this.getSessionIdFromCookie(request)||""));
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.errorPage, {error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});
                         
@@ -850,7 +868,8 @@ export class FastifyCookieAuthServer {
                     await this.login(request, reply, 
                     (reply, user) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok", user : user})});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Login failed for user " + request.body.username);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     });
@@ -867,7 +886,8 @@ export class FastifyCookieAuthServer {
                     await this.logout(request, reply, 
                     (reply) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Logout failed for session " + Hasher.hash(this.getSessionIdFromCookie(request)||""));
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     });
@@ -886,7 +906,8 @@ export class FastifyCookieAuthServer {
                         emailVerificationNeeded: this.enableEmailVerification||false,
                     })});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Logout failed for user " + request.body.username);
+                    CrossauthLogger.logger.debug(e);
                     this.handleError(e, reply, (reply, error) => {
                         reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     });
@@ -904,7 +925,8 @@ export class FastifyCookieAuthServer {
                         status: "ok", 
                     })});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Change password failed for user " + request.user.username);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     }, true);
@@ -923,7 +945,8 @@ export class FastifyCookieAuthServer {
                         emailVerificationRequired: emailVerificationRequired,
                     })});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Update user failed for user " + request.user.username);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     }, true);
@@ -940,7 +963,8 @@ export class FastifyCookieAuthServer {
                         status: "ok", 
                     })});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Reset password failed for token " + request.body.token);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     }, true);
@@ -957,7 +981,8 @@ export class FastifyCookieAuthServer {
                         status: "ok", 
                     })});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Reset password failed for email " + request.body.email);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     }, true);
@@ -975,7 +1000,8 @@ export class FastifyCookieAuthServer {
                         user : user,
                     })});
                 } catch (e) {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("Verify email failed for token " + request.params.token);
+                    CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
                         reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", error: error.message, errors: error.messageArray, code: ErrorCode[error.code]});                    
                     });
@@ -1007,7 +1033,8 @@ export class FastifyCookieAuthServer {
                                 code = ce.code;
                         }
                     }
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("userforsessionkeyfailed for session " + Hasher.hash(this.getSessionIdFromCookie(request)||""));
+                    CrossauthLogger.logger.debug(e);
                     return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", code: ErrorCode[code], error : error});
 
                 }
@@ -1031,7 +1058,8 @@ export class FastifyCookieAuthServer {
                         code = ce.code;
                         error = ce.message;
                     }
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.error("getcsrftoken for csrf " + Hasher.hash(this.getCsrfTokenFromCookie(request)||""));
+                    CrossauthLogger.logger.debug(e);
                     return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "error", code: ErrorCode[code], error : error});
 
                 }
@@ -1141,7 +1169,7 @@ export class FastifyCookieAuthServer {
                 {
                     qr: qrUrl,
                     next: next||this.loginRedirect,
-                    csrfToken: this.csrfToken(request, reply),
+                    csrfToken: request.csrfToken,
                 };
                 return reply.view(this.signupTotpPage, data);
             } catch (e) {
@@ -1165,7 +1193,8 @@ export class FastifyCookieAuthServer {
             const code = request.body.code;
             user = await this.sessionManager.verify2FA(code, sessionId);
         } catch (e) {
-            CrossauthLogger.logger.error(e);
+            CrossauthLogger.logger.error("Signtototp failed for session " + Hasher.hash(sessionId||""));
+            CrossauthLogger.logger.debug(e);
             try {
                 if (sessionId) {
                     const data = await this.sessionManager.dataForSessionKey(sessionId);
@@ -1361,7 +1390,7 @@ export class FastifyCookieAuthServer {
         this.sessionManager.validateDoubleSubmitCsrfToken(csrfCookie, request.csrfToken);
     }
 
-    csrfToken(request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) {
+    private csrfToken(request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) {
         let token = request.body.csrfToken;
         if (!token) {
             if (request.headers && CSRFHEADER in request.headers) {

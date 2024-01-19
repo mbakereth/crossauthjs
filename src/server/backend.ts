@@ -315,7 +315,7 @@ export class Backend {
      * session ID.  Otherwise returns without error
      * @param token 
      */
-    validatesrfCookie(csrfCookieValue : string) {
+    validateCsrfCookie(csrfCookieValue : string) {
         this.csrfTokens.validateCsrfCookie(csrfCookieValue);
     }
 
