@@ -1,13 +1,14 @@
 import type { User } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error';
 import { UserStorage } from './storage'
-import { Hasher, type HasherOptions } from './hasher';
+import { Hasher } from './hasher';
 import { CrossauthLogger } from '../logger.ts';
 import { setParameter, ParamType } from './utils.ts';
 
 /** Optional parameters to pass to {@link UsernamePasswordAuthenticator} constructor. */
-export interface UsernamePasswordAuthenticatorOptions extends HasherOptions {
-    enableSecretForPasswordHash? : boolean,
+export interface UsernamePasswordAuthenticatorOptions {
+    secret? : string,
+    enableSecretForPasswordHash? : boolean;
 }
 
 /**
@@ -36,12 +37,8 @@ export abstract class UsernamePasswordAuthenticator {
 export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
 
     private userStorage : UserStorage;
-    private iterations = 100000;
-    private keyLength = 64;
-    private digest = 'sha512';
-    private saltLength = 16; 
     private secret : string|undefined = undefined;
-    private enableSecretForPasswordHash : boolean = false;
+    enableSecretForPasswords : boolean = false;
 
     /**
      * Create a new authenticator.
@@ -58,12 +55,8 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
                 options : UsernamePasswordAuthenticatorOptions = {}) {
         super();
         this.userStorage = userStorage;
-        setParameter("iterations", ParamType.Number, this, options, "HASHER_ITERATIONS");
-        setParameter("keyLength", ParamType.Number, this, options, "HASHER_KEYLENGTH");
-        setParameter("digest", ParamType.String, this, options, "HASHER_DIGEST");
-        setParameter("saltLength", ParamType.Number, this, options, "HASHER_SALTLENGTH");
         setParameter("secret", ParamType.String, this, options, "HASHER_SECRET");
-        setParameter("enableSecretForPasswordHash", ParamType.Boolean, this, options, "ENABLE_SECRET_FOR_PASSWORD_HASH");
+        setParameter("enableSecretForPasswordHash", ParamType.Boolean, this, options, "ENABLE_SECRET_FOR_PASSWORDS");
 
     }
 
@@ -81,55 +74,33 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      */
     async authenticateUser(username : string, password : string) : Promise<User> {
         let user = await this.userStorage.getUserByUsername(username);
-        let storedPasswordHash = Hasher.decodePasswordHash(await user.passwordHash);
 
-        const hasher = new Hasher({
-            digest: storedPasswordHash.digest,
-            iterations: storedPasswordHash.iterations, 
-            keyLength: storedPasswordHash.keyLen,
-            saltLength: this.saltLength,
-            secret: this.secret,
-        });
-        let inputPasswordHash = hasher.hash(password, {salt: storedPasswordHash.salt});
-        if (storedPasswordHash.hashedPassword != inputPasswordHash) {
-            CrossauthLogger.logger.debug("Invalid password " + password + " " + storedPasswordHash + " " + inputPasswordHash);
+        if (!await Hasher.passwordsEqual(password, user.passwordHash, this.secret)) {
+            CrossauthLogger.logger.debug("Invalid password " + password + " " + user.passwordHash);
             throw new CrossauthError(ErrorCode.PasswordNotMatch);
         }
-        if ("passwordHash" in user) {
-            delete user.passwordHash;
-        }
+        delete user.passwordHash;
         return user;
     }
 
     /**
-     * Creates and returns a hashed of the passed password
+     * Creates and returns a hashed of the passed password, with the hasing parameters encoded ready
+     * for storage.
+     * 
+     * If salt is not provieed, a random one is greated.  If secret was passed to the constructor 
+     * or in the .env, and enableSecretInPasswords was set to true, it is used as the pepper.
+     * used as the pepper.
      * 
      * If the optional parameters `iterations`, `keyLen` or `digest` are passed, they override the class defaults,
      * 
      * @param password the password to hash
-     * @param encode if true, encode this as a string including the salt, algorith, etc (see {@link decodePasswordHash}).  Otherwise just returns the Base64-encoded hash.
      * @param salt the salt to use.  If undefined, a random one will be generated.
-     * @param iterations the number of PBKDF2 iterations to use 
-     * @param keyLen the length of hash to generate, before Base64
-     * @param digest the digest algorithm, eg `sha512`
-     * @returns either a string of the Base64-encoded hash, or the fully qualified hash, depending on `encode`.  See above.
+     * @returns the encoded hash string.
      */
-    createPasswordHash(password : string, encode = false, 
-                       {salt, iterations, keyLength: keyLen, digest} :
-                       {salt? : string, 
-                        iterations? : number, 
-                        keyLength? : number, 
-                        digest? : string} = {}) : string {
+    async createPasswordHash(password : string, salt? : string) : Promise<string> {
         
-        const hasher = new Hasher({
-            digest: digest||this.digest,
-            iterations: iterations||this.iterations,
-            keyLength: keyLen||this.keyLength,
-            saltLength: this.saltLength||this.saltLength,
-            secret: this.secret,
-        });
-
-        return hasher.hash(password, {salt: salt, encode: encode});
+        return await Hasher.passwordHash(password, {salt: salt, encode: true, 
+            secret: this.enableSecretForPasswords ? this.secret : undefined});
     }
 
     /**
@@ -137,7 +108,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      * @param password the password to hash
      */
     async createPasswordForStorage(password : string) : Promise<string> {
-        return this.createPasswordHash(password, true);
+        return this.createPasswordHash(password);
     }
 
 }

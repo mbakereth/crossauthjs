@@ -1,5 +1,6 @@
 import { test, expect, beforeAll } from 'vitest';
 import { DoubleSubmitCsrfToken, SessionCookie } from '../cookieauth';
+import { Hasher } from '../hasher';
 import { Backend } from '../backend';
 import { HashedPasswordAuthenticator } from '../password';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
@@ -10,7 +11,7 @@ export var userStorage : InMemoryUserStorage;
 
 // for all these tests, the database will have two users: bob and alice
 beforeAll(async () => {
-    userStorage = getTestUserStorage();
+    userStorage = await getTestUserStorage();
 });
 
 
@@ -19,36 +20,7 @@ test('SessionCookie.createSessionKey', async () => {
     const auth = new SessionCookie(userStorage, keyStorage,{secret: "ABCDEFGHIJKLMNOPQRSTUVWX", siteUrl: "http://locahost:3000"});
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
-    let key = await keyStorage.getKey(value);
-    expect(key.expires).toBeDefined();
-    expect(expires).toBeDefined();
-    expect(key.userId).toStrictEqual(bob.id);
-    expect(key.expires?.getTime()).toBe(expires?.getTime());
-    if (key.expires != undefined && expires != undefined) {
-        expect(key.expires?.getTime()-dateCreated.getTime()).toBe(expires?.getTime()-dateCreated.getTime());
-    }
-
-});
-
-test('DoubleSubmitCsrfToken.createAndValidateCsrfToken', async () => {
-    const auth = new DoubleSubmitCsrfToken({secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
-    let sessionId = "0123456789ABCDEFGHIJKL";
-    let token = await auth.createCsrfToken(sessionId);
-    let valid = false;
-    try {
-        auth.validateCsrfToken(token, sessionId);
-        valid = true;
-    } catch {}
-    expect(valid).toBe(true);
-});
-
-test('SessionCookie.createSessionKey.encrypted', async () => {
-    const keyStorage = new InMemoryKeyStorage();
-    const auth = new SessionCookie(userStorage, keyStorage, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX", hashSessionId: true });
-    const bob = await userStorage.getUserByUsername("bob");
-    let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
-    let hashedValue = auth.hashSessionKey(value);
-    let key = await keyStorage.getKey(hashedValue);
+    let key = await keyStorage.getKey(Hasher.hash(value));
     expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
     expect(key.userId).toStrictEqual(bob.id);
@@ -85,18 +57,34 @@ test('CookieSessionManager.logoutFromAll', async() => {
     }
 })
 
-test('CookieSessionManager.createAndValidateCsrfToken', async() => {
-    const keyStorage = new InMemoryKeyStorage();
-    let authenticator = new HashedPasswordAuthenticator(userStorage);
-    let manager = new Backend(userStorage, keyStorage, authenticator, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
-    let sessionId = "0123456789ABCDEFGHIJKL";
-    let cookie = await manager.createCsrfToken(sessionId);
+
+test('DoubleSubmitCsrfToken.signAndUnsignCookie', async () => {
+    const secret = "ABCDEFGHIJKLMNOPQRSTUVWX";
+    const auth = new DoubleSubmitCsrfToken({secret: secret});
+    const token = auth.createCsrfToken();
+    const cookie = auth.makeCsrfCookie(token);
+    const cookieToken = Hasher.unsign(cookie.value, secret).v;
+    expect(cookieToken).toBe(token);
+});
+
+test('DoubleSubmitCsrfToken.makeAndRecoverFormOrHeaderToken', async () => {
+    const secret = "ABCDEFGHIJKLMNOPQRSTUVWX";
+    const auth = new DoubleSubmitCsrfToken({secret: secret});
+    const token = auth.createCsrfToken();
+    const formOrHeaderValue = auth.makeCsrfFormOrHeaderToken(token);
+    const recoveredToken = auth['unmaskCsrfToken'](formOrHeaderValue);
+    expect(recoveredToken).toBe(token);
+});
+
+test('DoubleSubmitCsrfToken.createAndValidateCsrfToken', async () => {
+    const auth = new DoubleSubmitCsrfToken({secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
+    const token = auth.createCsrfToken();
+    const cookie = auth.makeCsrfCookie(token);
+    const formOrHeaderValue = auth.makeCsrfFormOrHeaderToken(token);
     let valid = false;
     try {
-        manager.validateCsrfToken(cookie.value, sessionId);
+        auth.validateDoubleSubmitCsrfToken(cookie.value, formOrHeaderValue);
         valid = true;
     } catch {}
     expect(valid).toBe(true);
-
 });
-

@@ -8,7 +8,7 @@ import { Server, IncomingMessage, ServerResponse } from 'http'
 import nunjucks from "nunjucks";
 import { UserStorage, KeyStorage } from './storage';
 import { UsernamePasswordAuthenticator } from './password';
-import { Cookie } from './cookieauth';
+import { Hasher } from './hasher';
 import { Backend, type BackendOptions } from './backend';
 import { CrossauthError, ErrorCode } from "..";
 import { User } from '../interfaces';
@@ -459,80 +459,54 @@ export class FastifyCookieAuthServer {
         // and user in the request object.
         this.app.addHook('onRequest', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
 
-            // if sessions are not enabled, nothing to do
-            if (!this.enableSessions) return;
+            CrossauthLogger.logger.debug("Getting csrf cookie");
+            // create CSRF cookie and token
+            let cookieValue : string|undefined;
+            try {
+                 cookieValue = this.getCsrfTokenFromCookie(request);
+                 if (cookieValue) this.sessionManager.validatesrfCookie(cookieValue);
+            }
+            catch (e) {
+                CrossauthLogger.logger.warn("Invalid csrf cookie " + Hasher.hash(this.getCsrfTokenFromCookie(request)||"") + " received");
+                reply.clearCookie(this.sessionManager.csrfCookieName);
+            }
+            if (["GET", "OPTIONS", "HEAD"].includes(request.method)) {
+                try {
+                    if (!cookieValue) {
+                        CrossauthLogger.logger.debug("Invalid CSRF cookie - recreating");
+                        const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createCsrfToken();
+                        reply.setCookie(csrfCookie.name, csrfCookie.value, csrfCookie.options );
+                        request.csrfToken = csrfFormOrHeaderValue;
+                    } else {
+                        CrossauthLogger.logger.debug("Valid CSRF cookie - creating token");
+                        const csrfFormOrHeaderValue = await this.sessionManager.createCsrfFormOrHeaderValue(cookieValue);
+                        request.csrfToken = csrfFormOrHeaderValue;
+                    }
+                    reply.header(CSRFHEADER, request.csrfToken);
+                } catch (e) {
+                    CrossauthLogger.logger.error("Couldn't create CSRF token");
+                    CrossauthLogger.logger.error(e);
+                    reply.clearCookie(this.sessionManager.csrfCookieName);
+                }
+            }
+            let user : User|undefined;
 
             // get existing cookies (unvalidated)
-            let sessionId = this.getSessionIdFromCookie(request);
-            let csrfToken = this.getCsrfTokenFromCookie(request);
-
-            // validate the session if and csrf token
-            let {sessionCookie, csrfCookie, user} = await this.sessionManager.getValidatedSessionAndCsrf(sessionId, csrfToken);
-
-            let safeMethod = ["GET", "HEAD", "OPTIONS"].includes(request.method);
-            if (!sessionCookie && !safeMethod) {
-                // we don't create session ids or csrf cookies for these methods.  If the cookies
-                // are not valid, delete them and return
-                if (!sessionId) {
-                    CrossauthLogger.logger.debug("Invalid session cookie received - deleting");
-                    reply.clearCookie(this.sessionManager.sessionCookieName);
-                }
-                if (!csrfToken) {
-                    CrossauthLogger.logger.debug("Invalid csrf cookie received - deleting");
-                    reply.clearCookie(this.sessionManager.csrfCookieName);
-                }
-                return;
-            }
-            if (sessionId && !sessionCookie) {
-                // session cookie exists but is invalid - delete it
-                CrossauthLogger.logger.debug("Invalid session cookie received - deleting");
-                reply.clearCookie(this.sessionManager.sessionCookieName);   
-                if (csrfToken) {         
-                    CrossauthLogger.logger.debug("Invalid csrf cookie received - deleting");
-                    reply.clearCookie(this.sessionManager.csrfCookieName);
-                }
-            } else if (csrfToken && !csrfCookie) {
-                // session id is valid but csrf token isn't - delete it
-                CrossauthLogger.logger.debug("Invalid csrf cookie received - deleting");
-                reply.clearCookie(this.sessionManager.csrfCookieName);
-            }
-            else if (!sessionCookie && csrfToken) {
-                // csrf token exists but session is not valid - delete it
-                CrossauthLogger.logger.debug("Invalid csrf cookie received - deleting");
-                reply.clearCookie(this.sessionManager.csrfCookieName);
-            }
-
-            if (safeMethod) {
-
-                // create cookies if they don't exist already or were invalid
-                if ((!sessionCookie || !csrfToken) && this.anonymousSessions) {
-
-                    // session cookie is not valid - create one, along with the csrf token
-                    let {sessionCookie: newSessionCookie, csrfCookie: newCsrfCookie, user: newUser, sessionCookieCreated, csrfCookieCreated} = await this.sessionManager.createAnonymousSessionKeyIfNoneExists(sessionId);
-                    sessionCookie = newSessionCookie;
-                    csrfCookie = newCsrfCookie;
-                    user = newUser;
-                    if (sessionCookieCreated) {
-                        CrossauthLogger.logger.debug("Creating anonymous session cookie");
-                        reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
+            if (this.enableSessions) {
+                const sessionCookieValue = this.getSessionIdFromCookie(request);
+                CrossauthLogger.logger.debug("Getting session cookie");
+                if (sessionCookieValue) {
+                    try {
+                        user = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
+                        CrossauthLogger.logger.debug("Valid session id - user " + user?.username);
+                    } catch (e) {
+                        CrossauthLogger.logger.warn("Invalid session cookie " + Hasher.hash(sessionCookieValue) + " received");
+                        reply.clearCookie(this.sessionManager.sessionCookieName);
                     }
-                    if (csrfCookieCreated) {
-                        CrossauthLogger.logger.debug("Creating csrf cookie");
-                        reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
-                    }
- 
-                } else if (!csrfToken && sessionCookie) {
-
-                    // session id is valid but csrf token is not - create it
-                    CrossauthLogger.logger.debug("Creating csrf token for user " + user?.username);
-                    csrfCookie = await this.sessionManager.createCsrfToken(sessionCookie.value);
-                    reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
-                    
                 }
             }
 
             request.user = user;
-            request.csrfToken = csrfCookie?csrfCookie.value.split(".")[1]:undefined; // already validated so this will work;
         });
           
         if (this.endpoints.includes("login")) {
@@ -560,6 +534,7 @@ export class FastifyCookieAuthServer {
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
                     return this.handleError(e, reply, (reply, error) => {
+                        console.log("Passing csrf token " + request.csrfToken);
                         return reply.view(this.loginPage, {
                             error: error.message,
                             errors: error.messageArray, 
@@ -567,7 +542,8 @@ export class FastifyCookieAuthServer {
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
-                            csrfToken: request.csrfToken});
+                            csrfToken: this.csrfToken(request, reply)
+                        });;
                         
                     });
                 }
@@ -597,7 +573,7 @@ export class FastifyCookieAuthServer {
                         if (this.enableEmailVerification) {
                             return reply.view(this.signupPage, {
                                 next: next, 
-                                csrfToken: request.csrfToken,
+                                csrfToken: this.csrfToken(request, reply),
                                 message: "Please check your email to finish signing up."
                             });
                         } else {
@@ -618,7 +594,7 @@ export class FastifyCookieAuthServer {
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                             twoFactor: request.body.twoFactor,
                             perUserTwoFactor: this.twoFactor == "peruser",
                             ...extraFields
@@ -642,7 +618,7 @@ export class FastifyCookieAuthServer {
                         if (this.enableEmailVerification) {
                             return reply.view(this.signupPage, {
                                 next: next, 
-                                csrfToken: request.csrfToken,
+                                csrfToken: this.csrfToken(request, reply),
                                 message: "Please check your email to finish signing up."
                             });
                         } else {
@@ -658,7 +634,7 @@ export class FastifyCookieAuthServer {
                             errorCode: ErrorCode[error.code], 
                             next: next, 
                             persist: request.body.persist,
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                         });
                         
                     });
@@ -683,7 +659,7 @@ export class FastifyCookieAuthServer {
                     await this.changePassword(request, reply, 
                     (reply, _user) => {
                         return reply.view(this.changePasswordPage, {
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                             message: "Your password has been changed."
                         });
                     });
@@ -694,7 +670,7 @@ export class FastifyCookieAuthServer {
                             error: error.message,
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                         });
                     });
                 }
@@ -718,7 +694,7 @@ export class FastifyCookieAuthServer {
                     await this.updateUser(request, reply, 
                     (reply, _user, _emailVerificationRequired) => {
                         return reply.view(this.updateUserPage, {
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                             message: "Please click on the link in your email to verify your email address."
                         });
                     });
@@ -733,7 +709,7 @@ export class FastifyCookieAuthServer {
                             error: error.message,
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                         });
                     });
                 }
@@ -757,7 +733,7 @@ export class FastifyCookieAuthServer {
                     await this.requestPasswordReset(request, reply, 
                     (reply, _user) => {
                         return reply.view(this.requestPasswordResetPage, {
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                             message: message,
                         });
                     });
@@ -766,7 +742,7 @@ export class FastifyCookieAuthServer {
                     return this.handleError(e, reply, (reply, error) => {
                         if (error.code == ErrorCode.EmailNotExist) {
                             return reply.view(this.requestPasswordResetPage, {
-                                csrfToken: request.csrfToken,
+                                csrfToken: this.csrfToken(request, reply),                                
                                 message: message,
                             });
                         }
@@ -775,8 +751,7 @@ export class FastifyCookieAuthServer {
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
                             email: request.body.email,
-                            csrfToken: request.csrfToken,
-                        });
+                            csrfToken: this.csrfToken(request, reply),                        });
                     });
                 }
             });
@@ -806,7 +781,7 @@ export class FastifyCookieAuthServer {
                     await this.resetPassword(request, reply, 
                     (reply, _user) => {
                         return reply.view(this.resetPasswordPage, {
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                             message: "Your password has been changed."
                         });
                     });
@@ -817,7 +792,7 @@ export class FastifyCookieAuthServer {
                             error: error.message,
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                         });
                     });
                 }
@@ -840,7 +815,6 @@ export class FastifyCookieAuthServer {
                     CrossauthLogger.logger.error(e);
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.errorPage, {
-                            csrfToken: request.csrfToken,
                             errorCode: ErrorCode[error.code],
                             error: error.message,
                             errors: error.messageArray,
@@ -892,7 +866,6 @@ export class FastifyCookieAuthServer {
                 try {
                     await this.logout(request, reply, 
                     (reply) => {return reply.header('Content-Type', 'application/json; charset=utf-8').send({status: "ok"})});
-                    if (this.anonymousSessions && this.enableSessions) await this.createAnonymousSessionIdIfNoneExists(request, reply);
                 } catch (e) {
                     CrossauthLogger.logger.error(e);
                     return this.handleError(e, reply, (reply, error) => {
@@ -1070,20 +1043,15 @@ export class FastifyCookieAuthServer {
     private async login(request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user: User) => void) {
         if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
-        if (this.anonymousSessions) {
-            await this.validateCsrfToken(request, reply)
-        }
         const username = request.body.username;
         const password = request.body.password;
         const persist = request.body.persist;
+        const csrfFormOrHeaderValue = request.body.csrfToken;
+        const csrfCookieValue = this.getCsrfTokenFromCookie(request);
+        await this.sessionManager.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
 
         let sessionId = undefined;
-        let oldSessionId : string|undefined = undefined;
-        if (this.anonymousSessions && !this.keepAnonymousSessionId) 
-            oldSessionId = this.getSessionIdFromCookie(request);
-        if (this.anonymousSessions && this.keepAnonymousSessionId) {
-            sessionId = this.getSessionIdFromCookie(request);
-        }
+        const oldSessionId = this.getSessionIdFromCookie(request);
 
         let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, sessionId, persist);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
@@ -1105,12 +1073,7 @@ export class FastifyCookieAuthServer {
         successFn : (res : FastifyReply, user: User) => void) {
         if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         let sessionId = undefined;
-        let oldSessionId : string|undefined = undefined;
-        if (this.anonymousSessions && !this.keepAnonymousSessionId) 
-            oldSessionId = this.getSessionIdFromCookie(request);
-        if (this.anonymousSessions && this.keepAnonymousSessionId) {
-            sessionId = this.getSessionIdFromCookie(request);
-        }
+        const oldSessionId = this.getSessionIdFromCookie(request);
 
         let { sessionCookie, csrfCookie } = await this.sessionManager.login("", "", sessionId, undefined, user);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
@@ -1130,9 +1093,6 @@ export class FastifyCookieAuthServer {
 
     private async signup(request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
-        if (this.anonymousSessions) {
-            await this.validateCsrfToken(request, reply);
-        }
         const username = request.body.username;
         const password = request.body.password;
         const repeatPassword = request.body.repeatPassword;
@@ -1164,13 +1124,13 @@ export class FastifyCookieAuthServer {
             }
             return successFn(reply, undefined);
         } else {
-            if (!this.anonymousSessions) {
+            if (/*!this.anonymousSessions*/ true) {
                 throw new CrossauthError(ErrorCode.Configuration, "Anonymous sessions must be enabled for TOTP");
             }
             const sessionId = this.getSessionIdFromCookie(request);
             if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "Couldn't set up 2FA - please ensure cookies are enabled");
             let { qrUrl } = await this.sessionManager.createUserWith2FA(username, password, extraFields,
-                sessionId);
+                /*sessionId*/"");
             request.twofactor = {
                 qr : qrUrl,
                 username: username,
@@ -1181,7 +1141,7 @@ export class FastifyCookieAuthServer {
                 {
                     qr: qrUrl,
                     next: next||this.loginRedirect,
-                    csrfToken: request.csrfToken,
+                    csrfToken: this.csrfToken(request, reply),
                 };
                 return reply.view(this.signupTotpPage, data);
             } catch (e) {
@@ -1308,7 +1268,7 @@ export class FastifyCookieAuthServer {
         if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         let sessionId = this.getSessionIdFromCookie(request);
         if (sessionId) {
-                await this.sessionManager.logout(sessionId||"");
+                await this.sessionManager.logout(sessionId);
         }
         CrossauthLogger.logger.debug("Logout: clear cookie " + this.sessionManager.sessionCookieName);
         reply.clearCookie(this.sessionManager.sessionCookieName);
@@ -1325,27 +1285,13 @@ export class FastifyCookieAuthServer {
 
     }
 
-    private async createAnonymousSessionIdIfNoneExists(request : FastifyRequest, reply : FastifyReply) 
-        : Promise<{sessionCookie: Cookie, csrfCookie: Cookie|undefined, user : User|undefined}> {
-        let cookies = request.cookies;
-        let sessionId : string|undefined = undefined;
-        let csrfToken : string|undefined = undefined;
-        if (cookies && this.sessionManager.sessionCookieName in cookies) {
-            sessionId = cookies[this.sessionManager.sessionCookieName]||""
-        };
-        if (cookies && this.sessionManager.csrfCookieName in cookies) {
-            csrfToken = cookies[this.sessionManager.csrfCookieName]||"";
-        }
-        let {sessionCookie, csrfCookie, user} = await this.sessionManager.createAnonymousSessionKeyIfNoneExists(sessionId, csrfToken);
-        if (sessionId != sessionCookie.value) {
-            CrossauthLogger.logger.debug("Creating session ID");
-            reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
-        }
-        if (csrfToken != csrfCookie.value) {
-            CrossauthLogger.logger.debug("Creating CSRF Token");
-            reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
-        }        
-        return {sessionCookie, csrfCookie, user};
+    async createAnonymousSession(request : FastifyRequest, reply : FastifyReply) {
+        CrossauthLogger.logger.debug("Creating session ID");
+        let { sessionCookie, csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createAnonymousSession();
+        reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
+        request.csrfToken = csrfFormOrHeaderValue;
+        reply.setCookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
+        request.user = undefined;
     };
 
     private handleError(e : any, reply : FastifyReply, errorFn : (reply : FastifyReply, error : CrossauthError) => void, passwordInvalidOk? : boolean) {
@@ -1402,41 +1348,41 @@ export class FastifyCookieAuthServer {
      * @param sessionId if given, use this as the session ID.  If undefined, it is taken from the request cookie
      */
     async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>, 
-                            _reply : FastifyReply,
-                            sessionId? : string) {
-        if (!sessionId) {
-            sessionId = this.getSessionIdFromCookie(request);
-            if (!sessionId) {
-                CrossauthLogger.logger.debug("No session cookie found when validating CSRF token");
-                throw new CrossauthError(ErrorCode.InvalidKey);
-            }
-        } 
-        let formOrHeaderToken = this.getCsrfTokenFromFormOrHeader(request);
-        if (!formOrHeaderToken) {
-            CrossauthLogger.logger.debug("No CSRF form or header value found when validating CSRF token");
-            throw new CrossauthError(ErrorCode.InvalidKey);
-        }
-        let csrfToken = this.getCsrfTokenFromCookie(request);
-        if (!csrfToken) {
+                            _reply : FastifyReply) {
+        let csrfCookie = this.getCsrfTokenFromCookie(request);
+        if (!csrfCookie) {
             CrossauthLogger.logger.debug("No CSRF cookie found when validating CSRF token");
             throw new CrossauthError(ErrorCode.InvalidKey);
         }
-        this.sessionManager.validateDoubleSubmitCsrfToken(csrfToken, sessionId, formOrHeaderToken);
+        if (!request.csrfToken) {
+            CrossauthLogger.logger.debug("No CSRF form or header token found when validating CSRF token");
+            throw new CrossauthError(ErrorCode.InvalidKey);
+        }
+        this.sessionManager.validateDoubleSubmitCsrfToken(csrfCookie, request.csrfToken);
     }
 
-    private getCsrfTokenFromFormOrHeader(request : FastifyRequest<{ Body: CsrfBodyType }>) : string|undefined {
-        let formOrHeaderToken  : string|undefined = undefined;
-        if (request.body.csrfToken) {
-            formOrHeaderToken = request.body.csrfToken;
-        } else if (request.headers[CSRFHEADER]) {
-            let headers = request.headers[CSRFHEADER]
-            if (headers && Array.isArray(headers)) {
-                formOrHeaderToken = headers[0];
-            } else {
-                formOrHeaderToken = headers;
-            }            
+    csrfToken(request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) {
+        let token = request.body.csrfToken;
+        if (!token) {
+            if (request.headers && CSRFHEADER in request.headers) {
+                const header = request.headers[CSRFHEADER];
+                if (Array.isArray(header)) token = header[0];
+                else token = header;
+            }
         }
-        return formOrHeaderToken;
+        if (token) {
+            try {
+                this.sessionManager.validateDoubleSubmitCsrfToken(this.getCsrfTokenFromCookie(request), token);
+                request.csrfToken = token;
+                reply.header(CSRFHEADER, token);
+            }
+            catch (e) {
+                CrossauthLogger.logger.warn("Invalid CSRF token");
+                reply.clearCookie(this.sessionManager.csrfCookieName);
+            }
+        }
+
+        return token;
     }
 
     /**

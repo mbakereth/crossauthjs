@@ -13,12 +13,12 @@ async function main() {
 
     const user1 = await userStorage.createUser(
         "bob",
-        hasher.createPasswordHash("bobPass123", true),
+        await hasher.createPasswordHash("bobPass123"),
         {"email": "bob@bob.com", "emailVerified": true}
     );
     const user2 = await userStorage.createUser(
       "alice",
-      hasher.createPasswordHash("alicePass123", true),
+      await hasher.createPasswordHash("alicePass123"),
       {"email": "alice@alice.com", "emailVerified": true}
   );
   console.log({ user1, user2 })

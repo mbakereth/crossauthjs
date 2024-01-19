@@ -14,13 +14,13 @@ beforeAll(async () => {
     await prismaClient.key.deleteMany({});
     userStorage = new PrismaUserStorage({extraFields: "dummyField"});
     let authenticator = new HashedPasswordAuthenticator(userStorage);
-    await userStorage.createUser(
+    userStorage.createUser(
         "bob", 
-        authenticator.createPasswordHash("bobPass123", true), 
+        await authenticator.createPasswordHash("bobPass123"), 
         {"dummyField": "abc", "email": "bob@bob.com"});
-    await userStorage.createUser(
+    userStorage.createUser(
         "alice", 
-        authenticator.createPasswordHash("alicePass123", true), 
+        await authenticator.createPasswordHash("alicePass123"), 
         {"dummyField": "abc", "email": "alice@alice.com"});
 });
 

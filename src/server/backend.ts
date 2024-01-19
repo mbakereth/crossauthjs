@@ -1,6 +1,7 @@
-import type { User, Key } from '../interfaces.ts';
+import type { User } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
+import { Hasher } from './hasher';
 import { UsernamePasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 import { TokenEmailer, TokenEmailerOptions } from './email.ts';
@@ -47,7 +48,7 @@ export interface BackendOptions extends TokenEmailerOptions {
 export class Backend {
     userStorage : UserStorage;
     keyStorage : KeyStorage;
-    private csrfTokens : DoubleSubmitCsrfToken|undefined = undefined;
+    private csrfTokens : DoubleSubmitCsrfToken;
     private enableSessions : boolean = true;
     private session : SessionCookie|undefined = undefined;
     private authenticator : UsernamePasswordAuthenticator;
@@ -82,8 +83,8 @@ export class Backend {
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
         if (this.enableSessions) {
             this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
-            this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
         }
+        this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
 
 
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
@@ -128,17 +129,20 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, password : string, existingSessionId? : string, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user: User}> {
+    async login(username : string, password : string, existingSessionId? : string, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
 
         if (!user) user = await this.authenticator.authenticateUser(username, password);
-        const sessionKey = await this.session.createSessionKey(user.id, existingSessionId);
+        const sessionKey = await this.session.createSessionKey(user.id);
         //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
-        let sessionCookie = this.session.makeSessionCookie(sessionKey, persist);
-        let csrfCookie = this.csrfTokens.makeCsrfCookie(await this.csrfTokens.createCsrfToken(sessionKey.value));
+        let sessionCookie = this.session.makeCookie(sessionKey, persist);
+        const csrfToken = this.csrfTokens.createCsrfToken();
+        const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
+        const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
         return {
             sessionCookie: sessionCookie,
             csrfCookie: csrfCookie,
+            csrfForOrHeaderValue: csrfForOrHeaderValue,
             user: user
         }
     }
@@ -150,75 +154,17 @@ export class Backend {
      * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
      *          each of these was newly created and the user, which may be undefined.
      */
-    async createAnonymousSessionKeyIfNoneExists(sessionId? : string, csrfToken? : string) 
-    : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, user : User|undefined, sessionCookieCreated : boolean, csrfCookieCreated : boolean}> {
+    async createAnonymousSession() 
+    : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string}> {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
 
-        let sessionCookieCreated = false;
-        let csrfCookieCreated = false;
-
-        let {sessionKey, sessionCookie, csrfCookie, user} = await this.getValidatedSessionAndCsrf(sessionId, csrfToken);
-        
-        if (!sessionKey) {
-            sessionKey = await this.session.createSessionKey(undefined);
-            sessionCookieCreated = true;
-        }
-        if (!sessionCookie) {
-            sessionCookie = this.session.makeSessionCookie(sessionKey);
-        }  
-        if (!csrfCookie) {
-            csrfToken = await this.csrfTokens.createCsrfToken(sessionKey.value);
-            csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
-            csrfCookieCreated = true;
-        }
+        const key = await this.session.createSessionKey(undefined);
+        const sessionCookie = this.session.makeCookie(key, false);
+        let { csrfCookie, csrfFormOrHeaderValue } = await this.createCsrfToken();
         return {
             sessionCookie,
             csrfCookie,
-            user,
-            sessionCookieCreated,
-            csrfCookieCreated,
-        };
-    }
-
-    /**
-     * Validate the sessionId and csrfToken.  Return them and the user if they are valid.  Return undefined otherwise.
-     * 
-     * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
-     *          each of these was newly created and the user, which may be undefined.
-     */
-    async getValidatedSessionAndCsrf(sessionId? : string, csrfToken? : string) 
-        : Promise<{sessionKey : Key|undefined, sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, user : User|undefined}> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
-
-        let sessionKey : Key|undefined = undefined;
-        let user : User|undefined = undefined;
-        let userPromise : Promise<User|undefined>|undefined = undefined;
-        if (sessionId) {
-            try {
-                let  {key} = await this.session.getUserForSessionKey(sessionId);
-                if (key) sessionKey = key;
-                userPromise = this.userForSessionKey(sessionId);
-            }
-            catch {
-                sessionId = undefined;
-                csrfToken = undefined;
-            }
-        }
-        if (this.csrfTokens && sessionId && csrfToken) {
-            try {
-                this.csrfTokens.validateCsrfToken(csrfToken, sessionId);
-            } catch {
-                csrfToken = undefined;
-            }
-        }
-        let sessionCookie = sessionKey ? this.session.makeSessionCookie(sessionKey) : undefined;         
-        const csrfCookie = csrfToken && this.csrfTokens? this.csrfTokens.makeCsrfCookie(csrfToken) : undefined;
-        if (userPromise) user = await userPromise;
-        return {
-            sessionKey,
-            sessionCookie,
-            csrfCookie,
-            user
+            csrfFormOrHeaderValue,
         };
     }
 
@@ -229,8 +175,10 @@ export class Backend {
      * @param sessionKey the session ID to remove.
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
      */
-    async logout(sessionKey : string) : Promise<void> {
-        return await this.keyStorage.deleteKey(sessionKey)
+    async logout(sessionCookieValue : string) : Promise<void> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "logout called but sessions not enabled");
+        const key = await this.session.getSessionKey(sessionCookieValue);
+        return await this.keyStorage.deleteKey(Hasher.hash(key.value));
     }
 
     /**
@@ -250,16 +198,16 @@ export class Backend {
      * 
      * If the user is undefined, or the key has expired, returns undefined.
      * 
-     * @param sessionKey the session key to look up in session storage
+     * @param sessionCookieValue the session key to look up in session storage
      * @returns the {@link User} (without password hash) matching the  session key
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
-    async userForSessionKey(sessionKey : string) : Promise<User|undefined> {
+    async userForSessionCookieValue(sessionCookieValue : string) : Promise<User|undefined> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         let error : CrossauthError | undefined;
         try {
-            let {user} = await this.session.getUserForSessionKey(sessionKey);
+            let {user} = await this.session.getUserForSessionKey(sessionCookieValue);
             return user;
         } catch (e) {
             if (e instanceof CrossauthError) {
@@ -326,9 +274,30 @@ export class Backend {
      * @param sessionId the session ID
      * @returns a signed CSRF token
      */
-    async createCsrfToken(sessionId : string) : Promise<Cookie> {
-        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Csrf tokens not enabled");
-        return this.csrfTokens.makeCsrfCookie(await this.csrfTokens.createCsrfToken(sessionId));
+    async createCsrfToken() : Promise<{csrfCookie : Cookie, csrfFormOrHeaderValue : string}> {
+         this.csrfTokens.makeCsrfCookie(await this.csrfTokens.createCsrfToken());
+         const csrfToken = this.csrfTokens.createCsrfToken();
+         const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
+         return {
+            csrfCookie,
+            csrfFormOrHeaderValue,
+         }
+     }
+
+    /**
+     * Creates and returns a signed CSRF token based on the session ID
+     * @param sessionId the session ID
+     * @returns a signed CSRF token
+     */
+    async createCsrfFormOrHeaderValue(csrfCookieValue : string) : Promise<string> {
+        const csrfToken = this.csrfTokens.unsignCookie(csrfCookieValue);
+        return this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+    }
+
+    async userForSessionKey(sessionCookieValue : string) {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+        return (await this.session.getUserForSessionKey(sessionCookieValue)).user;
     }
 
     /**
@@ -336,9 +305,9 @@ export class Backend {
      * session ID.  Otherwise returns without error
      * @param token 
      */
-    validateCsrfToken(token : string, sessionId : string) {
-        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Csrf tokens not enabled");
-        this.csrfTokens.validateCsrfToken(token, sessionId);
+    validateDoubleSubmitCsrfToken(csrfCookieValue : string|undefined, csrfFormOrHeaderValue : string|undefined) {
+        if (!csrfCookieValue || !csrfFormOrHeaderValue) throw new CrossauthError(ErrorCode.InvalidKey, "CSRF missing from either cookie or form/header value");
+        this.csrfTokens.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
     }
 
     /**
@@ -346,20 +315,20 @@ export class Backend {
      * session ID.  Otherwise returns without error
      * @param token 
      */
-    validateDoubleSubmitCsrfToken(token : string, sessionId : string, formOrHeaderValue : string) {
-        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Csrf tokens not enabled");
-        this.csrfTokens.validateDoubleSubmitCsrfToken(token, sessionId, formOrHeaderValue);
+    validatesrfCookie(csrfCookieValue : string) {
+        this.csrfTokens.validateCsrfCookie(csrfCookieValue);
     }
 
     /**
      * If sessionIdleTimeout is set, update the last activcity time in key storage to current time
      * @param sessionId the session Id to update.
      */
-    async updateSessionActivity(sessionId : string) : Promise<void> {
+    async updateSessionActivity(sessionCookieValue : string) : Promise<void> {
         if (!this.session) return;
+        const key = await this.session.getSessionKey(sessionCookieValue);
         if (this.session.idleTimeout > 0) {
             this.session.updateSessionKey({
-                value: sessionId,
+                value: key.value,
                 lastActive: new Date(),
             });
         }

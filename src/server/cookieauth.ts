@@ -5,9 +5,12 @@ import type {
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, UserPasswordStorage, KeyStorage } from './storage';
 import { type TokenEmailerOptions } from './email.ts';
-import { Hasher, HasherOptions } from './hasher';
+import { Hasher } from './hasher';
 import { CrossauthLogger } from '../logger.ts';
 import { setParameter, ParamType } from './utils.ts';
+
+const CSRF_LENGTH = 16;
+const SESSIONID_LENGTH = 16;
 
 /**
  * Optional parameters when setting cookies,
@@ -37,7 +40,7 @@ export interface Cookie {
 /**
  * Options for double-submit csrf tokens
  */
-export interface DoubleSubmitCsrfTokenOptions extends CookieOptions, HasherOptions {
+export interface DoubleSubmitCsrfTokenOptions extends CookieOptions {
 
     /** Name of cookie.  Defaults to "CSRFTOKEN" */
     cookieName? : string,
@@ -45,8 +48,8 @@ export interface DoubleSubmitCsrfTokenOptions extends CookieOptions, HasherOptio
     /** Name of header.  Defaults to X-CROSSAUTH-CSRF */
     headerName? : string,
 
-    /** Length of unsigned part of csrf token in bytes.  It is base64-url encoded so will be longer in practice.  Default 16 */
-    length? : number,
+    /** The app secret used to sign the cookie */
+    secret? : string;
 }
 
 /**
@@ -55,8 +58,6 @@ export interface DoubleSubmitCsrfTokenOptions extends CookieOptions, HasherOptio
  * CSRF token is send as a cookie plus either a header or a hidden form field.
  */
 export class DoubleSubmitCsrfToken {
-
-    private length : number = 16;
 
     // header settings
     /** name of the CRSF HTTP header */
@@ -68,14 +69,10 @@ export class DoubleSubmitCsrfToken {
     private domain : string | undefined = undefined;
     private httpOnly : boolean = false;
     private path : string = "/";
-    private secure : boolean = false;
+    private secure : boolean = true;
     private sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
 
     // hasher settings
-    private saltLength : number = 32;
-    private iterations = 10000;
-    private keyLength = 16;
-    private digest = 'sha512';
     private secret : string = "";
 
     /**
@@ -85,8 +82,6 @@ export class DoubleSubmitCsrfToken {
      *                expires and maxAge options are ignored (cookies are session-only).
      */
     constructor(options : DoubleSubmitCsrfTokenOptions = {}) {
-
-        setParameter("length", ParamType.String, this, options, "CSRF_LENGTH");
 
         // header options
         setParameter("headerName", ParamType.String, this, options, "CSRF_HEADER_NAME");
@@ -100,22 +95,8 @@ export class DoubleSubmitCsrfToken {
         setParameter("sameSite", ParamType.String, this, options, "CSRF_COOKIE_SAMESITE");
 
         // hasher options
-        setParameter("saltLength", ParamType.Number, this, options, "HASHER_SALT_LENGTH");
-        setParameter("iterations", ParamType.Number, this, options, "HASHER_ITERATIONS");
-        setParameter("keyLength", ParamType.Number, this, options, "HASHER_KEY_LENGTH");
-        setParameter("digest", ParamType.Number, this, options, "HASHER_DIGEST");
         setParameter("secret", ParamType.String, this, options, "SECRET", true);
         
-    }
-
-    private csrfTokenSignature(token : string) : string {
-        const hasher = new Hasher({
-            digest: this.digest,
-            iterations: this.iterations, 
-            keyLength: this.keyLength,
-            saltLength: this.saltLength,
-        });
-        return hasher.hash(this.secret, {salt: token, charset: "base64url", encode: false});
     }
 
     /**
@@ -126,13 +107,8 @@ export class DoubleSubmitCsrfToken {
      * @param uniqueUserId the user ID to store with the session key.
      * @returns the session key, date created and expiry.
      */
-    async createCsrfToken(sessionId : string) : Promise<string> {
-        const array = new Uint8Array(this.length);
-        crypto.getRandomValues(array);
-        let token = sessionId + "!" + Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
-        let signature = this.csrfTokenSignature(token);
-
-        return signature + "." + token;
+    createCsrfToken() : string {
+        return Hasher.randomValue(CSRF_LENGTH);
     }
 
     /**
@@ -144,6 +120,7 @@ export class DoubleSubmitCsrfToken {
      * @returns a {@link Cookie } object,
      */
     makeCsrfCookie(token : string) : Cookie {
+        const cookieValue = Hasher.sign({v: token}, this.secret)
         let options : CookieOptions = {}
         if (this.domain) {
             options.domain = this.domain;
@@ -160,9 +137,21 @@ export class DoubleSubmitCsrfToken {
         }
         return {
             name : this.cookieName,
-            value : token,
+            value : cookieValue,
             options: options
         }
+    }
+
+    makeCsrfFormOrHeaderToken(token : string) : string {
+        return this.maskCsrfToken(token);
+    }
+
+    unsignCookie(cookieValue : string) : string {
+        const parts = cookieValue.split(".");
+        if (parts.length != 2) {
+            throw new CrossauthError(ErrorCode.InvalidKey, "CSRF cookie is not in a valid form");
+        }
+        return Hasher.unsign(cookieValue, this.secret).v;
     }
 
     /**
@@ -171,8 +160,8 @@ export class DoubleSubmitCsrfToken {
      * @param token the session key to put in the cookie
      * @returns a string representation of the cookie and options.
      */
-    makeCsrfCookieString(token : string) : string {
-        let cookie = this.cookieName + "=" + token + "; SameSite=" + this.sameSite;
+    makeCsrfCookieString(cookieValue : string) : string {
+        let cookie = this.cookieName + "=" + cookieValue + "; SameSite=" + this.sameSite;
         if (this.domain) {
             cookie += "; " + this.domain;
         }
@@ -188,111 +177,70 @@ export class DoubleSubmitCsrfToken {
         return cookie;
     }
 
+    private maskCsrfToken(token : string) : string {
+        const mask = Hasher.randomValue(CSRF_LENGTH);
+        const maskedToken = Hasher.xor(token, mask);
+        return mask + "." + maskedToken;
+    }
+
+    private unmaskCsrfToken(maskAndToken : string) {
+        const parts = maskAndToken.split(".");
+        if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidKey, "CSRF token in header or form not in correct format");
+        const mask = parts[0];
+        const maskedToken = parts[1];
+        return Hasher.xor(maskedToken, mask);
+    }
+
     /**
-     * Validates the passed CSRF token.  The signature must match the payload, and the payload must match the additional value from the header or form
+     * Validates the passed CSRF token.  
+     * 
+     * To be valid:
+     *     * The signature in the cookie must match the token in the cookie
+     *     * The token in the cookie must matched the value in the form or header after unmasking
      * 
      * @param token the token (with signature) to validate.
      * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} of `InvalidKey`
      */
-    validateDoubleSubmitCsrfToken(token : string, sessionId : string, formOrHeaderValue: string|undefined) : void {
-        let parts = token.split(".");
-        if (parts.length != 2) {
-            // TODO: this should raise a security issue
-            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received");
-            throw new CrossauthError(ErrorCode.InvalidKey);
-        }
-        let signature = parts[0];
-        let message = parts[1];
-        if (message != formOrHeaderValue) {
-            // TODO: this should raise a security issue
-            CrossauthLogger.logger.debug("Mismatch between CSRF cookie " + message + " form/header " + formOrHeaderValue);
-            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - form/header value does not match.  Stack trace follows");
-            let error = new CrossauthError(ErrorCode.InvalidKey);
-            CrossauthLogger.logger.debug(error);
-            throw error;
-        }
-        if (this.csrfTokenSignature(message) != signature) {
-            // TODO: this should raise a security issue
-            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - signature does not match.  Stack trace follows");
-            let error = new CrossauthError(ErrorCode.InvalidKey);
-            CrossauthLogger.logger.debug(error);
-            throw error;
-        }
-        parts = message.split("!");
-        if (parts.length != 2) {
-            // TODO: this should raise a security issue
-            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received.  Stack trace follows");
-            let error = new CrossauthError(ErrorCode.InvalidKey);
-            CrossauthLogger.logger.debug(error);
-            throw error;
-        }
-        let sessionIdInToken = parts[0];
-        if (sessionIdInToken != sessionId) {
-            // not necessarily a security issue - session ID may have changed when user logged in
-            CrossauthLogger.logger.debug("Invalid CSRF token " + token + " received - session ID does not match.  Stack trace follows");
-            let error = new CrossauthError(ErrorCode.InvalidKey);
-            CrossauthLogger.logger.debug(error);
-            throw error;
+    validateDoubleSubmitCsrfToken(cookieValue : string, formOrHeaderValue: string)  {
+        // token in form or header contains mask and masked token.  Unmask to get token back
+        const formOrHeaderToken = this.unmaskCsrfToken(formOrHeaderValue);
 
+        // cookie contains unmasked token and signature.  Verify the signature
+        const cookieToken = Hasher.unsign(cookieValue, this.secret).v;
+
+        if (cookieToken != formOrHeaderToken) {
+            // TODO: this should raise a security issue
+            CrossauthLogger.logger.debug("Mismatch between CSRF cookie " + cookieValue + " form/header " + formOrHeaderValue);
+            CrossauthLogger.logger.warn("Invalid CSRF token " + cookieToken + " received - form/header value does not match");
+            throw new CrossauthError(ErrorCode.InvalidKey);
         }
 
     }
 
     /**
-     * Validates the passed CSRF token.  The signature must match the payload.  
+     * Validates the passed CSRF token.  
      * 
-     * Doesn't check it matches a double-submit value passed from the form or headers
+     * To be valid:
+     *     * The signature in the cookie must match the token in the cookie
+     *     * The token in the cookie must matched the value in the form or header after unmasking
      * 
      * @param token the token (with signature) to validate.
+     * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} of `InvalidKey`
      */
-    validateCsrfToken(token : string, sessionId : string,) : void {
-        let parts = token.split(".");
-        if (parts.length != 2) {
-            // TODO: this should raise a security issue
-            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received");
-            throw new CrossauthError(ErrorCode.InvalidKey);
-        }
-        let signature = parts[0];
-        let message = parts[1];
-        if (this.csrfTokenSignature(message) != signature) {
-            // TODO: this should raise a security issue
-            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received - signature does not match.  Stack trace follows");
-            let error = new CrossauthError(ErrorCode.InvalidKey);
-            CrossauthLogger.logger.debug(error);
-            throw error;
-        }
-        parts = message.split("!");
-        if (parts.length != 2) {
-            // TODO: this should raise a security issue
-            CrossauthLogger.logger.warn("Invalid CSRF token " + token + " received.  Stack trace follows");
-            let error = new CrossauthError(ErrorCode.InvalidKey);
-            CrossauthLogger.logger.debug(error);
-            throw error;
-        }
-        let sessionIdInToken = parts[0];
-        if (sessionIdInToken != sessionId) {
-            // not necessarily a security issue - session ID may have changed when user logged in
-            CrossauthLogger.logger.debug("Invalid CSRF token " + token + " received - session ID does not match.  Stack trace follows");
-            let error = new CrossauthError(ErrorCode.InvalidKey);
-            CrossauthLogger.logger.debug(error);
-            throw error;
-
-        }
-
+    validateCsrfCookie(cookieValue : string)  {
+        return Hasher.unsign(cookieValue, this.secret).v;
     }
-
 }
 
 /**
  * Options for double-submit csrf tokens
  */
-export interface SessionCookieOptions extends CookieOptions, HasherOptions, TokenEmailerOptions {
+export interface SessionCookieOptions extends CookieOptions, TokenEmailerOptions {
 
     /** Name of cookie.  Defaults to "CSRFTOKEN" */
     cookieName? : string,
-
-    /** Length of the session ID (before the optional hashing) in bytes.  It is base64-url encoded so will be longer in practice.  Default 16 */
-    length? : number;
 
     /** If true, session IDs are stored in hashed form in the key storage.  Default false. */
     hashSessionId? : boolean;
@@ -302,6 +250,9 @@ export interface SessionCookieOptions extends CookieOptions, HasherOptions, Toke
 
     /** If true, sessions cookies will be persisted between browser sessions.  Default true */
     persist? : boolean;
+
+    /** App secret  */
+    secret? : string;
 
     /** 
      * This will be called with the session key to filter sessions 
@@ -317,8 +268,6 @@ export class SessionCookie {
 
     private userStorage : UserStorage;
     private keyStorage : KeyStorage;
-    private length : number = 16;
-    private hashSessionId : boolean = false;
     readonly idleTimeout : number = 0;
     private persist : boolean = true;
     private filterFunction? : (sessionKey : Key) => boolean;
@@ -330,14 +279,10 @@ export class SessionCookie {
     private domain : string | undefined = undefined;
     private httpOnly : boolean = false;
     private path : string = "/";
-    private secure : boolean = false;
+    private secure : boolean = true;
     private sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
 
     // hasher settings
-    private saltLength : number = 16;
-    private iterations = 10000;
-    private keyLength = 16;
-    private digest = 'sha512';
     private secret : string = "";
 
     /**
@@ -353,8 +298,6 @@ export class SessionCookie {
         this.userStorage = userStorage;
         this.keyStorage = keyStorage;
 
-        setParameter("length", ParamType.String, this, options, "SESSION_KEY_LENGTH");
-        setParameter("hashSessionId", ParamType.String, this, options, "HASH_SESSION_ID");
         setParameter("idleTimeout", ParamType.Number, this, options, "SESSION_IDLE_TIMEOUT");
         setParameter("persist", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
         this.filterFunction = options.filterFunction;
@@ -369,10 +312,6 @@ export class SessionCookie {
         setParameter("sameSite", ParamType.String, this, options, "SESSION_COOKIE_SAMESITE");
 
         // hasher options
-        setParameter("saltLength", ParamType.Number, this, options, "HASHER_SALT_LENGTH");
-        setParameter("iterations", ParamType.Number, this, options, "HASHER_ITERATIONS");
-        setParameter("keyLength", ParamType.Number, this, options, "HASHER_KEY_LENGTH");
-        setParameter("digest", ParamType.Number, this, options, "HASHER_DIGEST");
         setParameter("secret", ParamType.String, this, options, "SECRET", true);
         
     }
@@ -389,13 +328,7 @@ export class SessionCookie {
     ///// Session IDs
 
     hashSessionKey(sessionKey : string) : string {
-        const hasher = new Hasher({
-            digest: this.digest,
-            iterations: this.iterations, 
-            keyLength: this.keyLength,
-            saltLength: this.saltLength,
-        });
-        return hasher.hash(this.secret, {encode: false, charset: "base64url", salt: sessionKey});
+        return Hasher.hash(sessionKey);
     }
 
     /**
@@ -409,59 +342,35 @@ export class SessionCookie {
      * @param userId the user ID to store with the session key.
      * @param existingSessionId if passed, this will be used instead of a random one.  The expiry will be renewed
      * @returns the session key, date created and expiry.
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `KeyExists` if maximum
+     *          attempts exceeded trying to create a unique session id
      */
-    async createSessionKey(userId : string | number | undefined, existingSessionId? : string) : Promise<Key> {
+    async createSessionKey(userId : string | number | undefined) : Promise<Key> {
         const maxTries = 10;
         let numTries = 0;
-        const keepSessionId =  existingSessionId != undefined;
-        while (true) {
-            let sessionKey;
-            let hashedSessionKey = "";
-            if (numTries == 0 && existingSessionId) {
-                sessionKey = existingSessionId;
-                hashedSessionKey = sessionKey;
-            } else {
-                const array = new Uint8Array(this.length);
-                crypto.getRandomValues(array);
-                sessionKey = Hasher.base64ToBase64Url(Buffer.from(array).toString('base64'));
-                hashedSessionKey = sessionKey;
-            }
-            if (this.hashSessionId) {
-                hashedSessionKey = this.hashSessionKey(sessionKey);
-            }    
-            const dateCreated = new Date();
-            let expires = this.expiry(dateCreated);
+        let sessionId = Hasher.randomValue(SESSIONID_LENGTH);
+        const dateCreated = new Date();
+        let expires = this.expiry(dateCreated);
+        let succeeded = false;
+        while (numTries < maxTries && !succeeded) {
+            const hashedSessionId = Hasher.hash(sessionId);
             try {
-                if (keepSessionId && numTries == 0) {
-                    // check the key exists.  If not, an error will be thrown
-                    let {key} = await this.getUserForSessionKey(hashedSessionKey);
-                    key.expiry = expires;
-                    if (this.idleTimeout > 0) {
-                        key.lastActive = new Date();
-                    }
-                    await this.updateSessionKey(key);
-                } else {
-                    // save the new session - if it exists, an error will be thrown
-                    let extraFields = {};
-                    if (this.idleTimeout > 0 && userId) {
-                        extraFields = {lastActivity: new Date()};
-                    }
-                    await this.keyStorage.saveKey(userId, hashedSessionKey, dateCreated, expires, undefined, extraFields);
+                // save the new session - if it exists, an error will be thrown
+                let extraFields = {};
+                if (this.idleTimeout > 0 && userId) {
+                    extraFields = {lastActivity: new Date()};
                 }
-                return {
-                    userId : userId,
-                    value : sessionKey,
-                    created : dateCreated,
-                    expires : expires
-                }
-                } catch (e) {
+                await this.keyStorage.saveKey(userId, hashedSessionId, dateCreated, expires, undefined, extraFields);
+                succeeded = true;
+            } catch (e) {
                 if (e instanceof CrossauthError) {
                     let ce = e as CrossauthError;
                     if (ce.code == ErrorCode.KeyExists || ce.code == ErrorCode.InvalidKey) {
                         numTries++;
+                        sessionId = Hasher.randomValue(SESSIONID_LENGTH);
                         if (numTries > maxTries) {
-                            CrossauthLogger.logger.debug(e);
-                            throw e;
+                            CrossauthLogger.logger.error("Max attempts exceeded trying to create session ID")
+                            throw new CrossauthError(ErrorCode.KeyExists)
                         }
                     } else {
                         CrossauthLogger.logger.debug(e);
@@ -471,7 +380,13 @@ export class SessionCookie {
                     CrossauthLogger.logger.debug(e);
                     throw e;
                 }
-            }    
+            }   
+        }
+        return {
+            userId : userId,
+            value : sessionId,
+            created : dateCreated,
+            expires : expires
         }
     }
 
@@ -484,7 +399,8 @@ export class SessionCookie {
      * @param persist if passed, overrides the persistSessionId setting
      * @returns a {@link Cookie } object,
      */
-    makeSessionCookie(sessionKey : Key, persist? : boolean) : Cookie {
+    makeCookie(sessionKey : Key, persist? : boolean) : Cookie {
+        let signedValue = Hasher.sign({v: sessionKey.value}, this.secret);
         let options : CookieOptions = {}
         if (persist == undefined) persist = this.persist;
         if (this.domain) {
@@ -505,7 +421,7 @@ export class SessionCookie {
         }
         return {
             name : this.cookieName,
-            value : sessionKey.value,
+            value : signedValue,
             options: options
         }
     }
@@ -516,28 +432,34 @@ export class SessionCookie {
      * @param sessionKey the session key to put in the cookie
      * @returns a string representation of the cookie and options.
      */
-    makeSessionCookieString(sessionKey : Key) : string {
-        let cookie = this.cookieName + "=" + sessionKey.value + "; SameSite=" + this.sameSite;
-        if (sessionKey.expires) {
-            cookie += "; " + new Date(sessionKey.expires).toUTCString();
+    makeCookieString(cookie : Cookie) : string {
+        let cookieString = cookie.name + "=" + cookie.value + "; SameSite=" + this.sameSite;
+        if (cookie.options.expires) {
+            cookieString += "; " + new Date(cookie.options.expires).toUTCString();
         }
         if (this.domain) {
-            cookie += "; " + this.domain;
+            cookieString += "; " + this.domain;
         }
         if (this.path) {
-            cookie += "; " + this.path;
+            cookieString += "; " + this.path;
         }
         if (this.httpOnly) {
-            cookie += "; httpOnly";
+            cookieString += "; httpOnly";
         }
         if (this.secure) {
-            cookie += "; secure";
+            cookieString += "; secure";
         }
-        return cookie;
+        return cookieString;
     }
     
     async updateSessionKey(sessionKey : Partial<Key>) : Promise<void> {
+        if (!sessionKey.value) throw new CrossauthError(ErrorCode.InvalidKey, "No session when updating activity");
+        sessionKey.value = Hasher.hash(sessionKey.value);
         this.keyStorage.updateKey(sessionKey);
+    }
+
+    private unsignCookie(cookieValue : string) {
+        return Hasher.unsign(cookieValue, this.secret).v;
     }
 
     /**
@@ -547,36 +469,13 @@ export class SessionCookie {
      * 
      * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
      * 
-     * @param sessionKey the session key to look up
-     * @returns a {@link User } object, with the password hash removed.
+     * @param cookieValue the value in the session cookie
+     * @returns a {@link index!User } object, with the password hash removed, and the {@link index!Key } with the unhashed
+     *          sessionId
      * @throws a {@link index!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
      */
-    async getUserForSessionKey(sessionKey: string) : Promise<{user: User|undefined, key : Key}> {
-        const now = Date.now();
-        if (this.hashSessionId) {
-            sessionKey = this.hashSessionKey(sessionKey);
-        }
-        const key = await this.keyStorage.getKey(sessionKey);
-        if (key.expires) {
-            if (now > key.expires.getTime()) {
-                let error = new CrossauthError(ErrorCode.Expired);
-                CrossauthLogger.logger.debug(error);
-                throw error;
-            }
-        }
-        if (key.userId && this.idleTimeout > 0 && key.lastActive 
-            && now > key.lastActive.getTime() + this.idleTimeout*1000) {
-                let error = new CrossauthError(ErrorCode.Expired);
-                CrossauthLogger.logger.debug(error);
-                throw error;
-        }
-        if (this.filterFunction) {
-            if (!this.filterFunction(key)) {
-                let error = new CrossauthError(ErrorCode.InvalidKey);
-                CrossauthLogger.logger.debug(error);
-                throw error;
-            }
-        }
+    async getUserForSessionKey(cookieValue: string) : Promise<{user: User|undefined, key : Key}> {
+        const key = await this.getSessionKey(cookieValue);
         if (key.userId) {
             let user = await this.userStorage.getUserById(key.userId);
             user = UserPasswordStorage.removePasswordHash(user);
@@ -593,15 +492,34 @@ export class SessionCookie {
      * 
      * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
      * 
-     * @param sessionId the session id to look up
-     * @returns a {@link Key } object.
-     * @throws a {@link index!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
+     * @param sessionKey the value in the session cookie
+     * @returns a {@link User } object, with the password hash removed.
+     * @throws a {@link index!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId`, `Expired` or `UserNotExist`.
      */
-    async getSessionKey(sessionId: string) : Promise<Key> {
-        if (this.hashSessionId) {
-            sessionId = this.hashSessionKey(sessionId);
+    async getSessionKey(cookieValue: string) : Promise<Key> {
+        const sessionId = this.unsignCookie(cookieValue);
+        const now = Date.now();
+        const hashedSessionId = Hasher.hash(sessionId);
+        const key = await this.keyStorage.getKey(hashedSessionId);
+        key.value = sessionId; // storage only has hashed version
+        if (key.expires) {
+            if (now > key.expires.getTime()) {
+                CrossauthLogger.logger.warn("Session key " + hashedSessionId + " in cookie expired in key storage");
+                throw new CrossauthError(ErrorCode.Expired);
+            }
         }
-        return await this.keyStorage.getKey(sessionId);
+        if (key.userId && this.idleTimeout > 0 && key.lastActive 
+            && now > key.lastActive.getTime() + this.idleTimeout*1000) {
+                CrossauthLogger.logger.warn("Idle time of session key " + hashedSessionId + " in cookie expired in key storage");
+                throw new CrossauthError(ErrorCode.Expired);
+        }
+        if (this.filterFunction) {
+            if (!this.filterFunction(key)) {
+                CrossauthLogger.logger.warn("Filter function on session key " + hashedSessionId + " in cookie failed");
+                throw new CrossauthError(ErrorCode.InvalidKey);
+            }
+        }
+        return key;
     }
 
     /**
@@ -610,7 +528,7 @@ export class SessionCookie {
      * @param except if defined, don't delete this key
      */
     async deleteAllForUser(userId : string | number, except: string|undefined) {
-        if (except && this.hashSessionId) {
+        if (except) {
             except = this.hashSessionKey(except);
         }
         await this.keyStorage.deleteAllForUser(userId, except);

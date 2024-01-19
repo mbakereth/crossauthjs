@@ -7,8 +7,8 @@ export var secretUserStorage : InMemoryUserStorage;
 
 // for all these tests, the database will have two users: bob and alice
 beforeAll(async () => {
-    userStorage = getTestUserStorage();
-    secretUserStorage = getTestUserStorage("ABCDEFGHIJKLMNOPQRSTUV");
+    userStorage = await getTestUserStorage();
+    secretUserStorage = await getTestUserStorage("ABCDEFGHIJKLMNOPQRSTUV");
 });
 
 test('HashedPasswordAuthenticator.authenticateUser', async () => {

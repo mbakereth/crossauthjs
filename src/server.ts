@@ -19,7 +19,7 @@ export { ExpressCookieAuthServer } from './server/expressserver';
 export type { ExpressCookieAuthServerOptions } from './server/expressserver';
 
 export { Hasher } from './server/hasher';
-export type { HasherOptions, PasswordHash } from './server/hasher';
+export type { PasswordHash } from './server/hasher';
 
 import type { User } from '..';
 

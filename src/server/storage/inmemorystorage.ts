@@ -168,6 +168,18 @@ export class InMemoryUserStorage extends UserPasswordStorage {
             }
         }
     }
+
+    async deleteUserByUsername(username: string): Promise<void> {
+        const normalizedUser = UserStorage.normalize(String(username));
+        if (normalizedUser in this.usersByUsername) {
+            const user = this.usersByUsername.newUser[normalizedUser];
+            delete this.usersByUsername[normalizedUser];
+            const normalizedEmail = UserStorage.normalize(String(user.email));
+            if (normalizedEmail in this.usersByEmail) {
+                delete this.usersByEmail[normalizedEmail];
+            }
+        }
+    }
 }
 
 /**
@@ -204,21 +216,21 @@ export class InMemoryKeyStorage extends KeyStorage {
     /**
      * Saves a session key in the session table.
      * 
-     * @param uniqueUserId user ID to store with the session key.  See {@link InMemoryUserStorage} for how this may differ from `username`.
+     * @param id user ID to store with the session key.  See {@link InMemoryUserStorage} for how this may differ from `username`.
      * @param key the session key to store.
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will also be stored in the key table row
      * @throws {@link index!CrossauthError } if the key could not be stored.
      */
-    async saveKey(uniqueUserId : string, 
+    async saveKey(id : string, 
                       key : string, dateCreated : Date, 
                       expires : Date | undefined, 
                       data? : string,
                       extraFields? : {[key : string]: any}) : Promise<void> {
         this.keys[key] = {
             value : key,
-            userId : uniqueUserId,
+            userId : id,
             created: dateCreated,
             expires: expires,
             data: data,
@@ -244,7 +256,9 @@ export class InMemoryKeyStorage extends KeyStorage {
      */
     async deleteAllForUser(userId : string | number, except : string|undefined = undefined) : Promise<void> {
        for (const key in this.keys) {
-            if (this.keys[key].userId == userId && (!except || key != except)) delete  this.keys[key];
+            if (this.keys[key].userId == userId && (!except || key != except)) {
+                delete  this.keys[key];
+            } 
        }
     }
 
