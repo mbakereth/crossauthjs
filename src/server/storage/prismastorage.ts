@@ -470,7 +470,7 @@ export class PrismaKeyStorage extends KeyStorage {
      * 
      * @param userId : user ID to delete keys for
      */
-    async deleteAllForUser(userId : string | number, except : string|undefined = undefined) : Promise<void> {
+    async deleteAllForUser(userId : string | number, prefix : string, except? : string) : Promise<void> {
         let error : CrossauthError;
         try {
             if (except) {
@@ -479,9 +479,8 @@ export class PrismaKeyStorage extends KeyStorage {
                     where: {
                         AND: [
                             { user_id: userId },
+                            { key: {startsWith: prefix} },
                             { key: { not: except } },
-                            { key: { not: {startsWith: 'e:'} } },
-                            { key: { not: {startsWith: 'p:'} } },
                         ]
                     }
                 });
@@ -492,8 +491,7 @@ export class PrismaKeyStorage extends KeyStorage {
                     where: {
                         AND: [
                             { user_id: userId },
-                            { key: { not: {startsWith: 'e:'} } },
-                            { key: { not: {startsWith: 'p:'} } },
+                            { key: {startsWith: prefix} } ,
                         ]
                     }
                 });

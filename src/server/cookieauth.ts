@@ -328,7 +328,7 @@ export class SessionCookie {
     ///// Session IDs
 
     hashSessionKey(sessionKey : string) : string {
-        return Hasher.hash(sessionKey);
+        return "s:" + Hasher.hash(sessionKey);
     }
 
     /**
@@ -353,7 +353,7 @@ export class SessionCookie {
         let expires = this.expiry(dateCreated);
         let succeeded = false;
         while (numTries < maxTries && !succeeded) {
-            const hashedSessionId = Hasher.hash(sessionId);
+            const hashedSessionId = this.hashSessionKey(sessionId);
             try {
                 // save the new session - if it exists, an error will be thrown
                 let extraFields = {};
@@ -454,7 +454,7 @@ export class SessionCookie {
     
     async updateSessionKey(sessionKey : Partial<Key>) : Promise<void> {
         if (!sessionKey.value) throw new CrossauthError(ErrorCode.InvalidKey, "No session when updating activity");
-        sessionKey.value = Hasher.hash(sessionKey.value);
+        sessionKey.value = this.hashSessionKey(sessionKey.value);
         this.keyStorage.updateKey(sessionKey);
     }
 
@@ -499,7 +499,7 @@ export class SessionCookie {
     async getSessionKey(cookieValue: string) : Promise<Key> {
         const sessionId = this.unsignCookie(cookieValue);
         const now = Date.now();
-        const hashedSessionId = Hasher.hash(sessionId);
+        const hashedSessionId = this.hashSessionKey(sessionId);
         const key = await this.keyStorage.getKey(hashedSessionId);
         key.value = sessionId; // storage only has hashed version
         if (key.expires) {
@@ -531,6 +531,6 @@ export class SessionCookie {
         if (except) {
             except = this.hashSessionKey(except);
         }
-        await this.keyStorage.deleteAllForUser(userId, except);
+        await this.keyStorage.deleteAllForUser(userId, "s:", except);
     }
 }

@@ -254,27 +254,15 @@ export class InMemoryKeyStorage extends KeyStorage {
      * 
      * @param userId : user ID to delete keys for
      */
-    async deleteAllForUser(userId : string | number, except : string|undefined = undefined) : Promise<void> {
+    async deleteAllForUser(userId : string | number, prefix: string, except : string|undefined = undefined) : Promise<void> {
        for (const key in this.keys) {
-            if (this.keys[key].userId == userId && (!except || key != except) && !(key.startsWith("p:") && !(key.startsWith("e:")))) {
+            if (this.keys[key].userId == userId && (!except || key != except) && key.startsWith(prefix)) {
                 delete  this.keys[key];
             } 
        }
     }
 
-    /**
-     * Deletes all keys from storage for the given user ID
-     * 
-     * @param userId : user ID to delete keys for
-     */
-    async deleteWithPrefix(userId : string | number, prefix : string) : Promise<void> {
-        for (const key in this.keys) {
-             if (this.keys[key].userId == userId && key.startsWith("p:")) {
-                 delete  this.keys[key];
-             } 
-        }
-     }
- 
+
     /**
      * If the given session key exist in the database, update it with the passed values.  If it doesn't
      * exist, throw a CreossauthError with InvalidKey.

@@ -1,7 +1,6 @@
 import type { User } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
-import { Hasher } from './hasher';
 import { UsernamePasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 import { TokenEmailer, TokenEmailerOptions } from './email.ts';
@@ -140,7 +139,7 @@ export class Backend {
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
         try {
-            this.keyStorage.deleteWithPrefix(user.id, "p:");
+            this.keyStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
             CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + username);
             CrossauthLogger.logger.debug(e);
@@ -184,7 +183,7 @@ export class Backend {
     async logout(sessionCookieValue : string) : Promise<void> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "logout called but sessions not enabled");
         const key = await this.session.getSessionKey(sessionCookieValue);
-        return await this.keyStorage.deleteKey(Hasher.hash(key.value));
+        return await this.keyStorage.deleteKey(this.session.hashSessionKey(key.value));
     }
 
     /**
@@ -500,7 +499,7 @@ export class Backend {
 
         // delete any password reset tokens
         try {
-            this.keyStorage.deleteWithPrefix(user.id, "p:");
+            this.keyStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
             CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + username);
             CrossauthLogger.logger.debug(e);
@@ -557,7 +556,7 @@ export class Backend {
 
         // delete all password reset tokens
         try {
-            this.keyStorage.deleteWithPrefix(user.id, "p:");
+            this.keyStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
             CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + user.username);
             CrossauthLogger.logger.debug(e);
