@@ -94,17 +94,6 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "emailverified.njk"
      */
     emailVerifiedPage? : string,
-
-    /** If true, a session ID will be created even when the user is not logged in.  This enabled 
-     * CSRF tokens to be sent and used even without a user being logged in.  Default true
-     */
-    anonymousSessions? : boolean,
-
-    /** If true, and anonymousSessions is also true, the anonymous session ID will be kept after 
-     * the user logs in.  Useful, for example, on web shops where a user can start creating a basked before
-     * logging in.  Default false
-     */
-    keepAnonymousSessionId? : boolean,
 }
 
 interface CsrfBodyType {
@@ -367,7 +356,6 @@ export class FastifyCookieAuthServer {
     private emailVerifiedPage : string = "emailverified.njk";
     private sessionManager : Backend;
     private anonymousSessions = true;
-    private keepAnonymousSessionId = false;
     private passwordValidator : (password : string) => string[] = defaultPasswordValidator;
     private userValidator : (user : User) => string[] = defaultUserValidator;
     private enableEmailVerification : boolean = true;
@@ -408,8 +396,6 @@ export class FastifyCookieAuthServer {
         setParameter("requestPasswordResetPage", ParamType.String, this, options, "REQUEST_PASSWORD_RESET_PAGE");
         setParameter("emailVerifiedPage", ParamType.String, this, options, "EMAIL_VERIFIED_PAGE");
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
-        setParameter("anonymousSessions", ParamType.Boolean, this, options, "ANONYMOUS_SESSIONS");
-        setParameter("keepAnonymousSessionId", ParamType.Boolean, this, options, "KEEP_ANONYMOUS_SESSION_ID");
         setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
 
         if (options.passwordValidator) this.passwordValidator = options.passwordValidator;
@@ -804,7 +790,7 @@ export class FastifyCookieAuthServer {
                     CrossauthLogger.logger.error("Reset password failure for token " + request.body.token);
                     CrossauthLogger.logger.debug(e);
                     return this.handleError(e, reply, (reply, error) => {
-                        return reply.view(this.changePasswordPage, {
+                        return reply.view(this.resetPasswordPage, {
                             error: error.message,
                             errors: error.messageArray, 
                             errorCode: ErrorCode[error.code], 
@@ -1024,7 +1010,7 @@ export class FastifyCookieAuthServer {
                         let ce = e as CrossauthError;
                         switch (ce.code) {
                             case ErrorCode.UserNotExist:
-                            case ErrorCode.PasswordNotMatch:
+                            case ErrorCode.PasswordInvalid:
                                 error = "Invalid username or password";
                                 code = ErrorCode.UsernameOrPasswordInvalid;
                                 break;
@@ -1071,6 +1057,7 @@ export class FastifyCookieAuthServer {
     private async login(request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user: User) => void) {
         if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+        if (request.user) return successFn(reply, request.user); // already logged in
         const username = request.body.username;
         const password = request.body.password;
         const persist = request.body.persist;
@@ -1078,10 +1065,9 @@ export class FastifyCookieAuthServer {
         const csrfCookieValue = this.getCsrfTokenFromCookie(request);
         await this.sessionManager.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
 
-        let sessionId = undefined;
         const oldSessionId = this.getSessionIdFromCookie(request);
 
-        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, sessionId, persist);
+        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, persist);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
@@ -1100,10 +1086,9 @@ export class FastifyCookieAuthServer {
     private async loginWithUser(user: User, request : FastifyRequest, reply : FastifyReply, 
         successFn : (res : FastifyReply, user: User) => void) {
         if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
-        let sessionId = undefined;
         const oldSessionId = this.getSessionIdFromCookie(request);
 
-        let { sessionCookie, csrfCookie } = await this.sessionManager.login("", "", sessionId, undefined, user);
+        let { sessionCookie, csrfCookie } = await this.sessionManager.login("", "", undefined, user);
         CrossauthLogger.logger.debug("Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug("Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options));
@@ -1327,13 +1312,15 @@ export class FastifyCookieAuthServer {
         let error = "Unknown error";
         let code = ErrorCode.UnknownError;
         let ce;
+        console.log(typeof e);
         if (e instanceof CrossauthError) {
+            console.log("Is crossautherror");
             ce = e as CrossauthError;
             code = ce.code;
             if (!passwordInvalidOk) {
                 switch (ce.code) {
                     case ErrorCode.UserNotExist:
-                    case ErrorCode.PasswordNotMatch:
+                    case ErrorCode.PasswordInvalid:
                         ce = new CrossauthError(ErrorCode.UsernameOrPasswordInvalid, "Invalid username or password");
                         break;
                     default:

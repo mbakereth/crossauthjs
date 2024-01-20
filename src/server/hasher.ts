@@ -68,7 +68,7 @@ export class Hasher {
         });
         if (newHash.length != hash.hashedPassword.length) {
             CrossauthLogger.logger.debug("Passwords different length " + newHash + " " + hash.hashedPassword);
-            throw new CrossauthError(ErrorCode.PasswordNotMatch);
+            throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
         return timingSafeEqual(Buffer.from(newHash), Buffer.from(hash.hashedPassword));
     }

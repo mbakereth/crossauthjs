@@ -7,15 +7,13 @@ export var userStorage : InMemoryUserStorage;
 
 // for all these tests, the database will have two users: bob and alice
 beforeAll(async () => {
-    userStorage = getTestUserStorage();
+    userStorage = await getTestUserStorage();
 });
 
 
 test('TokenEmailer.verifyEmailVerificationToken_activation', async () => {
     const sessionStorage = new InMemoryKeyStorage();
-    const secret = "ABCDEFGHIJKLMNOPQRSTUV";
     const emailer = new TokenEmailer(userStorage, sessionStorage, {
-        secret: secret,
         emailFrom: "crossauth@crossauth.com",
         smtpHost: "localhost",
         smtpPort: 1025,
@@ -24,7 +22,7 @@ test('TokenEmailer.verifyEmailVerificationToken_activation', async () => {
         siteUrl: "localhost",
     });
     let bob = await userStorage.getUserByUsername("bob");
-    let token = await emailer["createAndSaveEmailVerificationToken"](bob.id, bob.email);
+    let token = await emailer["createAndSaveEmailVerificationToken"](bob.id);
     let {userId, newEmail} = await emailer["verifyEmailVerificationToken"](token);
     expect(userId).toBe(bob.id);
     expect(newEmail).toBe('');
@@ -32,9 +30,7 @@ test('TokenEmailer.verifyEmailVerificationToken_activation', async () => {
 
 test('TokenEmailer.verifyEmailVerificationToken_emailchange', async () => {
     const sessionStorage = new InMemoryKeyStorage();
-    const secret = "ABCDEFGHIJKLMNOPQRSTUV";
     const emailer = new TokenEmailer(userStorage, sessionStorage, {
-        secret: secret,
         emailFrom: "crossauth@crossauth.com",
         smtpHost: "localhost",
         smtpPort: 1025,
@@ -43,7 +39,7 @@ test('TokenEmailer.verifyEmailVerificationToken_emailchange', async () => {
         siteUrl: "localhost",
     });
     let bob = await userStorage.getUserByUsername("bob");
-    let token = await emailer["createAndSaveEmailVerificationToken"](bob.id, bob.email, "newbob@bob.com");
+    let token = await emailer["createAndSaveEmailVerificationToken"](bob.id, "newbob@bob.com");
     let {userId, newEmail} = await emailer["verifyEmailVerificationToken"](token);
     expect(userId).toBe(bob.id);
     expect(newEmail).toBe("newbob@bob.com");
@@ -51,9 +47,7 @@ test('TokenEmailer.verifyEmailVerificationToken_emailchange', async () => {
 
 test('TokenEmailer.verifyPasswordResetToken', async () => {
     const sessionStorage = new InMemoryKeyStorage();
-    const secret = "ABCDEFGHIJKLMNOPQRSTUV";
     const emailer = new TokenEmailer(userStorage, sessionStorage, {
-        secret: secret,
         emailFrom: "crossauth@crossauth.com",
         smtpHost: "localhost",
         smtpPort: 1025,
@@ -62,6 +56,6 @@ test('TokenEmailer.verifyPasswordResetToken', async () => {
         siteUrl: "localhost",
     });
     let bob = await userStorage.getUserByUsername("bob");
-    let token = await emailer["createAndSavePasswordResetToken"](bob.id, bob.email, bob.passwordHash);
+    let token = await emailer["createAndSavePasswordResetToken"](bob.id);
     await emailer["verifyPasswordResetToken"](token);
 });

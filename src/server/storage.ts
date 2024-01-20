@@ -187,5 +187,13 @@ export abstract class KeyStorage {
      * @param userId : user ID to delete keys for
      */
     abstract deleteAllForUser(userId : string | number, except? : string) : Promise<void>;
+
+    /**
+     * Deletes all keys from storage for the given user ID that start with the given prefix
+     * 
+     * @param userId : user ID to delete keys for
+     */
+    abstract deleteWithPrefix(userId : string | number, prefix : string) : Promise<void>;
+
 }
 

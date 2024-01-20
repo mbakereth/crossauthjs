@@ -9,7 +9,17 @@
             <input type="hidden" name="next" value="{{ next }}"/>
             <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
             {% if error %}
-                <p class="error">{{ error }}</p>
+                <p class="error">
+                {% if errorCode == "UsernameOrPasswordInvalid"%}
+                    Invalid username or password
+                {% elif errorCode == "EmailNotVerified" %}
+                    Please verify your email before logging in
+                {% elif errorCode == "UserNotActive" %}
+                    This account has been deactivated
+                {% else %}
+                    {{ error }}
+                {% endif %}
+                </p>
             {% endif %}
             <p>
                 <label for="username">Username</label><br>

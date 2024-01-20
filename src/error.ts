@@ -7,7 +7,7 @@ export enum ErrorCode {
 	UserNotExist,
 
     /** Thrown when a password does not match, eg during login or signup */
-    PasswordNotMatch,
+    PasswordInvalid,
 
     /** Thrown when a a password reset is requested and the email does not exist */
     EmailNotExist,
@@ -97,7 +97,7 @@ export class CrossauthError extends Error {
         } else {
             if (code == ErrorCode.UserNotExist) {
                 _message = "Username does not exist";
-            } else if (code == ErrorCode.PasswordNotMatch) {
+            } else if (code == ErrorCode.PasswordInvalid) {
                 _message = "Password doesn't match"
             } else if (code == ErrorCode.UsernameOrPasswordInvalid) {
                 _message = "Username or password incorrect"

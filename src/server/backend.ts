@@ -129,8 +129,8 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, password : string, existingSessionId? : string, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
-        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+    async login(username : string, password : string, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
 
         if (!user) user = await this.authenticator.authenticateUser(username, password);
         const sessionKey = await this.session.createSessionKey(user.id);
@@ -139,6 +139,12 @@ export class Backend {
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+        try {
+            this.keyStorage.deleteWithPrefix(user.id, "p:");
+        } catch (e) {
+            CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + username);
+            CrossauthLogger.logger.debug(e);
+        }
         return {
             sessionCookie: sessionCookie,
             csrfCookie: csrfCookie,
@@ -394,7 +400,7 @@ export class Backend {
                     qrUrl = url;
             })
             .catch((err) => {
-                CrossauthLogger.logger.error(err);
+                CrossauthLogger.logger.debug(err);
                 throw new CrossauthError(ErrorCode.UnknownError, "Couldn't generate TOTP URL");
             });
 
@@ -491,6 +497,15 @@ export class Backend {
             id: user.id,
             passwordHash: await this.authenticator.createPasswordForStorage(newPassword),
         })
+
+        // delete any password reset tokens
+        try {
+            this.keyStorage.deleteWithPrefix(user.id, "p:");
+        } catch (e) {
+            CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + username);
+            CrossauthLogger.logger.debug(e);
+        }
+
         return user;
     }
 
@@ -538,7 +553,16 @@ export class Backend {
             id: user.id,
             passwordHash: await this.authenticator.createPasswordForStorage(newPassword),
         })
-        this.keyStorage.deleteKey(token);
+        //this.keyStorage.deleteKey(TokenEmailer.hashPasswordResetToken(token));
+
+        // delete all password reset tokens
+        try {
+            this.keyStorage.deleteWithPrefix(user.id, "p:");
+        } catch (e) {
+            CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + user.username);
+            CrossauthLogger.logger.debug(e);
+        }
+
         return user;
     }
 

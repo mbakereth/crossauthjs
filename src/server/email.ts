@@ -7,6 +7,8 @@ import { CrossauthLogger } from '../logger';
 import { setParameter, ParamType } from './utils';
 import { User } from '../interfaces';
 
+const TOKEN_LENGTH = 16; // in bytes, before base64url
+
 /**
  * Options for TokenEmailer.  
  * 
@@ -33,10 +35,8 @@ import { User } from '../interfaces';
  * @param smtpPassword password for authenticated SMTP.  Default is no authentication
  * @param passwordResetExpires token will expire after this number of seconds. Default 24 hours
  * @param verifyEmailExpires token will expire after this number of seconds.  Default 24 hours
- * @param tokenLength: number of bytes for generated tokens (will be longer as they are base64url encoded)
  */
 export interface TokenEmailerOptions {
-    secret?: string,
     siteUrl? : string,
     prefix? : string,
     views? : string;
@@ -54,13 +54,11 @@ export interface TokenEmailerOptions {
     smtpPassword? : string,
     verifyEmailExpires? : number,
     passwordResetExpires? : number,
-    tokenLength?: number,
 }
 
 export class TokenEmailer {
     private userStorage : UserStorage;
     private keyStorage : KeyStorage;
-    private secret : string = "";
     private views : string = "views";
     private siteUrl? : string;
     private prefix? : string = "/";
@@ -78,7 +76,6 @@ export class TokenEmailer {
     private smtpPassword? : string;
     private verifyEmailExpires : number = 60*60*24;
     private passwordResetExpires : number = 60*60*24;
-    private tokenLength : number = 16;
 
     static Activate = 0;
     static Change = 1;
@@ -96,7 +93,6 @@ export class TokenEmailer {
                 options : TokenEmailerOptions = {}) {
         this.userStorage = userStorage;
         this.keyStorage = keyStorage;
-        setParameter("secret", ParamType.String, this, options, "SECRET", true);
         setParameter("siteUrl", ParamType.String, this, options, "SITE_URL", true);
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("views", ParamType.String, this, options, "VIEWS");
@@ -114,7 +110,6 @@ export class TokenEmailer {
         setParameter("smtpUseTls", ParamType.Boolean, this, options, "SMTP_USE_TLS");
         setParameter("verifyEmailExpires", ParamType.Boolean, this, options, "VERIFY_EMAIL_EXPIRES");
         setParameter("passwordResetExpires", ParamType.String, this, options, "PASSWORD_RESET_EXPIRES");
-        setParameter("tokenLength", ParamType.Number, this, options, "EMAILED_TOKEN_LENGTH");
 
         nunjucks.configure(this.views, { autoescape: true });
 
@@ -132,49 +127,33 @@ export class TokenEmailer {
           });
     }
 
-    private hashTokenForStorage(token : string, salt? : string) : string {
-        const hasher = new Hasher({secret: this.secret, keyLength: this.tokenLength});
-        if (!salt) salt = hasher.randomSalt();
-        return salt + "!" + hasher.hash(token, {charset: "base64url", encode: false, salt: salt});
-
+    static hashEmailVerificationToken(token : string) : string {
+        return "e:" + Hasher.hash(token);
     }
 
-    private createEmailVerificationToken(userId : string | number, 
-                                         expiry : Date, email : string, 
-                                         newEmail : string = "", 
-                                         salt?: string) : {key:string, salt:string} {
-        email = UserStorage.normalize(email);
-        const message = userId + ":" + expiry.toString() + ":" + email + ":" + newEmail;
-        const hasher = new Hasher({secret: this.secret, keyLength: this.tokenLength});
-        if (!salt) salt = hasher.randomSalt();
-        return {salt, key:hasher.hash(message, {charset: "base64url", encode: false, salt: salt})};
+    static hashPasswordResetToken(token : string) : string {
+        return "p:" + Hasher.hash(token);
     }
 
     private async createAndSaveEmailVerificationToken(userId : string | number, 
-                                                      email : string,
                                                       newEmail : string="") : Promise<string> {
         const maxTries = 10;
         let tryNum = 0;
         const now = new Date();
         const expiry = new Date(now.getTime() + 1000*this.verifyEmailExpires);
-        let hash : string;
-        let token : string = "";
-        while (true) {
-            let {key, salt} = this.createEmailVerificationToken(userId, expiry, email, newEmail);
-            token = salt + "!" + key;
-            hash = this.hashTokenForStorage(key, salt);
+        while (tryNum < maxTries) {
+            let token = Hasher.randomValue(TOKEN_LENGTH);
+            let hash = TokenEmailer.hashEmailVerificationToken(token);
             try {
-                await this.keyStorage.getKey(hash);
-                tryNum++;
+                await this.keyStorage.saveKey(userId, hash, now, expiry, newEmail);
+                return token;
             } catch (e) {
-                break;
-            }
-            if (tryNum >= maxTries) {
-                throw new CrossauthError(ErrorCode.Connection, "failed creating a unique key");
+                token = Hasher.randomValue(TOKEN_LENGTH);
+                hash = TokenEmailer.hashEmailVerificationToken(token);
+                tryNum++;
             }
         }
-        await this.keyStorage.saveKey(userId, hash, now, expiry, newEmail);
-        return token;
+        throw new CrossauthError(ErrorCode.Connection, "failed creating a unique key");
     }
 
     /**
@@ -212,7 +191,7 @@ export class TokenEmailer {
             }
         }
         TokenEmailer.validateEmail(email);
-        const token = await this.createAndSaveEmailVerificationToken(userId, user.email, newEmail);
+        const token = await this.createAndSaveEmailVerificationToken(userId, newEmail);
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
         if (this.smtpPassword) auth.pass = this.smtpPassword;
@@ -251,62 +230,50 @@ export class TokenEmailer {
      */
     async verifyEmailVerificationToken(token : string) : Promise<{userId: string|number, newEmail: string}> {
 
-        const parts = token.split("!");
-        if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidHash);
-        const salt = parts[0];
-        const key = parts[1];
-        let hashedToken = this.hashTokenForStorage(key, salt);
-        let storedToken = await this.keyStorage.getKey(hashedToken);
-        let newEmail = "";
-        if (storedToken.data && storedToken.data != "") newEmail = storedToken.data;
-        if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
-        const user = await this.userStorage.getUserById(storedToken.userId, undefined, {skipEmailVerifiedCheck: true});
-        let email = user.email.toLowerCase();
-        if (email) {
-            TokenEmailer.validateEmail(email);
-        } else {
-            email = user.username.toLowerCase();
-            TokenEmailer.validateEmail(email);
+        const hash = TokenEmailer.hashEmailVerificationToken(token);
+        let storedToken = await this.keyStorage.getKey(hash);
+        try {
+            if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
+            const user = await this.userStorage.getUserById(storedToken.userId, undefined, {skipEmailVerifiedCheck: true});
+            let email = user.email.toLowerCase();
+            if (email) {
+                TokenEmailer.validateEmail(email);
+            } else {
+                email = user.username.toLowerCase();
+                TokenEmailer.validateEmail(email);
+            }
+            const now = new Date().getTime();
+            if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
+            await this.keyStorage.deleteKey(hash);
+            return {userId: storedToken.userId, newEmail: storedToken.data||''};
+        } finally {
+            try {
+                await this.keyStorage.deleteKey(hash);
+            } catch {
+                CrossauthLogger.logger.error("Couldn't delete email verification hash " + Hasher.hash(hash));
+            }
+
         }
-        const now = new Date().getTime();
-        if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
-        const {key: newHash} = this.createEmailVerificationToken(storedToken.userId, storedToken.expires, email, newEmail, salt);
-        if (newHash != key) throw new CrossauthError(ErrorCode.InvalidHash);
-        await this.keyStorage.deleteKey(hashedToken);
-        return {userId: storedToken.userId, newEmail: storedToken.data||''};
     }
 
-    private createPasswordResetToken(userId : string | number, expiry : Date, email: string, passwordHash : string, salt?:string) : {key:string, salt:string} {
-
-            const message = userId + ":" + expiry.toString() + ":" + email + ":" + passwordHash;
-            const hasher = new Hasher({secret: this.secret, keyLength: this.tokenLength});
-            if (!salt) salt = hasher.randomSalt();
-            return {salt, key:hasher.hash(message, {charset: "base64url", encode: false, salt: salt})};
-        }
-
-    private async createAndSavePasswordResetToken(userId : string | number, email: string, passwordHash : string) : Promise<string> {
+    private async createAndSavePasswordResetToken(userId : string | number) : Promise<string> {
         const maxTries = 10;
         let tryNum = 0;
-        let hash : string;
-        let token : string = "";
         const now = new Date();
         const expiry = new Date(now.getTime() + 1000*this.passwordResetExpires);
-        while (true) {
-            let {key, salt} = this.createPasswordResetToken(userId, expiry, email, passwordHash);
-            token = salt + "!" + key;
-            hash = this.hashTokenForStorage(key, salt);
+        while (tryNum < maxTries) {
+            let token = Hasher.randomValue(TOKEN_LENGTH);
+            let hash = TokenEmailer.hashPasswordResetToken(token);
             try {
-                await this.keyStorage.getKey(hash);
-                tryNum++;
+                await this.keyStorage.saveKey(userId, hash, now, expiry);
+                return token;
             } catch {
-                break;
-            }
-            if (tryNum >= maxTries) {
-                throw new CrossauthError(ErrorCode.Connection, "failed creating a unique key");
+                token = Hasher.randomValue(TOKEN_LENGTH);
+                hash = TokenEmailer.hashPasswordResetToken(token);
+                tryNum++;
             }
         }
-        await this.keyStorage.saveKey(userId, hash, now, expiry);
-        return token;
+        throw new CrossauthError(ErrorCode.Connection, "failed creating a unique key");
     }
 
     /**
@@ -323,25 +290,13 @@ export class TokenEmailer {
      * @param token the token to validate
      */
     async verifyPasswordResetToken(token : string) : Promise<User> {
-        const parts = token.split("!");
-        if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidHash);
-        const salt = parts[0];
-        const key = parts[1];
-        let storedToken = await this.keyStorage.getKey(this.hashTokenForStorage(key, salt));
+        const hash = TokenEmailer.hashPasswordResetToken(token);
+        let storedToken = await this.keyStorage.getKey(hash);
         if (!storedToken.userId) throw new CrossauthError(ErrorCode.InvalidKey);
         if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
         const user = await this.userStorage.getUserById(storedToken.userId);
-        let email = user.email.toLowerCase();
-        if (email) {
-            TokenEmailer.validateEmail(email);
-        } else {
-            email = user.username.toLowerCase();
-            TokenEmailer.validateEmail(email);
-        }
         const now = new Date().getTime();
         if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
-        const {key: newHash} = this.createPasswordResetToken(storedToken.userId, storedToken.expires, email, user.passwordHash, salt);
-        if (newHash != key) throw new CrossauthError(ErrorCode.InvalidHash);
         return user;
     }
 
@@ -366,7 +321,7 @@ export class TokenEmailer {
             email = user.username.toLowerCase();
             TokenEmailer.validateEmail(email);
         }
-        const token = await this.createAndSavePasswordResetToken(userId, email, user.passwordHash);
+        const token = await this.createAndSavePasswordResetToken(userId);
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
         if (this.smtpPassword) auth.pass = this.smtpPassword;

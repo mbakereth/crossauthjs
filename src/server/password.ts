@@ -77,7 +77,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
 
         if (!await Hasher.passwordsEqual(password, user.passwordHash, this.secret)) {
             CrossauthLogger.logger.debug("Invalid password " + password + " " + user.passwordHash);
-            throw new CrossauthError(ErrorCode.PasswordNotMatch);
+            throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
         delete user.passwordHash;
         return user;

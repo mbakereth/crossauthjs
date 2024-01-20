@@ -218,7 +218,7 @@ export class ExpressCookieAuthServer {
                     let ce = e as CrossauthError;
                     switch (ce.code) {
                         case ErrorCode.UserNotExist:
-                        case ErrorCode.PasswordNotMatch:
+                        case ErrorCode.PasswordInvalid:
                             error = "Invalid username or password";
                             break;
                         default:
@@ -252,7 +252,7 @@ export class ExpressCookieAuthServer {
                 code = ce.code;
                 switch (ce.code) {
                     case ErrorCode.UserNotExist:
-                    case ErrorCode.PasswordNotMatch:
+                    case ErrorCode.PasswordInvalid:
                         error = "Invalid username or password";
                         code = ErrorCode.UsernameOrPasswordInvalid;
                         break;
@@ -284,7 +284,7 @@ export class ExpressCookieAuthServer {
             code = ce.code;
             switch (ce.code) {
                 case ErrorCode.UserNotExist:
-                case ErrorCode.PasswordNotMatch:
+                case ErrorCode.PasswordInvalid:
                     error = "Invalid username or password";
                     code = ErrorCode.UsernameOrPasswordInvalid;
                     break;
