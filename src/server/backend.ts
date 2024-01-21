@@ -40,7 +40,14 @@ export interface BackendOptions extends TokenEmailerOptions {
 
     /** Whether to turn on 2FA.  Only Google Authenticator TOTP supported at present.  Default off */
     twoFactor? : "off" | "all" | "peruser";
+
+    /**
+     * Store for password reset and email vcerification tokens.  If not passed, the same store as
+     * for sessions is used.
+     */
+    emailTokenStorage? : KeyStorage,
 }
+
 /**
  * Class for managing sessions.
  */
@@ -89,7 +96,9 @@ export class Backend {
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
         if (this.enableEmailVerification || this.enablePasswordReset) {
-            this.tokenEmailer = new TokenEmailer(this.userStorage, this.keyStorage, options);
+            let keyStorage = this.keyStorage;
+            if (options.emailTokenStorage) keyStorage = options.emailTokenStorage;
+            this.tokenEmailer = new TokenEmailer(this.userStorage, keyStorage, options);
         }
     }
 
@@ -183,7 +192,7 @@ export class Backend {
     async logout(sessionCookieValue : string) : Promise<void> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "logout called but sessions not enabled");
         const key = await this.session.getSessionKey(sessionCookieValue);
-        return await this.keyStorage.deleteKey(this.session.hashSessionKey(key.value));
+        return await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(key.value));
     }
 
     /**

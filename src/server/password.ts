@@ -111,4 +111,24 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
         return this.createPasswordHash(password);
     }
 
+    /**
+     * A static version of the password hasher, provided for convenience
+     * @param password : unhashed password
+     * @param secret secret, if used when hashing passwords, or undefined if not
+     * @returns hashed password in the format used for user storage
+     */
+    async hashPassword(password : string, secret? : string) {
+        return await Hasher.passwordHash(password, {encode: true, secret: secret});
+    }
+
+    /**
+     * A static version of the password hasher, provided for convenience
+     * @param password : unhashed password
+     * @param passwordHash : hashed password
+     * @param secret secret, if used when hashing passwords, or undefined if not
+     * @returns true if match, false otherwise
+     */
+    async passwordMatchesHash(password : string, passwordHash : string, secret? : string) {
+        return await Hasher.passwordsEqual(password, passwordHash, secret);
+    }
 }

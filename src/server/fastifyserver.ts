@@ -42,6 +42,13 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `FormEnty` if the user doesn't confirm to local rules.  Doesn't validate passwords  */
     validateUser? : (user: User) => string[];
 
+    /** Called when a new user is going to be saved 
+     *  Add additional fields to your session storage here.  Return a map of keys to values.
+     *  ALternatively you can add fields in the create user form, preceded with `user_`.  If you
+     *  want to add fields which the user does not have control over, eg permissions, use this function.
+     */
+    addToUser? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
+
     /** Called when a new session token is going to be saved 
      *  Add additional fields to your session storage here.  Return a map of keys to values  */
     addToSession? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
@@ -368,6 +375,7 @@ export class FastifyCookieAuthServer {
     private anonymousSessions = true;
     private validatePassword : (password : string) => string[] = defaultPasswordValidator;
     private validateUser : (user : User) => string[] = defaultUserValidator;
+    private addToUser? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
     private addToSession? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
     private validateSession? : (session: Key, user: User|undefined, request : FastifyRequest) => void;
     private enableEmailVerification : boolean = true;
@@ -412,6 +420,7 @@ export class FastifyCookieAuthServer {
 
         if (options.validatePassword) this.validatePassword = options.validatePassword;
         if (options.validateUser) this.validateUser = options.validateUser;
+        if (options.addToUser) this.addToUser = options.addToUser;
         if (options.addToSession) this.addToSession = options.addToSession;
         if (options.validateSession) this.validateSession = options.validateSession;
 
@@ -1146,6 +1155,7 @@ export class FastifyCookieAuthServer {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
         if (this.twoFactor == "off" || (this.twoFactor == "peruser" && !twoFactor)) {
+            if (this.addToUser) extraFields = {...extraFields, ...this.addToUser(request)};
             await this.sessionManager.createUser(username, password, extraFields);
             if (!this.enableEmailVerification && this.enableSessions) {
                 return this.login(request, reply, successFn);
@@ -1157,6 +1167,7 @@ export class FastifyCookieAuthServer {
             }
             const sessionId = this.getSessionIdFromCookie(request);
             if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "Couldn't set up 2FA - please ensure cookies are enabled");
+            if (this.addToUser) extraFields = {...extraFields, ...this.addToUser(request)};
             let { qrUrl } = await this.sessionManager.createUserWith2FA(username, password, extraFields,
                 /*sessionId*/"");
             request.twofactor = {

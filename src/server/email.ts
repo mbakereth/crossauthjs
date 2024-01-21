@@ -37,22 +37,57 @@ const TOKEN_LENGTH = 16; // in bytes, before base64url
  * @param verifyEmailExpires token will expire after this number of seconds.  Default 24 hours
  */
 export interface TokenEmailerOptions {
+
+    /** The site url, used to create a link, eg "https://mysite.com:3000".  No default - required parameter */
     siteUrl? : string,
+
+    /** The prefix between the site url and the email verification/password reset link.  Default "/" */
     prefix? : string,
+
+    /** The directory containing views (by default, Nunjucks templates) */
     views? : string;
+
+    /** Template file containing page for producing the text version of the email verification email body */
     emailVerificationTextBody? : string,
+
+    /** Template file containing page for producing the HTML version of the email verification email body */
     emailVerificationHtmlBody? : string,
+
+    /** Subject for the the email verification email */
     emailVerificationSubject? : string,
+
+    /** Template file containing page for producing the text version of the password reset email body */
     passwordResetTextBody? : string,
+
+    /** Template file containing page for producing the HTML version of the password reset email body */
     passwordResetHtmlBody? : string,
+
+    /** Subject for the the password reset email */
     passwordResetSubject? : string,
+
+    /** Sender for emails */
     emailFrom? : string,
+
+    /** Hostname of the SMTP server.  No default - required parameter */
     smtpHost? : string,
+
+    /** Port the SMTP server is running on.  Default 25 */
+
     smtpPort? : number,
+
+    /** Whether or not TLS is used by the SMTP server.  Default false */
     smtpUseTls? : boolean,
+
+    /** Username for connecting to SMTP servger.  Default undefined */
     smtpUsername? : string,
+
+    /** Password for connecting to SMTP servger.  Default undefined */
     smtpPassword? : string,
+
+    /** Number of seconds befire email verification tokens should expire.  Default 1 day */
     verifyEmailExpires? : number,
+
+    /** Number of seconds befire password reset tokens should expire.  Default 1 day */
     passwordResetExpires? : number,
 }
 
