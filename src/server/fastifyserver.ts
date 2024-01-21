@@ -11,7 +11,7 @@ import { UsernamePasswordAuthenticator } from './password';
 import { Hasher } from './hasher';
 import { Backend, type BackendOptions } from './backend';
 import { CrossauthError, ErrorCode } from "..";
-import { User } from '../interfaces';
+import { User, Key } from '../interfaces';
 import { CrossauthLogger, j } from '..';
 import { setParameter, ParamType } from './utils';
 
@@ -41,6 +41,16 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
 
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `FormEnty` if the user doesn't confirm to local rules.  Doesn't validate passwords  */
     userValidator? : (user: User) => string[];
+
+    /** Called when a new session token is going to be saved 
+     *  Add additional fields to your session storage here.  Return a map of keys to values  */
+    addToSession? : (request : FastifyRequest) => {[key: string] : any};
+
+    /** Called after the session ID is validated.
+     * Use this to add additional checks based on the request.  
+     * Throw an exception if cecks fail
+     */
+    validateSession? : (session: Key, request : FastifyRequest) => void;
 
     /** Template file containing the login page (with without error messages).  
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "login.njk".
@@ -358,6 +368,8 @@ export class FastifyCookieAuthServer {
     private anonymousSessions = true;
     private passwordValidator : (password : string) => string[] = defaultPasswordValidator;
     private userValidator : (user : User) => string[] = defaultUserValidator;
+    private addToSession? : (request : FastifyRequest) => {[key: string] : any};
+    private validateSession? : (session: Key, request : FastifyRequest) => void;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
     private twoFactor :  "off" | "all" | "peruser" = "off";
@@ -400,6 +412,8 @@ export class FastifyCookieAuthServer {
 
         if (options.passwordValidator) this.passwordValidator = options.passwordValidator;
         if (options.userValidator) this.userValidator = options.userValidator;
+        if (options.addToSession) this.addToSession = options.addToSession;
+        if (options.validateSession) this.validateSession = options.validateSession;
 
         this.sessionManager = new Backend(userStorage, keyStorage, authenticator, 
             options);
@@ -1067,7 +1081,8 @@ export class FastifyCookieAuthServer {
 
         const oldSessionId = this.getSessionIdFromCookie(request);
 
-        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, persist);
+        let extraFields = this.addToSession ? this.addToSession(request) : {}
+        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, extraFields, persist);
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
@@ -1088,7 +1103,8 @@ export class FastifyCookieAuthServer {
         if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         const oldSessionId = this.getSessionIdFromCookie(request);
 
-        let { sessionCookie, csrfCookie } = await this.sessionManager.login("", "", undefined, user);
+        let extraFields = this.addToSession ? this.addToSession(request) : {}
+        let { sessionCookie, csrfCookie } = await this.sessionManager.login("", "", extraFields, undefined, user);
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user.username}));
@@ -1301,7 +1317,8 @@ export class FastifyCookieAuthServer {
 
     async createAnonymousSession(request : FastifyRequest, reply : FastifyReply) {
         CrossauthLogger.logger.debug(j({msg: "Creating session ID"}));
-        let { sessionCookie, csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createAnonymousSession();
+        let extraFields = this.addToSession ? this.addToSession(request) : {}
+        let { sessionCookie, csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createAnonymousSession(extraFields);
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         request.csrfToken = csrfFormOrHeaderValue;
         reply.setCookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);

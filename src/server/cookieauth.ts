@@ -343,7 +343,7 @@ export class SessionCookie {
      * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `KeyExists` if maximum
      *          attempts exceeded trying to create a unique session id
      */
-    async createSessionKey(userId : string | number | undefined) : Promise<Key> {
+    async createSessionKey(userId : string | number | undefined, extraFields: {[key: string] : any} = {}) : Promise<Key> {
         const maxTries = 10;
         let numTries = 0;
         let sessionId = Hasher.randomValue(SESSIONID_LENGTH);
@@ -354,9 +354,8 @@ export class SessionCookie {
             const hashedSessionId = this.hashSessionKey(sessionId);
             try {
                 // save the new session - if it exists, an error will be thrown
-                let extraFields = {};
                 if (this.idleTimeout > 0 && userId) {
-                    extraFields = {lastActivity: new Date()};
+                    extraFields = {...extraFields, lastActivity: new Date()};
                 }
                 await this.keyStorage.saveKey(userId, hashedSessionId, dateCreated, expires, undefined, extraFields);
                 succeeded = true;

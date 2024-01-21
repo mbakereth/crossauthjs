@@ -1,4 +1,4 @@
-import type { User } from '../interfaces.ts';
+import type { User, Key } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
 import { UsernamePasswordAuthenticator } from "./password";
@@ -128,11 +128,11 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, password : string, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
+    async login(username : string, password : string, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
 
         if (!user) user = await this.authenticator.authenticateUser(username, password);
-        const sessionKey = await this.session.createSessionKey(user.id);
+        const sessionKey = await this.session.createSessionKey(user.id, extraFields);
         //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
         let sessionCookie = this.session.makeCookie(sessionKey, persist);
         const csrfToken = this.csrfTokens.createCsrfToken();
@@ -159,11 +159,11 @@ export class Backend {
      * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
      *          each of these was newly created and the user, which may be undefined.
      */
-    async createAnonymousSession() 
+    async createAnonymousSession(extraFields: {[key: string]: any} = {}) 
     : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string}> {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
 
-        const key = await this.session.createSessionKey(undefined);
+        const key = await this.session.createSessionKey(undefined, extraFields);
         const sessionCookie = this.session.makeCookie(key, false);
         let { csrfCookie, csrfFormOrHeaderValue } = await this.createCsrfToken();
         return {
@@ -208,32 +208,10 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
-    async userForSessionCookieValue(sessionCookieValue : string) : Promise<User|undefined> {
+    async userForSessionCookieValue(sessionCookieValue : string) : Promise<{key: Key, user: User|undefined}> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
-        let error : CrossauthError | undefined;
-        try {
-            let {user} = await this.session.getUserForSessionKey(sessionCookieValue);
-            return user;
-        } catch (e) {
-            if (e instanceof CrossauthError) {
-                let ce = e as CrossauthError;
-                switch (ce.code) {
-                    case ErrorCode.Expired:
-                        return undefined;
-                        break;
-                    default:
-                        error = ce;
-                }
-            }
-            else {
-                CrossauthLogger.logger.error({err: e})
-            }
-            error = new CrossauthError(ErrorCode.UnknownError);
-        }
-        if (error) {
-            CrossauthLogger.logger.debug(j({err: error}));
-            throw error;
-        }
+        let {key, user} = await this.session.getUserForSessionKey(sessionCookieValue);
+        return {key, user};
     }
 
     /**
