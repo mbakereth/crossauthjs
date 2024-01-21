@@ -47,9 +47,9 @@ export interface BackendOptions extends TokenEmailerOptions {
 export class Backend {
     userStorage : UserStorage;
     keyStorage : KeyStorage;
-    private csrfTokens : DoubleSubmitCsrfToken;
+    private csrfTokens? : DoubleSubmitCsrfToken;
     private enableSessions : boolean = true;
-    private session : SessionCookie|undefined = undefined;
+    private session? : SessionCookie;
     private authenticator : UsernamePasswordAuthenticator;
 
     private appName : string = "Crossauth";
@@ -82,8 +82,8 @@ export class Backend {
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
         if (this.enableSessions) {
             this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
+            this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
         }
-        this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
 
 
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
@@ -129,7 +129,7 @@ export class Backend {
      *         `PasswordNotMatch`.
      */
     async login(username : string, password : string, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
 
         if (!user) user = await this.authenticator.authenticateUser(username, password);
         const sessionKey = await this.session.createSessionKey(user.id, extraFields);
@@ -258,6 +258,7 @@ export class Backend {
      * @returns a signed CSRF token
      */
     async createCsrfToken() : Promise<{csrfCookie : Cookie, csrfFormOrHeaderValue : string}> {
+        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
          this.csrfTokens.makeCsrfCookie(await this.csrfTokens.createCsrfToken());
          const csrfToken = this.csrfTokens.createCsrfToken();
          const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
@@ -274,6 +275,7 @@ export class Backend {
      * @returns a signed CSRF token
      */
     async createCsrfFormOrHeaderValue(csrfCookieValue : string) : Promise<string> {
+        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
         const csrfToken = this.csrfTokens.unsignCookie(csrfCookieValue);
         return this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
     }
@@ -296,6 +298,7 @@ export class Backend {
      * @param token 
      */
     validateDoubleSubmitCsrfToken(csrfCookieValue : string|undefined, csrfFormOrHeaderValue : string|undefined) {
+        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
         if (!csrfCookieValue || !csrfFormOrHeaderValue) throw new CrossauthError(ErrorCode.InvalidKey, "CSRF missing from either cookie or form/header value");
         this.csrfTokens.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
     }
@@ -306,6 +309,7 @@ export class Backend {
      * @param token 
      */
     validateCsrfCookie(csrfCookieValue : string) {
+        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
         this.csrfTokens.validateCsrfCookie(csrfCookieValue);
     }
 

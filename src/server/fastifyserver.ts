@@ -454,6 +454,8 @@ export class FastifyCookieAuthServer {
         // and user in the request object.
         this.app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
 
+            if (!this.enableSessions) return;
+
             // check if CSRF token is in cookie (and signature is valid)
             CrossauthLogger.logger.debug(j({msg: "Getting csrf cookie"}));
             let cookieValue : string|undefined;
@@ -501,22 +503,19 @@ export class FastifyCookieAuthServer {
 
             // get existing session cookie (unvalidated)
             request.user = undefined;
-            if (this.enableSessions) {
-                const sessionCookieValue = this.getSessionIdFromCookie(request);
-                CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
-                if (sessionCookieValue) {
-                    try {
-                        let {key, user} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
-                        if (this.validateSession) this.validateSession(key, user, request);
-                        request.user = user;
-                        CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
-                    } catch (e) {
-                        CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(request)}));
-                        reply.clearCookie(this.sessionManager.sessionCookieName);
-                    }
+            const sessionCookieValue = this.getSessionIdFromCookie(request);
+            CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
+            if (sessionCookieValue) {
+                try {
+                    let {key, user} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
+                    if (this.validateSession) this.validateSession(key, user, request);
+                    request.user = user;
+                    CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
+                } catch (e) {
+                    CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(request)}));
+                    reply.clearCookie(this.sessionManager.sessionCookieName);
                 }
             }
-
         });
           
         if (this.endpoints.includes("login")) {
