@@ -1,10 +1,10 @@
 import express, { Express, Request, Response } from "express";
 import nunjucks from "nunjucks";
-import { Backend } from './backend';
-import { CrossauthError, ErrorCode } from "..";
+import { Backend } from '../backend';
+import { CrossauthError, ErrorCode } from "../..";
 import cookieParser from 'cookie-parser';
-import { User } from '../interfaces';
-import { CrossauthLogger, j } from '../logger';
+import { User } from '../../interfaces';
+import { CrossauthLogger, j } from '../../logger';
 
 /**
  * Options for {@link ExpressCookieAuthServer }.

@@ -10,11 +10,11 @@
             <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
             {% if error %}
                 <p class="error">
-                {% if errorCode == "UsernameOrPasswordInvalid"%}
+                {% if codeName == "UsernameOrPasswordInvalid"%}
                     Invalid username or password
-                {% elif errorCode == "EmailNotVerified" %}
+                {% elif codeName == "EmailNotVerified" %}
                     Please verify your email before logging in
-                {% elif errorCode == "UserNotActive" %}
+                {% elif codeName == "UserNotActive" %}
                     This account has been deactivated
                 {% else %}
                     {{ error }}

@@ -12,11 +12,11 @@ export { PrismaUserStorage, PrismaKeyStorage } from './server/storage/prismastor
 export type { PrismaUserStorageOptions, PrismaKeyStorageOptions as PrismaSessionStorageOptions } from './server/storage/prismastorage';
 export { InMemoryUserStorage, InMemoryKeyStorage as InMemorySessionStorage } from './server/storage/inmemorystorage';
 
-export { FastifyCookieAuthServer } from './server/fastifyserver';
-export type { FastifyCookieAuthServerOptions  } from './server/fastifyserver';
+export { FastifyCookieAuthServer } from './server/middleware/fastifyserver';
+export type { FastifyCookieAuthServerOptions  } from './server/middleware/fastifyserver';
 
-export { ExpressCookieAuthServer } from './server/expressserver';
-export type { ExpressCookieAuthServerOptions } from './server/expressserver';
+export { ExpressCookieAuthServer } from './server/middleware/expressserver';
+export type { ExpressCookieAuthServerOptions } from './server/middleware/expressserver';
 
 export { Hasher } from './server/hasher';
 export type { PasswordHash } from './server/hasher';

@@ -73,6 +73,9 @@ export enum ErrorCode {
  */
 export class CrossauthError extends Error {
 
+    /** The best HTTP status to report */
+    readonly httpStatus: number;
+
     /** All Crossauth errors have an error code */
     readonly code : ErrorCode;
 
@@ -93,6 +96,7 @@ export class CrossauthError extends Error {
      */
     constructor(code : ErrorCode, message : string | string[] | undefined = undefined) {
         let _message : string;
+        let _httpStatus = 500;
         if (message != undefined && !Array.isArray(message)) {
             _message = message;
         } else if (Array.isArray(message)) {
@@ -100,40 +104,53 @@ export class CrossauthError extends Error {
         } else {
             if (code == ErrorCode.UserNotExist) {
                 _message = "Username does not exist";
+                _httpStatus = 401;
             } else if (code == ErrorCode.PasswordInvalid) {
                 _message = "Password doesn't match"
+                _httpStatus = 401;
             } else if (code == ErrorCode.UsernameOrPasswordInvalid) {
                 _message = "Username or password incorrect"
+                _httpStatus = 401;
             } else if (code == ErrorCode.EmailNotExist) {
                 _message = "No user exists with that email address"
+                _httpStatus = 401;
             } else if (code == ErrorCode.UserNotActive) {
                 _message = "Account is not active"
+                _httpStatus = 403;
             } else if (code == ErrorCode.EmailNotVerified) {
                 _message = "Email address has not been verified"
+                _httpStatus = 403;
             } else if (code == ErrorCode.Unauthorized) {
                 _message = "Not authorized"
+                _httpStatus = 401;
             } else if (code == ErrorCode.Connection) {
                 _message = "Connection failure";
             } else if (code == ErrorCode.Expired) {
                 _message = "Token has expired";
+                _httpStatus = 401;
             } else if (code == ErrorCode.InvalidHash) {
                 _message = "Hash is not in a valid format";
             } else if (code == ErrorCode.InvalidKey) {
                 _message = "Key is not valid";
+                _httpStatus = 401;
             } else if (code == ErrorCode.UnsupportedAlgorithm) {
                 _message = "Algorithm not supported";
             } else if (code == ErrorCode.KeyExists) {
                 _message = "Attempt to create a key that already exists";
             } else if (code == ErrorCode.PasswordResetNeeded) {
                 _message = "User must reset password";
+                _httpStatus = 403;
             } else if (code == ErrorCode.Configuration) {
                 _message = "There was an error in the configuration";
             } else if (code == ErrorCode.PasswordMatch) {
                 _message = "Passwords do not match";
+                _httpStatus = 400;
             } else if (code == ErrorCode.PasswordFormat) {
                 _message = "Password format was incorrect";
+                _httpStatus = 400;
             } else if (code == ErrorCode.UserExists) {
                 _message = "User already exists";
+                _httpStatus = 400;
             } else {
                 _message = "Unknown error";
             }    
@@ -141,6 +158,7 @@ export class CrossauthError extends Error {
         super(_message); 
         this.code = code;
         this.codeName = ErrorCode[code];
+        this.httpStatus = _httpStatus;
         this.name = 'CrossauthError';
         if (Array.isArray(message)) this.messages = message;
         else this.messages = [_message];

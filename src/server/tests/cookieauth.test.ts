@@ -20,7 +20,7 @@ test('SessionCookie.createSessionKey', async () => {
     const auth = new SessionCookie(userStorage, keyStorage,{secret: "ABCDEFGHIJKLMNOPQRSTUVWX", siteUrl: "http://locahost:3000"});
     const bob = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
-    let key = await keyStorage.getKey(Hasher.hash(value));
+    let key = await keyStorage.getKey(SessionCookie.hashSessionKey(value));
     expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
     expect(key.userId).toStrictEqual(bob.id);

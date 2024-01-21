@@ -10,12 +10,12 @@
         {% else %}
             {% if error %}
                 <p class="error">
-                {% if errorCode == "PasswordFormat" %}
+                {% if codeName == "PasswordFormat" %}
                     Password must be at leat 8 characters, contain at least one lowercase letter, one
                     uppercase letter and one digit.
-                {% elif errorCode == "PasswordMatch" %}
+                {% elif codeName == "PasswordMatch" %}
                     Passwords do not PasswordMatch
-                {% elif errorCode == "UserExists" %}
+                {% elif codeName == "UserExists" %}
                     Username or email already exists
                 {% else %}
                     {{ error }}

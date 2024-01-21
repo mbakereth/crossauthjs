@@ -57,7 +57,7 @@ test("InMemoryKeyStorage.deleteAllKeysForUser", async() => {
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await keyStorage.saveKey(bob.username, key1, now, expiry);
     await keyStorage.saveKey(bob.username, key2, now, expiry);
-    await keyStorage.deleteAllForUser(bob.id);
+    await keyStorage.deleteAllForUser(bob.id, "");
     await expect(async () => {await keyStorage.getKey(key1)}).rejects.toThrowError(CrossauthError);
     await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
 
@@ -73,7 +73,7 @@ test("InMemoryKeyStorage.deleteAllKeysForUserExcept", async() => {
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await keyStorage.saveKey(bob.username, key1, now, expiry);
     await keyStorage.saveKey(bob.username, key2, now, expiry);
-    await keyStorage.deleteAllForUser(bob.id, key1 );
+    await keyStorage.deleteAllForUser(bob.id, "", key1 );
     let bobkey2 = await keyStorage.getKey(key1);
     expect(bobkey2.userId).toBe(bob.id);
     await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
