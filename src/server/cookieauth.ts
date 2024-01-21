@@ -6,7 +6,7 @@ import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, UserPasswordStorage, KeyStorage } from './storage';
 import { type TokenEmailerOptions } from './email.ts';
 import { Hasher } from './hasher';
-import { CrossauthLogger } from '../logger.ts';
+import { CrossauthLogger, j } from '../logger.ts';
 import { setParameter, ParamType } from './utils.ts';
 
 const CSRF_LENGTH = 16;
@@ -210,9 +210,7 @@ export class DoubleSubmitCsrfToken {
         const cookieToken = Hasher.unsign(cookieValue, this.secret).v;
 
         if (cookieToken != formOrHeaderToken) {
-            // TODO: this should raise a security issue
-            CrossauthLogger.logger.debug("Mismatch between CSRF cookie " + cookieValue + " form/header " + formOrHeaderValue);
-            CrossauthLogger.logger.warn("Invalid CSRF token " + cookieToken + " received - form/header value does not match");
+            CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token received - form/header value does not match", csrfCookieHash: Hasher.hash(cookieValue)}));
             throw new CrossauthError(ErrorCode.InvalidKey);
         }
 
@@ -369,15 +367,15 @@ export class SessionCookie {
                         numTries++;
                         sessionId = Hasher.randomValue(SESSIONID_LENGTH);
                         if (numTries > maxTries) {
-                            CrossauthLogger.logger.error("Max attempts exceeded trying to create session ID")
+                            CrossauthLogger.logger.error(j({msg: "Max attempts exceeded trying to create session ID"}))
                             throw new CrossauthError(ErrorCode.KeyExists)
                         }
                     } else {
-                        CrossauthLogger.logger.debug(e);
+                        CrossauthLogger.logger.debug(j({err: e}));
                         throw e;
                     }
                 } else {
-                    CrossauthLogger.logger.debug(e);
+                    CrossauthLogger.logger.debug(j({err: e}));
                     throw e;
                 }
             }   
@@ -458,7 +456,7 @@ export class SessionCookie {
         this.keyStorage.updateKey(sessionKey);
     }
 
-    private unsignCookie(cookieValue : string) {
+    unsignCookie(cookieValue : string) : string {
         return Hasher.unsign(cookieValue, this.secret).v;
     }
 
@@ -504,18 +502,18 @@ export class SessionCookie {
         key.value = sessionId; // storage only has hashed version
         if (key.expires) {
             if (now > key.expires.getTime()) {
-                CrossauthLogger.logger.warn("Session key " + hashedSessionId + " in cookie expired in key storage");
+                CrossauthLogger.logger.warn(j({msg: "Session key in cookie expired in key storage", hashedSessionCookie: Hasher.hash(cookieValue)}));
                 throw new CrossauthError(ErrorCode.Expired);
             }
         }
         if (key.userId && this.idleTimeout > 0 && key.lastActive 
             && now > key.lastActive.getTime() + this.idleTimeout*1000) {
-                CrossauthLogger.logger.warn("Idle time of session key " + hashedSessionId + " in cookie expired in key storage");
+                CrossauthLogger.logger.warn(j({msg: "Session cookie with expired idle time received", hashedSessionCookie: Hasher.hash(cookieValue)}));
                 throw new CrossauthError(ErrorCode.Expired);
         }
         if (this.filterFunction) {
             if (!this.filterFunction(key)) {
-                CrossauthLogger.logger.warn("Filter function on session key " + hashedSessionId + " in cookie failed");
+                CrossauthLogger.logger.warn(j({msg: "Filter function on session key in cookie failed", hashedSessionCookie: Hasher.hash(cookieValue)}));
                 throw new CrossauthError(ErrorCode.InvalidKey);
             }
         }

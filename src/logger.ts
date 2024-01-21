@@ -14,6 +14,7 @@ export interface CrossauthLoggerInterface {
  */
 export class CrossauthLogger {
 
+
     /** Don't log anything */
     static readonly None = 0;
 
@@ -55,7 +56,11 @@ export class CrossauthLogger {
 
     private log(level: 0 | 1 | 2 | 3 | 4 , output: any) {
         if (level <= this.level) {
-            console.log("Crossauth " + CrossauthLogger.levelName[level] + " " + new Date().toISOString(), output);
+            if (typeof output == "string") {
+                console.log("Crossauth " + CrossauthLogger.levelName[level] + " " + new Date().toISOString(), output);
+            } else {
+                console.log(JSON.stringify({level: CrossauthLogger.levelName[level], time: new Date().toISOString(), ...output}));
+            }
         }
     }
 
@@ -79,13 +84,31 @@ export class CrossauthLogger {
         this.log(CrossauthLogger.Debug, output);
     }
 
-    static setLogger(logger : CrossauthLoggerInterface) {
+    /** 
+     * Override the default logger.
+     * 
+     * The only requirement is that the logger has the functions `error()`, `warn()`, `info()` and `debug()`.
+     * These functions must accept either an object or a string.  If they can only accept a string,
+     * set `acceptsJson` to false.  
+     * 
+     * @param logger a new logger instance of any supported class
+     * @param acceptsJson set this to false if the logger can only take strings.
+     */
+    static setLogger(logger : CrossauthLoggerInterface, acceptsJson : boolean) {
         globalThis.crossauthLogger = logger;
+        globalThis.crossauthLoggerAcceptsJson = acceptsJson;
     }
+}
+
+export function j(arg : {[key: string]: any}|string) : string|{[key: string]: any} {
+    try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object") && arg.err && ("message" in arg.err) && !("msg" in arg)) arg["msg"] = arg.err.message;} catch {}
+    return (typeof arg == "string" || globalThis.crossauthLoggerAcceptsJson) ? arg : JSON.stringify(arg);
 }
 
 declare global {
     var crossauthLogger : CrossauthLoggerInterface;
+    var crossauthLoggerAcceptsJson : boolean;
 };
 
 globalThis.crossauthLogger = new CrossauthLogger(CrossauthLogger.None);
+globalThis.crossauthLoggerAcceptsJson = true;

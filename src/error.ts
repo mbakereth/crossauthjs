@@ -76,11 +76,14 @@ export class CrossauthError extends Error {
     /** All Crossauth errors have an error code */
     readonly code : ErrorCode;
 
+    /** All Crossauth errors have an error code */
+    readonly codeName : string;
+
     /** A vector of error messages.  If there was only one, it will still be in this array.
      * The inherited property `message` is also always available.  If there were multiple messages,
      * it will be a concatenation of them with `". "` in between.
      */
-    readonly messageArray : string[];
+    readonly messages : string[];
 
     /**
      * Creates a new error to throw,
@@ -137,9 +140,10 @@ export class CrossauthError extends Error {
         }
         super(_message); 
         this.code = code;
+        this.codeName = ErrorCode[code];
         this.name = 'CrossauthError';
-        if (Array.isArray(message)) this.messageArray = message;
-        else this.messageArray = [_message];
+        if (Array.isArray(message)) this.messages = message;
+        else this.messages = [_message];
     }
 
 }

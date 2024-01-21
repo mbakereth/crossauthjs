@@ -1,9 +1,10 @@
 import express, { Express, Request, Response } from "express";
 import nunjucks from "nunjucks";
-import { Backend } from './cookieauth';
-import { CrossauthError, ErrorCode, CrossauthLogger } from "..";
+import { Backend } from './backend';
+import { CrossauthError, ErrorCode } from "..";
 import cookieParser from 'cookie-parser';
 import { User } from '../interfaces';
+import { CrossauthLogger, j } from '../logger';
 
 /**
  * Options for {@link ExpressCookieAuthServer }.
@@ -148,7 +149,7 @@ export class ExpressCookieAuthServer {
             try {
                 await this.login(req, res, (res, _user) => {res.redirect(this.loginRedirect)});
             } catch (e) {
-                console.log(e);
+                CrossauthLogger.logger.error({err: e})
                 this.handleError(e, res, (res, code, error) => {
                     if (this.loginPage) {
                         res.render(this.loginPage, {error: error, code: code});
@@ -166,7 +167,7 @@ export class ExpressCookieAuthServer {
             try {
                 await this.logout(req, res, (res) => {res.redirect(this.logoutRedirect);});
             } catch (e) {
-                console.log(e);
+                CrossauthLogger.logger.error({err: e})
                 this.handleError(e, res, (res, code, error) => {
                     if (this.errorPage) {
                         res.render(this.errorPage, {error: error, code: code});
@@ -182,7 +183,7 @@ export class ExpressCookieAuthServer {
             try {
                 await this.login(req, res, (res, user) => {res.json({status: "ok", user : user});});
             } catch (e) {
-                console.log(e);
+                CrossauthLogger.logger.error({err: e})
                 this.handleError(e, res, (reply, code, error) => {
                     reply.json({status: "error", error: error, code: code});                    
                 });
@@ -195,7 +196,7 @@ export class ExpressCookieAuthServer {
             try {
                 await this.logout(req, res, (res) => {res.json({status: "ok"});});
             } catch (e) {
-                console.log(e);
+                CrossauthLogger.logger.error({err: e})
                 this.handleError(e, res, (res, code, error) => {
                     res.json({status: "error", error: error, code: code});                    
                 });
@@ -207,7 +208,7 @@ export class ExpressCookieAuthServer {
             let cookies = req.cookies;
             try {
                 if (!cookies || !(this.sessionManager.sessionCookieName in cookies)) {
-                    CrossauthLogger.logger.debug("User requested but no session ID cookie passed");
+                    CrossauthLogger.logger.debug(j({msg: "User requested but no session ID cookie passed"}));
                     throw new CrossauthError(ErrorCode.InvalidKey);
                 }
                 let user = await this.sessionManager.userForSessionKey(cookies[this.sessionManager.sessionCookieName]);
@@ -225,7 +226,7 @@ export class ExpressCookieAuthServer {
                             error = ce.message;
                     }
                 }
-                CrossauthLogger.logger.error(e);
+                CrossauthLogger.logger.error(j({err: e}));
                 res.json({status: "error", error : error});
 
             }
@@ -292,7 +293,7 @@ export class ExpressCookieAuthServer {
                     error = ce.message;
             }
         }
-        CrossauthLogger.logger.error(e);
+        CrossauthLogger.logger.error(j({err: e}));
 
         errorFn(res, code, error);
 
@@ -304,7 +305,7 @@ export class ExpressCookieAuthServer {
      */
     start(port : number = 3000) {
         this.app.listen(port, () =>
-            CrossauthLogger.logger.info(`Starting express server on port ${port} with prefix '${this.prefix}'`),
+            CrossauthLogger.logger.info(j({msg: `Starting express server on port ${port} with prefix '${this.prefix}'`})),
         );
 
     }

@@ -3,7 +3,7 @@ import nunjucks from "nunjucks";
 import { UserStorage, KeyStorage } from './storage';
 import { Hasher } from './hasher';
 import { CrossauthError, ErrorCode } from '../error';
-import { CrossauthLogger } from '../logger';
+import { CrossauthLogger, j } from '../logger';
 import { setParameter, ParamType } from './utils';
 import { User } from '../interfaces';
 
@@ -211,7 +211,7 @@ export class TokenEmailer {
         const transporter = this.createEmailer();
         const info = await transporter.sendMail(mail);
     
-        CrossauthLogger.logger.info("Sent email verification email " + info.messageId + " to " + email);
+        CrossauthLogger.logger.info(j({msg: "Sent email verification email", emailMessageId: info.messageId, email: email}));
         
     }
 
@@ -340,7 +340,7 @@ export class TokenEmailer {
         }
         const transporter = this.createEmailer();
           const info = await transporter.sendMail(mail);
-        CrossauthLogger.logger.info("Sent password reset email " + info.messageId + " to " + email);
+        CrossauthLogger.logger.info(j({msg: "Sent password reset email", emailMessageId: info.messageId, email: email}));
         
     }
 

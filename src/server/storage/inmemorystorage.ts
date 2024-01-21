@@ -1,7 +1,7 @@
 import { UserStorage, UserPasswordStorage, KeyStorage, UserStorageGetOptions } from '../storage';
 import { UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
-import { CrossauthLogger } from '../..';
+import { CrossauthLogger, j } from '../..';
 import type { User } from '../..';
 
 /**
@@ -91,17 +91,17 @@ export class InMemoryUserStorage extends UserPasswordStorage {
 
             const user = this.usersByUsername[normalizedUsername];
             if ('active' in user && user['active'] == false && this.checkActive) {
-                CrossauthLogger.logger.debug("User has active set to false");
+                CrossauthLogger.logger.debug(j({msg: "User has active set to false"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if (options?.skipEmailVerifiedCheck!=true && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
-                CrossauthLogger.logger.debug("User email not verified");
+                CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             return {...user};
         }
 
-        CrossauthLogger.logger.debug("User does not exist");
+        CrossauthLogger.logger.debug(j({msg: "User does not exist"}));
         throw new CrossauthError(ErrorCode.UserNotExist);
     }
 
@@ -120,17 +120,17 @@ export class InMemoryUserStorage extends UserPasswordStorage {
 
             const user = this.usersByUsername[normalizedEmail];
             if ('active' in user && user['active'] == false && this.checkActive) {
-                CrossauthLogger.logger.debug("User has active set to false");
+                CrossauthLogger.logger.debug(j({msg: "User has active set to false"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if (options?.skipEmailVerifiedCheck!=true && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
-                CrossauthLogger.logger.debug("User email not verified");
+                CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             return {...user};
         }
 
-        CrossauthLogger.logger.debug("User does not exist");
+        CrossauthLogger.logger.debug(j({msg: "User does not exist"}));
         throw new CrossauthError(ErrorCode.UserNotExist);
     }
 
@@ -207,9 +207,9 @@ export class InMemoryKeyStorage extends KeyStorage {
         if (this.keys && key in this.keys) {
             return this.keys[key];
         }
-        CrossauthLogger.logger.debug("Key does not exist in key storage.  Stack trace follows");
+        CrossauthLogger.logger.debug(j({msg: "Key does not exist in key storage"}));
         let err = new CrossauthError(ErrorCode.InvalidKey); 
-        CrossauthLogger.logger.debug(err.stack);
+        CrossauthLogger.logger.debug(j({err: err}));
         throw err;
     }
 

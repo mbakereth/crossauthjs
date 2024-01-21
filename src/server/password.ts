@@ -2,7 +2,7 @@ import type { User } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error';
 import { UserStorage } from './storage'
 import { Hasher } from './hasher';
-import { CrossauthLogger } from '../logger.ts';
+import { CrossauthLogger, j } from '../logger.ts';
 import { setParameter, ParamType } from './utils.ts';
 
 /** Optional parameters to pass to {@link UsernamePasswordAuthenticator} constructor. */
@@ -76,7 +76,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
         let user = await this.userStorage.getUserByUsername(username);
 
         if (!await Hasher.passwordsEqual(password, user.passwordHash, this.secret)) {
-            CrossauthLogger.logger.debug("Invalid password " + password + " " + user.passwordHash);
+            CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
         delete user.passwordHash;

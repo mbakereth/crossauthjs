@@ -4,7 +4,7 @@ import { UserStorage, KeyStorage } from './storage';
 import { UsernamePasswordAuthenticator } from "./password";
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 import { TokenEmailer, TokenEmailerOptions } from './email.ts';
-import { CrossauthLogger } from '../logger.ts';
+import { CrossauthLogger, j } from '../logger.ts';
 import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth';
 import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth';
 import { setParameter, ParamType } from './utils.ts';
@@ -141,8 +141,8 @@ export class Backend {
         try {
             this.keyStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
-            CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + username);
-            CrossauthLogger.logger.debug(e);
+            CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
+            CrossauthLogger.logger.debug(j({err: e}));
         }
         return {
             sessionCookie: sessionCookie,
@@ -226,12 +226,12 @@ export class Backend {
                 }
             }
             else {
-                console.log(e);
+                CrossauthLogger.logger.error({err: e})
             }
             error = new CrossauthError(ErrorCode.UnknownError);
         }
         if (error) {
-            CrossauthLogger.logger.debug(error);
+            CrossauthLogger.logger.debug(j({err: error}));
             throw error;
         }
     }
@@ -269,7 +269,7 @@ export class Backend {
             error = new CrossauthError(ErrorCode.UnknownError);
         }
         if (error) {
-            CrossauthLogger.logger.debug(error);
+            CrossauthLogger.logger.debug(j({err: error}));
             throw error;
         }
     }
@@ -300,7 +300,14 @@ export class Backend {
         return this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
     }
 
-    async userForSessionKey(sessionCookieValue : string) {
+    /**
+     * Returns the user for a session key if it is valid, or undefined if ther is none,
+     * 
+     * Thows an exception if the session id is not valid
+     * @param sessionCookieValue the value of the session id cookie
+     * @returns user or undefined
+     */
+    async userForSessionKey(sessionCookieValue : string) : Promise<User|undefined> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         return (await this.session.getUserForSessionKey(sessionCookieValue)).user;
     }
@@ -399,7 +406,7 @@ export class Backend {
                     qrUrl = url;
             })
             .catch((err) => {
-                CrossauthLogger.logger.debug(err);
+                CrossauthLogger.logger.debug(j({err: err}));
                 throw new CrossauthError(ErrorCode.UnknownError, "Couldn't generate TOTP URL");
             });
 
@@ -501,8 +508,8 @@ export class Backend {
         try {
             this.keyStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
-            CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + username);
-            CrossauthLogger.logger.debug(e);
+            CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
+            CrossauthLogger.logger.debug(j({err: e}));
         }
 
         return user;
@@ -558,8 +565,8 @@ export class Backend {
         try {
             this.keyStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
-            CrossauthLogger.logger.warn("Couldn't delete password reset tokens while logging in " + user.username);
-            CrossauthLogger.logger.debug(e);
+            CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: user.username}));
+            CrossauthLogger.logger.debug(j({err: e}));
         }
 
         return user;

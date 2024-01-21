@@ -2,7 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { UserStorage, UserPasswordStorage, KeyStorage, UserStorageGetOptions } from '../storage';
 import { User, UserWithPassword, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
-import { CrossauthLogger } from '../..';
+import { CrossauthLogger, j } from '../..';
 import { setParameter, ParamType } from '../utils';
 
 /**
@@ -131,19 +131,19 @@ export class PrismaUserStorage extends UserPasswordStorage {
 
         }
         if (error) {
-            CrossauthLogger.logger.error(error);
+            CrossauthLogger.logger.error(j({err: error}));
             throw error;
         }
         if (options?.skipActiveCheck!=true && this.checkActive && !prismaUser["active"]) {
-            CrossauthLogger.logger.debug("User has active set to false");
+            CrossauthLogger.logger.debug(j({msg: "User has active set to false"}));
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
         if (options?.skipEmailVerifiedCheck!=true && this.enableEmailVerification && !prismaUser["emailVerified"]) {
-            CrossauthLogger.logger.debug("User has not verified email");
+            CrossauthLogger.logger.debug(j({msg: "User has not verified email"}));
             throw new CrossauthError(ErrorCode.EmailNotVerified);
         }
         if (this.checkPasswordReset && !prismaUser["checkPasswordReset"]) {
-            CrossauthLogger.logger.debug("User must reset password");
+            CrossauthLogger.logger.debug(j({msg: "User must reset password"}));
             throw new CrossauthError(ErrorCode.PasswordResetNeeded);
         }
         let user : UserWithPassword = {
@@ -232,7 +232,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
                 data: data
             });
         } catch (e) {
-            CrossauthLogger.logger.error(e);
+            CrossauthLogger.logger.error(j({err: e}));
             error = new CrossauthError(ErrorCode.Connection, "Error updating user");
         }
         if (error) {
@@ -271,7 +271,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
             });
             id = user[this.idColumn];
         } catch (e) {
-            CrossauthLogger.logger.error(e);
+            CrossauthLogger.logger.error(j({err: e}));
             error = new CrossauthError(ErrorCode.Connection, "Error creating user");
             if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                 if (e.code === 'P2002') {
@@ -295,7 +295,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
         }
     });
     } catch (e) {
-        CrossauthLogger.logger.error(e);
+        CrossauthLogger.logger.error(j({err: e}));
         error = new CrossauthError(ErrorCode.Connection, "Error deleting key");
     } 
     if (error) throw error;
@@ -427,15 +427,15 @@ export class PrismaKeyStorage extends KeyStorage {
         } catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                 if (e.code == 'P2002') {
-                    CrossauthLogger.logger.debug("Attempt to create key that already exists. Stack trace follows");
-                    CrossauthLogger.logger.debug(e);
+                    CrossauthLogger.logger.debug(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+                    CrossauthLogger.logger.debug(j({err: e}));
                     error = new CrossauthError(ErrorCode.KeyExists);
                 } else {
-                    CrossauthLogger.logger.error(e);
+                    CrossauthLogger.logger.debug(j({err: e}));
                     error = new CrossauthError(ErrorCode.Connection, "Error saving key");
                 }
             } else {
-                CrossauthLogger.logger.error(e);
+                CrossauthLogger.logger.debug(j({err: e}));
                 error = new CrossauthError(ErrorCode.Connection, "Error saving key");
             }
         }
@@ -459,7 +459,7 @@ export class PrismaKeyStorage extends KeyStorage {
             }
         });
         } catch (e) {
-            CrossauthLogger.logger.error(e);
+            CrossauthLogger.logger.debug(j({err: e}));
             error = new CrossauthError(ErrorCode.Connection, "Error deleting key");
         } 
         if (error) throw error;
@@ -497,7 +497,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 });
             }
         } catch (e) {
-            CrossauthLogger.logger.error(e);
+            CrossauthLogger.logger.debug(j({err: e}));
             error = new CrossauthError(ErrorCode.Connection, "Error deleting key");
         } 
         if (error) throw error;
@@ -522,7 +522,7 @@ export class PrismaKeyStorage extends KeyStorage {
             });
 
         } catch (e) {
-            CrossauthLogger.logger.error(e);
+            CrossauthLogger.logger.debug(j({err: e}));
             error = new CrossauthError(ErrorCode.Connection, "Error deleting key");
         } 
         if (error) throw error;
@@ -559,7 +559,7 @@ export class PrismaKeyStorage extends KeyStorage {
             error = new CrossauthError(ErrorCode.Connection, String(e));
         }
         if (error) {
-            CrossauthLogger.logger.error(error);
+            CrossauthLogger.logger.debug(j({err: error}));
             throw error;
         }
     }

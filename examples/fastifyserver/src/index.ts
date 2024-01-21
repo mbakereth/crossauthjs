@@ -1,19 +1,17 @@
 import dotenv from "dotenv";
 dotenv.config();
 import { PrismaClient } from '@prisma/client';
-import { Backend, FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage, HashedPasswordAuthenticator } from 'crossauth/server';
-import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage, HashedPasswordAuthenticator } from 'crossauth/server';
+import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
-import type { FastifyCookieOptions } from '@fastify/cookie'
 import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { CrossauthLogger } from 'crossauth';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
 CrossauthLogger.logger.level = CrossauthLogger.Debug;
-//CrossauthLogger.setLogger(Pino.pino({level: "debug"}));  // replace default logger with Pino
+//CrossauthLogger.setLogger(Pino.pino({level: "debug"}), true);  // replace default logger with Pino
 
 const port = Number(process.env.PORT || 3000);
 const __filename = new URL('', import.meta.url).pathname;
