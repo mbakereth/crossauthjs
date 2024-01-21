@@ -37,20 +37,20 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
     logoutRedirect? : string;
 
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
-    passwordValidator? : (password: string) => string[];
+    validatePassword? : (password: string) => string[];
 
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `FormEnty` if the user doesn't confirm to local rules.  Doesn't validate passwords  */
-    userValidator? : (user: User) => string[];
+    validateUser? : (user: User) => string[];
 
     /** Called when a new session token is going to be saved 
      *  Add additional fields to your session storage here.  Return a map of keys to values  */
-    addToSession? : (request : FastifyRequest) => {[key: string] : any};
+    addToSession? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
 
     /** Called after the session ID is validated.
      * Use this to add additional checks based on the request.  
      * Throw an exception if cecks fail
      */
-    validateSession? : (session: Key, request : FastifyRequest) => void;
+    validateSession? : (session: Key, user: User|undefined, request : FastifyRequest) => void;
 
     /** Template file containing the login page (with without error messages).  
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "login.njk".
@@ -366,10 +366,10 @@ export class FastifyCookieAuthServer {
     private emailVerifiedPage : string = "emailverified.njk";
     private sessionManager : Backend;
     private anonymousSessions = true;
-    private passwordValidator : (password : string) => string[] = defaultPasswordValidator;
-    private userValidator : (user : User) => string[] = defaultUserValidator;
-    private addToSession? : (request : FastifyRequest) => {[key: string] : any};
-    private validateSession? : (session: Key, request : FastifyRequest) => void;
+    private validatePassword : (password : string) => string[] = defaultPasswordValidator;
+    private validateUser : (user : User) => string[] = defaultUserValidator;
+    private addToSession? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
+    private validateSession? : (session: Key, user: User|undefined, request : FastifyRequest) => void;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
     private twoFactor :  "off" | "all" | "peruser" = "off";
@@ -410,8 +410,8 @@ export class FastifyCookieAuthServer {
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
         setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
 
-        if (options.passwordValidator) this.passwordValidator = options.passwordValidator;
-        if (options.userValidator) this.userValidator = options.userValidator;
+        if (options.validatePassword) this.validatePassword = options.validatePassword;
+        if (options.validateUser) this.validateUser = options.validateUser;
         if (options.addToSession) this.addToSession = options.addToSession;
         if (options.validateSession) this.validateSession = options.validateSession;
 
@@ -468,7 +468,7 @@ export class FastifyCookieAuthServer {
             }
 
             if (["GET", "OPTIONS", "HEAD"].includes(request.method)) {
-            // for get methods, create a CSRF token in the request object and response header
+                // for get methods, create a CSRF token in the request object and response header
                 try {
                     if (!cookieValue) {
                         CrossauthLogger.logger.debug(j({msg: "Invalid CSRF cookie - recreating"}));
@@ -499,15 +499,16 @@ export class FastifyCookieAuthServer {
             }
 
 
-            let user : User|undefined;
-
-            // get existing cookies (unvalidated)
+            // get existing session cookie (unvalidated)
+            request.user = undefined;
             if (this.enableSessions) {
                 const sessionCookieValue = this.getSessionIdFromCookie(request);
                 CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
                 if (sessionCookieValue) {
                     try {
-                        user = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
+                        let {key, user} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
+                        if (this.validateSession) this.validateSession(key, user, request);
+                        request.user = user;
                         CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
                     } catch (e) {
                         CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(request)}));
@@ -516,7 +517,6 @@ export class FastifyCookieAuthServer {
                 }
             }
 
-            request.user = user;
         });
           
         if (this.endpoints.includes("login")) {
@@ -1127,7 +1127,7 @@ export class FastifyCookieAuthServer {
         const repeatPassword = request.body.repeatPassword;
         const next = request.body.next;
         const twoFactor = request.body.twoFactor == "on";
-        const extraFields : {[key:string] : string|number|boolean|Date|undefined}= {};
+        let extraFields : {[key:string] : string|number|boolean|Date|undefined}= {};
         for (let field in request.body) {
             let name = field.replace("user_", ""); 
             if (field.startsWith("user_")) extraFields[name] = request.body[field];
@@ -1137,8 +1137,8 @@ export class FastifyCookieAuthServer {
             username: username,
             ...extraFields,
         }
-        let passwordErrors = this.passwordValidator(password);
-        let userErrors = this.userValidator(userToValidate);
+        let passwordErrors = this.validatePassword(password);
+        let userErrors = this.validateUser(userToValidate);
         let errors = [...userErrors, ...passwordErrors];
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.FormEntry, errors);
@@ -1153,7 +1153,7 @@ export class FastifyCookieAuthServer {
             }
             return successFn(reply, undefined);
         } else {
-            if (/*!this.anonymousSessions*/ true) {
+            if (/*!this.anonymousSessions*/ false) {
                 throw new CrossauthError(ErrorCode.Configuration, "Anonymous sessions must be enabled for TOTP");
             }
             const sessionId = this.getSessionIdFromCookie(request);
@@ -1221,7 +1221,7 @@ export class FastifyCookieAuthServer {
         if (repeatPassword != undefined && repeatPassword != newPassword) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        let errors = this.passwordValidator(newPassword);
+        let errors = this.validatePassword(newPassword);
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
@@ -1283,7 +1283,7 @@ export class FastifyCookieAuthServer {
         if (repeatPassword != undefined && repeatPassword != newPassword) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        let errors = this.passwordValidator(newPassword);
+        let errors = this.validatePassword(newPassword);
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
