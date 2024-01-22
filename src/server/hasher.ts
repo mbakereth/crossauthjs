@@ -4,10 +4,10 @@ import { promisify } from 'node:util';
 import { CrossauthLogger, j } from '..';
 
 // the following comply with NIST and OWASP recommendations
-const PBKDF2_DIGEST = "sha256";
-const PBKDF2_ITERATIONS = 600_000;
-const PBKDF2_KEYLENGTH = 32; // in bytes, before base64
-const PBKDF2_SALTLENGTH = 16; // in bytes, before base64 
+const PBKDF2_DIGEST = process.env["PBKDF2_DIGEST"] || "sha256";
+const PBKDF2_ITERATIONS = Number(process.env["PBKDF2_ITERATIONS"] || 600_000);
+const PBKDF2_KEYLENGTH = Number(process.env["PBKDF2_KEYLENGTH"] || 32); // in bytes, before base64
+const PBKDF2_SALTLENGTH = Number(process.env["PBKDF2_KEYLENGTH"] || 16); // in bytes, before base64 
 
 const SIGN_DIGEST = "sha256";
 

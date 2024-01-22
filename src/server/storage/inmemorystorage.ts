@@ -172,7 +172,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
     async deleteUserByUsername(username: string): Promise<void> {
         const normalizedUser = UserStorage.normalize(String(username));
         if (normalizedUser in this.usersByUsername) {
-            const user = this.usersByUsername.newUser[normalizedUser];
+            const user = this.usersByUsername[normalizedUser];
             delete this.usersByUsername[normalizedUser];
             const normalizedEmail = UserStorage.normalize(String(user.email));
             if (normalizedEmail in this.usersByEmail) {

@@ -50,8 +50,19 @@ export class CrossauthLogger {
      * Create a logger with the given level
      * @param level the level to report to
      */
-    constructor(level: 0 | 1 | 2 | 3 | 4 = CrossauthLogger.Error) {
-        this.level = level;
+    constructor(level?: 0 | 1 | 2 | 3 | 4) {
+        if (level) this.level = level;
+        else if ("CROSSAUTH_LOG_LEVEL" in process.env) {
+            const levelName = (process.env["CROSSAUTH_LOG_LEVEL"]||"ERROR").toUpperCase();
+            if (CrossauthLogger.levelName.includes(levelName)) {
+                // @ts-ignore
+                this.level = CrossauthLogger.levelName.indexOf(levelName);
+            } else {
+                this.level = CrossauthLogger.Error
+            }
+        } else {
+            this.level = CrossauthLogger.Error;
+        }
     }
 
     private log(level: 0 | 1 | 2 | 3 | 4 , output: any) {
@@ -101,7 +112,12 @@ export class CrossauthLogger {
 }
 
 export function j(arg : {[key: string]: any}|string) : string|{[key: string]: any} {
+    let stack;
+    if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object")) {
+        stack = arg.err.stack;
+    }
     try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object") && arg.err && ("message" in arg.err) && !("msg" in arg)) arg["msg"] = arg.err.message;} catch {}
+    try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object")) arg.err = {...arg.err, stack: stack}; } catch {}
     return (typeof arg == "string" || globalThis.crossauthLoggerAcceptsJson) ? arg : JSON.stringify(arg);
 }
 
