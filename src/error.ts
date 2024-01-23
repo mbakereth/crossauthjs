@@ -25,6 +25,9 @@ export enum ErrorCode {
     /** Thrown when a resource expecting authorization was access and authorization not provided or wrong */
     Unauthorized,
 
+    /** Returned with an HTTP 403 response */
+    Forbidden,
+
     /** Thrown when a session or API key was provided that is not in the key table */
     InvalidKey,
 

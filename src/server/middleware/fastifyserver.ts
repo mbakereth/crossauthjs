@@ -740,11 +740,14 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'updateuser', ip: request.ip, user: request.user?.username}));
                 if (!request.user) return this.sendPageError(reply, 401);
                 try {
-                    await this.updateUser(request, reply, 
-                    (reply, _user, _emailVerificationRequired) => {
+                    return await this.updateUser(request, reply, 
+                    (reply, _user, emailVerificationRequired) => {
+                        const message = emailVerificationRequired 
+                            ? "Please click on the link in your email to verify your email address."
+                            : "Your details have been updated";
                         return reply.view(this.updateUserPage, {
                             csrfToken: request.csrfToken,
-                            message: "Please click on the link in your email to verify your email address."
+                            message: message,
                         });
                     });
                 } catch (e) {
@@ -782,13 +785,13 @@ export class FastifyCookieAuthServer {
                     + " a link to reset your password has been sent."; 
                     CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'requestpasswordreset', ip: request.ip}));
                     try {
-                    await this.requestPasswordReset(request, reply, 
-                    (reply, _user) => {
-                        return reply.view(this.requestPasswordResetPage, {
-                            csrfToken: request.csrfToken,
-                            message: message,
+                        return await this.requestPasswordReset(request, reply, 
+                        (reply, _user) => {
+                            return reply.view(this.requestPasswordResetPage, {
+                                csrfToken: request.csrfToken,
+                                message: message,
+                            });
                         });
-                    });
                 } catch (e) {
                     CrossauthLogger.logger.error(j({msg: "Request password reset faiulure user failure", email: request.body.email}));
                     CrossauthLogger.logger.debug(j({err: e}));
@@ -817,7 +820,7 @@ export class FastifyCookieAuthServer {
             this.app.get(this.prefix+'resetpassword/:token', async (request : FastifyRequest<{Params : VerifyTokenParamType}>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'logresetpasswordin', ip: request.ip}));
                 try {
-                    await this.sessionManager.userForPasswordResetToken(request.params.token);
+                    return await this.sessionManager.userForPasswordResetToken(request.params.token);
                 } catch (e) {
                     let code = ErrorCode.UnknownError;
                     let error = "Unknown error";
@@ -833,7 +836,7 @@ export class FastifyCookieAuthServer {
             this.app.post(this.prefix+'resetpassword', async (request : FastifyRequest<{ Body: ResetPasswordBodyType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'logresetpasswordin', ip: request.ip}));
                 try {
-                    await this.resetPassword(request, reply, 
+                    return await this.resetPassword(request, reply, 
                     (reply, _user) => {
                         return reply.view(this.resetPasswordPage, {
                             csrfToken: request.csrfToken,
@@ -861,7 +864,7 @@ export class FastifyCookieAuthServer {
             this.app.get(this.prefix+'verifyemail/:token', async (request : FastifyRequest<{Params: VerifyTokenParamType}>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'verifyemail', ip: request.ip}));
                 try {
-                    await this.verifyEmail(request, reply, 
+                    return await this.verifyEmail(request, reply, 
                     (reply, user) => {
                         if (!this.emailVerifiedPage)  {
                             CrossauthLogger.logger.error("verify email requested but emailVerifiedPage not defined");
@@ -889,7 +892,7 @@ export class FastifyCookieAuthServer {
             this.app.post(this.prefix+'logout', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'logout', ip: request.ip, user: request.user?.username}));
                 try {
-                    await this.logout(request, reply, 
+                    return await this.logout(request, reply, 
                     (reply) => {return reply.redirect(this.logoutRedirect)});
                 } catch (e) {
                     CrossauthLogger.logger.error(j({msg: "Logout failure", user: request.user?.username, codeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
@@ -909,7 +912,7 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/login', ip: request.ip}));
                 if (request.user) return reply.header('Content-Type', JSONHDR).send({ok: false, user : request.user}); // already logged in
                 try {
-                    await this.login(request, reply, 
+                    return await this.login(request, reply, 
                     (reply, user) => {return reply.header('Content-Type', JSONHDR).send({ok: true, user : user})});
                 } catch (e) {
                     CrossauthLogger.logger.error(j({msg: "Login failure", user: request.body.username, codeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
@@ -928,7 +931,7 @@ export class FastifyCookieAuthServer {
                 if (!request.user) return this.sendJsonError(reply, 401, "You are not authorized to access this url");
 
                 try {
-                    await this.logout(request, reply, 
+                    return await this.logout(request, reply, 
                     (reply) => {return reply.header('Content-Type', JSONHDR).send({ok: true})});
                 } catch (e) {
                     CrossauthLogger.logger.error(j({msg: "Logout failure", user: request.user?.username, codeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
@@ -945,7 +948,7 @@ export class FastifyCookieAuthServer {
             this.app.post(this.prefix+'api/signup', async (request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/signup', ip: request.ip, user: request.body.username}));
                 try {
-                    await this.signup(request, reply, 
+                    return await this.signup(request, reply, 
                     (reply, user) => {return reply.header('Content-Type', JSONHDR).send({
                         ok: true,
                         user : user,
@@ -967,7 +970,7 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/changepassword', ip: request.ip, user: request.user?.username}));
                 if (!request.user) return this.sendJsonError(reply, 401);
                 try {
-                    await this.changePassword(request, reply, 
+                    return await this.changePassword(request, reply, 
                     (reply, _user) => {return reply.header('Content-Type', JSONHDR).send({
                         ok: true,
                     })});
@@ -987,7 +990,7 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/updateuser', ip: request.ip, user: request.user?.username}));
                 if (!request.user) return this.sendJsonError(reply, 401);
                 try {
-                    await this.updateUser(request, reply, 
+                    return await this.updateUser(request, reply, 
                     (reply, _user, emailVerificationRequired) => {return reply.header('Content-Type', JSONHDR).send({
                         ok: true,
                         emailVerificationRequired: emailVerificationRequired,
@@ -1007,7 +1010,7 @@ export class FastifyCookieAuthServer {
             this.app.post(this.prefix+'api/resetpassword', async (request : FastifyRequest<{ Body: ResetPasswordBodyType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/resetpassword', ip: request.ip}));
                 try {
-                    await this.resetPassword(request, reply, 
+                    return await this.resetPassword(request, reply, 
                     (reply, _user) => {return reply.header('Content-Type', JSONHDR).send({
                         ok: true,
                     })});
@@ -1026,7 +1029,7 @@ export class FastifyCookieAuthServer {
             this.app.post(this.prefix+'api/requestpasswordreset', async (request : FastifyRequest<{ Body: RequestPasswordResetBodyType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/resetpasswordrequest', ip: request.ip}));
                 try {
-                    await this.requestPasswordReset(request, reply, 
+                    return await this.requestPasswordReset(request, reply, 
                     (reply, _user) => {return reply.header('Content-Type', JSONHDR).send({
                         ok: true,
                     })});
@@ -1045,7 +1048,7 @@ export class FastifyCookieAuthServer {
             this.app.get(this.prefix+'api/verifyemail/:token', async (request : FastifyRequest<{Params: VerifyTokenParamType}>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/verifyemail', ip: request.ip}));
                 try {
-                    await this.verifyEmail(request, reply, 
+                    return await this.verifyEmail(request, reply, 
                     (reply, user) => {return reply.header('Content-Type', JSONHDR).send({
                         ok: true, 
                         user : user,
@@ -1103,7 +1106,7 @@ export class FastifyCookieAuthServer {
                     if (!cookie) throw new CrossauthError(ErrorCode.InvalidKey);
                     const parts = cookie.split(".");
                     if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidKey);
-                     reply.header('Content-Type', JSONHDR).send({ok: true, csrfToken : parts[1]});
+                        return reply.header('Content-Type', JSONHDR).send({ok: true, csrfToken : parts[1]});
                 } catch (e) {
                     let error = "Unknown error";
                     let code = ErrorCode.UnknownError;
@@ -1326,7 +1329,7 @@ export class FastifyCookieAuthServer {
         const user = await this.sessionManager.applyEmailVerificationToken(token);
         delete user.passwordHash;
         delete user.totpSecret;
-        return this.loginWithUser(user, request, reply, successFn);
+        return await this.loginWithUser(user, request, reply, successFn);
     }
 
     private async resetPassword(request : FastifyRequest<{ Body: ResetPasswordBodyType }>, reply : FastifyReply, 
@@ -1511,9 +1514,13 @@ export class FastifyCookieAuthServer {
         }   
         if (!error) {
             if (status == 401) {
-                error = "You are not authorized to access this oage";
+                error = "You are not authorized to access this page";
+                code = ErrorCode.Unauthorized;
+                codeName = ErrorCode[code];
             } else if (status == 403) {
                 error = "You do not have permission to access this page";
+                code = ErrorCode.Forbidden;
+                codeName = ErrorCode[code];
             } else {
                 error = "An unknwon error has occurred"
             }

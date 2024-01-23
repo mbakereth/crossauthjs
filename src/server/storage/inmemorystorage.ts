@@ -272,7 +272,7 @@ export class InMemoryKeyStorage extends KeyStorage {
         if (key.value && key.value in this.keys) {
             let value : string = key.value||"";
             for (let field in key) {
-                this.keys[value] = key[field];
+                this.keys[value][field] = key[field];
             }
         }
     }
