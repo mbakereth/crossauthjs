@@ -475,7 +475,6 @@ test('FastifyServer.passwordReset', async () => {
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);
-    console.log(body)
     expect(body.args.message).toBeDefined();
     expect(body.args.codeName).toBeUndefined();
 
