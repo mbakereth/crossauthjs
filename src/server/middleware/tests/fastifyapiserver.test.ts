@@ -111,7 +111,7 @@ test('FastifyServer.api.login', async () => {
 
 test('FastifyServer.api.signupWithEmailVerification', async () => {
 
-    let {server} = await makeAppWithOptions({enableEmailVerification: true});
+    let {server} = await makeAppWithOptions({enableEmailVerification: true, passwordResetTextBody: "dummy"});
 
     // @ts-ignore
     server["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
@@ -153,3 +153,247 @@ test('FastifyServer.api.signupWithEmailVerification', async () => {
     body = JSON.parse(res.body)
     expect(body.ok).toBe(true);
 });
+
+test('FastifyServer.api.signupWithoutEmailVerification', async () => {
+
+    let {server} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    // Right page served 
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    // error page on password mismatch
+    res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        repeatPassword: "x",
+        user_email: "mary@mary.com", 
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(false);
+    
+    // successful signup
+    res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        repeatPassword: "maryPass123",
+        user_email: "mary@mary.com", 
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+    expect(body.emailVerificationNeeded).toBe(false);
+});
+
+test('FastifyServer.api.wrongCsrf', async () => {
+
+    let {server} = await makeAppWithOptions();
+    const csrfTokens = server["sessionManager"]["csrfTokens"];
+    let res;
+    let body;
+
+    const {csrfCookie} = await getCsrf(server);
+    const csrfToken = csrfTokens?.makeCsrfFormOrHeaderToken(Hasher.randomValue(16))
+
+    // Error on invalid token
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "abc", csrfToken: csrfToken} })
+    body = JSON.parse(res.body);
+    expect(body.codeName).toBe("InvalidKey");
+    expect(body.ok).toBe(false);
+    expect(res.statusCode).toBe(401);
+
+    // error on invalid cookie
+    const {csrfToken: csrfToken2} = await getCsrf(server);
+    const csrfCookie2 = csrfTokens?.makeCsrfCookie(Hasher.randomValue(16));
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie2?.value||""}, payload: {username: "bob", password: "abc", csrfToken: csrfToken2} })
+    body = JSON.parse(res.body);
+    expect(body.codeName).toBe("InvalidKey");
+    expect(body.ok).toBe(false);
+    expect(res.statusCode).toBe(401);
+});
+
+test('FastifyServer.api.wrongSession', async () => {
+
+    let {server, keyStorage} = await makeAppWithOptions();
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    // successful login
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "bobPass123", csrfToken: csrfToken} })
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    const sessionCookie = getSession(res);
+
+    // Right page served 
+    res = await server.app.inject({ method: "POST", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, url: "/api/userforsessionkey" , payload: {
+        csrfToken: csrfToken,
+    }});
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+
+    // expire session
+    const session = server["sessionManager"]["session"];
+    if (!session) throw new Error("Sessions not enabled");
+    const sessionId = session.unsignCookie(sessionCookie);
+    const sessionHash = SessionCookie.hashSessionKey(sessionId);
+    const key = await keyStorage.getKey(sessionHash);
+    keyStorage.updateKey({value: sessionHash, expires: new Date(key.created.getTime()-1000)});
+    res = await server.app.inject({ method: "POST", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, url: "/api/userforsessionkey" , payload: {
+        csrfToken: csrfToken,
+    }});
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(false);
+    expect(res.statusCode).toBe(401);
+
+    // Invalid session ID
+    const sessionCookie2 = Hasher.randomValue(16);
+    keyStorage.updateKey({value: sessionHash, expires: new Date(key.created.getTime()-1000)});
+    res = await server.app.inject({ method: "POST", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie2}, url: "/api/userforsessionkey" , payload: {
+        csrfToken: csrfToken,
+    }});
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(false);
+    expect(res.statusCode).toBe(401);
+});
+
+test('FastifyServer.api.changeEmailWithoutVerification', async () => {
+
+    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    // login
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "bobPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    const sessionCookie = getSession(res);
+    
+    // successful email update
+    res = await server.app.inject({ method: "POST", url: "/api/updateuser", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        user_email: "newbob@bob.com", 
+        csrfToken: csrfToken
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    const bob = await userStorage.getUserByUsername("bob", ["email"]);
+    expect(bob.email).toBe("newbob@bob.com");
+});
+
+test('FastifyServer.api.changeEmailWithVerification', async () => {
+
+    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: true, emailVerificationTextBody: "dummy"});
+    // @ts-ignore
+    server["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+        confirmEmailData = {token, email, extraData}
+    };
+
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    // login
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "bobPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    const sessionCookie = getSession(res);
+    
+    // successful email update
+    res = await server.app.inject({ method: "POST", url: "/api/updateuser", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        user_email: "newbob@bob.com", 
+        csrfToken: csrfToken
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    const bob = await userStorage.getUserByUsername("bob", ["email"]);
+    expect(bob.email).toBe("bob@bob.com");
+
+    // verify token
+    expect(confirmEmailData.email).toBe("newbob@bob.com")
+    const token = confirmEmailData.token;
+    res = await server.app.inject({ method: "GET", url: "/api/verifyemail/" + token});
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+    expect(res.statusCode).toBe(200);
+    const bob2 = await userStorage.getUserByUsername("bob", ["email"]);
+    expect(bob2.email).toBe("newbob@bob.com");
+});
+
+test('FastifyServer.api.changePassword', async () => {
+
+    let {server} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    // login
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "bobPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+    const sessionCookie = getSession(res);
+    
+    // check wrong password is caught
+    res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        oldPassword: "XXX", 
+        newPassword: "newPass123",
+        repeatPassword: "newPass123",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(401);
+    expect(body.codeName).toBe("PasswordInvalid");
+
+    // check empty password caught
+    res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        oldPassword: "bobPass123", 
+        newPassword: "",
+        repeatPassword: "",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(400);
+    expect(body.codeName).toBe("PasswordFormat");
+
+    // check mismatched passwords caught
+    res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        oldPassword: "bobPass123", 
+        newPassword: "newPass123",
+        repeatPassword: "YYY",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(400);
+    expect(body.codeName).toBe("PasswordMatch");
+
+    // check successful change
+    res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        oldPassword: "bobPass123", 
+        newPassword: "newPass123",
+        repeatPassword: "newPass123",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    expect(body.ok).toBe(true);
+
+    // check login with new password
+    // login
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "newPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+});
+

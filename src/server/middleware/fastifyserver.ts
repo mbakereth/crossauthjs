@@ -978,7 +978,7 @@ export class FastifyCookieAuthServer {
                     CrossauthLogger.logger.error(j({msg: "Change password failure", user: request.user?.username, codeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.handleError(e, reply, (reply, error) => {
-                        reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, codeName: ErrorCode[error.code]});                    
+                        return reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, codeName: ErrorCode[error.code]});                    
                     }, true);
                 }
             });
@@ -1065,9 +1065,10 @@ export class FastifyCookieAuthServer {
 
         if (this.endpoints.includes("api/userforsessionkey")) {
             if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/api/userforsessionkey enabled but sessions are not");
-            this.app.get(this.prefix+'api/userforsessionkey', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
+            this.app.post(this.prefix+'api/userforsessionkey', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/userforsessionkey', ip: request.ip, user: request.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(request)}));
                 if (!request.user) return this.sendJsonError(reply, 401);
+                await this.validateCsrfToken(request, reply)
                 try {
                     let user : User|undefined;
                     const sessionId = this.getSessionIdFromCookie(request);
