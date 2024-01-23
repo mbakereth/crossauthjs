@@ -90,6 +90,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
         if (normalizedUsername in this.usersByUsername) {
 
             const user = this.usersByUsername[normalizedUsername];
+            if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
             if ('active' in user && user['active'] == false && this.checkActive) {
                 CrossauthLogger.logger.debug(j({msg: "User has active set to false"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
@@ -118,7 +119,8 @@ export class InMemoryUserStorage extends UserPasswordStorage {
         const normalizedEmail = UserStorage.normalize(email);
         if (normalizedEmail in this.usersByEmail) {
 
-            const user = this.usersByUsername[normalizedEmail];
+            const user = this.usersByEmail[normalizedEmail];
+            if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
             if ('active' in user && user['active'] == false && this.checkActive) {
                 CrossauthLogger.logger.debug(j({msg: "User has active set to false"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);

@@ -10,6 +10,7 @@ import { SessionCookie } from '../../cookieauth';
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
+export var passwordResetData :  {token : string, extraData: {[key:string]: any}};
 
 beforeAll(async () => {
 });
@@ -55,21 +56,6 @@ function getSession(res: any) : string {
     expect(sessionCookies.length).toBe(1);
     return sessionCookies[0].value;
 }
-
-test('FastifyServer.anonymousGets', async () => {
-
-    let {server} = await makeAppWithOptions();
-    let res;
-    let body;
-
-    // signup 
-    res = await server.app.inject({ method: "GET", url: "/signup" })
-    body = JSON.parse(res.body)
-    expect(body.template).toBe("signup.njk");
-
-    res = await server.app.inject({ method: "GET", url: "/changepassword" })
-    expect(res.statusCode = 401);
-});
 
 test('FastifyServer.requestProtectedUrlsAsAnonymous', async () => {
 
@@ -127,7 +113,7 @@ test('FastifyServer.login', async () => {
 
 test('FastifyServer.signupWithEmailVerification', async () => {
 
-    let {server} = await makeAppWithOptions({enableEmailVerification: true});
+    let {server} = await makeAppWithOptions({enableEmailVerification: true, emailVerificationTextBody: "dummy"});
 
     // @ts-ignore
     server["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
@@ -306,7 +292,7 @@ test('FastifyServer.changeEmailWithoutVerification', async () => {
 
 test('FastifyServer.changeEmailWithVerification', async () => {
 
-    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: true});
+    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: true, emailVerificationTextBody: "dummy"});
     // @ts-ignore
     server["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
         confirmEmailData = {token, email, extraData}
@@ -315,7 +301,7 @@ test('FastifyServer.changeEmailWithVerification', async () => {
     let res;
     let body;
 
-    // get login page for CRF token
+    // get login page for CSRF token
     res = await server.app.inject({ method: "GET", url: "/login" })
     body = JSON.parse(res.body);
     expect(body.template).toBe("login.njk");
@@ -351,3 +337,149 @@ test('FastifyServer.changeEmailWithVerification', async () => {
     expect(bob2.email).toBe("newbob@bob.com");
 });
 
+test('FastifyServer.changePassword', async () => {
+
+    let {server} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    // get login page for CSRF token
+    res = await server.app.inject({ method: "GET", url: "/login" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("login.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+    // login
+    res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "bobPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(302);
+    const sessionCookie = getSession(res);
+
+    // Right page served 
+    res = await server.app.inject({ method: "GET", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie} })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("changepassword.njk");
+    
+    // check wrong password is caught
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        oldPassword: "XXX", 
+        newPassword: "newPass123",
+        repeatPassword: "newPass123",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    expect(body.args.codeName).toBe("UsernameOrPasswordInvalid");
+
+    // check empty password caught
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        oldPassword: "bobPass123", 
+        newPassword: "",
+        repeatPassword: "",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    expect(body.args.codeName).toBe("PasswordFormat");
+
+    // check mismatched passwords caught
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        oldPassword: "bobPass123", 
+        newPassword: "newPass123",
+        repeatPassword: "YYY",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    expect(body.args.codeName).toBe("PasswordMatch");
+
+    // check successful change
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        oldPassword: "bobPass123", 
+        newPassword: "newPass123",
+        repeatPassword: "newPass123",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    expect(body.args.codeName).toBeUndefined();
+
+    // check login with new password
+    // login
+    res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "newPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(302);
+    
+});
+
+test('FastifyServer.passwordReset', async () => {
+
+    let {server} = await makeAppWithOptions({enablePasswordReset: true, passwordResetTextBody: "dummy"});
+
+    // @ts-ignore
+    server["sessionManager"]["tokenEmailer"]["_sendPasswordResetToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+        passwordResetData = {token, extraData}
+    };
+
+    let res;
+    let body;
+
+    // Right page served 
+    res = await server.app.inject({ method: "GET", url: "/requestpasswordreset" })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("requestpasswordreset.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+    
+    // no email on wrong email
+    passwordResetData = {token: "", extraData: {}};
+    res = await server.app.inject({ method: "POST", url: "/requestpasswordreset", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        email: "no@email.com", 
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("requestpasswordreset.njk");
+    expect(body.args.message).toBeDefined();
+    expect(passwordResetData.token).toBe("");
+    
+    // send email with valid password
+    res = await server.app.inject({ method: "POST", url: "/requestpasswordreset", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        email: "bob@bob.com", 
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("requestpasswordreset.njk");
+    expect(body.args.message).toBeDefined();
+    expect(passwordResetData.token).not.toBe("");
+
+    // verify token
+    const token = passwordResetData.token;
+    res = await server.app.inject({ method: "GET", url: "/resetpassword/" + token});
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("resetpassword.njk");
+
+    // submit password reset with non matching passwords
+    res = await server.app.inject({ method: "POST", url: "/resetpassword", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        token: token, 
+        newPassword: "newPass123",
+        repeatPassword: "XXX",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(body.args.codeName).toBe("PasswordMatch");
+
+    // submit successful password reset
+    res = await server.app.inject({ method: "POST", url: "/resetpassword", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        token: token, 
+        newPassword: "newPass123",
+        repeatPassword: "newPass123",
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    console.log(body)
+    expect(body.args.message).toBeDefined();
+    expect(body.args.codeName).toBeUndefined();
+
+    // log in with new password
+    res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "newPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(302);
+});

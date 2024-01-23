@@ -195,11 +195,6 @@ export class TokenEmailer {
      * Separated out for unit testing/mocking purposes
      */
     private async _sendEmailVerificationToken(token : string, email: string, extraData : {[key:string]:any}) {
-        if (!this.emailVerificationTextBody && !this.emailVerificationHtmlBody) {
-            let error = new CrossauthError(ErrorCode.Configuration, 
-                "Either emailVerificationTextBody or emailVerificationHtmlBody must be set to send email verification emails");
-                throw error;
-        }
 
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
@@ -238,6 +233,11 @@ export class TokenEmailer {
     async sendEmailVerificationToken(userId : string | number,
                                      newEmail : string="",
                                      extraData : {[key:string]:any} = {}) : Promise<void> {
+        if (!this.emailVerificationTextBody && !this.emailVerificationHtmlBody) {
+            let error = new CrossauthError(ErrorCode.Configuration, 
+                "Either emailVerificationTextBody or emailVerificationHtmlBody must be set to send email verification emails");
+                throw error;
+        }
         let user = await this.userStorage.getUserById(userId, undefined, {skipEmailVerifiedCheck: true});
         let email = newEmail;
         if (email != "") {
@@ -346,6 +346,37 @@ export class TokenEmailer {
     }
 
     /**
+     * Separated out for unit testing/mocking purposes
+     */
+    private async _sendPasswordResetToken(token : string, email: string, extraData : {[key:string]:any}) {
+        if (!this.emailVerificationTextBody && !this.emailVerificationHtmlBody) {
+            let error = new CrossauthError(ErrorCode.Configuration, 
+                "Either emailVerificationTextBody or emailVerificationHtmlBody must be set to send email verification emails");
+                throw error;
+        }
+
+        let auth : {user? : string, pass? : string}= {};
+        if (this.smtpUsername) auth.user = this.smtpUsername;
+        if (this.smtpPassword) auth.pass = this.smtpPassword;
+        let mail : {from:string, to:string, subject: string, text?:string, html?:string} = {
+            from: this.emailFrom, 
+            to: email,
+            subject: this.passwordResetSubject, 
+        };
+        let data = {token: token, siteUrl: this.siteUrl, prefix: this.prefix};
+        if (extraData) data = {...data, ...extraData};
+        if (this.passwordResetTextBody) {
+            mail.text = nunjucks.render(this.passwordResetTextBody, data)
+        }
+        if (this.passwordResetHtmlBody) {
+            mail.html = nunjucks.render(this.passwordResetHtmlBody, data)
+        }
+        const transporter = this.createEmailer();
+        return (await transporter.sendMail(mail)).messageId;
+
+    }
+
+    /**
      * Send a password reset token email using the Nunjucks templates
      * @param userId userId to send it for
      * @param to address to send it to
@@ -367,25 +398,8 @@ export class TokenEmailer {
             TokenEmailer.validateEmail(email);
         }
         const token = await this.createAndSavePasswordResetToken(userId);
-        let auth : {user? : string, pass? : string}= {};
-        if (this.smtpUsername) auth.user = this.smtpUsername;
-        if (this.smtpPassword) auth.pass = this.smtpPassword;
-        let mail : {from:string, to:string, subject: string, text?:string, html?:string} = {
-            from: this.emailFrom, 
-            to: email,
-            subject: this.passwordResetSubject, 
-        };
-        let data = {token: token, siteUrl: this.siteUrl, prefix: this.prefix};
-        if (extraData) data = {...data, ...extraData};
-        if (this.passwordResetTextBody) {
-            mail.text = nunjucks.render(this.passwordResetTextBody, data)
-        }
-        if (this.passwordResetHtmlBody) {
-            mail.html = nunjucks.render(this.passwordResetHtmlBody, data)
-        }
-        const transporter = this.createEmailer();
-          const info = await transporter.sendMail(mail);
-        CrossauthLogger.logger.info(j({msg: "Sent password reset email", emailMessageId: info.messageId, email: email}));
+        const messageId = await this._sendPasswordResetToken(token, email, extraData);
+        CrossauthLogger.logger.info(j({msg: "Sent password reset email", emailMessageId: messageId, email: email}));
         
     }
 
