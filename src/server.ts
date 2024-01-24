@@ -27,7 +27,7 @@ declare module 'fastify' {
     export interface FastifyRequest {
       user: User|undefined,
       csrfToken: string|undefined,
-      twofactor: {
+      totp: {
         qr? : string,
         username? : string,
         code? : string,

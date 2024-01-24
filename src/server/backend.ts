@@ -39,7 +39,7 @@ export interface BackendOptions extends TokenEmailerOptions {
     secret? : string;
 
     /** Whether to turn on 2FA.  Only Google Authenticator TOTP supported at present.  Default off */
-    twoFactor? : "off" | "all" | "peruser";
+    totp? : "off" | "all" | "peruser";
 
     /**
      * Store for password reset and email vcerification tokens.  If not passed, the same store as
@@ -62,7 +62,7 @@ export class Backend {
     private appName : string = "Crossauth";
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = false;
-    private twoFactor :  "off" | "all" | "peruser" = "off";
+    private totp :  "off" | "all" | "peruser" = "off";
     private tokenEmailer? : TokenEmailer;
 
     /**
@@ -83,8 +83,8 @@ export class Backend {
         this.authenticator = authenticator;
 
         setParameter("secret", ParamType.String, this, options, "SECRET");
-        setParameter("twoFactor", ParamType.String, this, options, "TWO_FACTOR");
-        setParameter("appName", ParamType.String, this, options, "APP_NAME", this.twoFactor!="off");
+        setParameter("totp", ParamType.String, this, options, "TOTP");
+        setParameter("appName", ParamType.String, this, options, "APP_NAME", this.totp!="off");
 
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
         if (this.enableSessions) {
@@ -140,10 +140,18 @@ export class Backend {
     async login(username : string, password : string, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
 
+        let bypass2FA = user != undefined;
+
         if (!user) user = await this.authenticator.authenticateUser(username, password);
-        const sessionKey = await this.session.createSessionKey(user.id, extraFields);
-        //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
-        let sessionCookie = this.session.makeCookie(sessionKey, persist);
+        let sessionCookie : Cookie;
+        if (!bypass2FA && user.totpSecret && user.totpSecret != "") {
+            // create an anonymous session and store the username in it
+            sessionCookie = await this.initiateTotpLogin(user);
+        } else {
+            const sessionKey = await this.session.createSessionKey(user.id, extraFields);
+            //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
+            sessionCookie = this.session.makeCookie(sessionKey, persist);
+        }
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
@@ -251,7 +259,7 @@ export class Backend {
                 }
             }
             else {
-                console.log(e);
+                CrossauthLogger.logger.error(j({err: e}));
             }
             error = new CrossauthError(ErrorCode.UnknownError);
         }
@@ -373,7 +381,7 @@ export class Backend {
         this.userStorage.deleteUserByUsername(username);
     }
 
-    /** Creates a user with 2FA enabled.
+    /** Creates a user with TOTP enabled.
      * 
      * The user storage entry will be enabled and the passed session key will be updated to include the
      * username.  The userId and QR Url are returned.
@@ -383,12 +391,13 @@ export class Backend {
      * @param sessionId the current session id (anonymous session)
      * @return the new userId and the QR code to display
      */
-    async createUserWith2FA(
+    async initiateTotpSignup(
         username : string, 
         password : string, 
         extraFields : {[key : string]: string|number|boolean|Date|undefined},
-        sessionId : string) : Promise<{userId: string|number, qrUrl: string}> {
-
+        sessionCookieValue : string) : Promise<{userId: string|number, qrUrl: string}> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
+        const sessionKey = this.session.unsignCookie(sessionCookieValue);
         const secret = gAuthenticator.generateSecret();
         extraFields.totpSecret = secret;
         let qrUrl = "";
@@ -401,34 +410,32 @@ export class Backend {
                 throw new CrossauthError(ErrorCode.UnknownError, "Couldn't generate TOTP URL");
             });
 
-        this.keyStorage.updateKey({
-            value: sessionId,
+        await this.keyStorage.updateKey({
+            value: SessionCookie.hashSessionKey(sessionKey),
             data: JSON.stringify({username: username, secret: secret}),
         });
 
         let passwordHash = await this.authenticator.createPasswordForStorage(password);
         if (this.enableEmailVerification && this.tokenEmailer) {
-            extraFields = {...extraFields, emailVerified: false};
+            extraFields = {...extraFields, emailVerified: false, active: false};
         }
         const userId = await this.userStorage.createUser(username, passwordHash, extraFields);
         return {userId, qrUrl}
         
     }
 
-    async verify2FA(code : string, sessionId : string) : Promise<User> {
+    async completeTotpSignup(code : string, sessionId : string) : Promise<User> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions not enabled");
         let {user, key} = await this.session.getUserForSessionKey(sessionId);
+        if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         let username;
         let secret;
-        if (user) {
-            username = user.username;
-            secret = user.totpSecret;
-        } else {
-            if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
+        try {
             const data = JSON.parse(key.data||"");
-            if (!("username" in data) || !("secret" in data)) throw new CrossauthError(ErrorCode.InvalidKey, "user data not found in session");
-            username = data.username;
             secret = data.secret;
+            username = data.username;
+        } catch (e) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "TOTP has not been requested for this session");
         }
 
         if (!gAuthenticator.check(code, secret)) {
@@ -437,13 +444,142 @@ export class Backend {
         if (!user) user = await this.userStorage.getUserByUsername(username, undefined, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
         const newUser = {
             id: user.id,
-            active: true,
+            state: "active",
+            totpSecret: secret,
         }
         await this.userStorage.updateUser(newUser);
         if (this.enableEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(user.id, undefined)
         }
+        await this.keyStorage.updateKey({value: SessionCookie.hashSessionKey(key.value), data: ""});
         return {...user, ...newUser};
+    }
+
+    /** Enables TOTP for an existing user.
+     * 
+     * The user storage entry will be enabled and the passed session key will be updated to include the
+     * username.  The userId and QR Url are returned.
+     * @param userId : the user id to update
+     * @param username : the username to update
+     * @param sessionId the current session id
+     * @return the new userId and the QR code to display
+     */
+    async initiateTotpEnable(
+        userId : string|number, username : string, 
+        sessionCookieValue : string) : Promise<string> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
+        const sessionKey = this.session.unsignCookie(sessionCookieValue);
+        const secret = gAuthenticator.generateSecret();
+        let qrUrl = "";
+        await QRCode.toDataURL(gAuthenticator.keyuri(username, this.appName, secret))
+            .then((url) => {
+                    qrUrl = url;
+            })
+            .catch((err) => {
+                CrossauthLogger.logger.debug(j({err: err}));
+                throw new CrossauthError(ErrorCode.UnknownError, "Couldn't generate TOTP URL");
+            });
+
+        await this.keyStorage.updateKey({
+            value: SessionCookie.hashSessionKey(sessionKey),
+            data: JSON.stringify({username: username, secret: secret}),
+        });
+
+        await this.userStorage.updateUser({id: userId, totpSecret: secret});
+
+        return qrUrl
+        
+    }
+
+    async completeTotpEnable(code : string, sessionId : string) : Promise<User> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions not enabled");
+        let {user, key} = await this.session.getUserForSessionKey(sessionId);
+        if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
+        let username;
+        let secret;
+        try {
+            const data = JSON.parse(key.data||"");
+            secret = data.secret;
+            username = data.username;
+        } catch (e) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "TOTP has not been requested for this session");
+        }
+
+        if (!gAuthenticator.check(code, secret)) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
+        }
+        if (!user) user = await this.userStorage.getUserByUsername(username, undefined, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+        const newUser = {
+            id: user.id,
+            state: "active",
+            totpSecret: secret,
+        }
+        await this.userStorage.updateUser(newUser);
+        await this.keyStorage.updateKey({value: SessionCookie.hashSessionKey(key.value), data: ""});
+        return {...user, ...newUser};
+    }
+
+    /** Disables TOTP for an existing user
+     * 
+     * The user storage entry will be enabled and the passed session key will be updated to include the
+     * username.  The userId and QR Url are returned.
+     * @param userId : the user id to update
+     */
+    async disableTotp(
+        userId : string|number) {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
+
+        await this.userStorage.updateUser({id: userId, totpSecret: ""});
+    }
+
+    async initiateTotpLogin(
+        user : User) : Promise<Cookie> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
+        const {sessionCookie} = await this.createAnonymousSession({data: JSON.stringify({username: user.username, totpInitiated: true})});
+
+        return sessionCookie;
+        
+    }
+
+    async completeTotpLogin(code : string, sessionCookieValue : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
+        if (!this.session|| !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
+        const sessionKey = this.session.unsignCookie(sessionCookieValue);
+        let {key} = await this.session.getUserForSessionKey(sessionKey);
+        if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
+        let username : string;
+        try {
+            const data = JSON.parse(key.data);
+            if (data.totpInitiated==false) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP not initiated");
+            username = data.username;
+        } catch {
+            CrossauthLogger.logger.error("Couldn't parse data in session - not JSON");
+            throw new CrossauthError(ErrorCode.Unauthorized);
+        }
+
+        const user = await this.userStorage.getUserByUsername(username);
+        if (!gAuthenticator.check(code, user.totpSecret)) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
+        }
+
+        const newSessionKey = await this.session.createSessionKey(user.id, extraFields);
+        await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(key.value));
+        const sessionCookie = this.session.makeCookie(newSessionKey, persist);
+
+        const csrfToken = this.csrfTokens.createCsrfToken();
+        const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
+        const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+        try {
+            this.keyStorage.deleteAllForUser(user.id, "p:");
+        } catch (e) {
+            CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
+        return {
+            sessionCookie: sessionCookie,
+            csrfCookie: csrfCookie,
+            csrfForOrHeaderValue: csrfForOrHeaderValue,
+            user: user
+        }
     }
 
     async requestPasswordReset(email : string) : Promise<void> {

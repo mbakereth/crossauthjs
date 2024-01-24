@@ -18,7 +18,7 @@ model User {
     email               String      @unique
     normalizedEmail     String      @unique
     emailVerified       Boolean     @default(true)
-    active              Boolean     @default(true)
+    state               String      @default("active")
     dummyField          String      @default("")
 
     session Key[]

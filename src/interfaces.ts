@@ -33,6 +33,7 @@ export interface Key {
 export interface User {
     id : string | number,
     username : string,
+    state : string,
     [ key : string ] : any,
 }
 

@@ -10,7 +10,6 @@ import type { User } from '../..';
  * See {@link InMemoryUserStorage.constructor} for definitions.
  */
 export interface InMemoryUserStorageOptions {
-    checkActive? : boolean,
     enableEmailVerification? : boolean,
 }
 
@@ -19,9 +18,6 @@ export interface InMemoryUserStorageOptions {
  * intended for testing and is not thread safe.
  * 
  * There is no separate ID field - it is set to username.
- *  
- * You can optionally check if an `active` field is set to `true` when validating users,  Enabling this requires
- * the user table to also have an `active Boolean` field.
  *
  * You can optionally check if an `emailVerified` field is set to `true` when validating users,  Enabling this requires
  * the user table to also have an `emailVerified Boolean` field.
@@ -29,20 +25,14 @@ export interface InMemoryUserStorageOptions {
 export class InMemoryUserStorage extends UserPasswordStorage {
     usersByUsername : { [key : string]: UserWithPassword } = {};
     usersByEmail : { [key : string]: UserWithPassword } = {};
-    private checkActive : boolean = false;
     private enableEmailVerification : boolean = false;
 
     /**
      * Creates a InMemoryUserStorage object, optionally overriding defaults.
-     * @param checkActive if set to `true`, a user will only be returned as valid if the `active` field is `true`.  See explaination above.
      * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
     */
-    constructor({checkActive,
-        enableEmailVerification} : InMemoryUserStorageOptions = {}) {
+    constructor({enableEmailVerification} : InMemoryUserStorageOptions = {}) {
         super();
-        if (checkActive) {
-            this.checkActive = checkActive;
-        }
         if (enableEmailVerification) {
             this.enableEmailVerification = enableEmailVerification;
         }
@@ -63,6 +53,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
                 username: username, 
                 id: username, 
                 passwordHash: passwordHash,
+                state: "active",
                 normalizedUsername: UserStorage.normalize(username),
                 ...extraFields,
             };
@@ -91,8 +82,8 @@ export class InMemoryUserStorage extends UserPasswordStorage {
 
             const user = this.usersByUsername[normalizedUsername];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
-            if ('active' in user && user['active'] == false && this.checkActive) {
-                CrossauthLogger.logger.debug(j({msg: "User has active set to false"}));
+            if (user['state'] != "active") {
+                CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if (options?.skipEmailVerifiedCheck!=true && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
@@ -121,8 +112,8 @@ export class InMemoryUserStorage extends UserPasswordStorage {
 
             const user = this.usersByEmail[normalizedEmail];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
-            if ('active' in user && user['active'] == false && this.checkActive) {
-                CrossauthLogger.logger.debug(j({msg: "User has active set to false"}));
+            if (user['state'] != "active") {
+                CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
             if (options?.skipEmailVerifiedCheck!=true && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {

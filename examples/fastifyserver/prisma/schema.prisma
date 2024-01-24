@@ -19,7 +19,7 @@ model User {
     normalizedEmail     String      @unique
     emailVerified       Boolean     @default(true)
     totpSecret          String      @default("")
-    active              Boolean     @default(true)
+    state               String      @default("active")
 
     session Key[]
 

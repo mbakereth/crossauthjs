@@ -41,9 +41,9 @@
                     <label for="user_email">Email</label><br>
                     <input type="email" name="user_email" size="20" value="{{ user_email }}"/>
                 </p>
-                {% if perUserTwoFactor %}
+                {% if perUserTotp %}
                 <p>
-                    <input type="checkbox" name="twoFactor", {% if twoFactor %}checked{% endif %}> Enable Two-Factor Authentication
+                    <input type="checkbox" name="totp", {% if totp %}checked{% endif %}> Enable Two-Factor Authentication
                 </p>
                 {% endif %}
                 <p><button type="submit">Sign Up</button></p>

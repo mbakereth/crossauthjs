@@ -219,6 +219,7 @@ test('FastifyServer.wrongSession', async () => {
     let res;
     let body;
 
+
     // Right page served 
     res = await server.app.inject({ method: "GET", url: "/login" })
     body = JSON.parse(res.body);

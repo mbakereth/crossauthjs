@@ -20,11 +20,6 @@ export interface PrismaUserStorageOptions {
      */
     idColumn? : string,
 
-    /** If true, check if the `active` field in the user table is true when fetching a user.
-     * Must add this field to your table as a boolean
-     */
-    checkActive? : boolean,
-
     /** If true, check if the `userVerified` field in the user table is true when fetching a user.
      * Must add this field to your table as a boolean. */
     enableEmailVerification? : boolean,
@@ -52,9 +47,6 @@ export interface PrismaUserStorageOptions {
  * It must also contain an ID column, which is either an `Int` or `String`, eg
  *    * `id Int \@id \@unique \@default(autoincrement())
  * Alternatively you can set it to `username` if you don't have a separate ID field.
- * 
- * You can optionally check if an `active` field is set to `true` when validating users,  Enabling this requires
- * the user table to also have an `active Boolean` field.
  *
  * You can optionally check if an `emailVerified` field is set to `true` when validating users,  Enabling this requires
  * the user table to also have an `emailVerified Boolean` field.  If the username is not the email address,
@@ -68,7 +60,6 @@ export interface PrismaUserStorageOptions {
 export class PrismaUserStorage extends UserPasswordStorage {
     private userTable : string = "user";
     private idColumn : string = "id";
-    readonly checkActive : boolean = false;
     readonly enableEmailVerification : boolean = false;
     readonly checkPasswordReset : boolean = false;
     private prismaClient : PrismaClient;
@@ -78,7 +69,6 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * Creates a PrismaUserStorage object, optionally overriding defaults.
      * @param userTable the (Prisma, ie lowercase) name of the database table for storing users.  Defaults to `user`.
      * @param idColumn the column for the unique user ID.  May be a number of string.  Defaults to `id`.  May also be set to `username`.
-     * @param checkActive if set to `true`, a user will only be returned as valid if the `active` field is `true`.  See explaination above.
      * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
      * @param checkPasswordReset if set to true, a user will only be returned as valid if the "passwordReset" field is not `true`.  See explaination above.
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
@@ -88,7 +78,6 @@ export class PrismaUserStorage extends UserPasswordStorage {
         super();
         setParameter("userTable", ParamType.String, this, options, "USER_TABLE");
         setParameter("idColumn", ParamType.String, this, options, "USER_ID_COLUMN");
-        setParameter("checkActive", ParamType.Boolean, this, options, "CHECK_USER_ACTIVE");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("checkPasswordReset", ParamType.String, Boolean, options, "CHECK_PASSWORD_RESET");
         setParameter("extraFields", ParamType.StringArray, this, options, "USER_EXTRA_FIELDS", false);
@@ -134,8 +123,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
             CrossauthLogger.logger.error(j({err: error}));
             throw error;
         }
-        if (options?.skipActiveCheck!=true && this.checkActive && !prismaUser["active"]) {
-            CrossauthLogger.logger.debug(j({msg: "User has active set to false"}));
+        if (options?.skipActiveCheck!=true && prismaUser["state"]!="active") {
+            CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
         if (options?.skipEmailVerifiedCheck!=true && this.enableEmailVerification && !prismaUser["emailVerified"]) {
@@ -149,7 +138,8 @@ export class PrismaUserStorage extends UserPasswordStorage {
         let user : UserWithPassword = {
             id : prismaUser[this.idColumn],
             username : prismaUser.username,
-            passwordHash : prismaUser.passwordHash
+            passwordHash : prismaUser.passwordHash,
+            state: "active",
         }
         if (this.extraFields) {
             this.extraFields.forEach((field) => {
