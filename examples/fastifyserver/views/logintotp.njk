@@ -8,19 +8,16 @@
     <title>Sign Up - Set up 2FA</title>
 </head>
 <body>
-    <h1>Sign Up - Set 2FA</h1>
-    <form action="/signuptotp" method="POST">
-        <ol>
-            <li>Install Google Authenticator on your phone from the App Store or Play Store</li>
-            <li>Scan the QR Code in the Authenticator app</li>
-            <li>Enter the code that you see in the app in the text field below and click Submit.</li>
-        </ol>
-        
-        <p><img src="{{ qr }}"/></p>
+    <h1>Login - please enter your code</h1>
+    <form action="/logintotp" method="POST">
 
         <p>
-            <label for="totpCode">Code</label>
+            Enter the code from Google Authenticator on your smartphone        
+        <p>
+            <input type="hidden" name="csrfToken" value="{{ csrfToken }}">
+            <input type="hidden" name="persist" value="{{ persist }}">
             <input type="hidden" name="next" value="{{ next }}">
+            <label for="totpCode">Code</label>
             <input type="text" name="totpCode">
         </p>
 

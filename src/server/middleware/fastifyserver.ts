@@ -84,6 +84,11 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
      */
     loginPage? : string;
 
+    /** Template file containing the page for getting the TOTP after entering username and password
+     * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "login.njk".
+     */
+    loginTotpPage? : string;
+
     /** Template file containing the signup page (with without error messages).  
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "signup.njk".
      * Signup form should contain at least `username` and `password` and may also contain `repeatPassword`.  If you have additional
@@ -145,7 +150,7 @@ interface LoginBodyType extends CsrfBodyType {
 }
 
 interface LoginTotpBodyType extends CsrfBodyType {
-    code : string,
+    totpCode : string,
     persist? : boolean,
     next? : string,
 }
@@ -158,7 +163,7 @@ interface SignupBodyType extends LoginBodyType {
 }
 
 interface SignupTotpBodyType extends CsrfBodyType {
-    code : string;
+    totpCode : string;
     next? : string,
     persist? : boolean,
 }
@@ -393,6 +398,7 @@ export class FastifyCookieAuthServer {
     private signupPage : string = "signup.njk";
     private signupTotpPage : string = "signuptotp.njk";
     private loginPage : string = "login.njk";
+    private loginTotpPage : string = "logintotp.njk";
     private errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
     private updateUserPage : string = "updateuser.njk";
@@ -437,6 +443,7 @@ export class FastifyCookieAuthServer {
         setParameter("signupPage", ParamType.String, this, options, "SIGNUP_PAGE");
         setParameter("signupTotpPage", ParamType.String, this, options, "SIGNUP_TOTP_PAGE");
         setParameter("loginPage", ParamType.String, this, options, "LOGIN_PAGE");
+        setParameter("loginTotpPage", ParamType.String, this, options, "LOGIN_TOTP_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
         setParameter("updateUser", ParamType.String, this, options, "UPDATE_USER_PAGE");
@@ -546,6 +553,10 @@ export class FastifyCookieAuthServer {
                 try {
                     let {key, user} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
                     if (this.validateSession) this.validateSession(key, user, request);
+                    if (user) {
+                        delete user.passwordHash;
+                        delete user.totpSecret;
+                    }
 
                     request.user = user;
                     CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
@@ -576,9 +587,18 @@ export class FastifyCookieAuthServer {
                     CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
 
                     await this.login(request, reply, 
-                    (reply, _user) => {
-                        CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect"}));
-                        return reply.redirect(next);
+                    (reply, user) => {
+                        if (!user.totpRequired) {
+                            CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect"}));
+                            return reply.redirect(next);
+                        } else {
+                            let data : {next? : any, persist? : any, csrfToken: string|undefined} = {
+                                csrfToken: request.csrfToken,
+                                next: request.body.next||this.loginRedirect,
+                                persist: request.body.persist ? "on" : "",
+                            };
+                            return reply.view(this.loginTotpPage, data);
+                        }
                     });
                 } catch (e) {
                     CrossauthLogger.logger.debug(j({err: e}));
@@ -591,6 +611,36 @@ export class FastifyCookieAuthServer {
                             next: next, 
                             persist: request.body.persist,
                             username: request.body.username,
+                            csrfToken: request.csrfToken
+                        });                      
+                    });
+                }
+            });
+        }
+
+        if (this.endpoints.includes("logintotp")) {
+            if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/login enabled but sessions are not");
+            this.app.post(this.prefix+'logintotp', async (request : FastifyRequest<{ Body: LoginTotpBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'logintotp', ip: request.ip}));
+                let next = request.body.next || this.loginRedirect;
+                try {
+                    CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
+
+                    await this.logintotp(request, reply, 
+                    (reply, _user) => {
+                        CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect"}));
+                        return reply.redirect(next);
+                    });
+                } catch (e) {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    return this.handleError(e, reply, (reply, error) => {
+                        return reply.view(this.loginTotpPage, {
+                            error: error.message,
+                            errors: error.messages, 
+                            code: error.code, 
+                            codeName: ErrorCode[error.code], 
+                            next: request.body.next, 
+                            persist: request.body.persist ? "on" : "",
                             csrfToken: request.csrfToken
                         });                      
                     });
@@ -924,10 +974,7 @@ export class FastifyCookieAuthServer {
                 try {
                     return await this.login(request, reply, 
                     (reply, user) => {
-                        const totpRequired = "totpSecret" in user && user.totpSecret != "";
-                        delete user.passwordHash;
-                        delete user.totpSecret;
-                        if (totpRequired) {
+                        if (user.totpRequired) {
                             return reply.header('Content-Type', JSONHDR).send({ok: true, totpRequired: true});
                         } else {
                             return reply.header('Content-Type', JSONHDR).send({ok: true, user : user});
@@ -954,7 +1001,7 @@ export class FastifyCookieAuthServer {
                         return reply.header('Content-Type', JSONHDR).send({ok: true, user : user});
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(j({msg: "Login failure", getHashOfSessionCookie: this.getHashOfSessionCookie(request), codeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                    CrossauthLogger.logger.error(j({msg: "Login failure", hashOfSessionCookie: this.getHashOfSessionCookie(request), codeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.handleError(e, reply, (reply, error) => {
                         reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, codeName: ErrorCode[error.code]});                    
@@ -1009,7 +1056,7 @@ export class FastifyCookieAuthServer {
         if (this.endpoints.includes("api/signuptotp")) {
             if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/api/signup enabled but sessions are not");
             this.app.post(this.prefix+'api/signuptotp', async (request : FastifyRequest<{ Body: SignupTotpBodyType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/signup', ip: request.ip, getHashOfSessionCookie: this.getHashOfSessionCookie(request)}));
+                CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/signup', ip: request.ip, hashOfSessionCookie: this.getHashOfSessionCookie(request)}));
                 try {
                     return await this.signuptotp(request, reply, 
                     (reply, user) => {
@@ -1201,11 +1248,11 @@ export class FastifyCookieAuthServer {
 
         let extraFields = this.addToSession ? this.addToSession(request) : {}
         let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, extraFields, persist);
-        console.log(user);
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
+        request.csrfToken = await this.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
         if (oldSessionId) {
             try {
                 await this.sessionManager.deleteSessionId(oldSessionId);
@@ -1214,6 +1261,9 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.debug(j({err: e}));
             }
         }
+        user.totpRequired = "totpSecret" in user && user.totpSecret != "";
+        delete user.totpSecret;
+        delete user.passwordHash;
         return successFn(reply, user);
     }
 
@@ -1228,12 +1278,15 @@ export class FastifyCookieAuthServer {
         const csrfCookieValue = this.getCsrfTokenFromCookie(request);
         await this.sessionManager.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
         let extraFields = this.addToSession ? this.addToSession(request) : {}
-        const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTotpLogin(request.body.code, oldSessionCookieValue, extraFields, persist);
+        const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTotpLogin(request.body.totpCode, oldSessionCookieValue, extraFields, persist);
         
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user?.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user?.username}));
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
+        request.csrfToken = await this.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
+        delete user.totpSecret;
+        delete user.passwordHash;
         return successFn(reply, user);
     }
 
@@ -1361,8 +1414,8 @@ export class FastifyCookieAuthServer {
         let user;
         try {
             if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "No session active while enabling TOTP.  Please enable cookies");
-            const code = request.body.code;
-            user = await this.sessionManager.completeTotpSignup(code, sessionId);
+            const totpCode = request.body.totpCode;
+            user = await this.sessionManager.completeTotpSignup(totpCode, sessionId);
         } catch (e) {
             CrossauthLogger.logger.error(j({msg: "Signtototp failed", hashedSessionCookie: this.getHashOfSessionCookie(request) }));
             CrossauthLogger.logger.debug(j({err: e}));
