@@ -75,7 +75,6 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      */
     async getUserByUsername(
         username : string, 
-        _extraFields? : string[],
         options? : UserStorageGetOptions) : Promise<UserWithPassword> {
         const normalizedUsername = UserStorage.normalize(username);
         if (normalizedUsername in this.usersByUsername) {
@@ -105,7 +104,6 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
     async getUserByEmail(email : string, 
-        _extraFields? : string[],
         options? : UserStorageGetOptions) : Promise<UserWithPassword> {
         const normalizedEmail = UserStorage.normalize(email);
         if (normalizedEmail in this.usersByEmail) {
@@ -134,9 +132,8 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string, 
-        extraFields? : string[],
         options? : UserStorageGetOptions) : Promise<UserWithPassword> {
-        return /*await*/ this.getUserByUsername(id, extraFields, options);
+        return /*await*/ this.getUserByUsername(id, options);
     }
 
     /**

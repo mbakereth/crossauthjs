@@ -73,12 +73,15 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
     async authenticateUser(username : string, password : string) : Promise<User> {
-        let user = await this.userStorage.getUserByUsername(username);
+        let user = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
 
         if (!await Hasher.passwordsEqual(password, user.passwordHash, this.secret)) {
             CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
+        if (user.state == "awaitingtotpsetup") throw new CrossauthError(ErrorCode.TotpIncomplete);
+        if (user.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
+        if (user.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
         delete user.passwordHash;
         return user;
     }

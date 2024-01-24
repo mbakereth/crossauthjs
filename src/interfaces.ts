@@ -22,6 +22,16 @@ export interface Key {
     data? : string,
 
     [ key : string ] : any,
+
+}
+
+export function getJsonData(key : Key) : {[key:string]:any} {
+    if (!key.data) return {}
+    try {
+        return JSON.parse(key.data);
+    } catch {
+        return {};
+    }
 }
 
 /**

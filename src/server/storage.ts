@@ -23,13 +23,11 @@ export abstract class UserStorage {
      * 
      * The username should be matched normalized and lowercased (using normalize())
      * @param username the username to return the user of
-     * @param extraFields extra fields to select (in addition to any pre-configured ones)
      * @param options optionally turn off checks.  Used internally
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
     abstract getUserByUsername(
         username : string, 
-         extraFields? : string[],
          options? : UserStorageGetOptions) : Promise<User>;
 
     /**
@@ -40,12 +38,10 @@ export abstract class UserStorage {
      * 
      * @param id the user id to return the user of
      * @param options optionally turn off checks.  Used internally
-     * @param extraFields extra fields to select (in addition to any pre-configured ones)
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
     abstract getUserById(
         id : string|number, 
-         extraFields? : string[],
          options? : UserStorageGetOptions) : Promise<User>;
 
     /**
@@ -56,12 +52,10 @@ export abstract class UserStorage {
      * 
      * @param email the email address to return the user of
      * @param options optionally turn off checks.  Used internally
-     * @param extraFields extra fields to select (in addition to any pre-configured ones)
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
      */
     abstract getUserByEmail(
         email : string | number, 
-        extraFields? : string[],
         options? : UserStorageGetOptions) : Promise<User>;
 
     /**
@@ -106,7 +100,6 @@ export abstract class UserPasswordStorage extends UserStorage {
      */
     abstract getUserByUsername(
         username : string, 
-        extraFields? : string[],
         options? : UserStorageGetOptions) : Promise<UserWithPassword>;
 
     /**
@@ -114,7 +107,6 @@ export abstract class UserPasswordStorage extends UserStorage {
      * @param id the user ID to match
      */
     abstract getUserById(id : string | number, 
-        extraFields? : string[],
         options? : UserStorageGetOptions) : Promise<UserWithPassword>;
 
     /**
@@ -157,7 +149,6 @@ export abstract class KeyStorage {
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param data an optional value, specific to the type of key, eg new email for email change tokens
-     * @param extraFields these will be stored in the key storage entry
      */
     abstract saveKey(userId : string | number | undefined, 
                          key : string, 

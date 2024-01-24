@@ -22,6 +22,9 @@ export enum ErrorCode {
     /** Thrown on login attempt with a user account marked not having had the email address validated */
     EmailNotVerified,
 
+    /** Thrown on login attempt with a user account marked not having completed TOTP setup */
+    TotpIncomplete,
+
     /** Thrown when a resource expecting authorization was access and authorization not provided or wrong */
     Unauthorized,
 
@@ -122,6 +125,9 @@ export class CrossauthError extends Error {
                 _httpStatus = 403;
             } else if (code == ErrorCode.EmailNotVerified) {
                 _message = "Email address has not been verified"
+                _httpStatus = 403;
+            } else if (code == ErrorCode.TotpIncomplete) {
+                _message = "TOTP setup is not complete"
                 _httpStatus = 403;
             } else if (code == ErrorCode.Unauthorized) {
                 _message = "Not authorized"
