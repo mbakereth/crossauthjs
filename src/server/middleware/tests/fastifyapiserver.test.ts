@@ -185,6 +185,7 @@ test('FastifyServer.api.signupWithoutEmailVerification', async () => {
     } })
     body = JSON.parse(res.body)
     expect(body.ok).toBe(true);
+    expect(body.user.state).toBe("active");
     expect(body.emailVerificationNeeded).toBe(false);
 });
 
@@ -396,4 +397,3 @@ test('FastifyServer.api.changePassword', async () => {
     body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
 });
-

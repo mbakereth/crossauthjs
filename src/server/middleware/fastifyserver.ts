@@ -1337,7 +1337,7 @@ export class FastifyCookieAuthServer {
         // completion.  Send the same response as before, in case the user closed the browser
         let totpInitiated = false;
         try {
-            await this.sessionManager.authenticator.authenticateUser(username, password);
+             await this.sessionManager.authenticator.authenticateUser(username, password);
         } catch (e) {
             if (e instanceof CrossauthError && e.code == ErrorCode.TotpIncomplete) {
                 totpInitiated = true;
@@ -1349,7 +1349,8 @@ export class FastifyCookieAuthServer {
             if (this.addToUser) extraFields = {...extraFields, ...this.addToUser(request)};
             await this.sessionManager.createUser(username, password, extraFields);
             if (!this.enableEmailVerification && this.enableSessions) {
-                return this.login(request, reply, successFn);
+                return this.login(request, reply, (request, user) => {
+                    successFn(request, {}, user)});
             }
             return successFn(reply, {}, undefined);
         } else {

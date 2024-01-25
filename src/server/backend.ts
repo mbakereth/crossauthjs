@@ -380,24 +380,21 @@ export class Backend {
     async createUser(username : string, 
         password : string, 
         extraFields : {[key : string]: string|number|boolean|Date|undefined})
-        : Promise<string|number> {
+        : Promise<User> {
             let passwordHash = await this.authenticator.createPasswordForStorage(password);
-        if (this.enableEmailVerification && this.tokenEmailer) {
-            extraFields = {...extraFields, emailVerified: false};
-        }
         const user : UserInputFields = {
             username: username,
-            state: "active",
+            state: this.enableEmailVerification ? "awaitingemailverification" : "active",
             ...extraFields,
         }
         const secrets : UserSecretsInputFields = {
             password: passwordHash
         }
-        const userId = await this.userStorage.createUser(user, secrets);
+        const newUser = await this.userStorage.createUser(user, secrets);
         if (this.enableEmailVerification && this.tokenEmailer) {
-            await this.tokenEmailer?.sendEmailVerificationToken(userId, undefined)
+            await this.tokenEmailer?.sendEmailVerificationToken(newUser.id, undefined)
         }
-        return userId;
+        return newUser;
     }
 
     async deleteUserByUsername(username : string ) {
@@ -425,9 +422,6 @@ export class Backend {
 
         let passwordHash = await this.authenticator.createPasswordForStorage(password);
         extraFields = {...extraFields, state: "awaitingtotpsetup"};
-        if (this.enableEmailVerification && this.tokenEmailer) {
-            extraFields = {...extraFields, emailVerified: false};
-        }
         const user : UserInputFields = {
             username: username,
             state: "awaitingtotpsetup",
@@ -436,8 +430,8 @@ export class Backend {
         const secrets : UserSecretsInputFields = {
             password: passwordHash
         }
-        const userId = await this.userStorage.createUser(user, secrets);
-        return {userId, qrUrl, secret}
+        const newUser = await this.userStorage.createUser(user, secrets);
+        return {userId: newUser.id, qrUrl, secret}
         
     }
 
@@ -465,8 +459,7 @@ export class Backend {
         }
         const newUser = {
             id: user.id,
-            state: "active",
-            emailVerified: !this.enableEmailVerification,
+            state: this.enableEmailVerification ? "awaitingemailverification" : "active",
         }
         const newSecrets = {
             totpSecret: secret,
@@ -588,7 +581,7 @@ export class Backend {
     /**
      * Takes an email verification token as input and applies it to the user storage.
      * 
-     * The emailVerified flag is set to true.  If the token was for changing the password, the new
+     * The state is reset to active.  If the token was for changing the password, the new
      * password is saved to the user in user storage.
      * 
      * @param token the token to apply
@@ -606,7 +599,9 @@ export class Backend {
         }
         let newUser : Partial<User> = {
             id: user.id,
-            emailVerified: true,
+        }
+        if (user.state = "awaitingemailverification") {
+            newUser.state = "active";
         }
         if (newEmail != "") {
             newUser.email = newEmail;

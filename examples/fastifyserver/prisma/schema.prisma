@@ -16,7 +16,6 @@ model User {
     usernameNormalized  String      @unique
     email               String      @unique
     emailNormalized     String      @unique
-    emailVerified       Boolean     @default(true)
     factor2             String      @default("")
     state               String      @default("active")
 

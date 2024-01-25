@@ -48,9 +48,9 @@ export interface PrismaUserStorageOptions {
  *    * `id Int \@id \@unique \@default(autoincrement())
  * Alternatively you can set it to `username` if you don't have a separate ID field.
  *
- * You can optionally check if an `emailVerified` field is set to `true` when validating users,  Enabling this requires
- * the user table to also have an `emailVerified Boolean` field.  If the username is not the email address,
- * it must contain these extra two fields:
+ * You can optionally check if the `state` field is set to `awaitingemailverification` when validating users.
+ *  If the username is not the email address,
+ *  it must contain these extra two fields:
  *     * `email String \@unique`
  *     * `emailNormalized String \@unique`
  * 
@@ -69,7 +69,7 @@ export class PrismaUserStorage extends UserStorage {
      * Creates a PrismaUserStorage object, optionally overriding defaults.
      * @param userTable the (Prisma, ie lowercase) name of the database table for storing users.  Defaults to `user`.
      * @param idColumn the column for the unique user ID.  May be a number of string.  Defaults to `id`.  May also be set to `username`.
-     * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
+     * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `state` field is not `awaitingemailverification`.  See explaination above.
      * @param checkPasswordReset if set to true, a user will only be returned as valid if the "passwordReset" field is not `true`.  See explaination above.
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
      */
@@ -120,11 +120,11 @@ export class PrismaUserStorage extends UserStorage {
             CrossauthLogger.logger.debug(j({msg: "TOTP setup is not complete"}));
             throw new CrossauthError(ErrorCode.TotpIncomplete);
         }
-        if (options?.skipActiveCheck!=true && prismaUser["state"]!="active") {
+        if (options?.skipActiveCheck!=true && prismaUser["state"]!="active" && prismaUser["state"]=="awaitingtotpsetup") {
             CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
-        if (options?.skipEmailVerifiedCheck!=true && this.enableEmailVerification && !prismaUser["emailVerified"]) {
+        if (options?.skipEmailVerifiedCheck!=true && this.enableEmailVerification && prismaUser["state"]=="awaitingemailverification") {
             CrossauthLogger.logger.debug(j({msg: "User has not verified email"}));
             throw new CrossauthError(ErrorCode.EmailNotVerified);
         }
@@ -234,10 +234,10 @@ export class PrismaUserStorage extends UserStorage {
      * @param extraFields 
      */
     async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
-               : Promise<string|number> {
+               : Promise<User> {
         let error : CrossauthError|undefined = undefined;
         if (secrets && !secrets.password) throw new CrossauthError(ErrorCode.PasswordFormat, "Password required when creating user");
-        let id = 0;
+        let newUser;
         let usernameNormalized = "";
         let emailNormalized = "";
         try {
@@ -247,7 +247,6 @@ export class PrismaUserStorage extends UserStorage {
             if ("username" in user && user.username) {
                 usernameNormalized = PrismaUserStorage.normalize(user.username);
             }
-            let newUser;
             if (secrets) {
 
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -271,7 +270,6 @@ export class PrismaUserStorage extends UserStorage {
                     usernameNormalized,
             });
             }
-            id = newUser[this.idColumn];
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             error = new CrossauthError(ErrorCode.Connection, "Error creating user");
@@ -284,7 +282,7 @@ export class PrismaUserStorage extends UserStorage {
         if (error) {
             throw error;
         }
-        return id;
+        return newUser;
     }
 
    async  deleteUserByUsername(username : string) : Promise<void>  {

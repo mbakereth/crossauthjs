@@ -62,7 +62,7 @@ export abstract class UserStorage {
      * If you enable signup, you will need to implement this method
      */
     createUser(_user : UserInputFields, _secrets : UserSecretsInputFields) 
-        : Promise<string|number> {
+        : Promise<User> {
         throw new CrossauthError(ErrorCode.Configuration);
     }
 

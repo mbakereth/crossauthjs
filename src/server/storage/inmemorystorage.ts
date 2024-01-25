@@ -23,8 +23,7 @@ interface UserWithNormalization extends User {
  * 
  * There is no separate ID field - it is set to username.
  *
- * You can optionally check if an `emailVerified` field is set to `true` when validating users,  Enabling this requires
- * the user table to also have an `emailVerified Boolean` field.
+ * You can optionally check if the state field is set to `awaitingemailverification` when validating users,  
 */
 export class InMemoryUserStorage extends UserStorage {
     usersByUsername : { [key : string]: User } = {};
@@ -35,7 +34,7 @@ export class InMemoryUserStorage extends UserStorage {
 
     /**
      * Creates a InMemoryUserStorage object, optionally overriding defaults.
-     * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `emailVerified` field is `true`.  See explaination above.
+     * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `state` field is not `awaitingemailverification`.  See explaination above.
     */
     constructor({enableEmailVerification} : InMemoryUserStorageOptions = {}) {
         super();
@@ -51,7 +50,7 @@ export class InMemoryUserStorage extends UserStorage {
      * @param extraFields 
      */
     async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
-        : Promise<string|number> {
+        : Promise<User> {
 
             user.usernameNormalized = UserStorage.normalize(user.username);
             if ("email" in user && user.email) {
@@ -64,7 +63,7 @@ export class InMemoryUserStorage extends UserStorage {
             if ("email" in user && user.email) this.usersByEmail[user.emailNormalized] = userToStore;
             if ("email" in user && user.email) this.secretsByEmail[user.emailNormalized] = secrets||{};
 
-        return user.username;
+        return {id: user.username, ...user};
     }
 
     /**
@@ -82,13 +81,17 @@ export class InMemoryUserStorage extends UserStorage {
 
             const user = this.usersByUsername[usernameNormalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
-            if (user['state'] != "active") {
-                CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
-                throw new CrossauthError(ErrorCode.UserNotActive);
+            if (options?.skipActiveCheck!=true && user["state"]=="awaitingtotpsetup") {
+                CrossauthLogger.logger.debug(j({msg: "TOTP setup is not complete"}));
+                throw new CrossauthError(ErrorCode.TotpIncomplete);
             }
-            if (options?.skipEmailVerifiedCheck!=true && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
+            if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification" && this.enableEmailVerification) {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
+            }
+            if (user['state'] != "active" && user['state'] != "awaitingemailverification") {
+                CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
+                throw new CrossauthError(ErrorCode.UserNotActive);
             }
             const secrets = this.secretsByUsername[usernameNormalized];
             return {user: {...user}, secrets: {userId: user.id, ...secrets}};
@@ -112,13 +115,13 @@ export class InMemoryUserStorage extends UserStorage {
 
             const user = this.usersByEmail[emailNormalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
+            if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification" && this.enableEmailVerification) {
+                CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
+                throw new CrossauthError(ErrorCode.EmailNotVerified);
+            }
             if (user['state'] != "active") {
                 CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
-            }
-            if (options?.skipEmailVerifiedCheck!=true && 'emailVerified' in user && user['emailVerified'] == false && this.enableEmailVerification) {
-                CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
-                throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
             const secrets = this.secretsByEmail[emailNormalized];
             return {user: {...user}, secrets: {userId: user.id, ...secrets}};
