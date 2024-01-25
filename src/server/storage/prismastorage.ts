@@ -23,15 +23,6 @@ export interface PrismaUserStorageOptions {
      */
     idColumn? : string,
 
-    /** If true, check if the `userVerified` field in the user table is true when fetching a user.
-     * Must add this field to your table as a boolean. */
-    enableEmailVerification? : boolean,
-
-
-    /** If true, check if the `passwordReset` field in the user table is true when fetching a user.
-     * Must add this field to your table as a boolean. Intended to enable forcing a user to reset their password */
-    checkPasswordReset? : boolean,
-
     /** The prisma client instanfce.  Leave this out to have Crossauth create a default one */
     prismaClient? : PrismaClient,
 }
@@ -61,15 +52,12 @@ export class PrismaUserStorage extends UserStorage {
     private userTable : string = "user";
     private userSecretsTable : string = "userSecrets";
     private idColumn : string = "id";
-    readonly enableEmailVerification : boolean = false;
-    readonly checkPasswordReset : boolean = false;
     private prismaClient : PrismaClient;
 
     /**
      * Creates a PrismaUserStorage object, optionally overriding defaults.
      * @param userTable the (Prisma, ie lowercase) name of the database table for storing users.  Defaults to `user`.
      * @param idColumn the column for the unique user ID.  May be a number of string.  Defaults to `id`.  May also be set to `username`.
-     * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `state` field is not `awaitingemailverification`.  See explaination above.
      * @param checkPasswordReset if set to true, a user will only be returned as valid if the "passwordReset" field is not `true`.  See explaination above.
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
      */
@@ -78,8 +66,6 @@ export class PrismaUserStorage extends UserStorage {
         setParameter("userTable", ParamType.String, this, options, "USER_TABLE");
         setParameter("userSecretsTable", ParamType.String, this, options, "USER_SECRETS_TABLE");
         setParameter("idColumn", ParamType.String, this, options, "USER_ID_COLUMN");
-        setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
-        setParameter("checkPasswordReset", ParamType.String, Boolean, options, "CHECK_PASSWORD_RESET");
 
         if (options && options.prismaClient) {
             this.prismaClient = options.prismaClient;
@@ -120,15 +106,15 @@ export class PrismaUserStorage extends UserStorage {
             CrossauthLogger.logger.debug(j({msg: "TOTP setup is not complete"}));
             throw new CrossauthError(ErrorCode.TotpIncomplete);
         }
-        if (options?.skipActiveCheck!=true && prismaUser["state"]!="active" && prismaUser["state"]=="awaitingtotpsetup") {
+        if (options?.skipActiveCheck!=true && prismaUser["state"]=="disabled") {
             CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
-        if (options?.skipEmailVerifiedCheck!=true && this.enableEmailVerification && prismaUser["state"]=="awaitingemailverification") {
+        if (options?.skipEmailVerifiedCheck!=true && prismaUser["state"]=="awaitingemailverification") {
             CrossauthLogger.logger.debug(j({msg: "User has not verified email"}));
             throw new CrossauthError(ErrorCode.EmailNotVerified);
         }
-        if (this.checkPasswordReset && !prismaUser["checkPasswordReset"]) {
+        if (prismaUser["state"] == "resetpassword") {
             CrossauthLogger.logger.debug(j({msg: "User must reset password"}));
             throw new CrossauthError(ErrorCode.PasswordResetNeeded);
         }

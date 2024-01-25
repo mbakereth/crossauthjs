@@ -9,7 +9,6 @@ import { CrossauthLogger, j } from '../..';
  * See {@link InMemoryUserStorage.constructor} for definitions.
  */
 export interface InMemoryUserStorageOptions {
-    enableEmailVerification? : boolean,
 }
 
 interface UserWithNormalization extends User {
@@ -30,17 +29,13 @@ export class InMemoryUserStorage extends UserStorage {
     usersByEmail : { [key : string]: User } = {};
     secretsByUsername : { [key : string]: UserSecretsInputFields } = {};
     secretsByEmail : { [key : string]: UserSecretsInputFields } = {};
-    private enableEmailVerification : boolean = false;
 
     /**
      * Creates a InMemoryUserStorage object, optionally overriding defaults.
      * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `state` field is not `awaitingemailverification`.  See explaination above.
     */
-    constructor({enableEmailVerification} : InMemoryUserStorageOptions = {}) {
+    constructor(_options : InMemoryUserStorageOptions = {}) {
         super();
-        if (enableEmailVerification) {
-            this.enableEmailVerification = enableEmailVerification;
-        }
     }
 
     /**
@@ -81,15 +76,19 @@ export class InMemoryUserStorage extends UserStorage {
 
             const user = this.usersByUsername[usernameNormalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
+            if (options?.skipActiveCheck!=true && user["state"]=="passwordreset") {
+                CrossauthLogger.logger.debug(j({msg: "Password reset reqzured"}));
+                throw new CrossauthError(ErrorCode.PasswordResetNeeded);
+            }
             if (options?.skipActiveCheck!=true && user["state"]=="awaitingtotpsetup") {
                 CrossauthLogger.logger.debug(j({msg: "TOTP setup is not complete"}));
                 throw new CrossauthError(ErrorCode.TotpIncomplete);
             }
-            if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification" && this.enableEmailVerification) {
+            if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification") {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
-            if (user['state'] != "active" && user['state'] != "awaitingemailverification") {
+            if (options?.skipActiveCheck!=true && user['state'] == "disabled") {
                 CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
@@ -115,7 +114,7 @@ export class InMemoryUserStorage extends UserStorage {
 
             const user = this.usersByEmail[emailNormalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
-            if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification" && this.enableEmailVerification) {
+            if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification") {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
