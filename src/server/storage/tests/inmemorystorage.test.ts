@@ -83,5 +83,5 @@ test("InMemoryKeyStorage.deleteAllKeysForUserExcept", async() => {
 test("InMemoryKeyStorage.secretedHashDifferentFromUnsecreted", async() => {
     const bob = await userStorage.getUserByUsername("bob");
     const secretedBob = await secretUserStorage.getUserByUsername("bob");
-    expect(bob.passwordHash).not.toBe(secretedBob.passwordHash);
+    expect(bob.password).not.toBe(secretedBob.password);
 });

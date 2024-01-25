@@ -56,6 +56,6 @@ export interface UserWithPassword extends User {
      * Password in PBKPDF2 hashed form, with the algorithm, iterations, etc.  
      * See {@link server!HashedPasswordAuthenticator.decodePasswordHash} 
      */
-    passwordHash : string
+    password : string
 }
 

@@ -376,7 +376,7 @@ function defaultUserValidator(user : User) : string[] {
  * | GET    | /api/userforsessionkey     |             |                                          |                          |                    | 
  * | GET    | /api/getcsrctoken          |             |                                          |                          |                    | 
  * 
- * If you have fields other than `id`, `username` and `passwordHash` in your user table, add them in 
+ * If you have fields other than `id`, `username` and `password` in your user table, add them in 
  * `extraFields` when you create your {@link UserStorage} object.  In your signup and user update pages
  * (`signupPage`, `updateUserPage`), prefix these with `user_` in field names and they will be passed
  * into the user object when processing the form.  If there is an error processing the form, they will
@@ -554,7 +554,7 @@ export class FastifyCookieAuthServer {
                     let {key, user} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
                     if (this.validateSession) this.validateSession(key, user, request);
                     if (user) {
-                        delete user.passwordHash;
+                        delete user.password;
                         delete user.totpSecret;
                     }
 
@@ -1263,7 +1263,7 @@ export class FastifyCookieAuthServer {
         }
         user.totpRequired = "totpSecret" in user && user.totpSecret != "";
         delete user.totpSecret;
-        delete user.passwordHash;
+        delete user.password;
         return successFn(reply, user);
     }
 
@@ -1286,7 +1286,7 @@ export class FastifyCookieAuthServer {
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         request.csrfToken = await this.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
         delete user.totpSecret;
-        delete user.passwordHash;
+        delete user.password;
         return successFn(reply, user);
     }
 
@@ -1431,7 +1431,7 @@ export class FastifyCookieAuthServer {
             throw e;
         }
         if (user) {
-            delete user.passwordHash;
+            delete user.password;
             delete user.totpSecret;
         }
         return successFn(reply, user);
@@ -1506,7 +1506,7 @@ export class FastifyCookieAuthServer {
         if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification reset not enabled");
         const token = request.params.token;
         const user = await this.sessionManager.applyEmailVerificationToken(token);
-        delete user.passwordHash;
+        delete user.password;
         delete user.totpSecret;
         return await this.loginWithUser(user, request, reply, successFn);
     }
@@ -1526,7 +1526,7 @@ export class FastifyCookieAuthServer {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
         const user = await this.sessionManager.resetPassword(token, newPassword);
-        delete user.passwordHash;
+        delete user.password;
         delete user.totpSecret;
         return this.loginWithUser(user, request, reply, successFn);
     }

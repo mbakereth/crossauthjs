@@ -497,7 +497,6 @@ export class SessionCookie {
         const sessionId = this.unsignCookie(cookieValue);
         const now = Date.now();
         const hashedSessionId = SessionCookie.hashSessionKey(sessionId);
-        console.log("getSessionKey", cookieValue, sessionId, hashedSessionId);
         const key = await this.keyStorage.getKey(hashedSessionId);
         key.value = sessionId; // storage only has hashed version
         if (key.expires) {

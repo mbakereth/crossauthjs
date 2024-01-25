@@ -61,7 +61,7 @@ export abstract class UserStorage {
     /**
      * If you enable signup, you will need to implement this method
      */
-    createUser(_username : string, _passwordHash : string, _extraFields : {[key : string]: string|number|boolean|Date|undefined}) 
+    createUser(_username : string, _password : string, _extraFields : {[key : string]: string|number|boolean|Date|undefined}) 
         : Promise<string|number> {
         throw new CrossauthError(ErrorCode.Configuration);
     }
@@ -110,15 +110,15 @@ export abstract class UserPasswordStorage extends UserStorage {
         options? : UserStorageGetOptions) : Promise<UserWithPassword>;
 
     /**
-     * Removes the passwordHash field from the user object
+     * Removes the password field from the user object
      * 
      * Doesn't change the passed user object, just removes it from a copy.
      * 
      * @param user the user object to remove password from
-     * @returns a new User object without passwordHash
+     * @returns a new User object without password
      */
     static removePasswordHash(user : User) {
-        const { passwordHash, ...rest} = user;
+        const { password, ...rest} = user;
         return rest;
     }
 }

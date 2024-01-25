@@ -328,7 +328,7 @@ export class TokenEmailer {
      *     * expiry date in the key storage record must be less than current time
      *     * userId in the token must match the userId in the key storage
      *     * the email in the token matches either the email or username field in user storage
-     *     * the passwordHash in user storage must match the passwordHash in the key
+     *     * the password in user storage must match the password in the key
      *     * expiry time in the key storage must match the expiry time in the key
      * Looks the token up in key storage and verifies it matches and has not expired.  Also verifies
      * the user exists and password has not changed in the meantime.

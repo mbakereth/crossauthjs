@@ -14,13 +14,13 @@ async function main() {
   const item1 = await prisma.user.create({
     data: {
       username : "bob",
-      passwordHash: hasher.createPasswordHash("bobPass123", true),
+      password: hasher.createpassword("bobPass123", true),
     },
   });
   const item2 = await prisma.user.create({
     data: {
       username : "alice",
-      passwordHash: hasher.createPasswordHash("alicePass123", true),
+      password: hasher.createPasswordHash("alicePass123", true),
     },
   });
   console.log({ item1, item2 })

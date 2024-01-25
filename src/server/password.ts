@@ -75,14 +75,14 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
     async authenticateUser(username : string, password : string) : Promise<User> {
         let user = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
 
-        if (!await Hasher.passwordsEqual(password, user.passwordHash, this.secret)) {
+        if (!await Hasher.passwordsEqual(password, user.password, this.secret)) {
             CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
         if (user.state == "awaitingtotpsetup") throw new CrossauthError(ErrorCode.TotpIncomplete);
         if (user.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
         if (user.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
-        delete user.passwordHash;
+        delete user.password;
         return user;
     }
 
@@ -127,7 +127,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
     /**
      * A static version of the password hasher, provided for convenience
      * @param password : unhashed password
-     * @param passwordHash : hashed password
+     * @param password : hashed password
      * @param secret secret, if used when hashing passwords, or undefined if not
      * @returns true if match, false otherwise
      */

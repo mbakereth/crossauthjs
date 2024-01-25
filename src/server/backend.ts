@@ -517,7 +517,6 @@ export class Backend {
 
     async completeTotpLogin(code : string, sessionCookieValue : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
         if (!this.session|| !this.csrfTokens || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "Sessions and TOTP must be enabled for 2FA");
-        console.log("completeTotpLogin", sessionCookieValue);
         let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
         if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
         let { username } = getJsonData(key);
@@ -591,7 +590,7 @@ export class Backend {
         let user = await this.authenticator.authenticateUser(username, oldPassword);
         await this.userStorage.updateUser({
             id: user.id,
-            passwordHash: await this.authenticator.createPasswordForStorage(newPassword),
+            password: await this.authenticator.createPasswordForStorage(newPassword),
         })
 
         // delete any password reset tokens
@@ -613,7 +612,7 @@ export class Backend {
         if (!("username" in currentUser) || currentUser.username == undefined) {
             throw new CrossauthError(ErrorCode.UserNotExist, "Please specify a userername");
         }
-        let { email, username, passwordHash, ...rest} = newUser;
+        let { email, username, password, ...rest} = newUser;
         rest.userId = currentUser.userId;
         let hasEmail = false;
         if (email) {
@@ -647,7 +646,7 @@ export class Backend {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
         await this.userStorage.updateUser({
             id: user.id,
-            passwordHash: await this.authenticator.createPasswordForStorage(newPassword),
+            password: await this.authenticator.createPasswordForStorage(newPassword),
         })
         //this.keyStorage.deleteKey(TokenEmailer.hashPasswordResetToken(token));
 

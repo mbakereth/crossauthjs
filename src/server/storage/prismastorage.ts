@@ -40,7 +40,7 @@ export interface PrismaUserStorageOptions {
  * By default, the Prisma name (ie the lowercased version) is called `user`.  It must have at least these fields:
  *    * `username String \@unique`
  *    * `normalizedUsername String \@unique`
- *    * `passwordHash String`
+ *    * `password String`
  * It must also contain an ID column, which is either an `Int` or `String`, eg
  *    * `id Int \@id \@unique \@default(autoincrement())
  * Alternatively you can set it to `username` if you don't have a separate ID field.
@@ -202,7 +202,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @param extraFields 
      */
     async createUser(username : string, 
-               passwordHash : string, 
+               password : string, 
                extraFields : {[key : string]: string|number|boolean|Date|undefined})
                : Promise<string|number> {
         let error : CrossauthError|undefined = undefined;
@@ -210,7 +210,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
         try {
             let data : {[key : string] : any} = {
                 username : username,
-                passwordHash : passwordHash,
+                password : password,
                 state: "active",
                 ...extraFields,
             };

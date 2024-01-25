@@ -45,14 +45,14 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @param extraFields 
      */
     async createUser(username : string, 
-        passwordHash : string, 
+        password : string, 
         extraFields : {[key : string]: string|number|boolean|Date|undefined})
         : Promise<string|number> {
 
             let newUser : UserWithPassword = {
                 username: username, 
                 id: username, 
-                passwordHash: passwordHash,
+                password: password,
                 state: "active",
                 normalizedUsername: UserStorage.normalize(username),
                 ...extraFields,

@@ -13,7 +13,7 @@ datasource db {
 model User {
     id                  Int         @id @unique @default(autoincrement())
     username            String      @unique
-    passwordHash        String
+    password        String
     email               String      @unique
 
     session Key[]
