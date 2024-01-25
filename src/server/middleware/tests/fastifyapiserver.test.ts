@@ -201,7 +201,7 @@ test('FastifyServer.api.wrongCsrf', async () => {
     // Error on invalid token
     res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "abc", csrfToken: csrfToken} })
     body = JSON.parse(res.body);
-    expect(body.codeName).toBe("InvalidKey");
+    expect(body.errorCodeName).toBe("InvalidKey");
     expect(body.ok).toBe(false);
     expect(res.statusCode).toBe(401);
 
@@ -210,7 +210,7 @@ test('FastifyServer.api.wrongCsrf', async () => {
     const csrfCookie2 = csrfTokens?.makeCsrfCookie(Hasher.randomValue(16));
     res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie2?.value||""}, payload: {username: "bob", password: "abc", csrfToken: csrfToken2} })
     body = JSON.parse(res.body);
-    expect(body.codeName).toBe("InvalidKey");
+    expect(body.errorCodeName).toBe("InvalidKey");
     expect(body.ok).toBe(false);
     expect(res.statusCode).toBe(401);
 });
@@ -354,7 +354,7 @@ test('FastifyServer.api.changePassword', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(401);
-    expect(body.codeName).toBe("PasswordInvalid");
+    expect(body.errorCodeName).toBe("PasswordInvalid");
 
     // check empty password caught
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
@@ -365,7 +365,7 @@ test('FastifyServer.api.changePassword', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(400);
-    expect(body.codeName).toBe("PasswordFormat");
+    expect(body.errorCodeName).toBe("PasswordFormat");
 
     // check mismatched passwords caught
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
@@ -376,7 +376,7 @@ test('FastifyServer.api.changePassword', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(400);
-    expect(body.codeName).toBe("PasswordMatch");
+    expect(body.errorCodeName).toBe("PasswordMatch");
 
     // check successful change
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
