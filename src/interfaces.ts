@@ -40,22 +40,19 @@ export function getJsonData(key : Key) : {[key:string]:any} {
  * This is extendible with additional keys - provide them to the {@link server!UserStorage} class as `extraFields`.
  * You may want to do this if you want to pass additional user data back to the caller, eg real name.
  */
-export interface User {
-    id : string | number,
+export interface UserInputFields {
     username : string,
     state : string,
     [ key : string ] : any,
 }
-
-/**
- * Extends the {@link User} interface to also require a password.  Used as input to functions that
- * perform password authentication
- */
-export interface UserWithPassword extends User {
-    /** 
-     * Password in PBKPDF2 hashed form, with the algorithm, iterations, etc.  
-     * See {@link server!HashedPasswordAuthenticator.decodePasswordHash} 
-     */
-    password : string
+export interface User extends UserInputFields {
+    id : string | number,
 }
 
+export interface UserSecretsInputFields {
+    password? : string,
+    totpSecret? : string,
+}
+export interface UserSecrets extends UserSecretsInputFields {
+    userId : string|number,
+}

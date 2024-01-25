@@ -13,13 +13,13 @@ beforeAll(async () => {
 
 test('HashedPasswordAuthenticator.authenticateUser', async () => {
     let authenticator = new HashedPasswordAuthenticator(userStorage);
-    let user = await authenticator.authenticateUser("bob", "bobPass123");
+    let {user} = await authenticator.authenticateUser("bob", "bobPass123");
     expect(user.username).toBe("bob");
 });
 
 test('HashedPasswordAuthenticator.authenticateUseWithSecret', async () => {
     let authenticator = new HashedPasswordAuthenticator(secretUserStorage, 
         {secret: "ABCDEFGHIJKLMNOPQRSTUV", enableSecretForPasswordHash: true});
-    let user = await authenticator.authenticateUser("bob", "bobPass123");
+    let {user} = await authenticator.authenticateUser("bob", "bobPass123");
     expect(user.username).toBe("bob");
 });

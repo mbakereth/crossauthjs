@@ -14,20 +14,20 @@ beforeAll(async () => {
 
 // test getting a user by username and by id
 test('InMemoryUserStorage.getUser', async () => {
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     expect(bob.username).toBe("bob");
     const id = bob.id;
-    const bob2 = await userStorage.getUserById(bob.username);
+    const {user: bob2} = await userStorage.getUserById(bob.username);
     expect(bob2.id).toBe(id);
     await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
 });
 
 // test updating a field
 test('InMemoryUserStorage.updateUser', async () => {
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     expect(bob.username).toBe("bob");
     userStorage.updateUser({id: "bob", dummyField: "def"});
-    const bob2 = await userStorage.getUserByUsername("bob");
+    const {user: bob2} = await userStorage.getUserByUsername("bob");
     expect(bob2.dummyField).toBe("def");
 });
 
@@ -35,13 +35,13 @@ test('InMemoryUserStorage.updateUser', async () => {
 test('InMemoryKeyStorage.createGetAndDeleteSession', async () => {
     const key = "ABCDEF123";
     const keyStorage = new InMemoryKeyStorage();
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     const now = new Date();
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await keyStorage.saveKey(bob.username, key, now, expiry);
     let sessionKey = await keyStorage.getKey(key);
-   expect(sessionKey.userId).toBe(bob.id);
+    expect(sessionKey.userId).toBe(bob.id);
     expect(sessionKey.expires).toStrictEqual(expiry);
     keyStorage.deleteKey(key);
     await expect(async () => {await keyStorage.getKey(key)}).rejects.toThrowError(CrossauthError);
@@ -51,7 +51,7 @@ test("InMemoryKeyStorage.deleteAllKeysForUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
     const keyStorage = new InMemoryKeyStorage();
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     const now = new Date();
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
@@ -67,7 +67,7 @@ test("InMemoryKeyStorage.deleteAllKeysForUserExcept", async() => {
     const key1 = "ABCDEF789";
     const key2 = "ABCDEF012";
     const keyStorage = new InMemoryKeyStorage();
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     const now = new Date();
     const expiry = new Date();
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
@@ -81,7 +81,7 @@ test("InMemoryKeyStorage.deleteAllKeysForUserExcept", async() => {
 });
 
 test("InMemoryKeyStorage.secretedHashDifferentFromUnsecreted", async() => {
-    const bob = await userStorage.getUserByUsername("bob");
-    const secretedBob = await secretUserStorage.getUserByUsername("bob");
-    expect(bob.password).not.toBe(secretedBob.password);
+    const {secrets: bobSecrets} = await userStorage.getUserByUsername("bob");
+    const {secrets: secretedBobSecrets} = await secretUserStorage.getUserByUsername("bob");
+    expect(bobSecrets.password).not.toBe(secretedBobSecrets.password);
 });

@@ -284,7 +284,7 @@ test('FastifyServer.api.changeEmailWithoutVerification', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     expect(bob.email).toBe("newbob@bob.com");
 });
 
@@ -315,7 +315,7 @@ test('FastifyServer.api.changeEmailWithVerification', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     expect(bob.email).toBe("bob@bob.com");
 
     // verify token
@@ -325,7 +325,7 @@ test('FastifyServer.api.changeEmailWithVerification', async () => {
     body = JSON.parse(res.body)
     expect(body.ok).toBe(true);
     expect(res.statusCode).toBe(200);
-    const bob2 = await userStorage.getUserByUsername("bob");
+    const {user: bob2} = await userStorage.getUserByUsername("bob");
     expect(bob2.email).toBe("newbob@bob.com");
 });
 

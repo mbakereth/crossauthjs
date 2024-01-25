@@ -1,9 +1,6 @@
-import type { 
-    User,
-    Key 
-} from '../interfaces.ts';
+import type { User, Key } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
-import { UserStorage, UserPasswordStorage, KeyStorage } from './storage';
+import { UserStorage, KeyStorage } from './storage';
 import { type TokenEmailerOptions } from './email.ts';
 import { Hasher } from './hasher';
 import { CrossauthLogger, j } from '../logger.ts';
@@ -474,8 +471,7 @@ export class SessionCookie {
     async getUserForSessionKey(cookieValue: string) : Promise<{user: User|undefined, key : Key}> {
         const key = await this.getSessionKey(cookieValue);
         if (key.userId) {
-            let user = await this.userStorage.getUserById(key.userId);
-            user = UserPasswordStorage.removePasswordHash(user);
+            let {user} = await this.userStorage.getUserById(key.userId);
             return {user, key};
         } else {
             return {user: undefined, key};

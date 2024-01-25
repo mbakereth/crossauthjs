@@ -1,4 +1,4 @@
-import { type User, type Key, getJsonData } from '../interfaces.ts';
+import { type User, UserSecrets, type Key, getJsonData, UserInputFields, UserSecretsInputFields } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
 import { UsernamePasswordAuthenticator } from "./password";
@@ -141,14 +141,23 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, password : string, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
+    async login(username : string, password : string, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User, secrets: UserSecrets}> {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
 
         let bypass2FA = user != undefined;
 
-        if (!user) user = await this.authenticator.authenticateUser(username, password);
+        let secrets : UserSecrets|undefined;
+        if (!user) 
+        {
+            let {user: user1, secrets: secrets1} = await this.authenticator.authenticateUser(username, password);
+            user = user1;
+            secrets = secrets1;
+        } else {
+            let {secrets: secrets1} = await this.userStorage.getUserById(user.id);
+            secrets = secrets1;
+        }
         let sessionCookie : Cookie;
-        if (!bypass2FA && user.totpSecret && user.totpSecret != "") {
+        if (!bypass2FA && secrets && secrets.totpSecret && secrets.totpSecret != "") {
             // create an anonymous session and store the username in it
             const { sessionCookie: newSssionCookie } = await this.initiateTotpLogin(user);
             sessionCookie = newSssionCookie;
@@ -170,7 +179,8 @@ export class Backend {
             sessionCookie: sessionCookie,
             csrfCookie: csrfCookie,
             csrfForOrHeaderValue: csrfForOrHeaderValue,
-            user: user
+            user: user,
+            secrets: secrets,
         }
     }
 
@@ -375,7 +385,15 @@ export class Backend {
         if (this.enableEmailVerification && this.tokenEmailer) {
             extraFields = {...extraFields, emailVerified: false};
         }
-            const userId = await this.userStorage.createUser(username, passwordHash, extraFields);
+        const user : UserInputFields = {
+            username: username,
+            state: "active",
+            ...extraFields,
+        }
+        const secrets : UserSecretsInputFields = {
+            password: passwordHash
+        }
+        const userId = await this.userStorage.createUser(user, secrets);
         if (this.enableEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(userId, undefined)
         }
@@ -410,7 +428,15 @@ export class Backend {
         if (this.enableEmailVerification && this.tokenEmailer) {
             extraFields = {...extraFields, emailVerified: false};
         }
-        const userId = await this.userStorage.createUser(username, passwordHash, extraFields);
+        const user : UserInputFields = {
+            username: username,
+            state: "awaitingtotpsetup",
+            ...extraFields,
+        }
+        const secrets : UserSecretsInputFields = {
+            password: passwordHash
+        }
+        const userId = await this.userStorage.createUser(user, secrets);
         return {userId, qrUrl, secret}
         
     }
@@ -422,7 +448,7 @@ export class Backend {
         const sessionId = this.session.unsignCookie(sessionCookieValue);
         const { qrUrl, secret} = await this.totpManager.getSecretFromSession(username, sessionId);
 
-        const user = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+        const {user} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
         return {userId: user.id, qrUrl, secret}
         
     }
@@ -433,14 +459,19 @@ export class Backend {
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         const { username, secret } = await this.totpManager.validateCodeFromKey(code, key);
 
-        if (!user) user = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+        if (!user) {
+            const {user: user1} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+            user = user1;
+        }
         const newUser = {
             id: user.id,
             state: "active",
             emailVerified: !this.enableEmailVerification,
+        }
+        const newSecrets = {
             totpSecret: secret,
         }
-        await this.userStorage.updateUser(newUser);
+        await this.userStorage.updateUser(newUser, newSecrets);
         if (this.enableEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(user.id, undefined)
         }
@@ -464,7 +495,7 @@ export class Backend {
         const sessionId = this.session.unsignCookie(sessionCookieValue);
         const { qrUrl, secret } = await this.totpManager.createAndStoreSecret(username, sessionId);
 
-        await this.userStorage.updateUser({id: userId, totpSecret: secret});
+        await this.userStorage.updateUser({id: userId}, {totpSecret: secret});
 
         return qrUrl
         
@@ -475,13 +506,18 @@ export class Backend {
         let {user, key} = await this.session.getUserForSessionKey(sessionId);
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         const { username, secret } = await this.totpManager.validateCodeFromKey(code, key);
-        if (!user) user = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+        if (!user) {
+            const {user: user1} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+            user = user1;
+        }
         const newUser = {
             id: user.id,
             state: "active",
+        }
+        const newSecrets = {
             totpSecret: secret,
         }
-        await this.userStorage.updateUser(newUser);
+        await this.userStorage.updateUser(newUser, newSecrets);
         await this.keyStorage.updateKey({value: SessionCookie.hashSessionKey(key.value), data: ""});
         return {...user, ...newUser};
     }
@@ -496,7 +532,7 @@ export class Backend {
         userId : string|number) {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions and TOTP must be enabled for 2FA");
 
-        await this.userStorage.updateUser({id: userId, totpSecret: ""});
+        await this.userStorage.updateUser({id: userId}, {totpSecret: ""});
     }
 
     async initiateTotpLogin(
@@ -520,7 +556,7 @@ export class Backend {
         let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
         if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
         let { username } = getJsonData(key);
-        const user = await this.userStorage.getUserByUsername(username);
+        const {user} = await this.userStorage.getUserByUsername(username);
         await this.totpManager.validateCodeFromUser(code, user);
 
         const newSessionKey = await this.session.createSessionKey(user.id, extraFields);
@@ -545,7 +581,7 @@ export class Backend {
     }
 
     async requestPasswordReset(email : string) : Promise<void> {
-        const user = await this.userStorage.getUserByEmail(email);
+        const {user} = await this.userStorage.getUserByEmail(email);
         await this.tokenEmailer?.sendPasswordResetToken(user.id);
     }
 
@@ -561,7 +597,7 @@ export class Backend {
     async applyEmailVerificationToken(token : string) : Promise<User> {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Email verification not enabled");
         let { userId, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
-        let user = await this.userStorage.getUserById(userId, {skipEmailVerifiedCheck: true});
+        let {user} = await this.userStorage.getUserById(userId, {skipEmailVerifiedCheck: true});
         let oldEmail;
         if ("email" in user && user.email != undefined) {
             oldEmail = user.email;
@@ -587,11 +623,10 @@ export class Backend {
     }
 
     async changePassword(username : string, oldPassword : string, newPassword : string) : Promise<User> {
-        let user = await this.authenticator.authenticateUser(username, oldPassword);
-        await this.userStorage.updateUser({
-            id: user.id,
-            password: await this.authenticator.createPasswordForStorage(newPassword),
-        })
+        let {user} = await this.authenticator.authenticateUser(username, oldPassword);
+        await this.userStorage.updateUser({id: user.id}, 
+            {password: await this.authenticator.createPasswordForStorage(newPassword)}
+        );
 
         // delete any password reset tokens
         try {
@@ -644,10 +679,10 @@ export class Backend {
 
         const user = await this.userForPasswordResetToken(token);
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
-        await this.userStorage.updateUser({
-            id: user.id,
-            password: await this.authenticator.createPasswordForStorage(newPassword),
-        })
+        await this.userStorage.updateUser(
+            {id: user.id},
+            {password: await this.authenticator.createPasswordForStorage(newPassword)},
+        );
         //this.keyStorage.deleteKey(TokenEmailer.hashPasswordResetToken(token));
 
         // delete all password reset tokens

@@ -139,7 +139,7 @@ test('FastifyServer.signupWithEmailVerification', async () => {
     } })
     body = JSON.parse(res.body)
     expect(body.template).toBe("signup.njk");
-    expect(body.args.codeName).toBe("PasswordMatch");
+    expect(body.args.errorCodeName).toBe("PasswordMatch");
     
     // successful signup
     res = await server.app.inject({ method: "POST", url: "/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
@@ -201,7 +201,7 @@ test('FastifyServer.wrongCsrf', async () => {
     // Error on invalid token
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "abc", csrfToken: csrfToken} })
     body = JSON.parse(res.body);
-    expect(body.args.codeName).toBe("InvalidKey");
+    expect(body.args.errorCodeName).toBe("InvalidKey");
 
     // error on invalid cookie
     res = await server.app.inject({ method: "GET", url: "/login" })
@@ -209,7 +209,7 @@ test('FastifyServer.wrongCsrf', async () => {
     const csrfCookie2 = csrfTokens?.makeCsrfCookie(Hasher.randomValue(16));
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie2?.value||""}, payload: {username: "bob", password: "abc", csrfToken: csrfToken2} })
     body = JSON.parse(res.body);
-    expect(body.args.codeName).toBe("InvalidKey");
+    expect(body.args.errorCodeName).toBe("InvalidKey");
 
 });
 
@@ -287,7 +287,7 @@ test('FastifyServer.changeEmailWithoutVerification', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     expect(bob.email).toBe("newbob@bob.com");
 });
 
@@ -325,7 +325,7 @@ test('FastifyServer.changeEmailWithVerification', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    const bob = await userStorage.getUserByUsername("bob");
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     expect(bob.email).toBe("bob@bob.com");
 
     // verify token
@@ -334,7 +334,7 @@ test('FastifyServer.changeEmailWithVerification', async () => {
     res = await server.app.inject({ method: "GET", url: "/verifyemail/" + token});
     body = JSON.parse(res.body)
     expect(body.template).toBe("emailverified.njk");
-    const bob2 = await userStorage.getUserByUsername("bob");
+    const {user: bob2} = await userStorage.getUserByUsername("bob");
     expect(bob2.email).toBe("newbob@bob.com");
 });
 
@@ -370,7 +370,7 @@ test('FastifyServer.changePassword', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    expect(body.args.codeName).toBe("UsernameOrPasswordInvalid");
+    expect(body.args.errorCodeName).toBe("UsernameOrPasswordInvalid");
 
     // check empty password caught
     res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
@@ -381,7 +381,7 @@ test('FastifyServer.changePassword', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    expect(body.args.codeName).toBe("PasswordFormat");
+    expect(body.args.errorCodeName).toBe("PasswordFormat");
 
     // check mismatched passwords caught
     res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
@@ -392,7 +392,7 @@ test('FastifyServer.changePassword', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    expect(body.args.codeName).toBe("PasswordMatch");
+    expect(body.args.errorCodeName).toBe("PasswordMatch");
 
     // check successful change
     res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
@@ -403,7 +403,7 @@ test('FastifyServer.changePassword', async () => {
     } });
     body = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    expect(body.args.codeName).toBeUndefined();
+    expect(body.args.errorCodeName).toBeUndefined();
 
     // check login with new password
     // login
@@ -466,7 +466,7 @@ test('FastifyServer.passwordReset', async () => {
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);
-    expect(body.args.codeName).toBe("PasswordMatch");
+    expect(body.args.errorCodeName).toBe("PasswordMatch");
 
     // submit successful password reset
     res = await server.app.inject({ method: "POST", url: "/resetpassword", cookies: {CSRFTOKEN: csrfCookie}, payload: {
@@ -477,9 +477,10 @@ test('FastifyServer.passwordReset', async () => {
     } });
     body = JSON.parse(res.body);
     expect(body.args.message).toBeDefined();
-    expect(body.args.codeName).toBeUndefined();
+    expect(body.args.errorCodeName).toBeUndefined();
 
     // log in with new password
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "newPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(302);
 });
+

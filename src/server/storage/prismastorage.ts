@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { UserStorage, UserPasswordStorage, KeyStorage, UserStorageGetOptions } from '../storage';
-import { User, UserWithPassword, Key } from '../../interfaces';
+import { UserStorage, KeyStorage, UserStorageGetOptions } from '../storage';
+import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 import { CrossauthLogger, j } from '../..';
 import { setParameter, ParamType } from '../utils';
@@ -14,6 +14,9 @@ export interface PrismaUserStorageOptions {
 
     /** Name of user table (to Prisma, ie lowercase).  Default `user` */
     userTable? : string,
+
+    /** Name of user secrets table (to Prisma, ie lowercase).  Default `user` */
+    userSecretsTable? : string,
 
     /** Name of the id column in the user table.  Can be set to `username` if that is your primary key.
      * Default `id`.
@@ -39,7 +42,7 @@ export interface PrismaUserStorageOptions {
  * 
  * By default, the Prisma name (ie the lowercased version) is called `user`.  It must have at least these fields:
  *    * `username String \@unique`
- *    * `normalizedUsername String \@unique`
+ *    * `usernameNormalized String \@unique`
  *    * `password String`
  * It must also contain an ID column, which is either an `Int` or `String`, eg
  *    * `id Int \@id \@unique \@default(autoincrement())
@@ -49,13 +52,14 @@ export interface PrismaUserStorageOptions {
  * the user table to also have an `emailVerified Boolean` field.  If the username is not the email address,
  * it must contain these extra two fields:
  *     * `email String \@unique`
- *     * `normalizedEmail String \@unique`
+ *     * `emailNormalized String \@unique`
  * 
  * You can optionally check if a `passwordReset` field is set to `true` when validating users.  Enabling this requires
  * the user table to also have a `passwordReset Boolean` field.  Use this if you want to require your user to change his/her password.
 */
-export class PrismaUserStorage extends UserPasswordStorage {
+export class PrismaUserStorage extends UserStorage {
     private userTable : string = "user";
+    private userSecretsTable : string = "userSecrets";
     private idColumn : string = "id";
     readonly enableEmailVerification : boolean = false;
     readonly checkPasswordReset : boolean = false;
@@ -72,6 +76,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
     constructor(options : PrismaUserStorageOptions = {}) {
         super();
         setParameter("userTable", ParamType.String, this, options, "USER_TABLE");
+        setParameter("userSecretsTable", ParamType.String, this, options, "USER_SECRETS_TABLE");
         setParameter("idColumn", ParamType.String, this, options, "USER_ID_COLUMN");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("checkPasswordReset", ParamType.String, Boolean, options, "CHECK_PASSWORD_RESET");
@@ -86,7 +91,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
     private async getUser(
         normalizedKey : string, 
         normalizedValue : string | number, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
+        options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         let error: CrossauthError|undefined = undefined;
         let prismaUser : any;
         try {
@@ -94,6 +99,9 @@ export class PrismaUserStorage extends UserPasswordStorage {
             prismaUser = await this.prismaClient[this.userTable].findUniqueOrThrow({
                 where: {
                     [normalizedKey]: normalizedValue
+                },
+                include: {
+                    secrets: true,
                 }
             });
 
@@ -124,7 +132,9 @@ export class PrismaUserStorage extends UserPasswordStorage {
             CrossauthLogger.logger.debug(j({msg: "User must reset password"}));
             throw new CrossauthError(ErrorCode.PasswordResetNeeded);
         }
-        return {...prismaUser, id: prismaUser[this.idColumn]};
+        const secrets = prismaUser.secrets;
+        delete prismaUser.secrets;
+        return {user: {...prismaUser, id: prismaUser[this.idColumn]}, secrets: {userId: prismaUser[this.idColumn], ...secrets}};
     }
 
     /**
@@ -135,9 +145,9 @@ export class PrismaUserStorage extends UserPasswordStorage {
      */
     async getUserByUsername(
         username : string, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
+        options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         const normalizedValue = PrismaUserStorage.normalize(username);
-        return this.getUser("normalizedUsername", normalizedValue, options);
+        return this.getUser("usernameNormalized", normalizedValue, options);
     }
 
     /**
@@ -151,9 +161,9 @@ export class PrismaUserStorage extends UserPasswordStorage {
      */
     async getUserByEmail(
         email : string, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
+        options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         const normalizedValue = PrismaUserStorage.normalize(email);
-        return this.getUser("normalizedEmail", normalizedValue, options);
+        return this.getUser("emailNormalized", normalizedValue, options);
     }
 
     /**
@@ -163,7 +173,7 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string | number, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
+        options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         return this.getUser(this.idColumn, id, options);
     }
 
@@ -172,23 +182,45 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * exist, throw a CreossauthError with InvalidKey.
      * @param user the user to update.  The id to update is taken from this obkect, which must be present.  All other attributes are optional. 
      */
-    async updateUser(user : Partial<User>) : Promise<void> {
+    async updateUser(user : Partial<User>, secrets?: Partial<UserSecrets>) : Promise<void> {
         if (!(this.idColumn in user)) throw new CrossauthError(ErrorCode.InvalidKey);
+        if (secrets && !secrets.userId) secrets.userId = user[this.idColumn];
         try {
-            let {id: _, ...data} = user;
-            if ("email" in data && data.email) {
-                data = {normalizedEmail: PrismaUserStorage.normalize(data.email), ...data};
+            let {id: dummyUserId, ...userData} = user;
+            let {userId: dummySecretsId, ...secretsData} = secrets||{};
+            if ("email" in userData && userData.email) {
+                userData = {emailNormalized: PrismaUserStorage.normalize(userData.email), ...userData};
             }
-            if ("username" in data && data.username) {
-                data = {normalizedUsername: PrismaUserStorage.normalize(data.username), ...data};
+            if ("username" in userData && userData.username) {
+                userData = {usernameNormalized: PrismaUserStorage.normalize(userData.username), ...userData};
             }
-            // @ts-ignore  (because types only exist when do prismaClient.table...)
-            await this.prismaClient[this.userTable].update({
-                where: {
-                    [this.idColumn]: user.id,
-                },
-                data: data
-            });
+            if (!secrets) {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                await this.prismaClient[this.userTable].update({
+                    where: {
+                        [this.idColumn]: user.id,
+                    },
+                    data: userData,
+                });
+            } else {
+                await this.prismaClient.$transaction([
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                this.prismaClient[this.userTable].update({
+                    where: {
+                        [this.idColumn]: user.id,
+                    },
+                    data: userData,
+                }),
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                this.prismaClient[this.userSecretsTable].update({
+                    where: {
+                        user_id: user.id,
+                    },
+                    data: secretsData,
+                })
+            ]);
+
+            }
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             throw new CrossauthError(ErrorCode.Connection, "Error updating user");
@@ -201,31 +233,45 @@ export class PrismaUserStorage extends UserPasswordStorage {
      * @param password 
      * @param extraFields 
      */
-    async createUser(username : string, 
-               password : string, 
-               extraFields : {[key : string]: string|number|boolean|Date|undefined})
+    async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
                : Promise<string|number> {
         let error : CrossauthError|undefined = undefined;
+        if (secrets && !secrets.password) throw new CrossauthError(ErrorCode.PasswordFormat, "Password required when creating user");
         let id = 0;
+        let usernameNormalized = "";
+        let emailNormalized = "";
         try {
-            let data : {[key : string] : any} = {
-                username : username,
-                password : password,
-                state: "active",
-                ...extraFields,
-            };
-            if ("email" in data && data.email) {
-                data = {normalizedEmail: PrismaUserStorage.normalize(data.email), ...data};
+            if ("email" in user && user.email) {
+                emailNormalized = PrismaUserStorage.normalize(user.email);
             }
-            if ("username" in data && data.username) {
-                data = {normalizedUsername: PrismaUserStorage.normalize(data.username), ...data};
+            if ("username" in user && user.username) {
+                usernameNormalized = PrismaUserStorage.normalize(user.username);
             }
+            let newUser;
+            if (secrets) {
 
-            // @ts-ignore  (because types only exist when do prismaClient.table...)
-            let user = await this.prismaClient[this.userTable].create({
-                data: data
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                newUser = await this.prismaClient[this.userTable].create({
+                    data: {
+                        ...user,
+                        emailNormalized,
+                        usernameNormalized,
+                        secrets: { 
+                            create: 
+                                {password: "", ...secrets}
+                        }
+                    },
+                    include: { secrets: true},
+                });
+            } else {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                newUser = await this.prismaClient[this.userTable].create({
+                    data: user,
+                    emailNormalized,
+                    usernameNormalized,
             });
-            id = user[this.idColumn];
+            }
+            id = newUser[this.idColumn];
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             error = new CrossauthError(ErrorCode.Connection, "Error creating user");

@@ -1,6 +1,6 @@
 import { CrossauthError, ErrorCode } from '../error.ts';
 import type { 
-    User, UserWithPassword, Key
+    User, UserSecrets, Key, UserInputFields, UserSecretsInputFields
 } from '../interfaces.ts';
 
 export interface UserStorageGetOptions {
@@ -28,7 +28,7 @@ export abstract class UserStorage {
      */
     abstract getUserByUsername(
         username : string, 
-         options? : UserStorageGetOptions) : Promise<User>;
+         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}>;
 
     /**
      * Returns user matching the given user id, or throws an exception.
@@ -42,7 +42,7 @@ export abstract class UserStorage {
      */
     abstract getUserById(
         id : string|number, 
-         options? : UserStorageGetOptions) : Promise<User>;
+         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}>;
 
     /**
      * Returns user matching the given email address, or throws an exception.
@@ -56,12 +56,12 @@ export abstract class UserStorage {
      */
     abstract getUserByEmail(
         email : string | number, 
-        options? : UserStorageGetOptions) : Promise<User>;
+        options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}>;
 
     /**
      * If you enable signup, you will need to implement this method
      */
-    createUser(_username : string, _password : string, _extraFields : {[key : string]: string|number|boolean|Date|undefined}) 
+    createUser(_user : UserInputFields, _secrets : UserSecretsInputFields) 
         : Promise<string|number> {
         throw new CrossauthError(ErrorCode.Configuration);
     }
@@ -71,7 +71,7 @@ export abstract class UserStorage {
      * exist, throw a CrossauthError with InvalidKey.
      * @param user  The id field must be set, but all others are optional 
      */
-    abstract updateUser(user : Partial<User>) : Promise<void>;
+    abstract updateUser(user : Partial<User>, secrets? : Partial<UserSecrets>) : Promise<void>;
 
     /**
      * If your storage supports this, delete the named user from storage.
@@ -84,42 +84,8 @@ export abstract class UserStorage {
      * @param str the string to normalize
      * @returns the normalized string, in lowercase with diacritics removed
      */
-    static normalize(str : string) {
+    static normalize(str : string) : string {
         return str.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-    }
-}
-
-/**
- * Subcalsses {@link UserStorage } for cases where there is a username and password.
- */
-export abstract class UserPasswordStorage extends UserStorage {
-
-    /**
-     * Same as for base class but returns {@link UserWithPassword} instead.
-     * @param username the username to match
-     */
-    abstract getUserByUsername(
-        username : string, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword>;
-
-    /**
-     * Same as for base class but returns {@link UserWithPassword} instead.
-     * @param id the user ID to match
-     */
-    abstract getUserById(id : string | number, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword>;
-
-    /**
-     * Removes the password field from the user object
-     * 
-     * Doesn't change the passed user object, just removes it from a copy.
-     * 
-     * @param user the user object to remove password from
-     * @returns a new User object without password
-     */
-    static removePasswordHash(user : User) {
-        const { password, ...rest} = user;
-        return rest;
     }
 }
 

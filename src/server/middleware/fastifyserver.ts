@@ -553,10 +553,6 @@ export class FastifyCookieAuthServer {
                 try {
                     let {key, user} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
                     if (this.validateSession) this.validateSession(key, user, request);
-                    if (user) {
-                        delete user.password;
-                        delete user.totpSecret;
-                    }
 
                     request.user = user;
                     CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
@@ -1247,7 +1243,7 @@ export class FastifyCookieAuthServer {
         const oldSessionId = this.getSessionIdFromCookie(request);
 
         let extraFields = this.addToSession ? this.addToSession(request) : {}
-        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, password, extraFields, persist);
+        let { sessionCookie, csrfCookie, user, secrets } = await this.sessionManager.login(username, password, extraFields, persist);
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
@@ -1261,9 +1257,7 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.debug(j({err: e}));
             }
         }
-        user.totpRequired = "totpSecret" in user && user.totpSecret != "";
-        delete user.totpSecret;
-        delete user.password;
+        user.totpRequired = "totpSecret" in secrets && secrets.totpSecret != "";
         return successFn(reply, user);
     }
 
@@ -1285,8 +1279,6 @@ export class FastifyCookieAuthServer {
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user?.username}));
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         request.csrfToken = await this.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
-        delete user.totpSecret;
-        delete user.password;
         return successFn(reply, user);
     }
 
@@ -1430,10 +1422,6 @@ export class FastifyCookieAuthServer {
             }*/
             throw e;
         }
-        if (user) {
-            delete user.password;
-            delete user.totpSecret;
-        }
         return successFn(reply, user);
     }
 
@@ -1506,8 +1494,6 @@ export class FastifyCookieAuthServer {
         if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification reset not enabled");
         const token = request.params.token;
         const user = await this.sessionManager.applyEmailVerificationToken(token);
-        delete user.password;
-        delete user.totpSecret;
         return await this.loginWithUser(user, request, reply, successFn);
     }
 
@@ -1526,8 +1512,6 @@ export class FastifyCookieAuthServer {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
         const user = await this.sessionManager.resetPassword(token, newPassword);
-        delete user.password;
-        delete user.totpSecret;
         return this.loginWithUser(user, request, reply, successFn);
     }
 

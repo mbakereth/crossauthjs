@@ -65,6 +65,10 @@ export class CrossauthLogger {
         }
     }
 
+    setLevel(level: 0 | 1 | 2 | 3 | 4) {
+        this.level = level;
+    }
+
     private log(level: 0 | 1 | 2 | 3 | 4 , output: any) {
         if (level <= this.level) {
             if (typeof output == "string") {

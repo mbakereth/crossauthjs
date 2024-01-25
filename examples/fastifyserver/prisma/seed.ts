@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { HashedPasswordAuthenticator } from 'crossauth/server';
 import { PrismaUserStorage } from 'crossauth/server';
+import { CrossauthLogger } from 'crossauth';
 
 const prisma = new PrismaClient();
 
@@ -11,16 +12,21 @@ async function main() {
     await prisma.user.deleteMany();
     await prisma.key.deleteMany();
 
-    const user1 = await userStorage.createUser(
-        "bob",
-        await hasher.createPasswordHash("bobPass123"),
-        {"email": "bob@bob.com", "emailVerified": true}
-    );
-    const user2 = await userStorage.createUser(
-      "alice",
-      await hasher.createPasswordHash("alicePass123"),
-      {"email": "alice@alice.com", "emailVerified": true}
-  );
+    let authenticator = new HashedPasswordAuthenticator(userStorage);
+    const user1 = await userStorage.createUser({
+      username: "bob", 
+      state: "active",
+      email: "bob@bob.com",
+  }, {
+      password: await authenticator.createPasswordHash("bobPass123"), 
+  });
+  const user2 = await userStorage.createUser({
+      username: "alice", 
+      state: "active",
+      email: "alice@alice.com",
+  }, {
+      password: await authenticator.createPasswordHash("alicePass123"), 
+  });
   console.log({ user1, user2 })
 }
 main()

@@ -1,8 +1,7 @@
-import { UserStorage, UserPasswordStorage, KeyStorage, UserStorageGetOptions } from '../storage';
-import { UserWithPassword, Key } from '../../interfaces';
+import { UserStorage, KeyStorage, UserStorageGetOptions } from '../storage';
+import { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 import { CrossauthLogger, j } from '../..';
-import type { User } from '../..';
 
 /**
  * Optional parameters for {@link InMemoryUserStorage}.
@@ -11,6 +10,11 @@ import type { User } from '../..';
  */
 export interface InMemoryUserStorageOptions {
     enableEmailVerification? : boolean,
+}
+
+interface UserWithNormalization extends User {
+    usernameNormalized? : string,
+    emailNormalized? : string,
 }
 
 /**
@@ -22,9 +26,11 @@ export interface InMemoryUserStorageOptions {
  * You can optionally check if an `emailVerified` field is set to `true` when validating users,  Enabling this requires
  * the user table to also have an `emailVerified Boolean` field.
 */
-export class InMemoryUserStorage extends UserPasswordStorage {
-    usersByUsername : { [key : string]: UserWithPassword } = {};
-    usersByEmail : { [key : string]: UserWithPassword } = {};
+export class InMemoryUserStorage extends UserStorage {
+    usersByUsername : { [key : string]: User } = {};
+    usersByEmail : { [key : string]: User } = {};
+    secretsByUsername : { [key : string]: UserSecretsInputFields } = {};
+    secretsByEmail : { [key : string]: UserSecretsInputFields } = {};
     private enableEmailVerification : boolean = false;
 
     /**
@@ -44,42 +50,37 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @param password 
      * @param extraFields 
      */
-    async createUser(username : string, 
-        password : string, 
-        extraFields : {[key : string]: string|number|boolean|Date|undefined})
+    async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
         : Promise<string|number> {
 
-            let newUser : UserWithPassword = {
-                username: username, 
-                id: username, 
-                password: password,
-                state: "active",
-                normalizedUsername: UserStorage.normalize(username),
-                ...extraFields,
-            };
-            if ("email" in newUser && newUser.email) {
-                newUser.normalizedEmail = UserStorage.normalize(newUser.email);
+            user.usernameNormalized = UserStorage.normalize(user.username);
+            if ("email" in user && user.email) {
+                user.emailNormalized = UserStorage.normalize(user.email);
             }
-            this.usersByUsername[newUser.normalizedUsername] = newUser;
-            if ("email" in newUser && newUser.email) this.usersByEmail[newUser.normalizedEmail] = newUser;
-    
-        return username;
+
+            const userToStore = {id: user.username, ...user}
+            this.usersByUsername[user.usernameNormalized] = userToStore;
+            this.secretsByUsername[user.usernameNormalized] = secrets||{};
+            if ("email" in user && user.email) this.usersByEmail[user.emailNormalized] = userToStore;
+            if ("email" in user && user.email) this.secretsByEmail[user.emailNormalized] = secrets||{};
+
+        return user.username;
     }
 
     /**
-     * Returns a {@link UserWithPassword } instance matching the given username, or throws an Exception.
+     * Returns a {@link User }and {@link UserSecrets } instance matching the given username, or throws an Exception.
      * 
      * @param username the username to look up
-     * @returns a {@link UserWithPassword } instance, ie including the password hash.
+     * @returns a {@link User } and {@link UserSecrets }instance
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
     async getUserByUsername(
         username : string, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
-        const normalizedUsername = UserStorage.normalize(username);
-        if (normalizedUsername in this.usersByUsername) {
+        options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
+        const usernameNormalized = UserStorage.normalize(username);
+        if (usernameNormalized in this.usersByUsername) {
 
-            const user = this.usersByUsername[normalizedUsername];
+            const user = this.usersByUsername[usernameNormalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
             if (user['state'] != "active") {
                 CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
@@ -89,7 +90,8 @@ export class InMemoryUserStorage extends UserPasswordStorage {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
-            return {...user};
+            const secrets = this.secretsByUsername[usernameNormalized];
+            return {user: {...user}, secrets: {userId: user.id, ...secrets}};
         }
 
         CrossauthLogger.logger.debug(j({msg: "User does not exist"}));
@@ -97,18 +99,18 @@ export class InMemoryUserStorage extends UserPasswordStorage {
     }
 
     /**
-     * Returns a {@link UserWithPassword } instance matching the given email address, or throws an Exception.
+     * Returns a {@link User } and {@link UserSecrets } instance matching the given email address, or throws an Exception.
      * 
      * @param email the emaila ddress to look up
-     * @returns a {@link UserWithPassword } instance, ie including the password hash.
+     * @returns a {@link User } and {@link UserSecrets } instance, ie including the password hash.
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
     async getUserByEmail(email : string, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
-        const normalizedEmail = UserStorage.normalize(email);
-        if (normalizedEmail in this.usersByEmail) {
+        options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
+        const emailNormalized = UserStorage.normalize(email);
+        if (emailNormalized in this.usersByEmail) {
 
-            const user = this.usersByEmail[normalizedEmail];
+            const user = this.usersByEmail[emailNormalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
             if (user['state'] != "active") {
                 CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
@@ -118,7 +120,8 @@ export class InMemoryUserStorage extends UserPasswordStorage {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
-            return {...user};
+            const secrets = this.secretsByEmail[emailNormalized];
+            return {user: {...user}, secrets: {userId: user.id, ...secrets}};
         }
 
         CrossauthLogger.logger.debug(j({msg: "User does not exist"}));
@@ -132,7 +135,7 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string, 
-        options? : UserStorageGetOptions) : Promise<UserWithPassword> {
+        options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         return /*await*/ this.getUserByUsername(id, options);
     }
 
@@ -141,20 +144,26 @@ export class InMemoryUserStorage extends UserPasswordStorage {
      * exist, throw a CreossauthError with InvalidKey.
      * @param user the user to update.  The id to update is taken from this obkect, which must be present.  All other attributes are optional. 
      */
-    async updateUser(user : Partial<User>) : Promise<void> {
-        let newUser = {...user};
+    async updateUser(user : Partial<User>, secrets?: Partial<UserSecrets>) : Promise<void> {
+        let newUser : Partial<UserWithNormalization> = {...user};
         if ("username" in newUser && newUser.username) {
-            newUser.normalizedUsername = UserStorage.normalize(newUser.username);
+            newUser.usernameNormalized = UserStorage.normalize(newUser.username);
         } else if ("id" in newUser && newUser.id) {
-            newUser.normalizedUsername = UserStorage.normalize(String(newUser.id));
+            newUser.usernameNormalized = UserStorage.normalize(String(newUser.id));
         }
         if ("email" in newUser && newUser.email) {
-            newUser.normalizedEmail = UserStorage.normalize(newUser.email);
+            newUser.emailNormalized = UserStorage.normalize(newUser.email);
 
         }
-        if (newUser.normalizedUsername && newUser.normalizedUsername in this.usersByUsername) {
+        if (newUser.usernameNormalized && newUser.usernameNormalized in this.usersByUsername) {
             for (let field in newUser) {
-                this.usersByUsername[newUser.normalizedUsername][field] = newUser[field];
+                this.usersByUsername[newUser.usernameNormalized][field] = newUser[field];
+            }
+            if (secrets) {
+                this.secretsByUsername[newUser.usernameNormalized] = {
+                    ...this.secretsByUsername[newUser.usernameNormalized],
+                    ...secrets,
+                }
             }
         }
     }
@@ -164,9 +173,11 @@ export class InMemoryUserStorage extends UserPasswordStorage {
         if (normalizedUser in this.usersByUsername) {
             const user = this.usersByUsername[normalizedUser];
             delete this.usersByUsername[normalizedUser];
-            const normalizedEmail = UserStorage.normalize(String(user.email));
-            if (normalizedEmail in this.usersByEmail) {
-                delete this.usersByEmail[normalizedEmail];
+            delete this.secretsByUsername[normalizedUser];
+            const emailNormalized = UserStorage.normalize(String(user.email));
+            if (emailNormalized in this.usersByEmail) {
+                delete this.usersByEmail[emailNormalized];
+                delete this.secretsByEmail[emailNormalized];
             }
         }
     }

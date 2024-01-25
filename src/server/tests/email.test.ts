@@ -21,7 +21,7 @@ test('TokenEmailer.verifyEmailVerificationToken_activation', async () => {
         views: "test/views",
         siteUrl: "localhost",
     });
-    let bob = await userStorage.getUserByUsername("bob");
+    let {user: bob} = await userStorage.getUserByUsername("bob");
     let token = await emailer["createAndSaveEmailVerificationToken"](bob.id);
     let {userId, newEmail} = await emailer["verifyEmailVerificationToken"](token);
     expect(userId).toBe(bob.id);
@@ -38,7 +38,7 @@ test('TokenEmailer.verifyEmailVerificationToken_emailchange', async () => {
         views: "test/views",
         siteUrl: "localhost",
     });
-    let bob = await userStorage.getUserByUsername("bob");
+    let {user: bob} = await userStorage.getUserByUsername("bob");
     let token = await emailer["createAndSaveEmailVerificationToken"](bob.id, "newbob@bob.com");
     let {userId, newEmail} = await emailer["verifyEmailVerificationToken"](token);
     expect(userId).toBe(bob.id);
@@ -55,7 +55,7 @@ test('TokenEmailer.verifyPasswordResetToken', async () => {
         views: "test/views",
         siteUrl: "localhost",
     });
-    let bob = await userStorage.getUserByUsername("bob");
+    let {user: bob} = await userStorage.getUserByUsername("bob");
     let token = await emailer["createAndSavePasswordResetToken"](bob.id);
     await emailer["verifyPasswordResetToken"](token);
 });

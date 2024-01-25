@@ -1,4 +1,4 @@
-export { UserStorage, UserPasswordStorage, KeyStorage as SessionStorage } from './server/storage'; 
+export { UserStorage, KeyStorage as SessionStorage } from './server/storage'; 
 
 export { 
     UsernamePasswordAuthenticator, 

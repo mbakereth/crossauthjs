@@ -1,4 +1,4 @@
-import type { User } from '../interfaces.ts';
+import type { User, UserSecrets } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error';
 import { UserStorage } from './storage'
 import { Hasher } from './hasher';
@@ -26,7 +26,7 @@ export abstract class UsernamePasswordAuthenticator {
      * @param username the username to authenticate
      * @param password the password to authenticate
      */
-    abstract authenticateUser(username : string, password : string) : Promise<User>;
+    abstract authenticateUser(username : string, password : string) : Promise<{user: User, secrets: UserSecrets}>;
 
     abstract createPasswordForStorage(password : string) : Promise<string>;
 }
@@ -72,10 +72,10 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      * @returns A {@link User } object with the optional extra fields but without the hashed password.  See explaination above.
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
-    async authenticateUser(username : string, password : string) : Promise<User> {
-        let user = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
-
-        if (!await Hasher.passwordsEqual(password, user.password, this.secret)) {
+    async authenticateUser(username : string, password : string) : Promise<{user: User, secrets: UserSecrets}> {
+        let {user, secrets} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+        if (!secrets.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
+        if (!await Hasher.passwordsEqual(password, secrets.password, this.secret)) {
             CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
@@ -83,7 +83,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
         if (user.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
         if (user.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
         delete user.password;
-        return user;
+        return {user, secrets};
     }
 
     /**

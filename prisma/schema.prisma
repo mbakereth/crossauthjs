@@ -13,18 +13,27 @@ datasource db {
 model User {
     id                  Int         @id @unique @default(autoincrement())
     username            String      @unique
-    normalizedUsername  String      @unique
-    password        String
+    usernameNormalized  String      @unique
     email               String      @unique
-    normalizedEmail     String      @unique
+    emailNormalized     String      @unique
     emailVerified       Boolean     @default(true)
     state               String      @default("active")
+    factor2             String      @default("")
     dummyField          String      @default("")
 
-    session Key[]
+    session             Key[]
+    secrets             UserSecrets?
 
     @@index([id])
     @@index([username])
+}
+
+model UserSecrets {
+    user_id             Int         @unique
+    password            String
+    totpSecret          String      @default("")
+
+    user                User      @relation(references: [id], fields: [user_id], onDelete: Cascade)
 }
 
 model Key {

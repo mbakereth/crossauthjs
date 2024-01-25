@@ -5,7 +5,7 @@ import { Hasher } from './hasher';
 import { CrossauthError, ErrorCode } from '../error';
 import { CrossauthLogger, j } from '../logger';
 import { setParameter, ParamType } from './utils';
-import { User } from '../interfaces';
+import { User, UserSecrets } from '../interfaces';
 
 const TOKEN_LENGTH = 16; // in bytes, before base64url
 
@@ -238,7 +238,7 @@ export class TokenEmailer {
                 "Either emailVerificationTextBody or emailVerificationHtmlBody must be set to send email verification emails");
                 throw error;
         }
-        let user = await this.userStorage.getUserById(userId, {skipEmailVerifiedCheck: true});
+        let {user} = await this.userStorage.getUserById(userId, {skipEmailVerifiedCheck: true});
         let email = newEmail;
         if (email != "") {
             // this message is to validate a new email (email change)
@@ -279,7 +279,7 @@ export class TokenEmailer {
         let storedToken = await this.keyStorage.getKey(hash);
         try {
             if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
-            const user = await this.userStorage.getUserById(storedToken.userId, {skipEmailVerifiedCheck: true});
+            const {user} = await this.userStorage.getUserById(storedToken.userId, {skipEmailVerifiedCheck: true});
             let email = user.email.toLowerCase();
             if (email) {
                 TokenEmailer.validateEmail(email);
@@ -339,7 +339,7 @@ export class TokenEmailer {
         let storedToken = await this.keyStorage.getKey(hash);
         if (!storedToken.userId) throw new CrossauthError(ErrorCode.InvalidKey);
         if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
-        const user = await this.userStorage.getUserById(storedToken.userId);
+        const {user} = await this.userStorage.getUserById(storedToken.userId);
         const now = new Date().getTime();
         if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
         return user;
@@ -389,7 +389,7 @@ export class TokenEmailer {
                 "Either passwordResetTextBody or passwordResetTextBody must be set to send email verification emails");
                 throw error;
         }
-        let user = await this.userStorage.getUserById(userId);
+        let {user} = await this.userStorage.getUserById(userId);
         let email = user.email.toLowerCase();
         if (email) {
             TokenEmailer.validateEmail(email);
