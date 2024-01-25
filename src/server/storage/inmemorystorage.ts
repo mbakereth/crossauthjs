@@ -80,9 +80,9 @@ export class InMemoryUserStorage extends UserStorage {
                 CrossauthLogger.logger.debug(j({msg: "Password reset reqzured"}));
                 throw new CrossauthError(ErrorCode.PasswordResetNeeded);
             }
-            if (options?.skipActiveCheck!=true && user["state"]=="awaitingtotpsetup") {
-                CrossauthLogger.logger.debug(j({msg: "TOTP setup is not complete"}));
-                throw new CrossauthError(ErrorCode.TotpIncomplete);
+            if (options?.skipActiveCheck!=true && user["state"]=="awaitingtwofactorsetup") {
+                CrossauthLogger.logger.debug(j({msg: "2FA setup is not complete"}));
+                throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
             }
             if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification") {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));

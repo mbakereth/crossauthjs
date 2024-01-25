@@ -102,9 +102,9 @@ export class PrismaUserStorage extends UserStorage {
             CrossauthLogger.logger.error(j({err: error}));
             throw error;
         }
-        if (options?.skipActiveCheck!=true && prismaUser["state"]=="awaitingtotpsetup") {
+        if (options?.skipActiveCheck!=true && prismaUser["state"]=="awaitingtwofactorsetup") {
             CrossauthLogger.logger.debug(j({msg: "TOTP setup is not complete"}));
-            throw new CrossauthError(ErrorCode.TotpIncomplete);
+            throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
         }
         if (options?.skipActiveCheck!=true && prismaUser["state"]=="disabled") {
             CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));

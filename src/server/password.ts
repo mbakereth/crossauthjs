@@ -79,7 +79,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
             CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
-        if (user.state == "awaitingtotpsetup") throw new CrossauthError(ErrorCode.TotpIncomplete);
+        if (user.state == "awaitingtwofactorsetup") throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
         if (user.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
         if (user.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
         delete user.password;

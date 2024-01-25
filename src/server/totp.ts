@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import { authenticator as gAuthenticator } from 'otplib';
-import type { User, Key } from '../interfaces.ts';
+import type { User, UserSecrets, Key } from '../interfaces.ts';
 import { getJsonData } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { SessionCookie } from './cookieauth.ts';
@@ -26,7 +26,7 @@ export class Totp {
             })
             .catch((err) => {
                 CrossauthLogger.logger.debug(j({err: err}));
-                throw new CrossauthError(ErrorCode.UnknownError, "Couldn't generate TOTP URL");
+                throw new CrossauthError(ErrorCode.UnknownError, "Couldn't generate 2FA URL");
             });
 
         return { qrUrl, secret };   
@@ -61,7 +61,7 @@ export class Totp {
     async validateCodeFromKey(code : string, sessionKey : Key) : Promise<{username : string, secret : string}> {
 
         let {username, secret} = getJsonData(sessionKey);
-        if (!username || !secret) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP has not been requested for this session");
+        if (!username || !secret) throw new CrossauthError(ErrorCode.Unauthorized, "2FA has not been requested for this session");
 
         if (!gAuthenticator.check(code, secret)) {
             throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
@@ -69,11 +69,10 @@ export class Totp {
         return { username, secret };
     }
 
-    async validateCodeFromUser(code : string, user : User) : Promise<{username : string, secret : string}> {
+    async validateCodeFromUser(code : string, user : User, secrets: UserSecrets) : Promise<{username : string, secret : string}> {
 
-        if (!("totpSecret" in user) || user.totpSecret == "") throw new CrossauthError(ErrorCode.Unauthorized, "TOTP has not been activated for this user");
-
-        if (!gAuthenticator.check(code, user.totpSecret)) {
+        if (!("totpSecret" in secrets) || secrets.totpSecret == "") throw new CrossauthError(ErrorCode.Unauthorized, "2FA has not been activated for this user");
+        if (!gAuthenticator.check(code, secrets.totpSecret||"")) {
             throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
         }
 

@@ -84,10 +84,10 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
      */
     loginPage? : string;
 
-    /** Template file containing the page for getting the TOTP after entering username and password
+    /** Template file containing the page for getting the 2nd factor after entering username and password
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "login.njk".
      */
-    loginTotpPage? : string;
+    loginTwoFactorPage? : string;
 
     /** Template file containing the signup page (with without error messages).  
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "signup.njk".
@@ -98,8 +98,8 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
      */
     signupPage? : string;
 
-    /** Page to set up TOTP after sign up */
-    signupTotpPage? : string;
+    /** Page to set up 2FA after sign up */
+    signupTwoFactorPage? : string;
 
     /** Page to render error messages, including failed login. 
      * See the class documentation for {@link FastifyCookieAuthServer} for more info.  Defaults to "error.njk".
@@ -149,7 +149,7 @@ interface LoginBodyType extends CsrfBodyType {
     next? : string,
 }
 
-interface LoginTotpBodyType extends CsrfBodyType {
+interface logintwofactorBodyType extends CsrfBodyType {
     totpCode : string,
     persist? : boolean,
     next? : string,
@@ -158,11 +158,11 @@ interface LoginTotpBodyType extends CsrfBodyType {
 interface SignupBodyType extends LoginBodyType {
     repeatPassword?: string,
     email? : string,
-    totp? : string,
+    twoFactor? : string,
     [key : string]: string|number|Date|boolean|undefined,
 }
 
-interface SignupTotpBodyType extends CsrfBodyType {
+interface signuptwofactorBodyType extends CsrfBodyType {
     totpCode : string;
     next? : string,
     persist? : boolean,
@@ -223,11 +223,11 @@ export const SessionApiEndpoints = [
 ];
 
 /**
- * API (JSON) endpoints that depend on TOTP being enabled 
+ * API (JSON) endpoints that depend on 2FA being enabled 
  */
-export const TotpApiEndpoints = [
-    "api/signuptotp",
-    "api/logintotp",
+export const TwoFactorApiEndpoints = [
+    "api/signuptwofactor",
+    "api/logintwofactor",
 ];
 
 /**
@@ -278,9 +278,9 @@ export const SignupApiEndpoints = [
 /**
  * Endpoints for signing a user up that display HTML
  */
-export const TotpPageEndpoints = [
-    "signuptotp",
-    "logintotp"
+export const TwoFactorPageEndpoints = [
+    "signuptwofactor",
+    "logintwofactor"
 ]
 
 /**
@@ -295,8 +295,8 @@ export const AllEndpoints = [
     ...EmailVerificationApiEndpoints,
     ...PasswordResetPageEndpoints,
     ...PasswordResetApiEndpoints,
-    ...TotpPageEndpoints,
-    ...TotpApiEndpoints,
+    ...TwoFactorPageEndpoints,
+    ...TwoFactorApiEndpoints,
 ];
 
 /**
@@ -396,9 +396,9 @@ export class FastifyCookieAuthServer {
     private loginRedirect = "/";
     private logoutRedirect : string = "/";
     private signupPage : string = "signup.njk";
-    private signupTotpPage : string = "signuptotp.njk";
+    private signupTwoFactorPage : string = "signuptotp.njk";
     private loginPage : string = "login.njk";
-    private loginTotpPage : string = "logintotp.njk";
+    private logintwofactorPage : string = "logintotp.njk";
     private errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
     private updateUserPage : string = "updateuser.njk";
@@ -414,7 +414,7 @@ export class FastifyCookieAuthServer {
     private validateSession? : (session: Key, user: User|undefined, request : FastifyRequest) => void;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
-    private totp :  "off" | "all" | "peruser" = "off";
+    private twoFactorRequired :  "off" | "all" | "peruser" = "off";
 
 
     /**
@@ -429,21 +429,21 @@ export class FastifyCookieAuthServer {
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
-        setParameter("totp", ParamType.String, this, options, "TOTP");
+        setParameter("twoFactorRequired", ParamType.String, this, options, "TWOFACTOR_REQUIRED");
 
         this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
         if (this.enableSessions) this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
         if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
         if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
-        if (this.totp != "off") this.endpoints = [...this.endpoints, ...TotpPageEndpoints, ...TotpApiEndpoints];
+        if (this.twoFactorRequired != "off") this.endpoints = [...this.endpoints, ...TwoFactorPageEndpoints, ...TwoFactorApiEndpoints];
         setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("signupPage", ParamType.String, this, options, "SIGNUP_PAGE");
-        setParameter("signupTotpPage", ParamType.String, this, options, "SIGNUP_TOTP_PAGE");
+        setParameter("signupTwoFactorPage", ParamType.String, this, options, "SIGNUP_TWOFACTOR_PAGE");
         setParameter("loginPage", ParamType.String, this, options, "LOGIN_PAGE");
-        setParameter("loginTotpPage", ParamType.String, this, options, "LOGIN_TOTP_PAGE");
+        setParameter("loginTwoFactorPage", ParamType.String, this, options, "LOGIN_TWOFACTOR_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
         setParameter("updateUser", ParamType.String, this, options, "UPDATE_USER_PAGE");
@@ -493,6 +493,7 @@ export class FastifyCookieAuthServer {
 
         this.app.decorateRequest('user', undefined);
         this.app.decorateRequest('csrfToken', undefined);
+        this.app.decorateRequest('twoFactor', {});
                                 
         // validates the session id and csrftokens, creating if necessary and putting the csrf token
         // and user in the request object.
@@ -584,7 +585,7 @@ export class FastifyCookieAuthServer {
 
                     await this.login(request, reply, 
                     (reply, user) => {
-                        if (!user.totpRequired) {
+                        if (!user.twoFactorRequired) {
                             CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect"}));
                             return reply.redirect(next);
                         } else {
@@ -593,7 +594,7 @@ export class FastifyCookieAuthServer {
                                 next: request.body.next||this.loginRedirect,
                                 persist: request.body.persist ? "on" : "",
                             };
-                            return reply.view(this.loginTotpPage, data);
+                            return reply.view(this.logintwofactorPage, data);
                         }
                     });
                 } catch (e) {
@@ -614,15 +615,15 @@ export class FastifyCookieAuthServer {
             });
         }
 
-        if (this.endpoints.includes("logintotp")) {
+        if (this.endpoints.includes("logintwofactor")) {
             if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/login enabled but sessions are not");
-            this.app.post(this.prefix+'logintotp', async (request : FastifyRequest<{ Body: LoginTotpBodyType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'logintotp', ip: request.ip}));
+            this.app.post(this.prefix+'logintwofactor', async (request : FastifyRequest<{ Body: logintwofactorBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'logintwofactor', ip: request.ip}));
                 let next = request.body.next || this.loginRedirect;
                 try {
                     CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
 
-                    await this.logintotp(request, reply, 
+                    await this.logintwofactor(request, reply, 
                     (reply, _user) => {
                         CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect"}));
                         return reply.redirect(next);
@@ -630,7 +631,7 @@ export class FastifyCookieAuthServer {
                 } catch (e) {
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.handleError(e, reply, (reply, error) => {
-                        return reply.view(this.loginTotpPage, {
+                        return reply.view(this.logintwofactorPage, {
                             error: error.message,
                             errors: error.messages, 
                             code: error.code, 
@@ -649,7 +650,7 @@ export class FastifyCookieAuthServer {
             this.app.get(this.prefix+'signup', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'signup', ip: request.ip}));
                 if (this.signupPage)  { // if is redundant but VC Code complains without it
-                    let data : {next? : any, csrfToken: string|undefined, perUserTotp: boolean} = {csrfToken: request.csrfToken, perUserTotp: this.totp=="peruser"};
+                    let data : {next? : any, csrfToken: string|undefined, perUserTwoFactor: boolean} = {csrfToken: request.csrfToken, perUserTwoFactor: this.twoFactorRequired=="peruser"};
                     if (request.query.next) {
                         data["next"] = request.query.next;
                     }
@@ -666,7 +667,7 @@ export class FastifyCookieAuthServer {
                     return await this.signup(request, reply, 
                     (reply, data, _user) => {
                         if (data.secret) {
-                            return reply.view(this.signupTotpPage, data);
+                            return reply.view(this.signupTwoFactorPage, data);
                         } else if (this.enableEmailVerification) {
                             return reply.view(this.signupPage, {
                                 next: next, 
@@ -694,8 +695,8 @@ export class FastifyCookieAuthServer {
                             persist: request.body.persist,
                             username: request.body.username,
                             csrfToken: request.csrfToken,
-                            totp: request.body.totp,
-                            perUserTotp: this.totp == "peruser",
+                            twoFactor: request.body.twoFactor,
+                            perUserTwoFactor: this.twoFactorRequired == "peruser",
                             ...extraFields
                             });
                         
@@ -704,15 +705,15 @@ export class FastifyCookieAuthServer {
             });
         }
 
-        if (this.endpoints.includes("signuptotp")) {
-            if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/signuptotp enabled but sessions are not");
-            this.app.post(this.prefix+'signuptotp', async (request : FastifyRequest<{ Body: SignupTotpBodyType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'signuptotp', ip: request.ip}));
+        if (this.endpoints.includes("signuptwofactor")) {
+            if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/signuptwofactor enabled but sessions are not");
+            this.app.post(this.prefix+'signuptwofactor', async (request : FastifyRequest<{ Body: signuptwofactorBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'signuptwofactor', ip: request.ip}));
                 let next = request.body.next || this.loginRedirect;
                 try {
                     CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
 
-                    await this.signuptotp(request, reply, 
+                    await this.signuptwofactor(request, reply, 
                     (reply, _user) => {
                         if (this.enableEmailVerification) {
                             return reply.view(this.signupPage, {
@@ -725,7 +726,7 @@ export class FastifyCookieAuthServer {
                         }
                     });
                 } catch (e) {
-                    CrossauthLogger.logger.error(j({msg: "TOTP failure", hashedsSessionCookie: this.getHashOfSessionCookie(request)}));
+                    CrossauthLogger.logger.error(j({msg: "2FA failure", hashedsSessionCookie: this.getHashOfSessionCookie(request)}));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.handleError(e, reply, (reply, error) => {
                         return reply.view(this.signupPage, {
@@ -970,8 +971,8 @@ export class FastifyCookieAuthServer {
                 try {
                     return await this.login(request, reply, 
                     (reply, user) => {
-                        if (user.totpRequired) {
-                            return reply.header('Content-Type', JSONHDR).send({ok: true, totpRequired: true});
+                        if (user.twoFactorRequired) {
+                            return reply.header('Content-Type', JSONHDR).send({ok: true, twoFactorRequired: true});
                         } else {
                             return reply.header('Content-Type', JSONHDR).send({ok: true, user : user});
                         }
@@ -986,13 +987,13 @@ export class FastifyCookieAuthServer {
             });
         }
 
-        if (this.endpoints.includes("api/logintotp")) {
-            if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/api/logintotp enabled but sessions are not");
-            this.app.post(this.prefix+'api/logintotp', async (request : FastifyRequest<{ Body: LoginTotpBodyType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/logintotp', ip: request.ip}));
+        if (this.endpoints.includes("api/logintwofactor")) {
+            if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/api/logintwofactor enabled but sessions are not");
+            this.app.post(this.prefix+'api/logintwofactor', async (request : FastifyRequest<{ Body: logintwofactorBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/logintwofactor', ip: request.ip}));
                 if (request.user) return reply.header('Content-Type', JSONHDR).send({ok: false, user : request.user}); // already logged in
                 try {
-                    return await this.logintotp(request, reply, 
+                    return await this.logintwofactor(request, reply, 
                     (reply, user) => {
                         return reply.header('Content-Type', JSONHDR).send({ok: true, user : user});
                     });
@@ -1036,7 +1037,7 @@ export class FastifyCookieAuthServer {
                         ok: true,
                         user : user,
                         emailVerificationNeeded: this.enableEmailVerification||false,
-                        totpNeeded: data.secret!=undefined,
+                        twoFactorRequired: data.secret!=undefined,
                         secret: data.secret,
                     })});
                 } catch (e) {
@@ -1049,12 +1050,12 @@ export class FastifyCookieAuthServer {
             });
         }
 
-        if (this.endpoints.includes("api/signuptotp")) {
+        if (this.endpoints.includes("api/signuptwofactor")) {
             if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "/api/signup enabled but sessions are not");
-            this.app.post(this.prefix+'api/signuptotp', async (request : FastifyRequest<{ Body: SignupTotpBodyType }>, reply : FastifyReply) =>  {
+            this.app.post(this.prefix+'api/signuptwofactor', async (request : FastifyRequest<{ Body: signuptwofactorBodyType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/signup', ip: request.ip, hashOfSessionCookie: this.getHashOfSessionCookie(request)}));
                 try {
-                    return await this.signuptotp(request, reply, 
+                    return await this.signuptwofactor(request, reply, 
                     (reply, user) => {
                         return reply.header('Content-Type', JSONHDR).send({
                         ok: true,
@@ -1062,7 +1063,7 @@ export class FastifyCookieAuthServer {
                         emailVerificationNeeded: this.enableEmailVerification,
                     })});
                 } catch (e) {
-                    CrossauthLogger.logger.error(j({msg: "Signup TOTP configuration failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                    CrossauthLogger.logger.error(j({msg: "Signup 2FA configuration failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                     CrossauthLogger.logger.debug(j({err: e}));
                     this.handleError(e, reply, (reply, error) => {
                         reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: ErrorCode[error.code]});                    
@@ -1257,11 +1258,11 @@ export class FastifyCookieAuthServer {
                 CrossauthLogger.logger.debug(j({err: e}));
             }
         }
-        user.totpRequired = "totpSecret" in secrets && secrets.totpSecret != "";
+        user.twoFactorRequired = "totpSecret" in secrets && secrets.totpSecret != "";
         return successFn(reply, user);
     }
 
-    private async logintotp(request : FastifyRequest<{ Body: LoginTotpBodyType }>, reply : FastifyReply, 
+    private async logintwofactor(request : FastifyRequest<{ Body: logintwofactorBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user: User) => void) {
         if (!this.enableSessions) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         if (request.user) return successFn(reply, request.user); // already logged in
@@ -1272,7 +1273,7 @@ export class FastifyCookieAuthServer {
         const csrfCookieValue = this.getCsrfTokenFromCookie(request);
         await this.sessionManager.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
         let extraFields = this.addToSession ? this.addToSession(request) : {}
-        const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTotpLogin(request.body.totpCode, oldSessionCookieValue, extraFields, persist);
+        const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTwoFactorLogin(request.body.totpCode, oldSessionCookieValue, extraFields, persist);
         
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user?.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
@@ -1311,7 +1312,7 @@ export class FastifyCookieAuthServer {
         const password = request.body.password;
         const repeatPassword = request.body.repeatPassword;
         const next = request.body.next;
-        const totp = request.body.totp == "on";
+        const twoFactor = request.body.twoFactor == "on";
         let extraFields : {[key:string] : string|number|boolean|Date|undefined}= {};
         for (let field in request.body) {
             let name = field.replace("user_", ""); 
@@ -1333,19 +1334,19 @@ export class FastifyCookieAuthServer {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
 
-        // See if the user was already created, with the correct password, and is awaiting TOTP
+        // See if the user was already created, with the correct password, and is awaiting 2FA
         // completion.  Send the same response as before, in case the user closed the browser
-        let totpInitiated = false;
+        let twoFactorInitiated = false;
         try {
              await this.sessionManager.authenticator.authenticateUser(username, password);
         } catch (e) {
-            if (e instanceof CrossauthError && e.code == ErrorCode.TotpIncomplete) {
-                totpInitiated = true;
+            if (e instanceof CrossauthError && e.code == ErrorCode.TwoFactorIncomplete) {
+                twoFactorInitiated = true;
             } // all other errors are legitimate ones - we ignore them
         }
         
-        if ((this.totp == "off" || (this.totp == "peruser" && !totp)) && !totpInitiated) {
-            // not enabling TOTP
+        if ((this.twoFactorRequired == "off" || (this.twoFactorRequired == "peruser" && !twoFactor)) && !twoFactorInitiated) {
+            // not enabling 2FA
             if (this.addToUser) extraFields = {...extraFields, ...this.addToUser(request)};
             await this.sessionManager.createUser(username, password, extraFields);
             if (!this.enableEmailVerification && this.enableSessions) {
@@ -1354,26 +1355,26 @@ export class FastifyCookieAuthServer {
             }
             return successFn(reply, {}, undefined);
         } else {
-            // also enabling TOTP
+            // also enabling 2FA
             let qrUrl : string;
             let secret : string;
-            if (totpInitiated) {
-                // account already created but TOTP setup not complete
+            if (twoFactorInitiated) {
+                // account already created but 2FA setup not complete
                 const sessionValue = this.getSessionIdFromCookie(request);
                 if (!sessionValue) throw new CrossauthError(ErrorCode.Unauthorized);
-                const resp = await this.sessionManager.repeatTotpSignup(username, sessionValue);
+                const resp = await this.sessionManager.repeatTwoFactorSignup(username, sessionValue);
                 qrUrl = resp.qrUrl;
                 secret = resp.secret;
             } else {
-                // account not created - create one with state awaiting TOTP setup
+                // account not created - create one with state awaiting 2FA setup
                 const sessionValue = await this.createAnonymousSession(request, reply);
                 if (this.addToUser) extraFields = {...extraFields, ...this.addToUser(request)};
-                const resp = await this.sessionManager.initiateTotpSignup(username, password, extraFields,
+                const resp = await this.sessionManager.initiateTwoFactorSignup(username, password, extraFields,
                 sessionValue);
                 qrUrl = resp.qrUrl;
                 secret = resp.secret;
             }
-            request.totp = {
+            request.twoFactor = {
                 qr : qrUrl,
                 username: username,
             }
@@ -1387,7 +1388,6 @@ export class FastifyCookieAuthServer {
                     next: next||this.loginRedirect,
                     csrfToken: request.csrfToken,
                 };
-                //return reply.view(this.signupTotpPage, data);
                 return successFn(reply, data)
             } catch (e) {
                 CrossauthLogger.logger.error(j({err: e}));
@@ -1401,16 +1401,16 @@ export class FastifyCookieAuthServer {
         }
     }
 
-    private async signuptotp(request : FastifyRequest<{ Body: SignupTotpBodyType }>, reply : FastifyReply, 
+    private async signuptwofactor(request : FastifyRequest<{ Body: signuptwofactorBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
         const sessionId = this.getSessionIdFromCookie(request);
         let user;
         try {
-            if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "No session active while enabling TOTP.  Please enable cookies");
+            if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "No session active while enabling 2FA.  Please enable cookies");
             const totpCode = request.body.totpCode;
-            user = await this.sessionManager.completeTotpSignup(totpCode, sessionId);
+            user = await this.sessionManager.completeTwoFactorSignup(totpCode, sessionId);
         } catch (e) {
-            CrossauthLogger.logger.error(j({msg: "Signtototp failed", hashedSessionCookie: this.getHashOfSessionCookie(request) }));
+            CrossauthLogger.logger.error(j({msg: "signup2fa failed", hashedSessionCookie: this.getHashOfSessionCookie(request) }));
             CrossauthLogger.logger.debug(j({err: e}));
             /*try {
                 if (sessionId) {
