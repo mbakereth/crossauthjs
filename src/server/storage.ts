@@ -1,11 +1,14 @@
 import { CrossauthError, ErrorCode } from '../error.ts';
-import type { 
-    User, UserSecrets, Key, UserInputFields, UserSecretsInputFields
-} from '../interfaces.ts';
+import { setParameter, ParamType } from './utils';
+import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '../interfaces.ts';
 
 export interface UserStorageGetOptions {
     skipEmailVerifiedCheck? : boolean
     skipActiveCheck? : boolean
+}
+
+export interface PrismaUserStorageOptions {
+	userEditableFields? : string[],
 }
 
 /**
@@ -20,8 +23,8 @@ export interface UserStorageGetOptions {
 export abstract class UserStorage {
     readonly userEditableFields : string[] = [];
 
-    constructor(userEditableFields? : string[]) {
-        if (userEditableFields) this.userEditableFields = userEditableFields;
+    constructor(options : PrismaUserStorageOptions = {}) {
+        setParameter("userEditableFields", ParamType.StringArray, this, options, "USER_EDITABLE_FIELDS");
     }
     
     /**

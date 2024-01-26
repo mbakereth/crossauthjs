@@ -36,7 +36,7 @@ export class InMemoryUserStorage extends UserStorage {
      * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `state` field is not `awaitingemailverification`.  See explaination above.
     */
     constructor(options : InMemoryUserStorageOptions = {}) {
-        super(options.userEditableFields);
+        super(options);
     }
 
     /**

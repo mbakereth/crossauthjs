@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { UserStorage, KeyStorage, UserStorageGetOptions } from '../storage';
+import { UserStorage, KeyStorage, UserStorageGetOptions, UserStorageOptions } from '../storage';
 import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 import { CrossauthLogger, j } from '../..';
@@ -10,7 +10,7 @@ import { setParameter, ParamType } from '../utils';
  * 
  * See {@link PrismaUserStorage.constructor} for definitions.
  */
-export interface PrismaUserStorageOptions {
+export interface PrismaUserStorageOptions extends UserStorageOptions {
 
     /** Name of user table (to Prisma, ie lowercase).  Default `user` */
     userTable? : string,
@@ -26,7 +26,7 @@ export interface PrismaUserStorageOptions {
     /** The prisma client instanfce.  Leave this out to have Crossauth create a default one */
     prismaClient? : PrismaClient,
 
-    userEditableFields? : string[];
+    includes? : string[];
 }
 
 /**
@@ -52,9 +52,10 @@ export interface PrismaUserStorageOptions {
 */
 export class PrismaUserStorage extends UserStorage {
     private userTable : string = "user";
-    private userSecretsTable : string = "userSecrets";
     private idColumn : string = "id";
     private prismaClient : PrismaClient;
+    private includes : string[] = ["secrets"];
+    private includesObject : {[key:string]:boolean} = {};
 
     /**
      * Creates a PrismaUserStorage object, optionally overriding defaults.
@@ -64,10 +65,12 @@ export class PrismaUserStorage extends UserStorage {
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
      */
     constructor(options : PrismaUserStorageOptions = {}) {
-        super(options.userEditableFields);
+        super(options);
         setParameter("userTable", ParamType.String, this, options, "USER_TABLE");
         setParameter("userSecretsTable", ParamType.String, this, options, "USER_SECRETS_TABLE");
         setParameter("idColumn", ParamType.String, this, options, "USER_ID_COLUMN");
+        setParameter("includes", ParamType.String, this, options, "USER_INCLUDES");
+	this.includes.forEach((item) => {this.includesObject[item] = true});
 
         if (options && options.prismaClient) {
             this.prismaClient = options.prismaClient;
@@ -191,7 +194,7 @@ export class PrismaUserStorage extends UserStorage {
                     data: userData,
                 });
             } else {
-                await this.prismaClient.$transaction([
+                /*await this.prismaClient.$transaction([
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
                 this.prismaClient[this.userTable].update({
                     where: {
@@ -206,7 +209,28 @@ export class PrismaUserStorage extends UserStorage {
                     },
                     data: secretsData,
                 })
-            ]);
+            ]);*/
+		const {user_id: _, ...filteredSecretsData} = secretsData;
+		await this.prismaClient[this.userTable].update({
+                    where: {
+                        [this.idColumn]: user.id,
+                    },
+                    data: {
+			...userData,
+			secrets: {
+				update: {
+					where: {
+						user_id: user.id,
+					},
+					data: filteredSecretsData,
+				}
+			}
+		    },
+		    include: {
+			secrets: true,
+		    },
+                });
+
 
             }
         } catch (e) {
