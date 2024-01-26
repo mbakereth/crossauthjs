@@ -483,4 +483,3 @@ test('FastifyServer.passwordReset', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "newPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(302);
 });
-

@@ -18,6 +18,12 @@ export interface UserStorageGetOptions {
  * need not be case insensitive .
  */
 export abstract class UserStorage {
+    readonly userEditableFields : string[] = [];
+
+    constructor(userEditableFields? : string[]) {
+        if (userEditableFields) this.userEditableFields = userEditableFields;
+    }
+    
     /**
      * Returns user matching the given username, or throws an exception.  
      * 

@@ -11,7 +11,7 @@ import { UsernamePasswordAuthenticator } from '../password';
 import { Hasher } from '../hasher';
 import { Backend, type BackendOptions } from '../backend';
 import { CrossauthError, ErrorCode } from "../..";
-import { User, Key } from '../../interfaces';
+import { User, Key, UserInputFields } from '../../interfaces';
 import { CrossauthLogger, j } from '../..';
 import { setParameter, ParamType } from '../utils';
 
@@ -57,17 +57,24 @@ export interface FastifyCookieAuthServerOptions extends BackendOptions {
     logoutRedirect? : string;
 
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
-    validatePassword? : (password: string) => string[];
+    validatePasswordFn? : (password: string) => string[];
 
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `FormEnty` if the user doesn't confirm to local rules.  Doesn't validate passwords  */
-    validateUser? : (user: User) => string[];
+    validateUserFn? : (user: UserInputFields) => string[];
 
-    /** Called when a new user is going to be saved 
-     *  Add additional fields to your session storage here.  Return a map of keys to values.
-     *  ALternatively you can add fields in the create user form, preceded with `user_`.  If you
-     *  want to add fields which the user does not have control over, eg permissions, use this function.
-     */
-    addToUser? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
+    /** Function that creates a user from form fields.
+     * Default one takes fields that begin with `user_`, removing the `user_` prefix
+     * and filtering out anything not in the userEditableFields list in the
+     * user storage.
+      */
+    createUserFn? : (username : string, request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) => UserInputFields;
+
+    /** Function that updates a user from form fields.
+     * Default one takes fields that begin with `user_`, removing the `user_` prefix
+     * and filtering out anything not in the userEditableFields list in the
+     * user storage.
+      */
+    updateUserFn? : (user : User, request : FastifyRequest<{ Body: UpdateUserBodyType }>, userEditableFields : string[]) => User;
 
     /** Called when a new session token is going to be saved 
      *  Add additional fields to your session storage here.  Return a map of keys to values  */
@@ -323,11 +330,38 @@ function defaultPasswordValidator(password : string) : string[] {
  * @param password The password to validate
  * @returns an array of errors.  If there were no errors, returns an empty array
  */
-function defaultUserValidator(user : User) : string[] {
+function defaultUserValidator(user : UserInputFields) : string[] {
     let errors : string[] = [];
     if (user.username == undefined) errors.push("Username must be given");
     else if (user.username.length < 2) errors.push("Username must be at least 2 characters");
     return errors;
+}
+
+function defaultCreateUser(username : string, request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) : UserInputFields {
+    let state = "active";
+    let user : UserInputFields = {
+        username: username,
+        state: state,
+    }
+    for (let field in request.body) {
+        let name = field.replace("user_", ""); 
+        if (field.startsWith("user_") && userEditableFields.includes(name)) {
+            user[name] = request.body[field];
+        }
+    }
+    return user;
+
+}
+
+function defaultUpdateUser(user : User, request : FastifyRequest<{ Body: UpdateUserBodyType }>, userEditableFields : string[]) : User {
+    for (let field in request.body) {
+        let name = field.replace("user_", ""); 
+        if (field.startsWith("user_") && userEditableFields.includes(name)) {
+            user[name] = request.body[field];
+        }
+    }
+    return user;
+
 }
 
 /**
@@ -407,15 +441,16 @@ export class FastifyCookieAuthServer {
     private emailVerifiedPage : string = "emailverified.njk";
     private sessionManager : Backend;
     private anonymousSessions = true;
-    private validatePassword : (password : string) => string[] = defaultPasswordValidator;
-    private validateUser : (user : User) => string[] = defaultUserValidator;
-    private addToUser? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
+    private validatePasswordFn : (password : string) => string[] = defaultPasswordValidator;
+    private validateUserFn : (user : UserInputFields) => string[] = defaultUserValidator;
+    private createUserFn : (username : string, request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) => UserInputFields = defaultCreateUser;
+    private updateUserFn : (user : User, request : FastifyRequest<{ Body: UpdateUserBodyType }>, userEditableFields : string[]) => User = defaultUpdateUser;
     private addToSession? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
     private validateSession? : (session: Key, user: User|undefined, request : FastifyRequest) => void;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
     private twoFactorRequired :  "off" | "all" | "peruser" = "off";
-
+    private userStorage : UserStorage;
 
     /**
      * Creates the Fastify endpoints, optionally also the Fastify app.
@@ -425,6 +460,8 @@ export class FastifyCookieAuthServer {
                 keyStorage: KeyStorage, 
                 authenticator: UsernamePasswordAuthenticator, 
                 options: FastifyCookieAuthServerOptions = {}) {
+
+        this.userStorage = userStorage;
 
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
@@ -453,9 +490,10 @@ export class FastifyCookieAuthServer {
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
         setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
 
-        if (options.validatePassword) this.validatePassword = options.validatePassword;
-        if (options.validateUser) this.validateUser = options.validateUser;
-        if (options.addToUser) this.addToUser = options.addToUser;
+        if (options.validatePasswordFn) this.validatePasswordFn = options.validatePasswordFn;
+        if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
+        if (options.createUserFn) this.createUserFn = options.createUserFn;
+        if (options.updateUserFn) this.updateUserFn = options.updateUserFn;
         if (options.addToSession) this.addToSession = options.addToSession;
         if (options.validateSession) this.validateSession = options.validateSession;
 
@@ -1312,20 +1350,16 @@ export class FastifyCookieAuthServer {
         const password = request.body.password;
         const repeatPassword = request.body.repeatPassword;
         const next = request.body.next;
-        const twoFactor = request.body.twoFactor == "on";
-        let extraFields : {[key:string] : string|number|boolean|Date|undefined}= {};
-        for (let field in request.body) {
-            let name = field.replace("user_", ""); 
-            if (field.startsWith("user_")) extraFields[name] = request.body[field];
+        let passwordErrors = this.validatePasswordFn(password);
+        let user = this.createUserFn(username, request, this.userStorage.userEditableFields);
+        user.state = "active";
+        if (this.twoFactorRequired == "all" || request.body.twoFactor == "on") {
+           user. state = "awaitingtwofactor";
+        } else if (this.enableEmailVerification) {
+            user.state = "awaitingemailverification";
         }
-        let userToValidate : User = {
-            id: "",
-            username: username,
-            state: "active",
-            ...extraFields,
-        }
-        let passwordErrors = this.validatePassword(password);
-        let userErrors = this.validateUser(userToValidate);
+    
+        let userErrors = this.validateUserFn(user);
         let errors = [...userErrors, ...passwordErrors];
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.FormEntry, errors);
@@ -1345,10 +1379,9 @@ export class FastifyCookieAuthServer {
             } // all other errors are legitimate ones - we ignore them
         }
         
-        if ((this.twoFactorRequired == "off" || (this.twoFactorRequired == "peruser" && !twoFactor)) && !twoFactorInitiated) {
+        if ((this.twoFactorRequired == "off" || (this.twoFactorRequired == "peruser" && !request.body.twoFactor)) && !twoFactorInitiated) {
             // not enabling 2FA
-            if (this.addToUser) extraFields = {...extraFields, ...this.addToUser(request)};
-            await this.sessionManager.createUser(username, password, extraFields);
+            await this.sessionManager.createUser(user, password);
             if (!this.enableEmailVerification && this.enableSessions) {
                 return this.login(request, reply, (request, user) => {
                     successFn(request, {}, user)});
@@ -1368,9 +1401,7 @@ export class FastifyCookieAuthServer {
             } else {
                 // account not created - create one with state awaiting 2FA setup
                 const sessionValue = await this.createAnonymousSession(request, reply);
-                if (this.addToUser) extraFields = {...extraFields, ...this.addToUser(request)};
-                const resp = await this.sessionManager.initiateTwoFactorSignup(username, password, extraFields,
-                sessionValue);
+                const resp = await this.sessionManager.initiateTwoFactorSignup(user, password, sessionValue);
                 qrUrl = resp.qrUrl;
                 secret = resp.secret;
             }
@@ -1412,15 +1443,6 @@ export class FastifyCookieAuthServer {
         } catch (e) {
             CrossauthLogger.logger.error(j({msg: "signup2fa failed", hashedSessionCookie: this.getHashOfSessionCookie(request) }));
             CrossauthLogger.logger.debug(j({err: e}));
-            /*try {
-                if (sessionId) {
-                    const data = await this.sessionManager.dataForSessionKey(sessionId);
-                    const dataObj = JSON.parse(data||"");
-                    if (dataObj.username)  this.sessionManager.deleteUserByUsername(dataObj.username);
-                }
-            } catch (e) {
-                CrossauthLogger.logger.error(j({err: e}));
-            }*/
             throw e;
         }
         return successFn(reply, user);
@@ -1438,7 +1460,7 @@ export class FastifyCookieAuthServer {
         if (repeatPassword != undefined && repeatPassword != newPassword) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        let errors = this.validatePassword(newPassword);
+        let errors = this.validatePasswordFn(newPassword);
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
@@ -1457,11 +1479,10 @@ export class FastifyCookieAuthServer {
             username: request.user.username,
             state: "active",
         };
-        for (let field in request.body) {
-            if (field.startsWith("user_")) {
-                const fieldName = field.replace("user_", "");
-                user[fieldName] = request.body[field];
-            }
+        user = this.updateUserFn(user, request, this.userStorage.userEditableFields);
+        let errors = this.validateUserFn(user);
+        if (errors.length > 0) {
+            throw new CrossauthError(ErrorCode.FormEntry, errors);
         }
         let emailVerificationNeeded = await this.sessionManager.updateUser(request.user, user);
         return successFn(reply, request.user, emailVerificationNeeded);
@@ -1508,7 +1529,7 @@ export class FastifyCookieAuthServer {
         if (repeatPassword != undefined && repeatPassword != newPassword) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        let errors = this.validatePassword(newPassword);
+        let errors = this.validatePasswordFn(newPassword);
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }

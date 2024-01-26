@@ -9,6 +9,7 @@ import { CrossauthLogger, j } from '../..';
  * See {@link InMemoryUserStorage.constructor} for definitions.
  */
 export interface InMemoryUserStorageOptions {
+    userEditableFields? : string[];
 }
 
 interface UserWithNormalization extends User {
@@ -34,8 +35,8 @@ export class InMemoryUserStorage extends UserStorage {
      * Creates a InMemoryUserStorage object, optionally overriding defaults.
      * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `state` field is not `awaitingemailverification`.  See explaination above.
     */
-    constructor(_options : InMemoryUserStorageOptions = {}) {
-        super();
+    constructor(options : InMemoryUserStorageOptions = {}) {
+        super(options.userEditableFields);
     }
 
     /**

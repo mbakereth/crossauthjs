@@ -2,7 +2,7 @@ import { InMemoryUserStorage } from '../inmemorystorage';
 import { HashedPasswordAuthenticator } from '../../password';
 
 export async function getTestUserStorage(pepper? : string|undefined) : Promise<InMemoryUserStorage> {
-    let userStorage = new InMemoryUserStorage();
+    let userStorage = new InMemoryUserStorage({userEditableFields: ["email", "dummyField"]});
     let authenticator = new HashedPasswordAuthenticator(userStorage, {secret: pepper});
     await Promise.all([
         userStorage.createUser({

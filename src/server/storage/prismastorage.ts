@@ -25,6 +25,8 @@ export interface PrismaUserStorageOptions {
 
     /** The prisma client instanfce.  Leave this out to have Crossauth create a default one */
     prismaClient? : PrismaClient,
+
+    userEditableFields? : string[];
 }
 
 /**
@@ -62,7 +64,7 @@ export class PrismaUserStorage extends UserStorage {
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
      */
     constructor(options : PrismaUserStorageOptions = {}) {
-        super();
+        super(options.userEditableFields);
         setParameter("userTable", ParamType.String, this, options, "USER_TABLE");
         setParameter("userSecretsTable", ParamType.String, this, options, "USER_SECRETS_TABLE");
         setParameter("idColumn", ParamType.String, this, options, "USER_ID_COLUMN");

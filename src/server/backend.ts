@@ -377,16 +377,9 @@ export class Backend {
      * @param extraFields and extra fields to add to the user table entry
      * @returns the userId
      */
-    async createUser(username : string, 
-        password : string, 
-        extraFields : {[key : string]: string|number|boolean|Date|undefined})
+    async createUser(user : UserInputFields, password : string)
         : Promise<User> {
-            let passwordHash = await this.authenticator.createPasswordForStorage(password);
-        const user : UserInputFields = {
-            username: username,
-            state: this.enableEmailVerification ? "awaitingemailverification" : "active",
-            ...extraFields,
-        }
+        let passwordHash = await this.authenticator.createPasswordForStorage(password);
         const secrets : UserSecretsInputFields = {
             password: passwordHash
         }
@@ -412,21 +405,15 @@ export class Backend {
      * @return the new userId and the QR code to display
      */
     async initiateTwoFactorSignup(
-        username : string, 
+        user : UserInputFields, 
         password : string, 
-        extraFields : {[key : string]: string|number|boolean|Date|undefined},
         sessionCookieValue : string) : Promise<{userId: string|number, qrUrl: string, secret: string}> {
         if (!this.session || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
         const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const { qrUrl, secret } = await this.totpManager.createAndStoreSecret(username, sessionId);
+        const { qrUrl, secret } = await this.totpManager.createAndStoreSecret(user.username, sessionId);
 
         let passwordHash = await this.authenticator.createPasswordForStorage(password);
-        extraFields = {...extraFields, state: "awaitingtwofactorsetup"};
-        const user : UserInputFields = {
-            username: username,
-            state: "awaitingtwofactorsetup",
-            ...extraFields,
-        }
+        user.state = "awaitingtwofactorsetup";
         const secrets : UserSecretsInputFields = {
             password: passwordHash
         }
