@@ -91,9 +91,7 @@ export class PrismaUserStorage extends UserStorage {
                 where: {
                     [normalizedKey]: normalizedValue
                 },
-                include: {
-                    secrets: true,
-                }
+                include: this.includesObject,
             });
 
         }  catch (e) {
@@ -124,6 +122,7 @@ export class PrismaUserStorage extends UserStorage {
             throw new CrossauthError(ErrorCode.PasswordResetNeeded);
         }
         const secrets = prismaUser.secrets;
+        delete secrets.user_id;
         delete prismaUser.secrets;
         return {user: {...prismaUser, id: prismaUser[this.idColumn]}, secrets: {userId: prismaUser[this.idColumn], ...secrets}};
     }
@@ -210,7 +209,7 @@ export class PrismaUserStorage extends UserStorage {
                     data: secretsData,
                 })
             ]);*/
-		const {user_id: _, ...filteredSecretsData} = secretsData;
+        // @ts-ignore
 		await this.prismaClient[this.userTable].update({
                     where: {
                         [this.idColumn]: user.id,
@@ -222,7 +221,7 @@ export class PrismaUserStorage extends UserStorage {
 					where: {
 						user_id: user.id,
 					},
-					data: filteredSecretsData,
+					data: secretsData,
 				}
 			}
 		    },
@@ -234,6 +233,7 @@ export class PrismaUserStorage extends UserStorage {
 
             }
         } catch (e) {
+            console.log(e);
             CrossauthLogger.logger.error(j({err: e}));
             throw new CrossauthError(ErrorCode.Connection, "Error updating user");
         }

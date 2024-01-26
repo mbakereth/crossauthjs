@@ -1,4 +1,4 @@
-import { UserStorage, KeyStorage, UserStorageGetOptions } from '../storage';
+import { UserStorage, KeyStorage, UserStorageGetOptions, UserStorageOptions } from '../storage';
 import { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 import { CrossauthLogger, j } from '../..';
@@ -8,8 +8,7 @@ import { CrossauthLogger, j } from '../..';
  * 
  * See {@link InMemoryUserStorage.constructor} for definitions.
  */
-export interface InMemoryUserStorageOptions {
-    userEditableFields? : string[];
+export interface InMemoryUserStorageOptions extends UserStorageOptions {
 }
 
 interface UserWithNormalization extends User {

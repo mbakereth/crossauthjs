@@ -7,8 +7,8 @@ export interface UserStorageGetOptions {
     skipActiveCheck? : boolean
 }
 
-export interface PrismaUserStorageOptions {
-	userEditableFields? : string[],
+export interface UserStorageOptions {
+	userEditableFields? : string,
 }
 
 /**
@@ -23,10 +23,10 @@ export interface PrismaUserStorageOptions {
 export abstract class UserStorage {
     readonly userEditableFields : string[] = [];
 
-    constructor(options : PrismaUserStorageOptions = {}) {
+    constructor(options : UserStorageOptions = {}) {
         setParameter("userEditableFields", ParamType.StringArray, this, options, "USER_EDITABLE_FIELDS");
     }
-    
+
     /**
      * Returns user matching the given username, or throws an exception.  
      * 

@@ -531,7 +531,6 @@ export class FastifyCookieAuthServer {
 
         this.app.decorateRequest('user', undefined);
         this.app.decorateRequest('csrfToken', undefined);
-        this.app.decorateRequest('twoFactor', {});
                                 
         // validates the session id and csrftokens, creating if necessary and putting the csrf token
         // and user in the request object.
@@ -1404,10 +1403,6 @@ export class FastifyCookieAuthServer {
                 const resp = await this.sessionManager.initiateTwoFactorSignup(user, password, sessionValue);
                 qrUrl = resp.qrUrl;
                 secret = resp.secret;
-            }
-            request.twoFactor = {
-                qr : qrUrl,
-                username: username,
             }
 
             try {

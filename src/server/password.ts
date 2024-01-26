@@ -73,6 +73,7 @@ export class HashedPasswordAuthenticator extends UsernamePasswordAuthenticator {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
     async authenticateUser(username : string, password : string) : Promise<{user: User, secrets: UserSecrets}> {
+        console.log("authenticateUser", username, password);
         let {user, secrets} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
         if (!secrets.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
         if (!await Hasher.passwordsEqual(password, secrets.password, this.secret)) {
