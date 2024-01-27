@@ -12,8 +12,8 @@ export { PrismaUserStorage, PrismaKeyStorage } from './server/storage/prismastor
 export type { PrismaUserStorageOptions, PrismaKeyStorageOptions as PrismaSessionStorageOptions } from './server/storage/prismastorage';
 export { InMemoryUserStorage, InMemoryKeyStorage as InMemorySessionStorage } from './server/storage/inmemorystorage';
 
-export { FastifyCookieAuthServer } from './server/middleware/fastifyserver';
-export type { FastifyCookieAuthServerOptions  } from './server/middleware/fastifyserver';
+export { FastifyServer as FastifyCookieAuthServer } from './server/middleware/fastifyserver';
+export type { FastifyServerOptions as FastifyCookieAuthServerOptions  } from './server/middleware/fastifyserver';
 
 export { ExpressCookieAuthServer } from './server/middleware/expressserver';
 export type { ExpressCookieAuthServerOptions } from './server/middleware/expressserver';

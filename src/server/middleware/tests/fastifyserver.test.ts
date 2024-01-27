@@ -3,7 +3,7 @@ import path from 'path';
 import fastify from 'fastify';
 import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../../storage/inmemorystorage';
-import { FastifyCookieAuthServer, type FastifyCookieAuthServerOptions } from '../fastifyserver';
+import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import { HashedPasswordAuthenticator } from '../../password';
 import { Hasher } from '../../hasher';
 import { SessionCookie } from '../../cookieauth';
@@ -15,14 +15,14 @@ export var passwordResetData :  {token : string, extraData: {[key:string]: any}}
 beforeAll(async () => {
 });
 
-async function makeAppWithOptions(options : FastifyCookieAuthServerOptions = {}) : Promise<{userStorage : InMemoryUserStorage, keyStorage : InMemoryKeyStorage, server: FastifyCookieAuthServer}> {
+async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise<{userStorage : InMemoryUserStorage, keyStorage : InMemoryKeyStorage, server: FastifyServer}> {
     const userStorage = await getTestUserStorage();
     const keyStorage = new InMemoryKeyStorage();
     let authenticator = new HashedPasswordAuthenticator(userStorage);
 
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
-    const server = new FastifyCookieAuthServer(userStorage, keyStorage, authenticator, {
+    const server = new FastifyServer(userStorage, keyStorage, authenticator, {
         app: app,
         views: path.join(__dirname, '../views'),
         secret: "ABCDEFG",
@@ -33,6 +33,13 @@ async function makeAppWithOptions(options : FastifyCookieAuthServerOptions = {})
     app.decorateReply("view",  function(template, args) {
         return {template: template, args: args};
     });
+
+    app.setErrorHandler(function (error, _request, reply) {
+        // Log error
+        console.log(error)
+        // Send error response
+        return reply.status(409).send({ ok: false })
+    })
 
     return {userStorage, keyStorage, server};
 }
@@ -116,8 +123,9 @@ test('FastifyServer.signupWithEmailVerification', async () => {
     let {server} = await makeAppWithOptions({enableEmailVerification: true, emailVerificationTextBody: "dummy"});
 
     // @ts-ignore
-    server["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+    server["sessionServer"]["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
         confirmEmailData = {token, email, extraData}
+        return "1";
     };
 
     let res;
@@ -187,7 +195,8 @@ test('FastifyServer.signupWithoutEmailVerification', async () => {
 test('FastifyServer.wrongCsrf', async () => {
 
     let {server} = await makeAppWithOptions();
-    const csrfTokens = server["sessionManager"]["csrfTokens"];
+    if (!server["sessionServer"]) throw Error("Sessions not enabled");
+    const csrfTokens = server["sessionServer"]["sessionManager"]["csrfTokens"];
     let res;
     let body;
 
@@ -237,7 +246,8 @@ test('FastifyServer.wrongSession', async () => {
     expect(body.template).toBe("changepassword.njk");
 
     // expire session
-    const session = server["sessionManager"]["session"];
+    if (!server["sessionServer"]) throw Error("Sessions not enabled");
+    const session = server["sessionServer"]["sessionManager"]["session"];
     if (!session) throw new Error("Sessions not enabled");
     const sessionId = session.unsignCookie(sessionCookie);
     const sessionHash = SessionCookie.hashSessionKey(sessionId);
@@ -295,8 +305,9 @@ test('FastifyServer.changeEmailWithVerification', async () => {
 
     let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: true, emailVerificationTextBody: "dummy"});
     // @ts-ignore
-    server["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+    server["sessionServer"]["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
         confirmEmailData = {token, email, extraData}
+        return "1";
     };
 
     let res;
@@ -417,7 +428,7 @@ test('FastifyServer.passwordReset', async () => {
     let {server} = await makeAppWithOptions({enablePasswordReset: true, passwordResetTextBody: "dummy"});
 
     // @ts-ignore
-    server["sessionManager"]["tokenEmailer"]["_sendPasswordResetToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+    server["sessionServer"]["sessionManager"]["tokenEmailer"]["_sendPasswordResetToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
         passwordResetData = {token, extraData}
     };
 
