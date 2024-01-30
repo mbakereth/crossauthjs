@@ -581,11 +581,11 @@ test('FastifyServer.signupTotpWithEmailVerification', async () => {
             csrfToken: csrfToken,
             totpCode: code
         } })
-        console.log(res.body);
         if (res.statusCode == 200) break;
     }
     expect(res.statusCode).toBe(200);
-
+    body = JSON.parse(res.body)
+    expect(body.args.message).toBeDefined();    
     // verify token
     const token = confirmEmailData.token;
     res = await server.app.inject({ method: "GET", url: "/verifyemail/" + token});

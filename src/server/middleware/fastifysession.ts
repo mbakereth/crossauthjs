@@ -516,7 +516,7 @@ export class FastifySessionServer {
             try {
                 CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
 
-                await this.signuptwofactor(request, reply, 
+                return await this.signuptwofactor(request, reply, 
                 (reply, _user) => {
                     if (this.enableEmailVerification) {
                         return reply.view(this.signupPage, {
@@ -1157,7 +1157,7 @@ export class FastifySessionServer {
             await this.sessionManager.createUser(user, request.body, repeatSecrets);
             if (!this.enableEmailVerification) {
                 return this.login(request, reply, (request, user) => {
-                    successFn(request, {}, user)});
+                    return successFn(request, {}, user)});
             }
             return successFn(reply, {}, undefined);
         } else {
