@@ -4,11 +4,10 @@ import fastify from 'fastify';
 import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../../storage/inmemorystorage';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
-import { HashedPasswordAuthenticator } from '../../password';
+import { LocalPasswordAuthenticator } from '../../password';
 import { Hasher } from '../../hasher';
 import { SessionCookie } from '../../cookieauth';
 
-//export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
 
 beforeAll(async () => {
@@ -17,11 +16,11 @@ beforeAll(async () => {
 async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise<{userStorage : InMemoryUserStorage, keyStorage : InMemoryKeyStorage, server: FastifyServer}> {
     const userStorage = await getTestUserStorage();
     const keyStorage = new InMemoryKeyStorage();
-    let authenticator = new HashedPasswordAuthenticator(userStorage);
+    let authenticator = new LocalPasswordAuthenticator(userStorage);
 
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
-    const server = new FastifyServer(userStorage, keyStorage, authenticator, {
+    const server = new FastifyServer(userStorage, keyStorage, {localpassword: authenticator}, {
         app: app,
         views: path.join(__dirname, '../views'),
         secret: "ABCDEFG",
@@ -83,7 +82,6 @@ test('FastifyServer.api.login', async () => {
 
 });
 
-
 test('FastifyServer.api.requestProtectedUrlsAsAnonymous', async () => {
 
     let {server} = await makeAppWithOptions();
@@ -138,7 +136,7 @@ test('FastifyServer.api.signupWithEmailVerification', async () => {
     res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
         username: "mary", 
         password: "maryPass123", 
-        repeatPassword: "x",
+        repeat_password: "x",
         user_email: "mary@mary.com", 
         csrfToken: csrfToken
     } })
@@ -149,8 +147,9 @@ test('FastifyServer.api.signupWithEmailVerification', async () => {
     res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
         username: "mary", 
         password: "maryPass123", 
-        repeatPassword: "maryPass123",
+        repeat_password: "maryPass123",
         user_email: "mary@mary.com", 
+        factor1: "localpassword",
         csrfToken: csrfToken
     } })
     body = JSON.parse(res.body)
@@ -178,7 +177,7 @@ test('FastifyServer.api.signupWithoutEmailVerification', async () => {
     res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
         username: "mary", 
         password: "maryPass123", 
-        repeatPassword: "x",
+        repeat_password: "x",
         user_email: "mary@mary.com", 
         csrfToken: csrfToken
     } })
@@ -189,7 +188,7 @@ test('FastifyServer.api.signupWithoutEmailVerification', async () => {
     res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
         username: "mary", 
         password: "maryPass123", 
-        repeatPassword: "maryPass123",
+        repeat_password: "maryPass123",
         user_email: "mary@mary.com", 
         csrfToken: csrfToken
     } })
@@ -361,9 +360,9 @@ test('FastifyServer.api.changePassword', async () => {
     
     // check wrong password is caught
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
-        oldPassword: "XXX", 
-        newPassword: "newPass123",
-        repeatPassword: "newPass123",
+        old_password: "XXX", 
+        new_password: "newPass123",
+        repeat_password: "newPass123",
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);
@@ -372,9 +371,9 @@ test('FastifyServer.api.changePassword', async () => {
 
     // check empty password caught
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
-        oldPassword: "bobPass123", 
-        newPassword: "",
-        repeatPassword: "",
+        old_password: "bobPass123", 
+        new_password: "",
+        repeat_password: "",
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);
@@ -383,9 +382,9 @@ test('FastifyServer.api.changePassword', async () => {
 
     // check mismatched passwords caught
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
-        oldPassword: "bobPass123", 
-        newPassword: "newPass123",
-        repeatPassword: "YYY",
+        old_password: "bobPass123", 
+        new_password: "newPass123",
+        repeat_password: "YYY",
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);
@@ -394,9 +393,9 @@ test('FastifyServer.api.changePassword', async () => {
 
     // check successful change
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
-        oldPassword: "bobPass123", 
-        newPassword: "newPass123",
-        repeatPassword: "newPass123",
+        old_password: "bobPass123", 
+        new_password: "newPass123",
+        repeat_password: "newPass123",
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);

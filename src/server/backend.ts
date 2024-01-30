@@ -1,7 +1,7 @@
-import { type User, UserSecrets, type Key, getJsonData, UserInputFields, UserSecretsInputFields } from '../interfaces.ts';
+import { type User, UserSecrets, type Key, getJsonData, UserInputFields } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
-import { UsernamePasswordAuthenticator } from "./password";
+import { AuthenticationParameters, Authenticator } from './auth';
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 import { TokenEmailer, TokenEmailerOptions } from './email.ts';
 import { Totp } from './totp';
@@ -56,7 +56,8 @@ export class Backend {
     private csrfTokens? : DoubleSubmitCsrfToken;
     private enableSessions : boolean = true;
     private session? : SessionCookie;
-    readonly authenticator : UsernamePasswordAuthenticator;
+    readonly authenticators : {[key:string] : Authenticator};
+    //readonly authenticator : UsernamePasswordAuthenticator;
 
     private appName : string = "Crossauth";
     private enableEmailVerification : boolean = false;
@@ -75,12 +76,12 @@ export class Backend {
     constructor(
         userStorage : UserStorage, 
         keyStorage : KeyStorage, 
-        authenticator : UsernamePasswordAuthenticator,
+        authenticators : {[key:string] : Authenticator},
         options : BackendOptions = {}) {
 
         this.userStorage = userStorage;
         this.keyStorage = keyStorage;
-        this.authenticator = authenticator;
+        this.authenticators = authenticators;
 
         setParameter("secret", ParamType.String, this, options, "SECRET");
         setParameter("twoFactorRequired", ParamType.String, this, options, "TWOFACTOR_REQUIRED");
@@ -128,6 +129,21 @@ export class Backend {
     }
 
     /**
+     * Authenticates a user and returns it and its secrets.
+     * @param username the username to validate
+     * @param params parameters to pass to the authenticator
+     * @param user if this is defined, the username and authentication parameters the user and secrets are returned
+     * @returns the user and its secrets
+     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
+     *         `PasswordNotMatch`.
+     */
+    async authenticateUser(user : User, secrets : UserSecrets, params : AuthenticationParameters) : Promise<void> {
+        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
+
+        await this.authenticators[user.factor1].authenticateUser(user, secrets, params);
+    }
+
+    /**
      * Performs a user login
      *    * Authenticates the username and password
      *    * Creates a session key
@@ -141,21 +157,23 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, password : string, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User, secrets: UserSecrets}> {
+    async login(username : string, params : AuthenticationParameters, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User, secrets: UserSecrets}> {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
 
         let bypass2FA = user != undefined;
 
-        let secrets : UserSecrets|undefined;
-        if (!user) 
-        {
-            let {user: user1, secrets: secrets1} = await this.authenticator.authenticateUser(username, password);
-            user = user1;
-            secrets = secrets1;
+        let secrets : UserSecrets;
+        if (!user) {
+            let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+            secrets = userAndSecrets.secrets;
+            user = userAndSecrets.user;
+            await this.authenticateUser(user, secrets, params);
         } else {
-            let {secrets: secrets1} = await this.userStorage.getUserById(user.id);
-            secrets = secrets1;
+            let userAndSecrets = await this.userStorage.getUserByUsername(user.username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+            secrets = userAndSecrets.secrets;
+
         }
+
         let sessionCookie : Cookie;
         if (!bypass2FA && secrets && secrets.totpSecret && secrets.totpSecret != "") {
             // create an anonymous session and store the username in it
@@ -377,12 +395,10 @@ export class Backend {
      * @param extraFields and extra fields to add to the user table entry
      * @returns the userId
      */
-    async createUser(user : UserInputFields, password : string)
+    async createUser(user : UserInputFields, params: AuthenticationParameters, repeatParams?: AuthenticationParameters)
         : Promise<User> {
-        let passwordHash = await this.authenticator.createPasswordForStorage(password);
-        const secrets : UserSecretsInputFields = {
-            password: passwordHash
-        }
+        if (!(this.authenticators[user.factor1])) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
+        let secrets = await this.authenticators[user.factor1].createSecrets(user.username, params, repeatParams);
         const newUser = await this.userStorage.createUser(user, secrets);
         if (this.enableEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(newUser.id, undefined)
@@ -406,17 +422,16 @@ export class Backend {
      */
     async initiateTwoFactorSignup(
         user : UserInputFields, 
-        password : string, 
-        sessionCookieValue : string) : Promise<{userId: string|number, qrUrl: string, secret: string}> {
+        params : AuthenticationParameters, 
+        sessionCookieValue : string,
+        repeatParams? : AuthenticationParameters) : Promise<{userId: string|number, qrUrl: string, secret: string}> {
         if (!this.session || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
+        if (!this.authenticators[user.factor1]) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
         const sessionId = this.session.unsignCookie(sessionCookieValue);
         const { qrUrl, secret } = await this.totpManager.createAndStoreSecret(user.username, sessionId);
 
-        let passwordHash = await this.authenticator.createPasswordForStorage(password);
+        let secrets = await this.authenticators[user.factor1].createSecrets(user.username, params, repeatParams);
         user.state = "awaitingtwofactorsetup";
-        const secrets : UserSecretsInputFields = {
-            password: passwordHash
-        }
         const newUser = await this.userStorage.createUser(user, secrets);
         return {userId: newUser.id, qrUrl, secret}
         
@@ -604,10 +619,13 @@ export class Backend {
         return await this.tokenEmailer.verifyPasswordResetToken(token);
     }
 
-    async changePassword(username : string, oldPassword : string, newPassword : string) : Promise<User> {
-        let {user} = await this.authenticator.authenticateUser(username, oldPassword);
+    async changeSecrets(username : string, factorNumber : 1|2, oldParams: AuthenticationParameters, newParams : AuthenticationParameters, repeatParams? : AuthenticationParameters) : Promise<User> {
+        let {user, secrets} = await this.userStorage.getUserByUsername(username);
+        const factor = factorNumber == 1 ? user.factor1 : user.factor2;
+        await this.authenticators[factor].authenticateUser(user, secrets, oldParams);
+        const newSecrets = await this.authenticators[user.factor1].createSecrets(user.username, newParams, repeatParams);
         await this.userStorage.updateUser({id: user.id}, 
-            {password: await this.authenticator.createPasswordForStorage(newPassword)}
+            newSecrets,
         );
 
         // delete any password reset tokens
@@ -656,14 +674,14 @@ export class Backend {
         return this.enableEmailVerification && hasEmail;
     }
 
-    async resetPassword(token : string, newPassword : string) : Promise<User> {
+    async resetSecret(token : string, factorNumber : 1|2, params : AuthenticationParameters, repeatParams? : AuthenticationParameters) : Promise<User> {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
-
         const user = await this.userForPasswordResetToken(token);
+        const factor = factorNumber == 1 ? user.factor1 : user.factor2;
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
         await this.userStorage.updateUser(
             {id: user.id},
-            {password: await this.authenticator.createPasswordForStorage(newPassword)},
+            await this.authenticators[factor].createSecrets(user.username, params, repeatParams),
         );
         //this.keyStorage.deleteKey(TokenEmailer.hashPasswordResetToken(token));
 

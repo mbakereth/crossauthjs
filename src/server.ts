@@ -1,8 +1,6 @@
 export { UserStorage, KeyStorage as SessionStorage } from './server/storage'; 
-
-export { 
-    UsernamePasswordAuthenticator, 
-    HashedPasswordAuthenticator } from './server/password';
+export { Authenticator } from './server/auth';
+export {  LocalPasswordAuthenticator } from './server/password';
 export type { UsernamePasswordAuthenticatorOptions } from './server/password';
 
 export { Backend } from './server/backend';

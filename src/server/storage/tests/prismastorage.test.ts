@@ -2,7 +2,7 @@ import { test, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaUserStorage, PrismaKeyStorage } from '../prismastorage';
 import { CrossauthError } from '../../..';
 import { PrismaClient } from '@prisma/client';
-import { HashedPasswordAuthenticator } from '../../password';
+import { LocalPasswordAuthenticator } from '../../password';
 
 export var prismaClient : PrismaClient;
 export var userStorage : PrismaUserStorage;
@@ -13,7 +13,7 @@ beforeAll(async () => {
     await prismaClient.user.deleteMany({});
     await prismaClient.key.deleteMany({});
     userStorage = new PrismaUserStorage({userEditableFields: "email, dummyField"});
-    let authenticator = new HashedPasswordAuthenticator(userStorage);
+    let authenticator = new LocalPasswordAuthenticator(userStorage);
     await userStorage.createUser({
         username: "bob", 
         state: "active",

@@ -1,5 +1,5 @@
 import { test, expect, beforeAll } from 'vitest';
-import { HashedPasswordAuthenticator } from '../password';
+import { LocalPasswordAuthenticator } from '../password';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
 import { InMemoryUserStorage } from '../storage/inmemorystorage';
 export var userStorage : InMemoryUserStorage;
@@ -12,14 +12,16 @@ beforeAll(async () => {
 });
 
 test('HashedPasswordAuthenticator.authenticateUser', async () => {
-    let authenticator = new HashedPasswordAuthenticator(userStorage);
-    let {user} = await authenticator.authenticateUser("bob", "bobPass123");
+    let {user, secrets} = await userStorage.getUserByUsername("bob");
+    let authenticator = new LocalPasswordAuthenticator(userStorage);
+    await authenticator.authenticateUser(user, secrets, {password: "bobPass123"});
     expect(user.username).toBe("bob");
 });
 
 test('HashedPasswordAuthenticator.authenticateUseWithSecret', async () => {
-    let authenticator = new HashedPasswordAuthenticator(secretUserStorage, 
+    let {user, secrets} = await userStorage.getUserByUsername("bob");
+    let authenticator = new LocalPasswordAuthenticator(secretUserStorage, 
         {secret: "ABCDEFGHIJKLMNOPQRSTUV", enableSecretForPasswordHash: true});
-    let {user} = await authenticator.authenticateUser("bob", "bobPass123");
+     await authenticator.authenticateUser(user, secrets, {password: "bobPass123"});
     expect(user.username).toBe("bob");
 });

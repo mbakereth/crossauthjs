@@ -2,7 +2,7 @@ import { test, expect, beforeAll } from 'vitest';
 import { DoubleSubmitCsrfToken, SessionCookie } from '../cookieauth';
 import { Hasher } from '../hasher';
 import { Backend } from '../backend';
-import { HashedPasswordAuthenticator } from '../password';
+import { LocalPasswordAuthenticator } from '../password';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
 import { CrossauthError } from '../../error';
@@ -17,8 +17,8 @@ beforeAll(async () => {
 
 test('SessionCookie.createSessionKey', async () => {
     const keyStorage = new InMemoryKeyStorage();
-    const auth = new SessionCookie(userStorage, keyStorage,{secret: "ABCDEFGHIJKLMNOPQRSTUVWX", siteUrl: "http://locahost:3000"});
-    const bob = await userStorage.getUserByUsername("bob");
+    const auth = new SessionCookie(userStorage, keyStorage, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX", siteUrl: "http://locahost:3000"});
+    const {user: bob} = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
     let key = await keyStorage.getKey(SessionCookie.hashSessionKey(value));
     expect(key.expires).toBeDefined();
@@ -33,9 +33,9 @@ test('SessionCookie.createSessionKey', async () => {
 
 test('CookieSessionManager.loginGetKeyLogout', async () => {
     const keyStorage = new InMemoryKeyStorage();
-    let authenticator = new HashedPasswordAuthenticator(userStorage);
-    let manager = new Backend(userStorage, keyStorage, authenticator, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
-    let {user: bob, sessionCookie: cookie } = await manager.login("bob", "bobPass123");
+    let authenticator = new LocalPasswordAuthenticator(userStorage);
+    let manager = new Backend(userStorage, keyStorage, {localpassword: authenticator}, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
+    let {user: bob, sessionCookie: cookie } = await manager.login("bob", {password: "bobPass123"});
     const user = await manager.userForSessionKey(cookie.value);
     expect(user).toBeDefined();
     if (user) expect(user.username).toBe(bob.username);
@@ -45,9 +45,9 @@ test('CookieSessionManager.loginGetKeyLogout', async () => {
 
 test('CookieSessionManager.logoutFromAll', async() => {
     const keyStorage = new InMemoryKeyStorage();
-    let authenticator = new HashedPasswordAuthenticator(userStorage);
-    let manager = new Backend(userStorage, keyStorage, authenticator, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
-    let {user: bob, sessionCookie: cookie } = await manager.login("bob", "bobPass123");
+    let authenticator = new LocalPasswordAuthenticator(userStorage);
+    let manager = new Backend(userStorage, keyStorage, {localpassword: authenticator}, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
+    let {user: bob, sessionCookie: cookie } = await manager.login("bob", {password: "bobPass123"});
     const user = await manager.userForSessionKey(cookie.value);
     expect(user).toBeDefined();
     if (user) {
@@ -56,7 +56,6 @@ test('CookieSessionManager.logoutFromAll', async() => {
         await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError(CrossauthError);
     }
 })
-
 
 test('DoubleSubmitCsrfToken.signAndUnsignCookie', async () => {
     const secret = "ABCDEFGHIJKLMNOPQRSTUVWX";

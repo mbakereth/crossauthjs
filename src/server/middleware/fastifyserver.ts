@@ -7,7 +7,7 @@ import { Server, IncomingMessage, ServerResponse } from 'http'
 
 import nunjucks from "nunjucks";
 import { UserStorage, KeyStorage } from '../storage';
-import { UsernamePasswordAuthenticator } from '../password';
+import { Authenticator } from '../auth';
 import { CrossauthError, ErrorCode } from "../..";
 import { CrossauthLogger, j } from '../..';
 import { setParameter, ParamType } from '../utils';
@@ -194,6 +194,7 @@ export class FastifyServer {
     private views : string = "views";
     private prefix : string = "/";
     private endpoints : string[] = [];
+    // @ts-ignore
     private sessionServer? : FastifySessionServer; // only needed for testing
 
     private enableEmailVerification : boolean = true;
@@ -206,7 +207,7 @@ export class FastifyServer {
      */
     constructor(userStorage: UserStorage, 
                 keyStorage: KeyStorage, 
-                authenticator: UsernamePasswordAuthenticator, 
+                authenticators: {[key:string]: Authenticator}, 
                 options: FastifyServerOptions = {}) {
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
@@ -258,7 +259,7 @@ export class FastifyServer {
         // validates the session id and csrftokens, creating if necessary and putting the csrf token
         // and user in the request object.
         if (this.enableSessions) { 
-            const sessionServer = new FastifySessionServer(this.app, this.prefix, userStorage, keyStorage, authenticator, options);
+            const sessionServer = new FastifySessionServer(this.app, this.prefix, userStorage, keyStorage, authenticators, options);
             this.sessionServer = sessionServer; // for testing only
             if (this.endpoints.includes("login")) {
                 sessionServer.addLoginEndpoints();

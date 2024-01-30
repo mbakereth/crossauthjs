@@ -20,8 +20,9 @@
 
         <p>
             <label for="totpCode">Code</label>
-            <input type="hidden" name="next" value="{{ next }}">
-            <input type="text" name="totpCode">
+            <input type="hidden" name="next" value="{{ next }}"/>
+            <input type="password" name="totpCode"/>
+            <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
         </p>
 
         <p><button type="submit">Submit</button></p>

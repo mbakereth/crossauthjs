@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { UserStorage, KeyStorage } from '../storage';
-import { UsernamePasswordAuthenticator } from '../password';
+import { AuthenticationParameters, Authenticator } from '../auth';
 import { Hasher } from '../hasher';
 import { Backend, type BackendOptions } from '../backend';
 import { CrossauthError, ErrorCode } from "../..";
@@ -44,9 +44,6 @@ export interface FastifySessionServerOptions extends BackendOptions {
     /** Page to redirect to after successful logout, default "/" */
     logoutRedirect? : string;
 
-    /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
-    validatePasswordFn? : (password: string) => string[];
-
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `FormEnty` if the user doesn't confirm to local rules.  Doesn't validate passwords  */
     validateUserFn? : (user: UserInputFields) => string[];
 
@@ -55,7 +52,7 @@ export interface FastifySessionServerOptions extends BackendOptions {
      * and filtering out anything not in the userEditableFields list in the
      * user storage.
       */
-    createUserFn? : (username : string, request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) => UserInputFields;
+    createUserFn? : (request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) => UserInputFields;
 
     /** Function that updates a user from form fields.
      * Default one takes fields that begin with `user_`, removing the `user_` prefix
@@ -197,23 +194,6 @@ interface LoginParamsType {
 
 
 /**
- * Default password validator.
- * 
- * Passwords must be at leat 8 characters, contain at least one lowercase character, at least one uppercase
- * chracter and at least one digit.
- * @param password The password to validate
- * @returns an array of errors.  If there were no errors, returns an empty array
- */
-function defaultPasswordValidator(password : string) : string[] {
-    let errors : string[] = [];
-    if (password.length < 8) errors.push("Password must be at least 8 characters");
-    if (password.match(/[a-z]/) == null) errors.push("Password must contain at least one lowercase character");
-    if (password.match(/[A-Z]/) == null) errors.push("Password must contain at least one uppercase character");
-    if (password.match(/[0-9]/) == null) errors.push("Password must contain at least one digit");
-    return errors;
-}
-
-/**
  * Default User validator.  Doesn't validate password
  * 
  * Username must be at least two characters.
@@ -227,25 +207,26 @@ function defaultUserValidator(user : UserInputFields) : string[] {
     return errors;
 }
 
-function defaultCreateUser(username : string, request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) : UserInputFields {
+function defaultCreateUser(request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) : UserInputFields {
     let state = "active";
     let user : UserInputFields = {
-        username: username,
+        username: request.body.username,
         state: state,
     }
     for (let field in request.body) {
-        let name = field.replace("user_", ""); 
+        let name = field.replace(/^user_/, ""); 
         if (field.startsWith("user_") && userEditableFields.includes(name)) {
             user[name] = request.body[field];
         }
     }
+    user.factor1 = "localpassword";
     return user;
 
 }
 
 function defaultUpdateUser(user : User, request : FastifyRequest<{ Body: UpdateUserBodyType }>, userEditableFields : string[]) : User {
     for (let field in request.body) {
-        let name = field.replace("user_", ""); 
+        let name = field.replace(/^user_/, ""); 
         if (field.startsWith("user_") && userEditableFields.includes(name)) {
             user[name] = request.body[field];
         }
@@ -271,15 +252,15 @@ export class FastifySessionServer {
     private requestPasswordResetPage: string = "requestpasswordreset.njk";
     private emailVerifiedPage : string = "emailverified.njk";
     private anonymousSessions = true;
-    private validatePasswordFn : (password : string) => string[] = defaultPasswordValidator;
     private validateUserFn : (user : UserInputFields) => string[] = defaultUserValidator;
-    private createUserFn : (username : string, request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) => UserInputFields = defaultCreateUser;
+    private createUserFn : (request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) => UserInputFields = defaultCreateUser;
     private updateUserFn : (user : User, request : FastifyRequest<{ Body: UpdateUserBodyType }>, userEditableFields : string[]) => User = defaultUpdateUser;
     private addToSession? : (request : FastifyRequest) => {[key: string] : string|number|boolean|Date|undefined};
     private validateSession? : (session: Key, user: User|undefined, request : FastifyRequest) => void;
 
     private userStorage : UserStorage;
     private sessionManager : Backend;
+    private authenticators: {[key:string]: Authenticator}
 
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
@@ -290,7 +271,7 @@ export class FastifySessionServer {
         prefix : string,
         userStorage: UserStorage, 
         keyStorage: KeyStorage, 
-        authenticator: UsernamePasswordAuthenticator, 
+        authenticators: {[key:string]: Authenticator}, 
         options: FastifySessionServerOptions = {}) {
 
         this.app = app;
@@ -311,7 +292,6 @@ export class FastifySessionServer {
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
 
-        if (options.validatePasswordFn) this.validatePasswordFn = options.validatePasswordFn;
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
         if (options.createUserFn) this.createUserFn = options.createUserFn;
         if (options.updateUserFn) this.updateUserFn = options.updateUserFn;
@@ -320,7 +300,8 @@ export class FastifySessionServer {
 
         this.prefix = prefix;
         this.userStorage = userStorage;
-        this.sessionManager = new Backend(userStorage, keyStorage, authenticator, options);
+        this.authenticators = authenticators;
+        this.sessionManager = new Backend(userStorage, keyStorage, authenticators, options);
 
         ////////////////
         // hooks
@@ -432,7 +413,7 @@ export class FastifySessionServer {
                     return reply.view(this.loginPage, {
                         error: error.message,
                         errors: error.messages, 
-                        code: error.code, 
+                        errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         next: next, 
                         persist: request.body.persist,
@@ -462,7 +443,7 @@ export class FastifySessionServer {
                     return reply.view(this.logintwofactorPage, {
                         error: error.message,
                         errors: error.messages, 
-                        code: error.code, 
+                        errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         next: request.body.next, 
                         persist: request.body.persist ? "on" : "",
@@ -516,7 +497,7 @@ export class FastifySessionServer {
                     return reply.view(this.signupPage, {
                         error: error.message,
                         errors: error.messages, 
-                        code: error.code, 
+                        errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         next: next, 
                         persist: request.body.persist,
@@ -552,20 +533,43 @@ export class FastifySessionServer {
                     }
                 });
             } catch (e) {
-                CrossauthLogger.logger.error(j({msg: "2FA failure", hashedsSessionCookie: this.getHashOfSessionCookie(request)}));
                 CrossauthLogger.logger.debug(j({err: e}));
-                return this.handleError(e, reply, (reply, error) => {
-                    return reply.view(this.signupPage, {
-                        error: error.message,
-                        errors: error.messages, 
-                        code: error.code, 
-                        errorCodeName: ErrorCode[error.code], 
-                        next: next, 
-                        persist: request.body.persist,
-                        csrfToken: request.csrfToken,
+                try {
+                    const sessionValue = this.getSessionIdFromCookie(request);
+                    if (!sessionValue) {
+                        CrossauthLogger.logger.error(j({msg: "Signup TOTP failure", errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                        CrossauthLogger.logger.error(j({msg: "Session not defined while during two factor process"}));
+                        return reply.status(500).view(this.errorPage, {status: 500, error: "An unknown error occurred", errorCode: ErrorCode.UnknownError, errorCodeName: "UnknownError"});
+                    }
+                    let data = await this.sessionManager.dataForSessionKey(sessionValue);
+                    let username : string;
+                    try {
+                        username = (JSON.parse(data||"")).username;
+                    } catch (e2) {
+                        CrossauthLogger.logger.error(j({msg: "Signup TOTP failure", errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                        CrossauthLogger.logger.error(j({err: e2}));
+                        return reply.status(500).view(this.errorPage, {status: 500, error: "An unknown error occurred", errorCode: ErrorCode.UnknownError, errorCodeName: "UnknownError"});
+
+                    }
+                    CrossauthLogger.logger.error(j({msg: "Signup TOTP failure", user: username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                    const { qrUrl } = await this.sessionManager.repeatTwoFactorSignup(username, sessionValue);
+                    return this.handleError(e, reply, (reply, error) => {
+                            return reply.view(this.signupTwoFactorPage, {
+                            error: error.message,
+                            errors: error.messages, 
+                            errorCode: error.code, 
+                            errorCodeName: ErrorCode[error.code], 
+                            next: next, 
+                            qr: qrUrl,
+                            csrfToken: request.csrfToken,
+                            });
+                        
                     });
-                    
-                });
+                } catch (e2) {
+                    CrossauthLogger.logger.error(j({err: e2}));
+                    return reply.status(500).view(this.errorPage, {status: 500, error: "An unknown error occurred", errorCode: ErrorCode.UnknownError, errorCodeName: "UnknownError"});
+
+                }
             }
         });
     }
@@ -598,7 +602,7 @@ export class FastifySessionServer {
                     return reply.view(this.changePasswordPage, {
                         error: error.message,
                         errors: error.messages, 
-                        code: error.code, 
+                        errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
                     });
@@ -642,7 +646,7 @@ export class FastifySessionServer {
                     return reply.view(this.updateUserPage, {
                         error: error.message,
                         errors: error.messages, 
-                        code: error.code, 
+                        errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
                     });
@@ -685,7 +689,7 @@ export class FastifySessionServer {
                     return reply.view(this.requestPasswordResetPage, {
                         error: error.message,
                         errors: error.messages, 
-                        code: error.code, 
+                        errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         email: request.body.email,
                         csrfToken: request.csrfToken
@@ -707,7 +711,7 @@ export class FastifySessionServer {
                     code = e.code;
                     error = e.message;
                 }
-                return reply.view(this.errorPage, {error: error, code: code, errorCodeName: ErrorCode[code]});
+                return reply.view(this.errorPage, {error: error, errorCode: code, errorCodeName: ErrorCode[code]});
             }
             return reply.view(this.resetPasswordPage, {token: request.params.token, csrfToken: request.csrfToken});
         });
@@ -729,7 +733,7 @@ export class FastifySessionServer {
                     return reply.view(this.resetPasswordPage, {
                         error: error.message,
                         errors: error.messages, 
-                        code: error.code, 
+                        errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
                     });
@@ -755,7 +759,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
                     return reply.view(this.errorPage, {
-                        code: error.code, 
+                        errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         error: error.message,
                         errors: error.messages,
@@ -775,7 +779,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Logout failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    return reply.view(this.errorPage, {error: error.message, errors: error.messages, code: error.code, errorCodeName: ErrorCode[error.code]});
+                    return reply.view(this.errorPage, {error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});
                     
                 });
             }
@@ -803,7 +807,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Login failure", user: request.body.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, errorCodeName: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
                 });
             }
         });
@@ -822,7 +826,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Login failure", hashOfSessionCookie: this.getHashOfSessionCookie(request), errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, errorCodeName: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
                 });
             }
         });
@@ -840,7 +844,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Logout failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: ErrorCode[error.code]});                    
                 });
             }
         });
@@ -863,7 +867,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Signup failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: ErrorCode[error.code]});                    
                 });
             }
         });
@@ -884,7 +888,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Signup 2FA configuration failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: ErrorCode[error.code]});                    
                 });
             }
         });
@@ -903,7 +907,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Change password failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    return reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, errorCodeName: ErrorCode[error.code]});                    
+                    return reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
                 }, true);
             }
         });
@@ -923,7 +927,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Update user failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok:false, error: error.message, errors: error.messages, code: error.code, errorCodeName: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok:false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
                 }, true);
             }
         });
@@ -941,7 +945,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Reset password failure", hashedToken: Hasher.hash(request.body.token), errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, errorCodeName: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
                 }, true);
             }
         });
@@ -959,7 +963,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Reset password failure failure", email: request.body.email, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, errorCodeName: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
                 }, true);
             }
         });
@@ -978,7 +982,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({msg: "Verify email failure", hashedToken: Hasher.hash(request.params.token), errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, code: error.code, errorCodeName: ErrorCode[error.code]});                    
+                    reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
                 });
             }
         });
@@ -1012,7 +1016,7 @@ export class FastifySessionServer {
                 }
                 CrossauthLogger.logger.error(j({msg: "getuserforsessionkey failure", user: request.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(request), errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
-                return reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, code: code, errorCodeName: ErrorCode[code], error : error});
+                return reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, errorCode: code, errorCodeName: ErrorCode[code], error : error});
 
             }
         });
@@ -1033,7 +1037,7 @@ export class FastifySessionServer {
                 }
                 CrossauthLogger.logger.error(j({msg: "getcsrftoken failure", user: request.user?.username, hashedCsrfCookie: this.getHashOfCsrfCookie(request), errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
-                return reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, code: code, errorCodeName: ErrorCode[code], error : error});
+                return reply.status(this.errorStatus(e)).header('Content-Type', JSONHDR).send({ok: false, errorCode: code, errorCodeName: ErrorCode[code], error : error});
 
             }
         });
@@ -1046,7 +1050,6 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, user: User) => void) {
         if (request.user) return successFn(reply, request.user); // already logged in
         const username = request.body.username;
-        const password = request.body.password;
         const persist = request.body.persist;
         const csrfFormOrHeaderValue = request.body.csrfToken;
         const csrfCookieValue = this.getCsrfTokenFromCookie(request);
@@ -1055,7 +1058,7 @@ export class FastifySessionServer {
         const oldSessionId = this.getSessionIdFromCookie(request);
 
         let extraFields = this.addToSession ? this.addToSession(request) : {}
-        let { sessionCookie, csrfCookie, user, secrets } = await this.sessionManager.login(username, password, extraFields, persist);
+        let { sessionCookie, csrfCookie, user, secrets } = await this.sessionManager.login(username, request.body, extraFields, persist);
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
@@ -1098,7 +1101,7 @@ export class FastifySessionServer {
         const oldSessionId = this.getSessionIdFromCookie(request);
 
         let extraFields = this.addToSession ? this.addToSession(request) : {}
-        let { sessionCookie, csrfCookie } = await this.sessionManager.login("", "", extraFields, undefined, user);
+        let { sessionCookie, csrfCookie } = await this.sessionManager.login("", {}, extraFields, undefined, user);
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user.username}));
@@ -1118,11 +1121,18 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, data: {[key:string]:any}, user? : User) => void) {
             
         const username = request.body.username;
-        const password = request.body.password;
-        const repeatPassword = request.body.repeatPassword;
         const next = request.body.next;
-        let passwordErrors = this.validatePasswordFn(password);
-        let user = this.createUserFn(username, request, this.userStorage.userEditableFields);
+        let user = this.createUserFn(request, this.userStorage.userEditableFields);
+        let passwordErrors = this.authenticators[user.factor1].validateSecrets(request.body);
+        const secretNames = this.authenticators[user.factor1].secretNames();
+        let repeatSecrets : AuthenticationParameters = {};
+        for (let field in request.body) {
+            if (field.startsWith("repeat_")) {
+                const name = field.replace(/^repeat_/, "");
+                // @ts-ignore as it complains about request.body[field]
+                if (secretNames.includes(name)) repeatSecrets[name] = request.body[field];
+            }
+        }
         user.state = "active";
         if (this.twoFactorRequired == "all" || request.body.twoFactor == "on") {
            user. state = "awaitingtwofactor";
@@ -1135,15 +1145,13 @@ export class FastifySessionServer {
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.FormEntry, errors);
         }
-        if (repeatPassword != undefined && repeatPassword != password) {
-            throw new CrossauthError(ErrorCode.PasswordMatch);
-        }
 
         // See if the user was already created, with the correct password, and is awaiting 2FA
         // completion.  Send the same response as before, in case the user closed the browser
         let twoFactorInitiated = false;
         try {
-             await this.sessionManager.authenticator.authenticateUser(username, password);
+            const {user: existingUser, secrets: existingSecrets} = await this.userStorage.getUserByUsername(username);
+            await this.sessionManager.authenticators[user.factor1].authenticateUser(existingUser, existingSecrets, request.body);
         } catch (e) {
             if (e instanceof CrossauthError && e.code == ErrorCode.TwoFactorIncomplete) {
                 twoFactorInitiated = true;
@@ -1152,7 +1160,7 @@ export class FastifySessionServer {
         
         if ((this.twoFactorRequired == "off" || (this.twoFactorRequired == "peruser" && !request.body.twoFactor)) && !twoFactorInitiated) {
             // not enabling 2FA
-            await this.sessionManager.createUser(user, password);
+            await this.sessionManager.createUser(user, request.body, repeatSecrets);
             if (!this.enableEmailVerification) {
                 return this.login(request, reply, (request, user) => {
                     successFn(request, {}, user)});
@@ -1172,7 +1180,7 @@ export class FastifySessionServer {
             } else {
                 // account not created - create one with state awaiting 2FA setup
                 const sessionValue = await this.createAnonymousSession(request, reply);
-                const resp = await this.sessionManager.initiateTwoFactorSignup(user, password, sessionValue);
+                const resp = await this.sessionManager.initiateTwoFactorSignup(user, request.body, sessionValue, repeatSecrets);
                 qrUrl = resp.qrUrl;
                 secret = resp.secret;
             }
@@ -1220,17 +1228,31 @@ export class FastifySessionServer {
 
         if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized);
         await this.validateCsrfToken(request, reply)
-        const oldPassword = request.body.oldPassword;
-        const newPassword = request.body.newPassword;
-        const repeatPassword = request.body.repeatPassword;
-        if (repeatPassword != undefined && repeatPassword != newPassword) {
-            throw new CrossauthError(ErrorCode.PasswordMatch);
+        const authenticator = this.authenticators[request.user.factor1];
+        const secretNames = authenticator.secretNames();
+        let oldSecrets : AuthenticationParameters = {};
+        let newSecrets : AuthenticationParameters = {};
+        let repeatSecrets : AuthenticationParameters = {};
+        for (let field in request.body) {
+            if (field.startsWith("new_")) {
+                const name = field.replace(/^new_/, "");
+                // @ts-ignore as it complains about request.body[field]
+                if (secretNames.includes(name)) newSecrets[name] = request.body[field];
+            } else if (field.startsWith("old_")) {
+                const name = field.replace(/^old_/, "");
+                // @ts-ignore as it complains about request.body[field]
+                if (secretNames.includes(name)) oldSecrets[name] = request.body[field];
+            } else if (field.startsWith("repeat_")) {
+                const name = field.replace(/^repeat_/, "");
+                // @ts-ignore as it complains about request.body[field]
+                if (secretNames.includes(name)) repeatSecrets[name] = request.body[field];
+            }
         }
-        let errors = this.validatePasswordFn(newPassword);
+        let errors = authenticator.validateSecrets(newSecrets);
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
-        await this.sessionManager.changePassword(request.user.username, oldPassword, newPassword);
+        await this.sessionManager.changeSecrets(request.user.username, 1, oldSecrets, newSecrets, repeatSecrets);
         return successFn(reply, undefined);
     }
 
@@ -1289,17 +1311,28 @@ export class FastifySessionServer {
         if (this.anonymousSessions) await this.validateCsrfToken(request, reply);
         //const user = await this.sessionManager.userForPasswordResetToken(request.body.token);
         const token = request.body.token;
-        const newPassword = request.body.newPassword;
-        const repeatPassword = request.body.repeatPassword;
-        if (repeatPassword != undefined && repeatPassword != newPassword) {
-            throw new CrossauthError(ErrorCode.PasswordMatch);
+        const user = await this.sessionManager.userForPasswordResetToken(token);
+        const authenticator = this.authenticators[user.factor1];
+        const secretNames = authenticator.secretNames();
+        let newSecrets : AuthenticationParameters = {};
+        let repeatSecrets : AuthenticationParameters = {};
+        for (let field in request.body) {
+            if (field.startsWith("new_")) {
+                const name = field.replace(/^new_/, "");
+                // @ts-ignore as it complains about request.body[field]
+                if (secretNames.includes(name)) newSecrets[name] = request.body[field];
+            } else if (field.startsWith("repeat_")) {
+                const name = field.replace(/^repeat_/, "");
+                // @ts-ignore as it complains about request.body[field]
+                if (secretNames.includes(name)) repeatSecrets[name] = request.body[field];
+            }
         }
-        let errors = this.validatePasswordFn(newPassword);
+        let errors = authenticator.validateSecrets(newSecrets);
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
         }
-        const user = await this.sessionManager.resetPassword(token, newPassword);
-        return this.loginWithUser(user, request, reply, successFn);
+        const user1 = await this.sessionManager.resetSecret(token, 1, newSecrets, repeatSecrets);
+        return this.loginWithUser(user1, request, reply, successFn);
     }
 
     private async logout(request : FastifyRequest, reply : FastifyReply, 
@@ -1454,9 +1487,9 @@ export class FastifySessionServer {
                 error = "An unknwon error has occurred"
             }
         }         
-        CrossauthLogger.logger.warn(j({msg: error, code: code, errorCodeName: codeName, httpStatus: status}));
+        CrossauthLogger.logger.warn(j({msg: error, errorCode: code, errorCodeName: codeName, httpStatus: status}));
         if (this.errorPage) {
-            return reply.status(status).view(this.errorPage, {status: status, error: error, code: code, errorCodeName: codeName});
+            return reply.status(status).view(this.errorPage, {status: status, error: error, errorCode: code, errorCodeName: codeName});
         } else {
             return reply.status(status).send(status==401 ? ERROR_401 : ERROR_500);
         }
@@ -1471,8 +1504,8 @@ export class FastifySessionServer {
             if (!error) error = e.message;
         }            
         if (!error) error = "Unknown error";
-        CrossauthLogger.logger.warn(j({msg: error, code: code, errorCodeName: codeName, httpStatus: status}));
-        return reply.header('Content-Type', JSONHDR).status(status).send({ok: false, status: status, error: error, code: code, errorCodeName: codeName});
+        CrossauthLogger.logger.warn(j({msg: error, errorCode: code, errorCodeName: codeName, httpStatus: status}));
+        return reply.header('Content-Type', JSONHDR).status(status).send({ok: false, status: status, error: error, errorCode: code, errorCodeName: codeName});
     }
 
     errorStatus(e : any) {
