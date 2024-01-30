@@ -1051,9 +1051,7 @@ export class FastifySessionServer {
         if (request.user) return successFn(reply, request.user); // already logged in
         const username = request.body.username;
         const persist = request.body.persist;
-        const csrfFormOrHeaderValue = request.body.csrfToken;
-        const csrfCookieValue = this.getCsrfTokenFromCookie(request);
-        await this.sessionManager.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
+        this.validateCsrfToken(request, reply);
 
         const oldSessionId = this.getSessionIdFromCookie(request);
 
@@ -1082,9 +1080,7 @@ export class FastifySessionServer {
         const oldSessionCookieValue = this.getSessionIdFromCookie(request);
         if (!oldSessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized);
         const persist = request.body.persist;
-        const csrfFormOrHeaderValue = request.body.csrfToken;
-        const csrfCookieValue = this.getCsrfTokenFromCookie(request);
-        await this.sessionManager.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
+        this.validateCsrfToken(request, reply);
         let extraFields = this.addToSession ? this.addToSession(request) : {}
         const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTwoFactorLogin(request.body.totpCode, oldSessionCookieValue, extraFields, persist);
         
@@ -1120,6 +1116,7 @@ export class FastifySessionServer {
     private async signup(request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, data: {[key:string]:any}, user? : User) => void) {
             
+        this.validateCsrfToken(request, reply);
         const username = request.body.username;
         const next = request.body.next;
         let user = this.createUserFn(request, this.userStorage.userEditableFields);
@@ -1210,6 +1207,7 @@ export class FastifySessionServer {
     private async signuptwofactor(request : FastifyRequest<{ Body: signuptwofactorBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
         const sessionId = this.getSessionIdFromCookie(request);
+        this.validateCsrfToken(request, reply);
         let user;
         try {
             if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "No session active while enabling 2FA.  Please enable cookies");
