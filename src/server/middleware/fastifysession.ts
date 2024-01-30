@@ -130,7 +130,7 @@ export interface FastifySessionServerOptions extends BackendOptions {
     emailVerifiedPage? : string,
 }
 
-interface CsrfBodyType {
+export interface CsrfBodyType {
     csrfToken?: string;
 }
 
@@ -182,10 +182,6 @@ interface RequestPasswordResetBodyType extends CsrfBodyType {
 
 interface VerifyTokenParamType {
     token : string,
-}
-
-interface CsrfBodyType {
-    csrfToken? : string;
 }
 
 interface LoginParamsType {
@@ -992,7 +988,7 @@ export class FastifySessionServer {
         this.app.post(this.prefix+'api/userforsessionkey', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/userforsessionkey', ip: request.ip, user: request.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(request)}));
             if (!request.user) return this.sendJsonError(reply, 401);
-            await this.validateCsrfToken(request, reply)
+            await this.validateCsrfToken(request)
             try {
                 let user : User|undefined;
                 const sessionId = this.getSessionIdFromCookie(request);
@@ -1051,7 +1047,7 @@ export class FastifySessionServer {
         if (request.user) return successFn(reply, request.user); // already logged in
         const username = request.body.username;
         const persist = request.body.persist;
-        this.validateCsrfToken(request, reply);
+        await this.validateCsrfToken(request);
 
         const oldSessionId = this.getSessionIdFromCookie(request);
 
@@ -1080,7 +1076,7 @@ export class FastifySessionServer {
         const oldSessionCookieValue = this.getSessionIdFromCookie(request);
         if (!oldSessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized);
         const persist = request.body.persist;
-        this.validateCsrfToken(request, reply);
+        await this.validateCsrfToken(request);
         let extraFields = this.addToSession ? this.addToSession(request) : {}
         const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTwoFactorLogin(request.body.totpCode, oldSessionCookieValue, extraFields, persist);
         
@@ -1116,13 +1112,13 @@ export class FastifySessionServer {
     private async signup(request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, data: {[key:string]:any}, user? : User) => void) {
             
-        this.validateCsrfToken(request, reply);
+        await this.validateCsrfToken(request);
         const username = request.body.username;
         const next = request.body.next;
         let user = this.createUserFn(request, this.userStorage.userEditableFields);
         let passwordErrors = this.authenticators[user.factor1].validateSecrets(request.body);
         const secretNames = this.authenticators[user.factor1].secretNames();
-        let repeatSecrets : AuthenticationParameters = {};
+        let repeatSecrets : AuthenticationParameters|undefined = {};
         for (let field in request.body) {
             if (field.startsWith("repeat_")) {
                 const name = field.replace(/^repeat_/, "");
@@ -1130,6 +1126,7 @@ export class FastifySessionServer {
                 if (secretNames.includes(name)) repeatSecrets[name] = request.body[field];
             }
         }
+        if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
         user.state = "active";
         if (this.twoFactorRequired == "all" || request.body.twoFactor == "on") {
            user. state = "awaitingtwofactor";
@@ -1207,7 +1204,7 @@ export class FastifySessionServer {
     private async signuptwofactor(request : FastifyRequest<{ Body: signuptwofactorBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
         const sessionId = this.getSessionIdFromCookie(request);
-        this.validateCsrfToken(request, reply);
+        await this.validateCsrfToken(request);
         let user;
         try {
             if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "No session active while enabling 2FA.  Please enable cookies");
@@ -1225,12 +1222,12 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, user? : User) => void) {
 
         if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized);
-        await this.validateCsrfToken(request, reply)
+        await this.validateCsrfToken(request)
         const authenticator = this.authenticators[request.user.factor1];
         const secretNames = authenticator.secretNames();
         let oldSecrets : AuthenticationParameters = {};
         let newSecrets : AuthenticationParameters = {};
-        let repeatSecrets : AuthenticationParameters = {};
+        let repeatSecrets : AuthenticationParameters|undefined = {};
         for (let field in request.body) {
             if (field.startsWith("new_")) {
                 const name = field.replace(/^new_/, "");
@@ -1246,6 +1243,8 @@ export class FastifySessionServer {
                 if (secretNames.includes(name)) repeatSecrets[name] = request.body[field];
             }
         }
+        if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
+
         let errors = authenticator.validateSecrets(newSecrets);
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
@@ -1258,7 +1257,7 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, user : User, emailVerificationRequired : boolean) => void) {
 
         if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized);
-        await this.validateCsrfToken(request, reply);
+        await this.validateCsrfToken(request);
         let user : User = {
             id: request.user.id,
             username: request.user.username,
@@ -1279,7 +1278,7 @@ export class FastifySessionServer {
             throw new CrossauthError(ErrorCode.Configuration, "password reset not enabled");
         }
         if (this.anonymousSessions) {
-            await this.validateCsrfToken(request, reply);
+            await this.validateCsrfToken(request);
         }
         const email = request.body.email;
 
@@ -1306,14 +1305,14 @@ export class FastifySessionServer {
 
     private async resetPassword(request : FastifyRequest<{ Body: ResetPasswordBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
-        if (this.anonymousSessions) await this.validateCsrfToken(request, reply);
+        if (this.anonymousSessions) await this.validateCsrfToken(request);
         //const user = await this.sessionManager.userForPasswordResetToken(request.body.token);
         const token = request.body.token;
         const user = await this.sessionManager.userForPasswordResetToken(token);
         const authenticator = this.authenticators[user.factor1];
         const secretNames = authenticator.secretNames();
         let newSecrets : AuthenticationParameters = {};
-        let repeatSecrets : AuthenticationParameters = {};
+        let repeatSecrets : AuthenticationParameters|undefined = {};
         for (let field in request.body) {
             if (field.startsWith("new_")) {
                 const name = field.replace(/^new_/, "");
@@ -1325,6 +1324,8 @@ export class FastifySessionServer {
                 if (secretNames.includes(name)) repeatSecrets[name] = request.body[field];
             }
         }
+        if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
+
         let errors = authenticator.validateSecrets(newSecrets);
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.PasswordFormat);
@@ -1426,8 +1427,7 @@ export class FastifySessionServer {
         return "";
     }
 
-    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>, 
-                            _reply : FastifyReply) {
+    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) {
         let csrfCookie = this.getCsrfTokenFromCookie(request);
         if (!csrfCookie) {
             CrossauthLogger.logger.warn(j({msg: "No CSRF cookie found when validating CSRF token", hashedCsrfToken: Hasher.hash(request.body.csrfToken||"")}));

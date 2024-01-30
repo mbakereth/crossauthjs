@@ -49,6 +49,8 @@
   "devDependencies": {
     "@types/node": "^20.10.8",
     "@types/supertest": "^6.0.2",
+    "jimp": "^0.22.10",
+    "jsqr": "^1.4.0",
     "supertest": "^6.3.3",
     "typedoc": "^0.25.4",
     "typescript": "^5.2.2",

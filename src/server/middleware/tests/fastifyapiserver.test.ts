@@ -7,6 +7,7 @@ import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import { LocalPasswordAuthenticator } from '../../password';
 import { Hasher } from '../../hasher';
 import { SessionCookie } from '../../cookieauth';
+import { authenticator as gAuthenticator } from 'otplib';
 
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
 
@@ -409,3 +410,91 @@ test('FastifyServer.api.changePassword', async () => {
     body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
 });
+
+test('FastifyServer.api.signupTotpWithoutEmailVerification', async () => {
+    let {server} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        user_email: "mary@mary.com", 
+        twoFactor: "on",
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+    expect(body.twoFactorRequired).toBe(true);
+    expect(body.secret.length).toBeGreaterThan(1);
+
+    const sessionCookie = getSession(res);
+    const secret = body.secret;
+    // try twice as the code may be near expiry
+    for (let tryNum=0; tryNum<2; ++tryNum) {
+        const code = gAuthenticator.generate(secret);
+        res = await server.app.inject({ method: "POST", url: "/api/signuptwofactor", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+            csrfToken: csrfToken,
+            totpCode: code
+        } })
+        body = JSON.parse(res.body)
+        if (body.ok == true) break;
+    }
+    expect(body.ok).toBe(true);
+    expect(body.user.username).toBe("mary");
+});
+
+test('FastifyServer.api.signupTotpWithEmailVerification', async () => {
+    let {server} = await makeAppWithOptions({enableEmailVerification: true});
+    // @ts-ignore
+    if (!server["sessionServer"]) throw new Error("Sessions not enabled");
+    if (!server["sessionServer"]["sessionManager"]) throw new Error("Sessions not enabled");
+    if (!server["sessionServer"]["sessionManager"]["tokenEmailer"]) throw new Error("Sessions not enabled");
+    server["sessionServer"]["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+        confirmEmailData = {token, email, extraData}
+        return "1";
+    };
+
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        user_email: "mary@mary.com", 
+        twoFactor: "on",
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+    expect(body.twoFactorRequired).toBe(true);
+    expect(body.secret.length).toBeGreaterThan(1);
+
+    const sessionCookie = getSession(res);
+    const secret = body.secret;
+    // try twice as the code may be near expiry
+    for (let tryNum=0; tryNum<2; ++tryNum) {
+        const code = gAuthenticator.generate(secret);
+        res = await server.app.inject({ method: "POST", url: "/api/signuptwofactor", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+            csrfToken: csrfToken,
+            totpCode: code
+        } })
+        body = JSON.parse(res.body)
+        if (body.ok == true) break;
+    }
+    expect(body.ok).toBe(true);
+    expect(body.user.username).toBe("mary");
+    expect(body.emailVerificationNeeded).toBe(true);
+
+    // verify token
+    const token = confirmEmailData.token;
+    res = await server.app.inject({ method: "GET", url: "/api/verifyemail/" + token});
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+});
+

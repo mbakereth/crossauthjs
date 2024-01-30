@@ -7,6 +7,10 @@ import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import { LocalPasswordAuthenticator } from '../../password';
 import { Hasher } from '../../hasher';
 import { SessionCookie } from '../../cookieauth';
+import Jimp from 'jimp';
+import jsQR from 'jsqr';
+import { authenticator as gAuthenticator } from 'otplib';
+
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
@@ -158,7 +162,6 @@ test('FastifyServer.signupWithEmailVerification', async () => {
         csrfToken: csrfToken
     } })
     body = JSON.parse(res.body)
-    console.log(body.args)
     expect(body.template).toBe("signup.njk");
     expect(body.args.message).toBeDefined();
 
@@ -495,3 +498,131 @@ test('FastifyServer.passwordReset', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "newPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(302);
 });
+
+test('FastifyServer.signupTotpWithoutEmailVerification', async () => {
+
+    let {server} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    // Right page served 
+    res = await server.app.inject({ method: "GET", url: "/signup" })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("signup.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+    
+    // get QR code and extract secret
+    res = await server.app.inject({ method: "POST", url: "/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        repeat_password: "maryPass123",
+        user_email: "mary@mary.com", 
+        csrfToken: csrfToken,
+        twoFactor: "on",
+    } });
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body);
+    const secret = await getSecretFromQr(body);
+    expect(secret).toBeDefined();
+
+    const sessionCookie = getSession(res);
+    // try twice as the code may be near expiry
+    for (let tryNum=0; tryNum<2; ++tryNum) {
+        const code = gAuthenticator.generate(secret||"");
+        res = await server.app.inject({ method: "POST", url: "/signuptwofactor", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+            csrfToken: csrfToken,
+            totpCode: code
+        } })
+        if (res.statusCode == 302) break;
+    }
+    expect(res.statusCode).toBe(302);
+
+
+});
+
+test('FastifyServer.signupTotpWithEmailVerification', async () => {
+
+    let {server} = await makeAppWithOptions({enableEmailVerification: true});
+    // @ts-ignore
+    server["sessionServer"]["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+        confirmEmailData = {token, email, extraData}
+        return "1";
+    };
+
+    let res;
+    let body;
+
+    // Right page served 
+    res = await server.app.inject({ method: "GET", url: "/signup" })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("signup.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+    
+    // get QR code and extract secret
+    res = await server.app.inject({ method: "POST", url: "/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        repeat_password: "maryPass123",
+        user_email: "mary@mary.com", 
+        csrfToken: csrfToken,
+        twoFactor: "on",
+    } });
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body);
+    const secret = await getSecretFromQr(body);
+    expect(secret).toBeDefined();
+
+    const sessionCookie = getSession(res);
+    // try twice as the code may be near expiry
+    for (let tryNum=0; tryNum<2; ++tryNum) {
+        const code = gAuthenticator.generate(secret||"");
+        res = await server.app.inject({ method: "POST", url: "/signuptwofactor", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+            csrfToken: csrfToken,
+            totpCode: code
+        } })
+        console.log(res.body);
+        if (res.statusCode == 200) break;
+    }
+    expect(res.statusCode).toBe(200);
+
+    // verify token
+    const token = confirmEmailData.token;
+    res = await server.app.inject({ method: "GET", url: "/verifyemail/" + token});
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("emailverified.njk");
+
+});
+
+async function getSecretFromQr(body : {[key:string] : any}) {
+    const qrParts = body.args.qr.split(",");
+    expect (qrParts.length).toBe(2);
+    expect(qrParts[0]).toBe("data:image/png;base64");
+    let imageBuffer = Buffer.from(qrParts[1], 'base64');
+    const image = await Jimp.read(imageBuffer);
+
+    const imageData = {
+        data: new Uint8ClampedArray(image.bitmap.data),
+        width: image.bitmap.width,
+        height: image.bitmap.height,
+    };
+
+    const decodedQR = jsQR(imageData.data, imageData.width, imageData.height);
+    expect(decodedQR).not.toBeNull();
+    if (decodedQR != null) {
+        expect(decodedQR.data).toBeDefined();
+        const dataParts = decodedQR.data.split("?");
+        expect(dataParts.length).toBe(2);
+        const args = dataParts[1].split("&");
+        let secret : string|undefined = undefined;
+        for (let i=0; i<args.length; ++i) {
+            if (args[i].startsWith("secret=")) {
+                const argParts = args[i].split("=");
+                secret = argParts[1];
+            }
+        }
+        return secret;
+
+    }
+}
+

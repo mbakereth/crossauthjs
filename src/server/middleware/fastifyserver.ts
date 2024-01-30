@@ -1,4 +1,4 @@
-import fastify, { FastifyInstance } from 'fastify';
+import fastify, { FastifyInstance, FastifyRequest } from 'fastify';
 import view from '@fastify/view';
 import fastifyFormBody from '@fastify/formbody';
 import type { FastifyCookieOptions } from '@fastify/cookie'
@@ -11,7 +11,8 @@ import { Authenticator } from '../auth';
 import { CrossauthError, ErrorCode } from "../..";
 import { CrossauthLogger, j } from '../..';
 import { setParameter, ParamType } from '../utils';
-import { FastifySessionServer, type FastifySessionServerOptions } from './fastifysession';
+import { FastifySessionServer } from './fastifysession';
+import type { FastifySessionServerOptions, CsrfBodyType } from './fastifysession';
 
 
 
@@ -357,7 +358,12 @@ export class FastifyServer {
         }
     }
     
-
+    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) {
+        if (!this.sessionServer) {
+            throw new CrossauthError(ErrorCode.Configuration, "Cannot validate csrf tokens if sessions not enabled");
+        }
+        return this.sessionServer.validateCsrfToken(request);
+    }
 
     /**
      * Starts the Fastify app on the given port.  
