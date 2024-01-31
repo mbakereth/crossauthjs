@@ -52,6 +52,7 @@ export interface User extends UserInputFields {
 export interface UserSecretsInputFields {
     password? : string,
     totpSecret? : string,
+    [key:string]: string|number|undefined,
 }
 export interface UserSecrets extends UserSecretsInputFields {
     userId : string|number,

@@ -5,6 +5,7 @@ import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../../storage/inmemorystorage';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import { LocalPasswordAuthenticator } from '../../password';
+import { TotpAuthenticator } from '../../totp';
 import { Hasher } from '../../hasher';
 import { SessionCookie } from '../../cookieauth';
 import Jimp from 'jimp';
@@ -22,15 +23,20 @@ beforeAll(async () => {
 async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise<{userStorage : InMemoryUserStorage, keyStorage : InMemoryKeyStorage, server: FastifyServer}> {
     const userStorage = await getTestUserStorage();
     const keyStorage = new InMemoryKeyStorage();
-    let authenticator = new LocalPasswordAuthenticator(userStorage);
+    let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
+    let totpAuthenticator = new TotpAuthenticator("FastifyTest");
 
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
-    const server = new FastifyServer(userStorage, keyStorage, {localpassword: authenticator}, {
+    const server = new FastifyServer(userStorage, keyStorage, {
+        localpassword: lpAuthenticator,
+        totp: totpAuthenticator,
+    }, {
         app: app,
         views: path.join(__dirname, '../views'),
         secret: "ABCDEFG",
         enableSessions: true,
+        allowedFactor2: "totp",
         ...options,
     });
     // @ts-ignore
@@ -519,7 +525,7 @@ test('FastifyServer.signupTotpWithoutEmailVerification', async () => {
         repeat_password: "maryPass123",
         user_email: "mary@mary.com", 
         csrfToken: csrfToken,
-        twoFactor: "on",
+        factor2: "totp",
     } });
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body);
@@ -530,7 +536,7 @@ test('FastifyServer.signupTotpWithoutEmailVerification', async () => {
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
         const code = gAuthenticator.generate(secret||"");
-        res = await server.app.inject({ method: "POST", url: "/signuptwofactor", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        res = await server.app.inject({ method: "POST", url: "/signupfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             totpCode: code
         } })
@@ -566,7 +572,7 @@ test('FastifyServer.signupTotpWithEmailVerification', async () => {
         repeat_password: "maryPass123",
         user_email: "mary@mary.com", 
         csrfToken: csrfToken,
-        twoFactor: "on",
+        factor2: "totp",
     } });
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body);
@@ -577,7 +583,7 @@ test('FastifyServer.signupTotpWithEmailVerification', async () => {
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
         const code = gAuthenticator.generate(secret||"");
-        res = await server.app.inject({ method: "POST", url: "/signuptwofactor", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        res = await server.app.inject({ method: "POST", url: "/signupfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             totpCode: code
         } })
@@ -626,3 +632,75 @@ async function getSecretFromQr(body : {[key:string] : any}) {
     }
 }
 
+async function createTotpAccount(server : FastifyServer) {
+
+    let res;
+    let body;
+
+    res = await server.app.inject({ method: "GET", url: "/login" })
+    const {csrfCookie, csrfToken} = await getCsrf(res);
+
+    res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        user_email: "mary@mary.com", 
+        factor2: "totp",
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+    expect(body.totpSecret.length).toBeGreaterThan(1);
+
+    const sessionCookie = getSession(res);
+    const secret = body.totpSecret;
+    // try twice as the code may be near expiry
+    for (let tryNum=0; tryNum<2; ++tryNum) {
+        const code = gAuthenticator.generate(secret);
+        res = await server.app.inject({ method: "POST", url: "/api/signupfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+            csrfToken: csrfToken,
+            totpCode: code
+        } })
+        body = JSON.parse(res.body)
+        if (body.ok == true) break;
+    }
+    expect(body.ok).toBe(true);
+    expect(body.user.username).toBe("mary");
+
+};
+
+test('FastifyServer.loginTotp', async () => {
+
+    let {server, userStorage, keyStorage} = await makeAppWithOptions();
+
+    await createTotpAccount(server);
+
+    let res;
+    let body;
+
+    // Right page served 
+    res = await server.app.inject({ method: "GET", url: "/login" })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("login.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+
+    // successful login first factor
+    res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("logintotp.njk");
+
+    const sessionCookie = getSession(res);
+    const {secrets} = await userStorage.getUserByUsername("mary");
+    // try twice as the code may be near expiry
+    for (let tryNum=0; tryNum<2; ++tryNum) {
+        const code = gAuthenticator.generate(secrets.totpSecret||"");
+        res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+            csrfToken: csrfToken,
+            totpCode: code
+        } })
+        if (res.statusCode == 302) break;
+    }
+    expect(res.statusCode).toBe(302);
+    //expect(body.user.username).toBe("mary");
+});

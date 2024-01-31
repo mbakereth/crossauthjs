@@ -79,7 +79,7 @@ export interface FastifySessionServerOptions extends BackendOptions {
     /** Template file containing the page for getting the 2nd factor after entering username and password
      * See the class documentation for {@link FastifyServer} for more info.  Defaults to "login.njk".
      */
-    loginTwoFactorPage? : string;
+    loginFactor2Page? : string;
 
     /** Template file containing the signup page (with without error messages).  
      * See the class documentation for {@link FastifyServer} for more info.  Defaults to "signup.njk".
@@ -91,7 +91,7 @@ export interface FastifySessionServerOptions extends BackendOptions {
     signupPage? : string;
 
     /** Page to set up 2FA after sign up */
-    signupTwoFactorPage? : string;
+    signupFactor2Page? : string;
 
     /** Page to render error messages, including failed login. 
      * See the class documentation for {@link FastifyServer} for more info.  Defaults to "error.njk".
@@ -128,6 +128,8 @@ export interface FastifySessionServerOptions extends BackendOptions {
      * See the class documentation for {@link FastifyServer} for more info.  Defaults to "emailverified.njk"
      */
     emailVerifiedPage? : string,
+
+    allowedFactor2? : string,
 }
 
 export interface CsrfBodyType {
@@ -141,23 +143,23 @@ interface LoginBodyType extends CsrfBodyType {
     next? : string,
 }
 
-interface logintwofactorBodyType extends CsrfBodyType {
-    totpCode : string,
+interface LoginFactor2BodyType extends CsrfBodyType {
     persist? : boolean,
     next? : string,
+    [key : string]: string|number|Date|boolean|undefined,
 }
 
 interface SignupBodyType extends LoginBodyType {
     repeatPassword?: string,
     email? : string,
-    twoFactor? : string,
+    factor2? : string,
     [key : string]: string|number|Date|boolean|undefined,
 }
 
-interface signuptwofactorBodyType extends CsrfBodyType {
-    totpCode : string;
+interface SignupFactor2BodyType extends CsrfBodyType {
     next? : string,
     persist? : boolean,
+    [key:string] : any,
 }
 
 interface ChangePasswordBodyType extends CsrfBodyType {
@@ -216,6 +218,7 @@ function defaultCreateUser(request : FastifyRequest<{ Body: SignupBodyType }>, u
         }
     }
     user.factor1 = "localpassword";
+    user.factor2 = request.body.factor2;
     return user;
 
 }
@@ -238,9 +241,9 @@ export class FastifySessionServer {
     private loginRedirect = "/";
     private logoutRedirect : string = "/";
     private signupPage : string = "signup.njk";
-    private signupTwoFactorPage : string = "signuptotp.njk";
+    private signupFactor2Page : string = "signuptotp.njk";
     private loginPage : string = "login.njk";
-    private logintwofactorPage : string = "logintotp.njk";
+    private loginFactor2Page : string = "logintotp.njk";
     private errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
     private updateUserPage : string = "updateuser.njk";
@@ -260,7 +263,7 @@ export class FastifySessionServer {
 
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
-    private twoFactorRequired :  "off" | "all" | "peruser" = "off";
+    private allowedFactor2 :  string[] = [];
 
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
@@ -273,9 +276,9 @@ export class FastifySessionServer {
         this.app = app;
 
         setParameter("signupPage", ParamType.String, this, options, "SIGNUP_PAGE");
-        setParameter("signupTwoFactorPage", ParamType.String, this, options, "SIGNUP_TWOFACTOR_PAGE");
+        setParameter("signupFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
         setParameter("loginPage", ParamType.String, this, options, "LOGIN_PAGE");
-        setParameter("loginTwoFactorPage", ParamType.String, this, options, "LOGIN_TWOFACTOR_PAGE");
+        setParameter("loginFactor2Page", ParamType.String, this, options, "LOGIN_FACTOR2_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
         setParameter("updateUser", ParamType.String, this, options, "UPDATE_USER_PAGE");
@@ -284,7 +287,7 @@ export class FastifySessionServer {
         setParameter("emailVerifiedPage", ParamType.String, this, options, "EMAIL_VERIFIED_PAGE");
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
         setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
-        setParameter("twoFactorRequired", ParamType.String, this, options, "TWOFACTOR_REQUIRED");
+        setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
 
@@ -389,9 +392,9 @@ export class FastifySessionServer {
             try {
                 CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
 
-                await this.login(request, reply, 
+                return await this.login(request, reply, 
                 (reply, user) => {
-                    if (!user.twoFactorRequired) {
+                    if (!user.factor2 || user.factor2.length == 0) {
                         CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect"}));
                         return reply.redirect(next);
                     } else {
@@ -400,7 +403,7 @@ export class FastifySessionServer {
                             next: request.body.next||this.loginRedirect,
                             persist: request.body.persist ? "on" : "",
                         };
-                        return reply.view(this.logintwofactorPage, data);
+                        return reply.view(this.loginFactor2Page, data);
                     }
                 });
             } catch (e) {
@@ -421,22 +424,22 @@ export class FastifySessionServer {
         });
     }
 
-    addLoginTwoFactorEndpoints() {
-        this.app.post(this.prefix+'logintwofactor', async (request : FastifyRequest<{ Body: logintwofactorBodyType }>, reply : FastifyReply) => {
-            CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'logintwofactor', ip: request.ip}));
+    addLoginFactor2Endpoints() {
+        this.app.post(this.prefix+'loginfactor2', async (request : FastifyRequest<{ Body: LoginFactor2BodyType }>, reply : FastifyReply) => {
+            CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'loginfactor2', ip: request.ip}));
             let next = request.body.next || this.loginRedirect;
             try {
                 CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
 
-                await this.logintwofactor(request, reply, 
+                return await this.loginFactor2(request, reply, 
                 (reply, _user) => {
-                    CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect"}));
+                    CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect to"}));
                     return reply.redirect(next);
                 });
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
-                    return reply.view(this.logintwofactorPage, {
+                    return reply.view(this.loginFactor2Page, {
                         error: error.message,
                         errors: error.messages, 
                         errorCode: error.code, 
@@ -454,7 +457,7 @@ export class FastifySessionServer {
         this.app.get(this.prefix+'signup', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply)  => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'signup', ip: request.ip}));
             if (this.signupPage)  { // if is redundant but VC Code complains without it
-                let data : {next? : any, csrfToken: string|undefined, perUserTwoFactor: boolean} = {csrfToken: request.csrfToken, perUserTwoFactor: this.twoFactorRequired=="peruser"};
+                let data : {next? : any, csrfToken: string|undefined, allowedFactor2: string[]} = {csrfToken: request.csrfToken, allowedFactor2: this.allowedFactor2};
                 if (request.query.next) {
                     data["next"] = request.query.next;
                 }
@@ -470,13 +473,14 @@ export class FastifySessionServer {
 
                 return await this.signup(request, reply, 
                 (reply, data, _user) => {
-                    if (data.secret) {
-                        return reply.view(this.signupTwoFactorPage, data);
+                    if (data.userData?.factor2) {
+                        return reply.view(this.signupFactor2Page, data.userData);
                     } else if (this.enableEmailVerification) {
                         return reply.view(this.signupPage, {
                             next: next, 
                             csrfToken: request.csrfToken,
-                            message: "Please check your email to finish signing up."
+                            message: "Please check your email to finish signing up.",
+                            ...data.userData,
                         });
                     } else {
                         return reply.redirect(this.loginRedirect);
@@ -499,8 +503,8 @@ export class FastifySessionServer {
                         persist: request.body.persist,
                         username: request.body.username,
                         csrfToken: request.csrfToken,
-                        twoFactor: request.body.twoFactor,
-                        perUserTwoFactor: this.twoFactorRequired == "peruser",
+                        factor2: request.body.factor2,
+                        allowedFactor2: this.allowedFactor2,
                         ...extraFields
                         });
                     
@@ -509,14 +513,14 @@ export class FastifySessionServer {
         });
     }
     
-    addSignupTwoFactorEndpoints() {
-        this.app.post(this.prefix+'signuptwofactor', async (request : FastifyRequest<{ Body: signuptwofactorBodyType }>, reply : FastifyReply) => {
-            CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'signuptwofactor', ip: request.ip}));
+    addSignupFactor2Endpoints() {
+        this.app.post(this.prefix+'signupfactor2', async (request : FastifyRequest<{ Body: SignupFactor2BodyType }>, reply : FastifyReply) => {
+            CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'signupfactor2', ip: request.ip}));
             let next = request.body.next || this.loginRedirect;
             try {
                 CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
 
-                return await this.signuptwofactor(request, reply, 
+                return await this.signupFactor2(request, reply, 
                 (reply, _user) => {
                     if (this.enableEmailVerification) {
                         return reply.view(this.signupPage, {
@@ -533,30 +537,27 @@ export class FastifySessionServer {
                 try {
                     const sessionValue = this.getSessionIdFromCookie(request);
                     if (!sessionValue) {
-                        CrossauthLogger.logger.error(j({msg: "Signup TOTP failure", errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
-                        CrossauthLogger.logger.error(j({msg: "Session not defined while during two factor process"}));
+                        CrossauthLogger.logger.error(j({msg: "Signup second factor failure", errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                        CrossauthLogger.logger.error(j({msg: "Session not defined during two factor process"}));
                         return reply.status(500).view(this.errorPage, {status: 500, error: "An unknown error occurred", errorCode: ErrorCode.UnknownError, errorCodeName: "UnknownError"});
                     }
                     let data = await this.sessionManager.dataForSessionKey(sessionValue);
-                    let username : string;
-                    try {
-                        username = (JSON.parse(data||"")).username;
-                    } catch (e2) {
-                        CrossauthLogger.logger.error(j({msg: "Signup TOTP failure", errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
-                        CrossauthLogger.logger.error(j({err: e2}));
+                    let username = data?.username;
+                    let factor2 = data?.factor2;
+                    if (!username || !factor2) {
+                        CrossauthLogger.logger.error(j({msg: "Signup two factor failure - cannot get user data from first factor", }));
                         return reply.status(500).view(this.errorPage, {status: 500, error: "An unknown error occurred", errorCode: ErrorCode.UnknownError, errorCodeName: "UnknownError"});
-
                     }
-                    CrossauthLogger.logger.error(j({msg: "Signup TOTP failure", user: username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
-                    const { qrUrl } = await this.sessionManager.repeatTwoFactorSignup(username, sessionValue);
+                    CrossauthLogger.logger.error(j({msg: "Signup two factor failure", user: username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                    const { userData } = await this.sessionManager.repeatTwoFactorSignup(username, sessionValue, factor2);
                     return this.handleError(e, reply, (reply, error) => {
-                            return reply.view(this.signupTwoFactorPage, {
+                            return reply.view(this.signupFactor2Page, {
                             error: error.message,
                             errors: error.messages, 
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             next: next, 
-                            qr: qrUrl,
+                            ...userData,
                             csrfToken: request.csrfToken,
                             });
                         
@@ -809,12 +810,12 @@ export class FastifySessionServer {
         });
     }
 
-    addApiLoginTwoFactorEndpoints() {
-        this.app.post(this.prefix+'api/logintwofactor', async (request : FastifyRequest<{ Body: logintwofactorBodyType }>, reply : FastifyReply) => {
-            CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/logintwofactor', ip: request.ip}));
+    addApiLoginFactor2Endpoints() {
+        this.app.post(this.prefix+'api/loginfactor2', async (request : FastifyRequest<{ Body: LoginFactor2BodyType }>, reply : FastifyReply) => {
+            CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/loginfactor2', ip: request.ip}));
             if (request.user) return reply.header('Content-Type', JSONHDR).send({ok: false, user : request.user}); // already logged in
             try {
-                return await this.logintwofactor(request, reply, 
+                return await this.loginFactor2(request, reply, 
                 (reply, user) => {
                     return reply.header('Content-Type', JSONHDR).send({ok: true, user : user});
                 });
@@ -856,8 +857,7 @@ export class FastifySessionServer {
                     ok: true,
                     user : user,
                     emailVerificationNeeded: this.enableEmailVerification||false,
-                    twoFactorRequired: data.secret!=undefined,
-                    secret: data.secret,
+                    ...data.userData,
                 })});
             } catch (e) {
                 CrossauthLogger.logger.error(j({msg: "Signup failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
@@ -869,11 +869,11 @@ export class FastifySessionServer {
         });
     }
 
-    addApiSignupTwoFactorEndpoints() {
-        this.app.post(this.prefix+'api/signuptwofactor', async (request : FastifyRequest<{ Body: signuptwofactorBodyType }>, reply : FastifyReply) => {
+    addApiSignupFactor2Endpoints() {
+        this.app.post(this.prefix+'api/signupfactor2', async (request : FastifyRequest<{ Body: SignupFactor2BodyType }>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/signup', ip: request.ip, hashOfSessionCookie: this.getHashOfSessionCookie(request)}));
             try {
-                return await this.signuptwofactor(request, reply, 
+                return await this.signupFactor2(request, reply, 
                 (reply, user) => {
                     return reply.header('Content-Type', JSONHDR).send({
                     ok: true,
@@ -1052,7 +1052,7 @@ export class FastifySessionServer {
         const oldSessionId = this.getSessionIdFromCookie(request);
 
         let extraFields = this.addToSession ? this.addToSession(request) : {}
-        let { sessionCookie, csrfCookie, user, secrets } = await this.sessionManager.login(username, request.body, extraFields, persist);
+        let { sessionCookie, csrfCookie, user } = await this.sessionManager.login(username, request.body, extraFields, persist);
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: request.body.username}));
@@ -1066,11 +1066,10 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.debug(j({err: e}));
             }
         }
-        user.twoFactorRequired = "totpSecret" in secrets && secrets.totpSecret != "";
         return successFn(reply, user);
     }
 
-    private async logintwofactor(request : FastifyRequest<{ Body: logintwofactorBodyType }>, reply : FastifyReply, 
+    private async loginFactor2(request : FastifyRequest<{ Body: LoginFactor2BodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user: User) => void) {
         if (request.user) return successFn(reply, request.user); // already logged in
         const oldSessionCookieValue = this.getSessionIdFromCookie(request);
@@ -1078,8 +1077,7 @@ export class FastifySessionServer {
         const persist = request.body.persist;
         await this.validateCsrfToken(request);
         let extraFields = this.addToSession ? this.addToSession(request) : {}
-        const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTwoFactorLogin(request.body.totpCode, oldSessionCookieValue, extraFields, persist);
-        
+        const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTwoFactorLogin(request.body, oldSessionCookieValue, extraFields, persist);
         CrossauthLogger.logger.debug(j({msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user?.username}));
         reply.cookie(sessionCookie.name, sessionCookie.value, sessionCookie.options);
         CrossauthLogger.logger.debug(j({msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options), user: user?.username}));
@@ -1115,6 +1113,9 @@ export class FastifySessionServer {
         await this.validateCsrfToken(request);
         const username = request.body.username;
         const next = request.body.next;
+        if (request.body.factor2 && !(this.allowedFactor2.includes(request.body.factor2))) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "Illegal second factor " + request.body.factor2 + " requested");
+        }
         let user = this.createUserFn(request, this.userStorage.userEditableFields);
         let passwordErrors = this.authenticators[user.factor1].validateSecrets(request.body);
         const secretNames = this.authenticators[user.factor1].secretNames();
@@ -1128,7 +1129,8 @@ export class FastifySessionServer {
         }
         if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
         user.state = "active";
-        if (this.twoFactorRequired == "all" || request.body.twoFactor == "on") {
+        if (request.body.factor2 == "none") request.body.factor2 = undefined;
+        if (request.body.factor2) {
            user. state = "awaitingtwofactor";
         } else if (this.enableEmailVerification) {
             user.state = "awaitingemailverification";
@@ -1152,7 +1154,7 @@ export class FastifySessionServer {
             } // all other errors are legitimate ones - we ignore them
         }
         
-        if ((this.twoFactorRequired == "off" || (this.twoFactorRequired == "peruser" && !request.body.twoFactor)) && !twoFactorInitiated) {
+        if ((!request.body.factor2) && !twoFactorInitiated) {
             // not enabling 2FA
             await this.sessionManager.createUser(user, request.body, repeatSecrets);
             if (!this.enableEmailVerification) {
@@ -1162,28 +1164,27 @@ export class FastifySessionServer {
             return successFn(reply, {}, undefined);
         } else {
             // also enabling 2FA
-            let qrUrl : string;
-            let secret : string;
+            let userData : {[key:string] : any};
             if (twoFactorInitiated) {
                 // account already created but 2FA setup not complete
                 const sessionValue = this.getSessionIdFromCookie(request);
                 if (!sessionValue) throw new CrossauthError(ErrorCode.Unauthorized);
-                const resp = await this.sessionManager.repeatTwoFactorSignup(username, sessionValue);
-                qrUrl = resp.qrUrl;
-                secret = resp.secret;
+                const secrets = await this.sessionManager.dataForSessionKey(sessionValue);
+                const username = secrets.username;
+                const factor2 = secrets.factor2;
+                const resp = await this.sessionManager.repeatTwoFactorSignup(username, sessionValue, factor2);
+                userData = resp.userData;
             } else {
                 // account not created - create one with state awaiting 2FA setup
                 const sessionValue = await this.createAnonymousSession(request, reply);
                 const resp = await this.sessionManager.initiateTwoFactorSignup(user, request.body, sessionValue, repeatSecrets);
-                qrUrl = resp.qrUrl;
-                secret = resp.secret;
+                userData = resp.userData;
             }
 
             try {
-                let data : {qr: string, username: string, next : string, csrfToken: string|undefined, secret: string} = 
+                let data : {userData: {[key:string] : any}, username: string, next : string, csrfToken: string|undefined} = 
                 {
-                    qr: qrUrl,
-                    secret: secret,
+                    userData: userData,
                     username: username,
                     next: next||this.loginRedirect,
                     csrfToken: request.csrfToken,
@@ -1201,17 +1202,16 @@ export class FastifySessionServer {
         }
     }
 
-    private async signuptwofactor(request : FastifyRequest<{ Body: signuptwofactorBodyType }>, reply : FastifyReply, 
+    private async signupFactor2(request : FastifyRequest<{ Body: SignupFactor2BodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
         const sessionId = this.getSessionIdFromCookie(request);
         await this.validateCsrfToken(request);
         let user;
         try {
             if (!sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "No session active while enabling 2FA.  Please enable cookies");
-            const totpCode = request.body.totpCode;
-            user = await this.sessionManager.completeTwoFactorSignup(totpCode, sessionId);
+            user = await this.sessionManager.completeTwoFactorSignup(request.body, sessionId);
         } catch (e) {
-            CrossauthLogger.logger.error(j({msg: "signup2fa failed", hashedSessionCookie: this.getHashOfSessionCookie(request) }));
+            CrossauthLogger.logger.error(j({msg: "signupfactor2 failed", hashedSessionCookie: this.getHashOfSessionCookie(request) }));
             CrossauthLogger.logger.debug(j({err: e}));
             throw e;
         }

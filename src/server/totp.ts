@@ -1,20 +1,22 @@
 import QRCode from 'qrcode';
 import { authenticator as gAuthenticator } from 'otplib';
-import type { User, UserSecrets, Key } from '../interfaces.ts';
+import type { User, UserSecrets, Key, UserSecretsInputFields } from '../interfaces.ts';
 import { getJsonData } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { SessionCookie } from './cookieauth.ts';
 import { KeyStorage } from './storage.ts';
 import { CrossauthLogger, j } from '../logger.ts';
+import { Authenticator, type AuthenticationParameters } from './auth';
 
-export class Totp {
+export class TotpAuthenticator extends Authenticator {
 
     private appName : string;
-    private keyStorage : KeyStorage;
+    private authenticatorName;
 
-    constructor(appName : string, keyStorage : KeyStorage ) {
+    constructor(appName : string, authenticatorName : string = "totp") {
+        super();
         this.appName = appName;
-        this.keyStorage = keyStorage;
+        this.authenticatorName = authenticatorName;
     }
 
     private async createSecret(username : string, secret? : string) : Promise<{qrUrl : string, secret: string}> {
@@ -32,50 +34,64 @@ export class Totp {
         return { qrUrl, secret };   
     }
 
-    async createAndStoreSecret(
+    private async getSecretFromSession(
         username : string, 
-        sessionId : string) : Promise<{qrUrl: string, secret: string}> {
-        const { qrUrl, secret } = await this.createSecret(username);
-
-        await this.keyStorage.updateKey({
-            value: SessionCookie.hashSessionKey(sessionId),
-            data: JSON.stringify({username: username, secret: secret}),
-        });
-
-        return { qrUrl, secret}
-    }
-
-    async getSecretFromSession(
-        username : string, 
-        sessionId : string) : Promise<{qrUrl: string, secret: string}> {
-        const sessionKey = await this.keyStorage.getKey(SessionCookie.hashSessionKey(sessionId));
+        sessionKey : Key) : Promise<{qrUrl: string, secret: string, factor2: string}> {
         const data = getJsonData(sessionKey);
         if (!("secret" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP data not in session");
+        if (!("factor2" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP factor name not in session");
         const savedSecret = data.secret;
         const { qrUrl, secret } = await this.createSecret(username, savedSecret);
 
-        return {qrUrl, secret}
+        return {qrUrl, secret, factor2: data.factor2}
         
     }
 
-    async validateCodeFromKey(code : string, sessionKey : Key) : Promise<{username : string, secret : string}> {
+    async prepareAuthentication(username : string) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
+        const { qrUrl, secret } = await this.createSecret(username);
 
-        let {username, secret} = getJsonData(sessionKey);
-        if (!username || !secret) throw new CrossauthError(ErrorCode.Unauthorized, "2FA has not been requested for this session");
-
-        if (!gAuthenticator.check(code, secret)) {
-            throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
-        }
-        return { username, secret };
+        const userData = {username: username, qr: qrUrl, totpSecret: secret, factor2: this.authenticatorName};
+        const sessionData = {username: username, totpSecret: secret, factor2: this.authenticatorName}
+        return { userData, sessionData};
     }
 
-    async validateCodeFromUser(code : string, user : User, secrets: UserSecrets) : Promise<{username : string, secret : string}> {
+    async reprepareAuthentication(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined> {
+        const { qrUrl, secret, factor2 } = await this.getSecretFromSession(username, sessionKey);
 
-        if (!("totpSecret" in secrets) || secrets.totpSecret == "") throw new CrossauthError(ErrorCode.Unauthorized, "2FA has not been activated for this user");
-        if (!gAuthenticator.check(code, secrets.totpSecret||"")) {
-            throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
+        return { userData: {qr: qrUrl, totpSecret: secret, factor2: factor2}, secrets: {totpSecret: secret}}
+    }
+
+    async authenticateUser(_user : User|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
+        if (!secrets.totpSecret || !params.totpCode) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "TOTP secret or code not given");
         }
+        const code = params.totpCode;
+        const secret = secrets.totpSecret;
+        if (!gAuthenticator.check(code, secret)) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "Invalid TOTP code");
+        }
+    }
 
-        return { username: user.username, secret: user.totpSecret };
+    async createSecrets(username : string, _params: AuthenticationParameters, _repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
+        const { secret } = await this.createSecret(username);
+        return { totpSecret: secret };
+    }
+
+    canCreateUser() : boolean {
+        return true;
+
+    }
+    canUpdateUser() : boolean {
+        return true;
+    }
+    secretNames() : string[] {
+        return ["totpSecret"];
+    }
+    validateSecrets(_params : AuthenticationParameters) : string[] {
+        return [];
+    }
+
+    skipEmailVerificationOnSignup() : boolean {
+        return false;
     }
 }

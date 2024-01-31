@@ -57,9 +57,9 @@ export const SessionApiEndpoints = [
 /**
  * API (JSON) endpoints that depend on 2FA being enabled 
  */
-export const TwoFactorApiEndpoints = [
-    "api/signuptwofactor",
-    "api/logintwofactor",
+export const Factor2ApiEndpoints = [
+    "api/signupfactor2",
+    "api/loginfactor2",
 ];
 
 /**
@@ -110,9 +110,9 @@ export const SignupApiEndpoints = [
 /**
  * Endpoints for signing a user up that display HTML
  */
-export const TwoFactorPageEndpoints = [
-    "signuptwofactor",
-    "logintwofactor"
+export const Factor2PageEndpoints = [
+    "signupfactor2",
+    "loginfactor2"
 ]
 
 /**
@@ -127,8 +127,8 @@ export const AllEndpoints = [
     ...EmailVerificationApiEndpoints,
     ...PasswordResetPageEndpoints,
     ...PasswordResetApiEndpoints,
-    ...TwoFactorPageEndpoints,
-    ...TwoFactorApiEndpoints,
+    ...Factor2PageEndpoints,
+    ...Factor2ApiEndpoints,
 ];
 
 
@@ -200,7 +200,7 @@ export class FastifyServer {
 
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
-    private twoFactorRequired :  "off" | "all" | "peruser" = "off";
+    private allowedFactor2 : string[] = [];
 
     /**
      * Creates the Fastify endpoints, optionally also the Fastify app.
@@ -214,7 +214,7 @@ export class FastifyServer {
         setParameter("views", ParamType.String, this, options, "VIEWS");
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
-        setParameter("twoFactorRequired", ParamType.String, this, options, "TWOFACTOR_REQUIRED");
+        setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
 
@@ -254,7 +254,7 @@ export class FastifyServer {
         if (this.enableSessions) this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
         if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
         if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
-        if (this.twoFactorRequired != "off") this.endpoints = [...this.endpoints, ...TwoFactorPageEndpoints, ...TwoFactorApiEndpoints];
+        if (this.allowedFactor2.length > 0) this.endpoints = [...this.endpoints, ...Factor2PageEndpoints, ...Factor2ApiEndpoints];
         setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
 
         // validates the session id and csrftokens, creating if necessary and putting the csrf token
@@ -266,16 +266,16 @@ export class FastifyServer {
                 sessionServer.addLoginEndpoints();
             }
 
-            if (this.endpoints.includes("logintwofactor")) {
-                sessionServer.addLoginTwoFactorEndpoints();
+            if (this.endpoints.includes("loginfactor2")) {
+                sessionServer.addLoginFactor2Endpoints();
             }
     
             if (this.endpoints.includes("signup")) {
                 sessionServer.addSignupEndpoints();
             }
 
-            if (this.endpoints.includes("signuptwofactor")) {
-                sessionServer.addSignupTwoFactorEndpoints();
+            if (this.endpoints.includes("signupfactor2")) {
+                sessionServer.addSignupFactor2Endpoints();
             }
 
             if (this.endpoints.includes("changepassword")) {
@@ -308,8 +308,8 @@ export class FastifyServer {
                 sessionServer.addApiLoginEndpoints();
             }
     
-            if (this.endpoints.includes("api/logintwofactor")) {
-                sessionServer.addApiLoginTwoFactorEndpoints();
+            if (this.endpoints.includes("api/loginfactor2")) {
+                sessionServer.addApiLoginFactor2Endpoints();
             }
           
             if (this.endpoints.includes("api/logout")) {
@@ -320,8 +320,8 @@ export class FastifyServer {
                 sessionServer.addApiSignupEndpoints();
             }
 
-            if (this.endpoints.includes("api/signuptwofactor")) {
-                sessionServer.addApiSignupTwoFactorEndpoints();
+            if (this.endpoints.includes("api/signupfactor2")) {
+                sessionServer.addApiSignupFactor2Endpoints();
             }
 
             if (this.endpoints.includes("api/changepassword")) {

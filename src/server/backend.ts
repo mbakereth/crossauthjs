@@ -1,10 +1,9 @@
-import { type User, UserSecrets, type Key, getJsonData, UserInputFields } from '../interfaces.ts';
+import { type User, UserSecrets, type Key, getJsonData, UserInputFields, UserSecretsInputFields } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
 import { AuthenticationParameters, Authenticator } from './auth';
 import type { UsernamePasswordAuthenticatorOptions }  from "./password";
 import { TokenEmailer, TokenEmailerOptions } from './email.ts';
-import { Totp } from './totp';
 import { CrossauthLogger, j } from '../logger.ts';
 import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth';
 import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth';
@@ -64,7 +63,6 @@ export class Backend {
     private enablePasswordReset : boolean = false;
     private twoFactorRequired :  "off" | "all" | "peruser" = "off";
     private tokenEmailer? : TokenEmailer;
-    private totpManager? : Totp;
 
     /**
      * Constructor
@@ -100,10 +98,6 @@ export class Backend {
             let keyStorage = this.keyStorage;
             if (options.emailTokenStorage) keyStorage = options.emailTokenStorage;
             this.tokenEmailer = new TokenEmailer(this.userStorage, keyStorage, options);
-        }
-
-        if (this.twoFactorRequired != "off") {
-            this.totpManager = new Totp(this.appName, this.keyStorage);
         }
     }
 
@@ -274,7 +268,7 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
-    async dataForSessionKey(sessionKey : string) : Promise<string|undefined> {
+    async dataStringForSessionKey(sessionKey : string) : Promise<string|undefined> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         let error : CrossauthError | undefined;
         try {
@@ -301,6 +295,13 @@ export class Backend {
             throw error;
         }
     }
+
+    async dataForSessionKey(sessionKey : string) : Promise<{[key:string]:any}> {
+        const str = await this.dataStringForSessionKey(sessionKey);
+        if (!str || str.length == 0) return {};
+        return JSON.parse(str);
+    }
+
     
     /**
      * Creates and returns a signed CSRF token based on the session ID
@@ -424,47 +425,64 @@ export class Backend {
         user : UserInputFields, 
         params : AuthenticationParameters, 
         sessionCookieValue : string,
-        repeatParams? : AuthenticationParameters) : Promise<{userId: string|number, qrUrl: string, secret: string}> {
-        if (!this.session || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
+        repeatParams? : AuthenticationParameters) : Promise<{userId: string|number, userData : {[key:string] : any}}> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
         if (!this.authenticators[user.factor1]) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
+        if (!this.authenticators[user.factor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
+        const authenticator = this.authenticators[user.factor2];
         const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const { qrUrl, secret } = await this.totpManager.createAndStoreSecret(user.username, sessionId);
+        const factor2Data = await authenticator.prepareAuthentication(user.username);
+        const userData = (factor2Data == undefined) ? {} : factor2Data.userData;
+        const sessionData = (factor2Data == undefined) ? {} : factor2Data.sessionData;
 
-        let secrets = await this.authenticators[user.factor1].createSecrets(user.username, params, repeatParams);
+        const factor1Secrets = await this.authenticators[user.factor1].createSecrets(user.username, params, repeatParams);
         user.state = "awaitingtwofactorsetup";
-        const newUser = await this.userStorage.createUser(user, secrets);
-        return {userId: newUser.id, qrUrl, secret}
-        
+        await this.keyStorage.updateKey({
+            value: SessionCookie.hashSessionKey(sessionId),
+            data: JSON.stringify(sessionData),
+        });
+
+        const newUser = await this.userStorage.createUser(user, factor1Secrets);    
+        return {userId: newUser.id, userData};
     }
 
     async repeatTwoFactorSignup(
         username : string, 
-        sessionCookieValue : string) : Promise<{userId: string|number, qrUrl: string, secret: string}> {
-        if (!this.session || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
+        sessionCookieValue : string,
+        factor2: string) : Promise<{userId: string|number, userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
         const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const { qrUrl, secret} = await this.totpManager.getSecretFromSession(username, sessionId);
+        const sessionKey = await this.keyStorage.getKey(SessionCookie.hashSessionKey(sessionId));
+        const authenticator = this.authenticators[factor2];
+
+        const resp = await authenticator.reprepareAuthentication(username, sessionKey);
+        const userData = (resp == undefined) ? {} : resp.userData;
+        const secrets = (resp == undefined) ? {} : resp.secrets;
 
         const {user} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
-        return {userId: user.id, qrUrl, secret}
-        
+        return {userId: user.id, userData, secrets};      
     }
     
-    async completeTwoFactorSignup(code : string, sessionId : string) : Promise<User> {
-        if (!this.session || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions not enabled");
-        let {user, key} = await this.session.getUserForSessionKey(sessionId);
+    async completeTwoFactorSignup(secrets : Partial<UserSecretsInputFields>, sessionId : string) : Promise<User> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions not enabled");
+        let {key} = await this.session.getUserForSessionKey(sessionId);
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
-        const { username, secret } = await this.totpManager.validateCodeFromKey(code, key);
-
-        if (!user) {
-            const {user: user1} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
-            user = user1;
+        let data = getJsonData(key);
+        if (!data?.factor2 || !data?.username) throw new CrossauthError(ErrorCode.Unauthorized, "Two factor authentication not initiated");
+        let username = data.username;
+        const authenticator = this.authenticators[data.factor2];
+        if (!authenticator) throw new CrossauthError(ErrorCode.Configuration, "Unrecognised second factor authentication");
+        const newSecrets : {[key:string] : any} = {};
+        const secretNames = authenticator.secretNames();
+        for (let secret in data) {
+            if (secretNames.includes(secret)) newSecrets[secret] = data[secret];
         }
+        await authenticator.authenticateUser(undefined, data, secrets);
+
+        const {user} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
         const newUser = {
             id: user.id,
             state: this.enableEmailVerification ? "awaitingemailverification" : "active",
-        }
-        const newSecrets = {
-            totpSecret: secret,
         }
         await this.userStorage.updateUser(newUser, newSecrets);
         if (this.enableEmailVerification && this.tokenEmailer) {
@@ -483,7 +501,7 @@ export class Backend {
      * @param sessionId the current session id
      * @return the new userId and the QR code to display
      */
-    async initiateTwoFactorEnable(
+    /*async initiateTwoFactorEnable(
         userId : string|number, username : string, 
         sessionCookieValue : string) : Promise<string> {
         if (!this.session || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
@@ -494,10 +512,10 @@ export class Backend {
 
         return qrUrl
         
-    }
+    }*/
 
-    async completeTwoFactorEnable(code : string, sessionId : string) : Promise<User> {
-        if (!this.session || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions and/or 2FA not enabled");
+    /*async completeTwoFactorEnable(params : AuthenticationParameters, sessionId : string) : Promise<User> {
+        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions and/or 2FA not enabled");
         let {user, key} = await this.session.getUserForSessionKey(sessionId);
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         const { username, secret } = await this.totpManager.validateCodeFromKey(code, key);
@@ -515,7 +533,7 @@ export class Backend {
         await this.userStorage.updateUser(newUser, newSecrets);
         await this.keyStorage.updateKey({value: SessionCookie.hashSessionKey(key.value), data: ""});
         return {...user, ...newUser};
-    }
+    }*/
 
     /** Disables 2FA for an existing user
      * 
@@ -533,7 +551,7 @@ export class Backend {
     async initiateTwoFactorLogin(
         user : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string}>  {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
-        const {sessionCookie} = await this.createAnonymousSession({data: JSON.stringify({username: user.username, twoFactorInitiated: true})});
+        const {sessionCookie} = await this.createAnonymousSession({data: JSON.stringify({username: user.username, twoFactorInitiated: true, factor2: user.factor2})});
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
@@ -546,13 +564,15 @@ export class Backend {
         
     }
 
-    async completeTwoFactorLogin(code : string, sessionCookieValue : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
-        if (!this.session|| !this.csrfTokens || !this.totpManager) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
+    async completeTwoFactorLogin(params : AuthenticationParameters, sessionCookieValue : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
+        if (!this.session|| !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
         let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
         if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
-        let { username } = getJsonData(key);
+        let { username, factor2 } = getJsonData(key);
         const {user, secrets} = await this.userStorage.getUserByUsername(username);
-        await this.totpManager.validateCodeFromUser(code, user, secrets);
+        const authenticator = this.authenticators[factor2];
+        if (!authenticator) throw new CrossauthError(ErrorCode.Configuration, "Second factor " + factor2 + " not enabled");
+        await authenticator.authenticateUser(user, secrets, params);
 
         const newSessionKey = await this.session.createSessionKey(user.id, extraFields);
         await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(key.value));

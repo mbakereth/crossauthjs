@@ -1,4 +1,4 @@
-import type { User, UserSecrets, UserSecretsInputFields } from '../interfaces.ts';
+import type { User, UserSecrets, UserSecretsInputFields, Key } from '../interfaces.ts';
 
 /** Optional parameters to pass to {@link UsernamePasswordAuthenticator} constructor. */
 export interface AuthenticationParameters {
@@ -12,6 +12,10 @@ export interface AuthenticationParameters {
  */
 export abstract class Authenticator {
 
+    abstract skipEmailVerificationOnSignup() : boolean;
+    abstract prepareAuthentication(username : string) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any} }|undefined>;
+    abstract reprepareAuthentication(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined>;
+        
     // throws Connection, UserNotExist, PasswordNotMatch
     /**
      * Should return the user if it exists in storage, otherwise throw {@link index!CrossauthError}:
@@ -20,7 +24,7 @@ export abstract class Authenticator {
      * @param username the username to authenticate
      * @param password the password to authenticate
      */
-    abstract authenticateUser(user : User, secrets : UserSecrets, params: AuthenticationParameters) : Promise<void>;
+    abstract authenticateUser(user : User|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void>;
 
     abstract createSecrets(username : string, params: AuthenticationParameters, repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>>;
 
