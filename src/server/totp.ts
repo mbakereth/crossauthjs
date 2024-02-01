@@ -1,22 +1,18 @@
 import QRCode from 'qrcode';
 import { authenticator as gAuthenticator } from 'otplib';
-import type { User, UserSecrets, Key, UserSecretsInputFields } from '../interfaces.ts';
+import type { User, Key, UserSecretsInputFields } from '../interfaces.ts';
 import { getJsonData } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
-import { SessionCookie } from './cookieauth.ts';
-import { KeyStorage } from './storage.ts';
 import { CrossauthLogger, j } from '../logger.ts';
-import { Authenticator, type AuthenticationParameters } from './auth';
+import { Authenticator, type AuthenticationParameters, AuthenticationOptions } from './auth';
 
 export class TotpAuthenticator extends Authenticator {
 
     private appName : string;
-    private authenticatorName;
 
-    constructor(appName : string, authenticatorName : string = "totp") {
-        super();
+    constructor(appName : string, options? : AuthenticationOptions) {
+        super({friendlyName : "Google Authenticator", ...options});
         this.appName = appName;
-        this.authenticatorName = authenticatorName;
     }
 
     private async createSecret(username : string, secret? : string) : Promise<{qrUrl : string, secret: string}> {
@@ -38,7 +34,7 @@ export class TotpAuthenticator extends Authenticator {
         username : string, 
         sessionKey : Key) : Promise<{qrUrl: string, secret: string, factor2: string}> {
         const data = getJsonData(sessionKey);
-        if (!("secret" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP data not in session");
+        if (!("totpSecret" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP data not in session");
         if (!("factor2" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP factor name not in session");
         const savedSecret = data.secret;
         const { qrUrl, secret } = await this.createSecret(username, savedSecret);
@@ -50,8 +46,8 @@ export class TotpAuthenticator extends Authenticator {
     async prepareAuthentication(username : string) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
         const { qrUrl, secret } = await this.createSecret(username);
 
-        const userData = {username: username, qr: qrUrl, totpSecret: secret, factor2: this.authenticatorName};
-        const sessionData = {username: username, totpSecret: secret, factor2: this.authenticatorName}
+        const userData = {username: username, qr: qrUrl, totpSecret: secret, factor2: this.factorName};
+        const sessionData = {username: username, totpSecret: secret, factor2: this.factorName}
         return { userData, sessionData};
     }
 

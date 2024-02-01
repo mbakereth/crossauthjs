@@ -1,7 +1,9 @@
 export { UserStorage, KeyStorage as SessionStorage } from './server/storage'; 
 export { Authenticator } from './server/auth';
+export type { AuthenticationOptions, AuthenticationParameters } from './server/auth';
 export {  LocalPasswordAuthenticator } from './server/password';
 export type { UsernamePasswordAuthenticatorOptions } from './server/password';
+export { TotpAuthenticator } from './server/totp';
 
 export { Backend } from './server/backend';
 export type { CookieOptions, Cookie } from './server/cookieauth';

@@ -4,7 +4,7 @@ import { UserStorage } from './storage'
 import { Hasher } from './hasher';
 import { CrossauthLogger, j } from '../logger.ts';
 import { setParameter, ParamType } from './utils.ts';
-import { Authenticator, type AuthenticationParameters } from './auth';
+import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from './auth';
 
 /**
  * Default password validator.
@@ -24,8 +24,9 @@ function defaultPasswordValidator(params : AuthenticationParameters) : string[] 
     return errors;
 }
 
+
 /** Optional parameters to pass to {@link UsernamePasswordAuthenticator} constructor. */
-export interface UsernamePasswordAuthenticatorOptions {
+export interface UsernamePasswordAuthenticatorOptions extends AuthenticationOptions {
     secret? : string,
     enableSecretForPasswordHash? : boolean;
 
@@ -55,7 +56,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
      */
     constructor(_userStorage : UserStorage,
                 options : UsernamePasswordAuthenticatorOptions = {}) {
-        super();
+        super({friendlyName: "Local password", ...options});
         setParameter("secret", ParamType.String, this, options, "HASHER_SECRET");
         setParameter("enableSecretForPasswordHash", ParamType.Boolean, this, options, "ENABLE_SECRET_FOR_PASSWORDS");
         if (options.validatePasswordFn) this.validatePasswordFn = options.validatePasswordFn;

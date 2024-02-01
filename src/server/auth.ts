@@ -1,8 +1,23 @@
+import { CrossauthError, ErrorCode } from '../error.ts';
 import type { User, UserSecrets, UserSecretsInputFields, Key } from '../interfaces.ts';
+import { setParameter } from './utils.ts';
 
-/** Optional parameters to pass to {@link UsernamePasswordAuthenticator} constructor. */
+/** Parameters needed for this this class to authenticator a user (besides username)
+ * An example is `password`
+*/
 export interface AuthenticationParameters {
     [key:string] : any,
+}
+
+/**
+ * Options to pass to the constructor.
+ */
+export interface AuthenticationOptions {
+    /** If passed, this is what will be displayed to the user when selecting
+     * an authentication method.
+     */
+    friendlyName? : string,
+
 }
 
 /**
@@ -15,7 +30,14 @@ export abstract class Authenticator {
     abstract skipEmailVerificationOnSignup() : boolean;
     abstract prepareAuthentication(username : string) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any} }|undefined>;
     abstract reprepareAuthentication(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined>;
-        
+    friendlyName : string;
+    factorName : string = ""; // overridden when registered to backend
+
+    constructor(options? : AuthenticationOptions) {
+        if (!options?.friendlyName) throw new CrossauthError(ErrorCode.Configuration, "Authenticator must have a friendly name");
+         this.friendlyName = options?.friendlyName;
+
+    }
     // throws Connection, UserNotExist, PasswordNotMatch
     /**
      * Should return the user if it exists in storage, otherwise throw {@link index!CrossauthError}:

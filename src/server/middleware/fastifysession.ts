@@ -156,7 +156,7 @@ interface SignupBodyType extends LoginBodyType {
     [key : string]: string|number|Date|boolean|undefined,
 }
 
-interface SignupFactor2BodyType extends CsrfBodyType {
+interface SignupFactor2BodyType extends LoginBodyType {
     next? : string,
     persist? : boolean,
     [key:string] : any,
@@ -190,6 +190,10 @@ interface LoginParamsType {
     next? : string;
 }
 
+interface AuthenticatorDetails {
+    name: string,
+    friendlyName : string,
+}
 
 /**
  * Default User validator.  Doesn't validate password
@@ -241,9 +245,9 @@ export class FastifySessionServer {
     private loginRedirect = "/";
     private logoutRedirect : string = "/";
     private signupPage : string = "signup.njk";
-    private signupFactor2Page : string = "signuptotp.njk";
+    private signupFactor2Page : string = "signupfactor2.njk";
     private loginPage : string = "login.njk";
-    private loginFactor2Page : string = "logintotp.njk";
+    private loginFactor2Page : string = "loginfactor2.njk";
     private errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
     private updateUserPage : string = "updateuser.njk";
@@ -260,10 +264,10 @@ export class FastifySessionServer {
     private userStorage : UserStorage;
     private sessionManager : Backend;
     private authenticators: {[key:string]: Authenticator}
+    private allowedFactor2 : string[] = [];
 
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
-    private allowedFactor2 :  string[] = [];
 
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
@@ -457,7 +461,7 @@ export class FastifySessionServer {
         this.app.get(this.prefix+'signup', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply)  => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'signup', ip: request.ip}));
             if (this.signupPage)  { // if is redundant but VC Code complains without it
-                let data : {next? : any, csrfToken: string|undefined, allowedFactor2: string[]} = {csrfToken: request.csrfToken, allowedFactor2: this.allowedFactor2};
+                let data : {next? : any, csrfToken: string|undefined, allowedFactor2: AuthenticatorDetails[]} = {csrfToken: request.csrfToken, allowedFactor2: this.allowedFactor2FriendlyNames()};
                 if (request.query.next) {
                     data["next"] = request.query.next;
                 }
@@ -474,12 +478,14 @@ export class FastifySessionServer {
                 return await this.signup(request, reply, 
                 (reply, data, _user) => {
                     if (data.userData?.factor2) {
-                        return reply.view(this.signupFactor2Page, data.userData);
+                        console.log(data)
+                        return reply.view(this.signupFactor2Page, {csrfToken: data.csrfToken, ...data.userData});
                     } else if (this.enableEmailVerification) {
                         return reply.view(this.signupPage, {
                             next: next, 
-                            csrfToken: request.csrfToken,
+                            csrfToken: this.csrfToken(request, reply),
                             message: "Please check your email to finish signing up.",
+                            allowedFactor2: this.allowedFactor2FriendlyNames(),
                             ...data.userData,
                         });
                     } else {
@@ -502,9 +508,9 @@ export class FastifySessionServer {
                         next: next, 
                         persist: request.body.persist,
                         username: request.body.username,
-                        csrfToken: request.csrfToken,
+                        csrfToken: this.csrfToken(request, reply),
                         factor2: request.body.factor2,
-                        allowedFactor2: this.allowedFactor2,
+                        allowedFactor2: this.allowedFactor2FriendlyNames(),
                         ...extraFields
                         });
                     
@@ -529,7 +535,7 @@ export class FastifySessionServer {
                             message: "Please check your email to finish signing up."
                         });
                     } else {
-                        return reply.redirect(this.logoutRedirect);
+                        return reply.redirect(this.loginRedirect);
                     }
                 });
             } catch (e) {
@@ -558,8 +564,8 @@ export class FastifySessionServer {
                             errorCodeName: ErrorCode[error.code], 
                             next: next, 
                             ...userData,
-                            csrfToken: request.csrfToken,
-                            });
+                            csrfToken: this.csrfToken(request, reply),
+                        });
                         
                     });
                 } catch (e2) {
@@ -1113,9 +1119,13 @@ export class FastifySessionServer {
         await this.validateCsrfToken(request);
         const username = request.body.username;
         const next = request.body.next;
-        if (request.body.factor2 && !(this.allowedFactor2.includes(request.body.factor2))) {
-            throw new CrossauthError(ErrorCode.Unauthorized, "Illegal second factor " + request.body.factor2 + " requested");
+        if (!request.body.factor2) {
+            request.body.factor2 = this.allowedFactor2[0]; 
         }
+        if (request.body.factor2 && !(this.allowedFactor2.includes(request.body.factor2))) {
+            throw new CrossauthError(ErrorCode.Forbidden, "Illegal second factor " + request.body.factor2 + " requested");
+        }
+        if (request.body.factor2 == "none") request.body.factor2 = undefined;
         let user = this.createUserFn(request, this.userStorage.userEditableFields);
         let passwordErrors = this.authenticators[user.factor1].validateSecrets(request.body);
         const secretNames = this.authenticators[user.factor1].secretNames();
@@ -1129,8 +1139,7 @@ export class FastifySessionServer {
         }
         if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
         user.state = "active";
-        if (request.body.factor2 == "none") request.body.factor2 = undefined;
-        if (request.body.factor2) {
+        if (request.body.factor2 && request.body.factor2!="none") {
            user. state = "awaitingtwofactor";
         } else if (this.enableEmailVerification) {
             user.state = "awaitingemailverification";
@@ -1154,7 +1163,7 @@ export class FastifySessionServer {
             } // all other errors are legitimate ones - we ignore them
         }
         
-        if ((!request.body.factor2) && !twoFactorInitiated) {
+        if (((!request.body.factor2) || request.body.factor2=="none") && !twoFactorInitiated) {
             // not enabling 2FA
             await this.sessionManager.createUser(user, request.body, repeatSecrets);
             if (!this.enableEmailVerification) {
@@ -1214,6 +1223,10 @@ export class FastifySessionServer {
             CrossauthLogger.logger.error(j({msg: "signupfactor2 failed", hashedSessionCookie: this.getHashOfSessionCookie(request) }));
             CrossauthLogger.logger.debug(j({err: e}));
             throw e;
+        }
+        if (!this.enableEmailVerification) {
+            return this.loginWithUser(user, request, reply, (request, user) => {
+                return successFn(request, user)});
         }
         return successFn(reply, user);
     }
@@ -1509,5 +1522,19 @@ export class FastifySessionServer {
     errorStatus(e : any) {
         if (typeof e == "object" && "httpStatus" in e) return e.httpStatus||500;
         return 500;
+    }
+
+    private allowedFactor2FriendlyNames() : AuthenticatorDetails[] {
+        let ret : {name: string, friendlyName: string}[] = [];
+        this.allowedFactor2.forEach((authenticatorName) => {
+            if (authenticatorName in this.authenticators) {
+                ret.push({name: authenticatorName, friendlyName: this.authenticators[authenticatorName].friendlyName});
+            } else if (authenticatorName == "none") {
+                ret.push({name: "none", friendlyName: "None"});
+
+            }
+        });
+        console.log(ret)
+        return ret;
     }
 }

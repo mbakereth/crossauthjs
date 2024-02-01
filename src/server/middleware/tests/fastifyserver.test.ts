@@ -36,7 +36,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         views: path.join(__dirname, '../views'),
         secret: "ABCDEFG",
         enableSessions: true,
-        allowedFactor2: "totp",
+        allowedFactor2: "none, totp",
         ...options,
     });
     // @ts-ignore
@@ -688,7 +688,7 @@ test('FastifyServer.loginTotp', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body)
-    expect(body.template).toBe("logintotp.njk");
+    expect(body.template).toBe("loginfactor2.njk");
 
     const sessionCookie = getSession(res);
     const {secrets} = await userStorage.getUserByUsername("mary");

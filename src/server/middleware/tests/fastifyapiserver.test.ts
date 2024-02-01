@@ -31,7 +31,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         views: path.join(__dirname, '../views'),
         secret: "ABCDEFG",
         enableSessions: true,
-        allowedFactor2: "totp",
+        allowedFactor2: "none, totp",
         ...options,
     });
     // @ts-ignore
@@ -122,7 +122,7 @@ test('FastifyServer.api.requestProtectedUrlsAsAnonymous', async () => {
 
 test('FastifyServer.api.signupWithEmailVerification', async () => {
 
-    let {server} = await makeAppWithOptions({enableEmailVerification: true, passwordResetTextBody: "dummy"});
+    let {server, userStorage, keyStorage} = await makeAppWithOptions({enableEmailVerification: true, passwordResetTextBody: "dummy"});
 
     // @ts-ignore
     if (!server["sessionServer"]) throw new Error("Sessions not enabled");

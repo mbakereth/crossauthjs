@@ -11,9 +11,6 @@ import { setParameter, ParamType } from './utils.ts';
 
 export interface BackendOptions extends TokenEmailerOptions {
 
-    /** Application name - used for Google Authenticator igf 2FA enabled */
-    appName? : string;
-
     /** options for csrf cookie manager */
     doubleSubmitCookieOptions? : DoubleSubmitCsrfTokenOptions,
 
@@ -58,7 +55,6 @@ export class Backend {
     readonly authenticators : {[key:string] : Authenticator};
     //readonly authenticator : UsernamePasswordAuthenticator;
 
-    private appName : string = "Crossauth";
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = false;
     private twoFactorRequired :  "off" | "all" | "peruser" = "off";
@@ -80,10 +76,12 @@ export class Backend {
         this.userStorage = userStorage;
         this.keyStorage = keyStorage;
         this.authenticators = authenticators;
+        for (let authenticationName in this.authenticators) {
+            this.authenticators[authenticationName].factorName = authenticationName;
+        }
 
         setParameter("secret", ParamType.String, this, options, "SECRET");
         setParameter("twoFactorRequired", ParamType.String, this, options, "TWOFACTOR_REQUIRED");
-        setParameter("appName", ParamType.String, this, options, "APP_NAME", this.twoFactorRequired!="off");
 
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
         if (this.enableSessions) {
