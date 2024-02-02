@@ -154,5 +154,6 @@ export abstract class KeyStorage {
      */
     abstract deleteAllForUser(userId : string | number, prefix : string, except? : string) : Promise<void>;
 
+    abstract updateData(keyName : string, dataName : string, value: any|undefined) : Promise<void>;
 }
 

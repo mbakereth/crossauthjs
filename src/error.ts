@@ -64,6 +64,9 @@ export enum ErrorCode {
     /** Thrown when a password does not match rules (length, uppercase/lowercase/digits) */
     PasswordFormat,
 
+    /** Thrown when a the data field of key storage is not valid json */
+    DataFormat,
+
     /** Thrown when attempting to create a user that already exists */
     UserExists,
 
@@ -166,6 +169,9 @@ export class CrossauthError extends Error {
             } else if (code == ErrorCode.BadRequest) {
                 _message = "The request is invalid";
                 _httpStatus = 400;
+            } else if (code == ErrorCode.DataFormat) {
+                _message = "Session data has unexpected format";
+                _httpStatus = 500;
             } else {
                 _message = "Unknown error";
             }    

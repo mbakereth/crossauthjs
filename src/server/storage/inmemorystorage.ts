@@ -280,5 +280,21 @@ export class InMemoryKeyStorage extends KeyStorage {
         }
     }
 
+    async updateData(keyName : string, dataName: string, value: any|undefined) : Promise<void> {
+        const key = await this.getKey(keyName);
+        let data : {[key:string] : any};
+        if (!key.data || key.data == "") {
+            data = {}
+        } else {
+            try {
+                data = JSON.parse(key.data);
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.DataFormat);
+            }
+        }
+        data[dataName] = value;
+        key.data = JSON.stringify(data);
+    }
 
 }

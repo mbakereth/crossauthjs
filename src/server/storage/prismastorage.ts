@@ -81,7 +81,7 @@ export class PrismaUserStorage extends UserStorage {
 
     private async getUser(
         normalizedKey : string, 
-        normalizedValue : string | number, 
+        normalizedValue : string | number,
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         let error: CrossauthError|undefined = undefined;
         let prismaUser : any;
@@ -365,18 +365,22 @@ export class PrismaKeyStorage extends KeyStorage {
         }
     }
 
+    async getKey(key : string) : Promise<Key> {
+        return await this.getKeyWithTransaction(key, this.prismaClient);
+    }
+
     /**
      * Returns the matching Key record, or throws an exception if it doesn't exist
      * @param key the session key to look up in the session storage.
      * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
      * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
-    async getKey(key : string) : Promise<Key> {
+    private async getKeyWithTransaction(key : string, tx : any) : Promise<Key> {
         let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
         let error : CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
-            let prismaKey =  await this.prismaClient[this.keyTable].findUniqueOrThrow({
+            let prismaKey =  await tx[this.keyTable].findUniqueOrThrow({
                 where: {
                     value: key
                 }
@@ -534,6 +538,10 @@ export class PrismaKeyStorage extends KeyStorage {
      * @param value 
      */
     async updateKey(key : Partial<Key>) : Promise<void> {
+        await this.updateKeyWithTransaction(key, this.prismaClient);
+    }
+
+    private async updateKeyWithTransaction(key : Partial<Key>, tx : any) : Promise<void> {
         let error : CrossauthError|undefined = undefined;
         if (!(key.value)) throw new CrossauthError(ErrorCode.InvalidKey);
         try {
@@ -549,7 +557,7 @@ export class PrismaKeyStorage extends KeyStorage {
             }*/
 
             // @ts-ignore  (because types only exist when do prismaClient.table...)
-            await this.prismaClient[this.keyTable].update({
+            await tx[this.keyTable].update({
                 where: {
                     value: key.value,
                 },
@@ -562,5 +570,26 @@ export class PrismaKeyStorage extends KeyStorage {
             CrossauthLogger.logger.debug(j({err: error}));
             throw error;
         }
+    }
+
+    async updateData(keyName : string, dataName: string, value: any|undefined) : Promise<void> {
+        await this.prismaClient.$transaction(async (tx) =>{
+            const key = await this.getKeyWithTransaction(keyName, tx);
+            let data : {[key:string] : any};
+            if (!key.data || key.data == "") {
+                data = {}
+            } else {
+                try {
+                    data = JSON.parse(key.data);
+                } catch (e) {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.DataFormat);
+                }
+            }   
+            data[dataName] = value;
+    
+            await this.updateKeyWithTransaction({value: key.value, data: JSON.stringify(data)}, tx)
+        });
+                  
     }
 }

@@ -601,7 +601,7 @@ export class FastifySessionServer {
                         CrossauthLogger.logger.error(j({msg: "Session not defined during two factor process"}));
                         return reply.status(500).view(this.errorPage, {status: 500, error: "An unknown error occurred", errorCode: ErrorCode.UnknownError, errorCodeName: "UnknownError"});
                     }
-                    let data = await this.sessionManager.dataForSessionKey(sessionValue);
+                    let data = (await this.sessionManager.dataForSessionKey(sessionValue))["2fa"];
                     let username = data?.username;
                     let factor2 = data?.factor2;
                     if (!username || !factor2) {
@@ -1341,7 +1341,7 @@ export class FastifySessionServer {
                 // account already created but 2FA setup not complete
                 const sessionValue = this.getSessionCookieValue(request);
                 if (!sessionValue) throw new CrossauthError(ErrorCode.Unauthorized);
-                const secrets = await this.sessionManager.dataForSessionKey(sessionValue);
+                const secrets = (await this.sessionManager.dataForSessionKey(sessionValue))["2fa"];
                 const username = secrets.username;
                 const factor2 = secrets.factor2;
                 const resp = await this.sessionManager.repeatTwoFactorSignup(username, sessionValue, factor2);
