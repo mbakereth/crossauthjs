@@ -58,8 +58,9 @@ export const SessionApiEndpoints = [
  * API (JSON) endpoints that depend on 2FA being enabled 
  */
 export const Factor2ApiEndpoints = [
-    "api/signupfactor2",
+    "api/configurefactor2",
     "api/loginfactor2",
+    "api/changefactor2",
 ];
 
 /**
@@ -111,8 +112,9 @@ export const SignupApiEndpoints = [
  * Endpoints for signing a user up that display HTML
  */
 export const Factor2PageEndpoints = [
-    "signupfactor2",
-    "loginfactor2"
+    "configurefactor2",
+    "loginfactor2",
+    "changefactor2",
 ]
 
 /**
@@ -198,7 +200,7 @@ export class FastifyServer {
     // @ts-ignore
     private sessionServer? : FastifySessionServer; // only needed for testing
 
-    private enableEmailVerification : boolean = true;
+    private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = true;
     private allowedFactor2 : string[] = [];
 
@@ -274,8 +276,12 @@ export class FastifyServer {
                 sessionServer.addSignupEndpoints();
             }
 
-            if (this.endpoints.includes("signupfactor2")) {
-                sessionServer.addSignupFactor2Endpoints();
+            if (this.endpoints.includes("configurefactor2")) {
+                sessionServer.addConfigureFactor2Endpoints();
+            }
+
+            if (this.endpoints.includes("changefactor2")) {
+                sessionServer.addChangeFactor2Endpoints();
             }
 
             if (this.endpoints.includes("changepassword")) {
@@ -320,12 +326,16 @@ export class FastifyServer {
                 sessionServer.addApiSignupEndpoints();
             }
 
-            if (this.endpoints.includes("api/signupfactor2")) {
-                sessionServer.addApiSignupFactor2Endpoints();
+            if (this.endpoints.includes("api/configurefactor2")) {
+                sessionServer.addApiConfigureFactor2Endpoints();
             }
 
             if (this.endpoints.includes("api/changepassword")) {
                 sessionServer.addApiChangePasswordEndpoints();
+            }
+
+            if (this.endpoints.includes("api/changefactor2")) {
+                sessionServer.addApiChangeFactor2Endpoints();
             }
 
             if (this.endpoints.includes("api/updateuser")) {

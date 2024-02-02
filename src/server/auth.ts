@@ -1,6 +1,5 @@
 import { CrossauthError, ErrorCode } from '../error.ts';
-import type { User, UserSecrets, UserSecretsInputFields, Key } from '../interfaces.ts';
-import { setParameter } from './utils.ts';
+import type { User, UserSecretsInputFields, Key } from '../interfaces.ts';
 
 /** Parameters needed for this this class to authenticator a user (besides username)
  * An example is `password`

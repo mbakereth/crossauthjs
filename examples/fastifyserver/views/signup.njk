@@ -22,7 +22,7 @@
                 {% endif %}
                 </p>
             {% endif %}
-            <form method="POST" action="/signup">
+            <form method="POST" action="signup">
                 <input type="hidden" name="next" value="{{ next }}"/>
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
                 <p>
@@ -45,7 +45,7 @@
                     <h3>Two Factor Authentication</h3>
                     {% for item in allowedFactor2 %}
                             <p>
-                                <input type="radio" id="factor2_{{item.name}}", name="factor2" value="{{ item.name }}" {% if loop.first %}checked{% endif %}> <label for="factor2_{{item.name}}">{{ item.friendlyName }}</label>
+                                <input type="radio" id="factor2_{{item.name}}", name="factor2" value="{{ item.name }}" {% if (item.name == factor2 or (factor2|length == 0 and loop.first)) %}checked{% endif %}> <label for="factor2_{{item.name}}">{{ item.friendlyName }}</label>
                             </p>
                     {% endfor %}
                 {% endif %}

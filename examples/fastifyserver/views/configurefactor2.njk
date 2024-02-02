@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/public/style.css"/>
+    <title>Sign Up - Set up 2FA</title>
+</head>
+<body>
+    <h1>Configure Two-Factor Authentication</h1>
+    {% if message %}
+        <p class="success">{{ message}}</p>
+        <p><button onclick="window.location.href='{{next or '/'}}'">OK</button></p>
+    {% else %}
+        {% if errors %}
+            <p class="error">{{ errors }}</p>
+        {% endif %}
+        <form action="configurefactor2" method="POST">
+            <ol>
+                <li>Install Google Authenticator on your phone from the App Store or Play Store</li>
+                <li>Scan the QR Code in the Authenticator app, or enter the following code manually:
+                    <pre>{{totpSecret }}</pre>
+                </li>
+                <li>Enter the code that you see in the app in the text field below and click Submit.</li>
+            </ol>
+            
+            <p><img src="{{ qr }}"/></p>
+
+            <p>
+                <label for="totpCode">Code</label>
+                <input type="hidden" name="next" value="{{ next }}"/>
+                <input type="password" name="totpCode"/>
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+            </p>
+
+            <p><button type="submit">Submit</button></p>
+        </form>
+    {% endif %}
+</body>
+</html>

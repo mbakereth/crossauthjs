@@ -1,4 +1,4 @@
-import type { User, UserSecrets, UserSecretsInputFields, Key } from '../interfaces.ts';
+import type { User, UserSecretsInputFields, Key } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error';
 import { UserStorage } from './storage'
 import { Hasher } from './hasher';

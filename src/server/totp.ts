@@ -36,7 +36,7 @@ export class TotpAuthenticator extends Authenticator {
         const data = getJsonData(sessionKey);
         if (!("totpSecret" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP data not in session");
         if (!("factor2" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "TOTP factor name not in session");
-        const savedSecret = data.secret;
+        const savedSecret = data.totpSecret;
         const { qrUrl, secret } = await this.createSecret(username, savedSecret);
 
         return {qrUrl, secret, factor2: data.factor2}
@@ -53,7 +53,6 @@ export class TotpAuthenticator extends Authenticator {
 
     async reprepareAuthentication(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined> {
         const { qrUrl, secret, factor2 } = await this.getSecretFromSession(username, sessionKey);
-
         return { userData: {qr: qrUrl, totpSecret: secret, factor2: factor2}, secrets: {totpSecret: secret}}
     }
 

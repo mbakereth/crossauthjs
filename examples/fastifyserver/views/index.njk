@@ -7,12 +7,12 @@
         <h1>Welcome {{ user.username or "nobody" }}</h1>
 
         {% if user.username %}
-            <form method="POST" action="/logout">
+            <form method="POST" action="logout">
                 <button type="submit">Logout</button>
             </form>
         {% else %}
             <p><button onClick="document.location='/login';">Login</button></p>
-            <p><a href="/signup">Sign up</a></p>
+            <p><a href="signup">Sign up</a></p>
         {% endif %}
 
         <p><a href="/protected">Protected page</a></p>

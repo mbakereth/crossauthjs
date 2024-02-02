@@ -14,17 +14,26 @@
                     {{ error }}
                 </p>
             {% endif %}
-            <form method="POST" action="/updateuser">
+            <form method="POST" action="updateuser">
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
                 <table>
                     <tr>
                         <td>Password</td>
-                        <td>************ &nbsp;<a href="/changepassword">Change...</a></td>
+                        <td>************ &nbsp;<a href="changepassword">Change...</a></td>
                     </tr>
                     <tr>
                         <td><label for="user_email">Email</label></td>
                         <td><input type="email" name="user_email" value="{{ user_email or user.email }}"></td>
                     </tr>
+                    {% if allowedFactor2 and allowedFactor2|length > 0 %}
+                        <tr>
+                            <td>Two-factor authentication</td>
+                            <td>
+                                {{ user.factor2 or "none" }}
+                                &nbsp;<a href="changefactor2?next=updateuser">Change...</a>
+                            </td>
+                        </tr>
+                    {% endif %}
                 </table>
                 <button type="submit">Update</button>
             </form>

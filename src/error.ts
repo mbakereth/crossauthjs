@@ -70,6 +70,9 @@ export enum ErrorCode {
     /** Thrown by user-supplied validation functions if a user details form was incorrectly filled out */
     FormEntry,
 
+    /** Thrown when an invalid request is made, eg configure 2FA when 2FA is switched off for user */
+    BadRequest,
+
     /** Thrown for an condition not convered above. */
     UnknownError,
 }
@@ -159,6 +162,9 @@ export class CrossauthError extends Error {
                 _httpStatus = 400;
             } else if (code == ErrorCode.UserExists) {
                 _message = "User already exists";
+                _httpStatus = 400;
+            } else if (code == ErrorCode.BadRequest) {
+                _message = "The request is invalid";
                 _httpStatus = 400;
             } else {
                 _message = "Unknown error";
