@@ -28,7 +28,7 @@ export abstract class Authenticator {
 
     abstract skipEmailVerificationOnSignup() : boolean;
     abstract prepareConfiguration(user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any} }|undefined>;
-    abstract reprepareConfiguration(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined>;
+    abstract reprepareConfiguration(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>, newSessionData: {[key:string]: any}|undefined}|undefined>;
     friendlyName : string;
     factorName : string = ""; // overridden when registered to backend
 

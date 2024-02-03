@@ -39,7 +39,7 @@
             {% elif factor2 == "email" %}
                 <p>Please check your email and enter the code sent to you.</p>
                 <p>
-    b               <input type="hidden" name="next" value="{{ next }}"/>
+                    <input type="hidden" name="next" value="{{ next }}"/>
                     <label for="token">Code</label>
                     <input type="password" name="token"/>
                     <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>

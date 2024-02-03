@@ -76,16 +76,6 @@ export class EmailAuthenticator extends Authenticator {
         nunjucks.configure(this.views, { autoescape: true });
     }
 
-    private async getSecretFromSession(
-        sessionKey : Key) : Promise<{email: string, factor2: string, token: string}> {
-        const data = getJsonData(sessionKey);
-        if (!("email" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "Email not in session");
-        if (!("factor2" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "Factor name not in session");
-        if (!("token" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "Token not in session");
-
-        return {email: data.factor2, factor2: data.factor2, token: data.token};
-    }
-
     private createEmailer() {
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
@@ -135,16 +125,27 @@ export class EmailAuthenticator extends Authenticator {
         return { userData, sessionData};
     }
 
-    async reprepareConfiguration(_username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined> {
-        const {email, factor2, token } = await this.getSecretFromSession(sessionKey);
-        const messageId = this.sendToken(email, token);
-        CrossauthLogger.logger.info(j({msg: "Sent factor token email", emailMessageId: messageId, email: email}));
-        return { userData: {email: email, factor2: factor2, token: token}, secrets: {}}
+    async reprepareConfiguration(_username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>, newSessionData: {[key:string]: any}|undefined}|undefined> {
+        const data = getJsonData(sessionKey)["2fa"];
+        const token = EmailAuthenticator.zeroPad(randomInt(999999), 6);
+        const now = new Date();
+        const expiry = new Date(now.getTime() + 1000*this.emailAuthenticatorTokenExpires).getTime();
+        const messageId = this.sendToken(data.email, token);
+        CrossauthLogger.logger.info(j({msg: "Sent factor token email", emailMessageId: messageId, email: data.email}));
+        return { 
+            userData: {email: data.email, factor2: data.factor2, token: token}, 
+            secrets: {},
+            newSessionData: {...data, token: token, expiry: expiry},
+        }
     }
 
     async authenticateUser(_user : User, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (params.token != secrets?.token) {
             throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
+        }
+        const now = new Date().getTime();
+        if (!secrets.expiry || now > secrets.expiry) {
+            throw new CrossauthError(ErrorCode.Expired, "Token has expired");
         }
     }
 
@@ -154,10 +155,12 @@ export class EmailAuthenticator extends Authenticator {
 
     async createOneTimeSecrets(user : User) : Promise<Partial<UserSecretsInputFields>> {
         const token = EmailAuthenticator.zeroPad(randomInt(999999), 6);
+        const now = new Date();
+        const expiry = new Date(now.getTime() + 1000*this.emailAuthenticatorTokenExpires).getTime();
         const email = user.email || user.username;
         const messageId = this.sendToken(email, token);
         CrossauthLogger.logger.info(j({msg: "Sent factor token email", emailMessageId: messageId, email: email}));
-        return { token: token }
+        return { token: token, expiry: expiry }
     }
 
     canCreateUser() : boolean {

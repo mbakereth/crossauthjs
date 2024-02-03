@@ -531,12 +531,17 @@ export class Backend {
         factor2: string) : Promise<{userId: string|number, userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}> {
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
         const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const sessionKey = await this.keyStorage.getKey(SessionCookie.hashSessionKey(sessionId));
+        const hashedSessionKey = SessionCookie.hashSessionKey(sessionId);
+        const sessionKey = await this.keyStorage.getKey(hashedSessionKey);
         const authenticator = this.authenticators[factor2];
 
         const resp = await authenticator.reprepareConfiguration(username, sessionKey);
         const userData = (resp == undefined) ? {} : resp.userData;
         const secrets = (resp == undefined) ? {} : resp.secrets;
+        const newSessionData = (resp == undefined) ? {} : resp.newSessionData;
+        if (newSessionData) {
+            await this.keyStorage.updateData(hashedSessionKey, "2fa", newSessionData);
+        }
 
         const {user} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
         return {userId: user.id, userData, secrets};      

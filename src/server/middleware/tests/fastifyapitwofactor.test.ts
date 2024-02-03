@@ -9,6 +9,7 @@ import { TotpAuthenticator } from '../../authenticators/totpauth';
 import { EmailAuthenticator } from '../../authenticators/emailauth';
 import { CrossauthError } from '../../..';
 import { authenticator as gAuthenticator } from 'otplib';
+import { SessionCookie } from '../../cookieauth';
 
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
 export var emailTokenData :  {to: string, token : string};
@@ -572,4 +573,97 @@ test('FastifyServer.api.turnOffEmail', async () => {
     expect(body.ok).toBe(true);
     const {user: changedUser} = await userStorage.getUserByUsername("mary");
     expect(changedUser.factor2).toBe("");
+});
+
+test('FastifyServer.api.loginEmailTokenExpired', async () => {
+    let {server, keyStorage} = await makeAppWithOptions({enableEmailVerification: false});
+
+    await createEmailAccount(server);
+
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+
+    const sessionCookie = getSession(res);
+    const token = emailTokenData.token;
+    // @ts-ignore we will ignore the possibilty of being undefined
+    const sessionManager = server["sessionServer"]["sessionManager"];
+    expect(sessionManager).toBeDefined();
+    // @ts-ignore we will ignore the possibilty of being undefined
+    const sessionData = (await sessionManager.dataForSessionKey(sessionCookie))["2fa"];
+    const {key} = await sessionManager.userForSessionCookieValue(sessionCookie);
+    expect(sessionData?.expiry).toBeDefined();
+    // @ts-ignore we will ignore the possibilty of being undefined
+    const now = Date.now();
+    expect(sessionData?.expiry-now).toBeLessThan(1000*60*6);
+    const expired = new Date(now-1000);
+    sessionData.expiry = expired.getTime();
+    await keyStorage.updateData(
+        SessionCookie.hashSessionKey(key.value), 
+        "2fa",
+        sessionData);
+
+    res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+        token: token
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(false);
+});
+
+test('FastifyServer.api.signupEmailWithoutEmailVerificationExpiredCode', async () => {
+    let {server, userStorage, keyStorage} = await makeAppWithOptions({enableEmailVerification: false});
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        user_email: "mary@mary.com", 
+        factor2: "email",
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+
+    const sessionCookie = getSession(res);
+    const token = emailTokenData.token;
+
+    // @ts-ignore
+    const sessionManager = server["sessionServer"]["sessionManager"];
+    expect(sessionManager).toBeDefined();
+    // @ts-ignore we will ignore the possibilty of being undefined
+    const sessionData = (await sessionManager.dataForSessionKey(sessionCookie))["2fa"];
+    const {key} = await sessionManager.userForSessionCookieValue(sessionCookie);
+    expect(sessionData?.expiry).toBeDefined();
+    // @ts-ignore we will ignore the possibilty of being undefined
+    const now = Date.now();
+    expect(sessionData?.expiry-now).toBeLessThan(1000*60*6);
+    const expired = new Date(now-1000);
+    sessionData.expiry = expired.getTime();
+    await keyStorage.updateData(
+        SessionCookie.hashSessionKey(key.value), 
+        "2fa",
+        sessionData);
+
+
+    res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+        token: token
+    } })
+    body = JSON.parse(res.body)
+    
+    expect(body.ok).toBe(false);
+    await expect(async () => {await userStorage.getUserByUsername("mary")}).rejects.toThrowError(CrossauthError);
 });
