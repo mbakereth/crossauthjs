@@ -132,14 +132,16 @@ export class Backend {
     /**
      * Performs a user login
      *    * Authenticates the username and password
-     *    * Creates a session key
+     *    * Creates a session key - if 2FA is enabled, this is an anonymous session,
+     *      otherwise it is bound to the user
      *    * Returns the user (without the password hash) and the session cookie.
      * @param username the username to validate
      * @param password the password to validate
      * @param existingSessionId if this is passed, the it will be used for the new sessionId.  If not, a new random one will be created
      * @param persist if passed, overrides the persistSessionId setting.
-     * @param user if this is defined, the username and password are ignored and the given user is logged in
-     * @returns the user (without the password hash) and session cookie.
+     * @param user if this is defined, the username and password are ignored and the given user is logged in.
+     *             The 2FA step is also skipped
+     * @returns the user, user secrets, and session cookie and CSRF cookie and token.
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
@@ -160,9 +162,10 @@ export class Backend {
 
         }
 
+        // create a session ID - bound to user if no 2FA, anonymous otherwiyse
         let sessionCookie : Cookie;
         if (!bypass2FA && user.factor2 && user.factor2 != "") {
-            // create an anonymous session and store the username in it
+            // create an anonymous session and store the username and 2FA data in it
             const { sessionCookie: newSesionCookie } = await this.initiateTwoFactorLogin(user);
             sessionCookie = newSesionCookie;
         } else {
@@ -170,15 +173,21 @@ export class Backend {
             //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
             sessionCookie = this.session.makeCookie(sessionKey, persist);
         }
+
+        // create a new CSRF token, since we have a new session
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+
+        // delete any password reset tokens that still exist for this user.
         try {
             this.keyStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
         }
+
+        // send back the cookies and user details
         return {
             sessionCookie: sessionCookie,
             csrfCookie: csrfCookie,
@@ -235,7 +244,7 @@ export class Backend {
     }
     
     /**
-     * Returns the user (without password hash) matching the given session key.
+     * Returns the user (without secrets) matching the given session key.
      * 
      * If the user is undefined, or the key has expired, returns undefined.
      * 
@@ -251,7 +260,8 @@ export class Backend {
     }
 
     /**
-     * Returns the data object for a session key, or undefined
+     * Returns the data object for a session key, or undefined, as a JSON string 
+     * (which is how it is stored in the session table)
      * 
      * If the user is undefined, or the key has expired, returns undefined.
      * 
@@ -288,6 +298,16 @@ export class Backend {
         }
     }
 
+    /**
+     * Returns the data object for a session key, or undefined, as an object.
+     * 
+     * If the user is undefined, or the key has expired, returns undefined.
+     * 
+     * @param sessionKey the session key to look up in session storage
+     * @returns a string from the data field
+     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     *         `UserNotExist` or `Expired`.
+     */
     async dataForSessionKey(sessionKey : string) : Promise<{[key:string]:any}> {
         const str = await this.dataStringForSessionKey(sessionKey);
         if (!str || str.length == 0) return {};
@@ -382,7 +402,10 @@ export class Backend {
     }
 
     /**
-     * Creates a new user, sending an email verification message if necessary
+     * Creates a new user, sending an email verification message if necessary.
+     *  
+     * If email verification is enabled, the user's state is set to
+     * `awaitingemailverification`. Otherwise it is set to `active`.
      * 
      * @param username username to give the user
      * @param password password to give the user
@@ -407,13 +430,19 @@ export class Backend {
 
     /** Creates a user with 2FA enabled.
      * 
-     * The user storage entry will be enabled and the passed session key will be updated to include the
-     * username.  The userId and QR Url are returned.
-     * @param username : the username to create
-     * @param password : the unhashed password for the new user
-     * @extraFIelds extra fields to insert into the new user entry
-     * @param sessionId the current session id (anonymous session)
-     * @return the new userId and the QR code to display
+     * The user storage entry will be createed, with the state set to
+     * `awaitingtwofactorsetup`.   The passed session key will be updated to 
+     * include the username and details needed by 2FA during the configure step.  
+     * @param user : details to save in the user table
+     * @param params : params the parameters needed to authenticate with factor1
+     *                   (eg password)
+     * @param sessionCookieValue the anonymous session cookie 
+     * @param repeatParams if passed, these will be compared with `params` and
+     *                     if they don't match, `PasswordMatch` is thrown.
+     * @return `userId` the id of the created user.  
+     *         `userData` data that can be displayed to the user in the page to 
+     *          complete 2FA set up (eg the secret key and QR codee for TOTP),
+     * 
      */
     async initiateTwoFactorSignup(
         user : UserInputFields, 
@@ -440,6 +469,15 @@ export class Backend {
         return {userId: newUser.id, userData};
     }
 
+    /**
+     * Begins the process of setting up 2FA for a user which has already been 
+     * created and activated.  Called when changing 2FA or changing its parameters.
+     * @param user the logged in user
+     * @param newFactor2 new second factor to change user to
+     * @param sessionCookieValue the session cookie for the user
+     * @returns the 2FA data that can be displayed to the user in the confifugre 2FA
+     *          step (such as the secret and QR code for TOTP).
+     */
     async initiateTwoFactorSetup(
         user : User, 
         newFactor2 : string|undefined,
@@ -459,6 +497,8 @@ export class Backend {
                 sessionData);
             return userData;
         } 
+
+        // this part is for turning off 2FA
         await this.userStorage.updateUser({id: user.id, factor2: newFactor2||""});
         await this.keyStorage.updateData(
             SessionCookie.hashSessionKey(sessionId), 
@@ -470,6 +510,21 @@ export class Backend {
 
     }
 
+    /**
+     * This can be called if the user has finished signing up with factor1 but
+     * closed the browser before completing factor2 setup.  Call it if the user
+     * signs up again with the same factor1 credentials.
+     * @param username the username
+     * @param sessionCookieValue the anonymous session ID for the user
+     * @param factor2 the second factor being set up
+     * @returns `userId` the id of the created user
+     *          `userData` data that can be displayed to the user in the page to 
+     *           complete 2FA set up (eg the secret key and QR codee for TOTP),
+     *          `secrets` data that is saved in the session for factor2.  In the
+     *          case of TOTP, both `userData` and `secrets` contain the shared
+     *          secret but only `userData` has the QR code, since it can be
+     *          generated from the shared secret.
+     */
     async repeatTwoFactorSignup(
         username : string, 
         sessionCookieValue : string,
@@ -486,11 +541,21 @@ export class Backend {
         const {user} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
         return {userId: user.id, userData, secrets};      
     }
-    
-    async completeTwoFactorSetup(secrets : Partial<UserSecretsInputFields>, sessionId : string) : Promise<User> {
+  
+    /**
+     * Authenticates with the second factor.  
+     * 
+     * If successful, the new user object is returned.  Otherwise an exception
+     * is thrown,
+     * @param params the parameters from user input needed to authenticate (eg TOTP code)
+     * @param sessionCookieValue the session cookie value (ie still signed)
+     * @returns the user object
+     * @throws {@link index!CrossauthError} if authentication fails.
+     */
+    async completeTwoFactorSetup(params : AuthenticationParameters, sessionCookieValue : string) : Promise<User> {
         let newSignup = false;
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions not enabled");
-        let {user, key} = await this.session.getUserForSessionKey(sessionId);
+        let {user, key} = await this.session.getUserForSessionKey(sessionCookieValue);
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         let data = getJsonData(key)["2fa"];
         if (!data?.factor2 || !data?.username) throw new CrossauthError(ErrorCode.Unauthorized, "Two factor authentication not initiated");
@@ -502,7 +567,7 @@ export class Backend {
         for (let secret in data) {
             if (secretNames.includes(secret)) newSecrets[secret] = data[secret];
         }
-        await authenticator.authenticateUser(undefined, data, secrets);
+        await authenticator.authenticateUser(undefined, data, params);
 
         if (!user) {
             newSignup = true;
@@ -523,20 +588,14 @@ export class Backend {
         return {...user, ...newUser};
     }
 
-    /** Disables 2FA for an existing user
+    /**
+     * Initiates the two factor login process.
      * 
-     * The user storage entry will be enabled and the passed session key will be updated to include the
-     * username.  The userId and QR Url are returned.
-     * @param userId : the user id to update
+     * Creates an anonymous session and coorresponding CSRF token
+     * @param user the user, which should aleady have been authenticated with factor1
+     * @returns a new anonymous session cookie and corresponding CSRF cookie and token.
      */
-    async disableTwoFactor(
-        userId : string|number) {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
-
-        await this.userStorage.updateUser({id: userId}, {totpSecret: ""});
-    }
-
-    async initiateTwoFactorLogin(
+    private async initiateTwoFactorLogin(
         user : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string}>  {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
         const authenticator = this.authenticators[user.factor2];
@@ -554,6 +613,23 @@ export class Backend {
         
     }
 
+    /**
+     * Performs the second factor authentication as the second step of the login
+     * process
+     * 
+     * If authentication is successful, the user's state will be set to active
+     * and a new session will be created, bound to the user.  The anonymous session
+     * will be deleted.
+     * @param params the user-provided parameters to authenticate with (eg TOTP code).
+     * @param sessionCookieValue the user's anonymous session
+     * @param extraFields extra fields to add to the user-bound new session table entry
+     * @param persist if true, the cookie will be perstisted (with an expiry value);
+     *                otberwise it will be a session-only cookie.
+     * @returns `sessionCookie` the new session cookie
+     *          `csrfCookie` the new CSRF cookie
+     *          `csrfToken` the new CSRF token corresponding to the cookie
+     *          `user` the newly-logged in user.
+     */
     async completeTwoFactorLogin(params : AuthenticationParameters, sessionCookieValue : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
         if (!this.session|| !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
         let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
@@ -587,6 +663,10 @@ export class Backend {
         }
     }
 
+    /**
+     * Sends a password reset token
+     * @param email the user's email (where the token will be sent)
+.     */
     async requestPasswordReset(email : string) : Promise<void> {
         const {user} = await this.userStorage.getUserByEmail(email);
         await this.tokenEmailer?.sendPasswordResetToken(user.id);
@@ -626,6 +706,12 @@ export class Backend {
         return {...user, ...newUser, oldEmail: oldEmail};
     }
 
+    /**
+     * Returns the user associated with a password reset token
+     * @param token the token that was emailed
+     * @returns the user
+     * @throws {@link index!CrossauthError} if the token is not valid.
+     */
     async userForPasswordResetToken(token : string) : Promise<User> {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
         return await this.tokenEmailer.verifyPasswordResetToken(token);
@@ -651,6 +737,12 @@ export class Backend {
         return user;
     }
 
+    /**
+     * Updates a user entry in storage
+     * @param currentUser the current user details
+     * @param newUser the new user details
+     * @returns true if email verification is now needed, false otherwise
+     */
     async updateUser(currentUser: User, newUser : User) : Promise<boolean> {
         let newEmail = undefined;
         if (!("id" in currentUser) || currentUser.id == undefined) {
@@ -686,6 +778,17 @@ export class Backend {
         return this.enableEmailVerification && hasEmail;
     }
 
+    /**
+     * Resets the secret for factor1 or 2 (eg reset password)
+     * @param token the reset password token that was emailed
+     * @param factorNumber which factor to reset (1 or 2)
+     * @param params the new secrets entered by the user (eg new password)
+     * @param repeatParams optionally, repeat of the secrets.  If passed, 
+     *                     an exception will be thrown if they do not match
+     * @returns the new user object
+     * @throws {@link CrossauthError} if the repeatParams don't match params,
+     * the token is invalid or the user storage cannot be updated.
+     */
     async resetSecret(token : string, factorNumber : 1|2, params : AuthenticationParameters, repeatParams? : AuthenticationParameters) : Promise<User> {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
         const user = await this.userForPasswordResetToken(token);

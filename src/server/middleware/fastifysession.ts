@@ -518,7 +518,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
 
                 return await this.signup(request, reply, 
-                (reply, data, user) => {
+                (reply, data, _user) => {
                     const authenticator = data?.userData?.factor2 ? this.authenticators[data.userData.factor2] : undefined;
                     if (data.userData?.factor2) {
                         return reply.view(this.configureFactor2Page, {csrfToken: data.csrfToken, ...data.userData});
