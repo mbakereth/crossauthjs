@@ -17,6 +17,7 @@
             <p class="error">{{ errors }}</p>
         {% endif %}
         <form action="configurefactor2" method="POST">
+            {% if factor2 == "totp" %}
             <ol>
                 <li>Install Google Authenticator on your phone from the App Store or Play Store</li>
                 <li>Scan the QR Code in the Authenticator app, or enter the following code manually:
@@ -35,6 +36,20 @@
             </p>
 
             <p><button type="submit">Submit</button></p>
+            {% elif factor2 == "email" %}
+                <p>Please check your email and enter the code sent to you.</p>
+                <p>
+    b               <input type="hidden" name="next" value="{{ next }}"/>
+                    <label for="token">Code</label>
+                    <input type="password" name="token"/>
+                    <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                </p>
+                <p><button type="submit">Submit</button></p>
+            {% else %}
+            <p class="error">Unknown two-factor authentication type.  please
+                <a href="signup">try to sign up again</a>.
+            </p>
+            {% endif%}
         </form>
     {% endif %}
 </body>

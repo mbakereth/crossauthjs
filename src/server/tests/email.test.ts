@@ -1,5 +1,5 @@
 import { test, expect, beforeAll } from 'vitest';
-import { TokenEmailer } from '../email';
+import { TokenEmailer } from '../emailtokens';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
 

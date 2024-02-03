@@ -1,5 +1,5 @@
 import { test, expect, beforeAll } from 'vitest';
-import { LocalPasswordAuthenticator } from '../password';
+import { LocalPasswordAuthenticator } from '../authenticators/passwordauth';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
 import { InMemoryUserStorage } from '../storage/inmemorystorage';
 export var userStorage : InMemoryUserStorage;

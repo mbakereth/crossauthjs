@@ -1,5 +1,5 @@
 import { InMemoryUserStorage } from '../inmemorystorage';
-import { LocalPasswordAuthenticator } from '../../password';
+import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 
 export async function getTestUserStorage(pepper? : string|undefined) : Promise<InMemoryUserStorage> {
     //let userStorage = new InMemoryUserStorage({userEditableFields: ["email", "dummyField"]});

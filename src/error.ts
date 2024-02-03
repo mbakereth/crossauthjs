@@ -133,7 +133,7 @@ export class CrossauthError extends Error {
                 _message = "Email address has not been verified"
                 _httpStatus = 403;
             } else if (code == ErrorCode.TwoFactorIncomplete) {
-                _message = "TOTP setup is not complete"
+                _message = "Two-factor setup is not complete"
                 _httpStatus = 403;
             } else if (code == ErrorCode.Unauthorized) {
                 _message = "Not authorized"

@@ -11,17 +11,34 @@
     <h1>Login - please enter your code</h1>
     <form action="loginfactor2" method="POST">
 
-        <p>
-            Enter the code from Google Authenticator on your smartphone        
-        <p>
-            <input type="hidden" name="csrfToken" value="{{ csrfToken }}">
-            <input type="hidden" name="persist" value="{{ persist }}">
-            <input type="hidden" name="next" value="{{ next }}">
-            <label for="totpCode">Code</label>
-            <input type="password" name="totpCode">
-        </p>
-
-        <p><button type="submit">Submit</button></p>
+        {% if factor2 == "totp" %}
+            <p>
+                Enter the code from Google Authenticator on your smartphone        
+            </p>
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}">
+                <input type="hidden" name="persist" value="{{ persist }}">
+                <input type="hidden" name="next" value="{{ next }}">
+            <p>
+                <label for="totpCode">Code</label>
+                <input type="password" name="totpCode">
+            </p>
+            <p><button type="submit">Submit</button></p>
+        {% elif factor2 == "email" %}
+            <p>
+                Please enter the code we just emailed you        
+            </p>
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}">
+                <input type="hidden" name="persist" value="{{ persist }}">
+                <input type="hidden" name="next" value="{{ next }}">
+                <label for="token">Code</label>
+                <input type="password" name="token">
+            </p>
+            <p><button type="submit">Submit</button></p>
+        {% else %}
+            <p class="error">Unknown two-factor authentication type.  please
+                <a href="login">try to log in again</a>.
+            </p>
+        {% endif %}
     </form>
 </body>
 </html>

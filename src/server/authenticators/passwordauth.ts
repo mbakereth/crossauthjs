@@ -1,10 +1,10 @@
-import type { User, UserSecretsInputFields, Key } from '../interfaces.ts';
-import { ErrorCode, CrossauthError } from '../error';
-import { UserStorage } from './storage'
-import { Hasher } from './hasher';
-import { CrossauthLogger, j } from '../logger.ts';
-import { setParameter, ParamType } from './utils.ts';
-import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from './auth';
+import type { User, UserSecretsInputFields, Key, UserInputFields } from '../../interfaces.ts';
+import { ErrorCode, CrossauthError } from '../../error.ts';
+import { UserStorage } from '../storage.ts'
+import { Hasher } from '../hasher.ts';
+import { CrossauthLogger, j } from '../../logger.ts';
+import { setParameter, ParamType } from '../utils.ts';
+import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
 
 /**
  * Default password validator.
@@ -144,11 +144,15 @@ export class LocalPasswordAuthenticator extends Authenticator {
         return await Hasher.passwordsEqual(password, passwordHash, secret);
     }
 
-    async createSecrets(_username : string, params: AuthenticationParameters, repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
+    async createPersistentSecrets(_username : string, params: AuthenticationParameters, repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         if (repeatParams && repeatParams.password != params.password) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
         return {password: await this.hashPassword(params.password)};
+    }
+
+    async createOneTimeSecrets(_user : User) : Promise<Partial<UserSecretsInputFields>> {
+        return { }
     }
 
     canCreateUser() : boolean { return true; }
@@ -157,11 +161,11 @@ export class LocalPasswordAuthenticator extends Authenticator {
     skipEmailVerificationOnSignup() : boolean {
         return false;
     }
-    async prepareAuthentication(_username : string) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
+    async prepareConfiguration(_user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
         return undefined;
     }
 
-    async reprepareAuthentication(_username : string, _sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined> {
+    async reprepareConfiguration(_username : string, _sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined> {
         return undefined;
     }
 }

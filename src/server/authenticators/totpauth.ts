@@ -1,10 +1,10 @@
 import QRCode from 'qrcode';
 import { authenticator as gAuthenticator } from 'otplib';
-import type { User, Key, UserSecretsInputFields } from '../interfaces.ts';
-import { getJsonData } from '../interfaces.ts';
-import { ErrorCode, CrossauthError } from '../error.ts';
-import { CrossauthLogger, j } from '../logger.ts';
-import { Authenticator, type AuthenticationParameters, AuthenticationOptions } from './auth';
+import type { User, Key, UserSecretsInputFields, UserInputFields } from '../../interfaces.ts';
+import { getJsonData } from '../../interfaces.ts';
+import { ErrorCode, CrossauthError } from '../../error.ts';
+import { CrossauthLogger, j } from '../../logger.ts';
+import { Authenticator, type AuthenticationParameters, AuthenticationOptions } from '../auth.ts';
 
 export class TotpAuthenticator extends Authenticator {
 
@@ -43,15 +43,15 @@ export class TotpAuthenticator extends Authenticator {
         
     }
 
-    async prepareAuthentication(username : string) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
-        const { qrUrl, secret } = await this.createSecret(username);
+    async prepareConfiguration(user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
+        const { qrUrl, secret } = await this.createSecret(user.username);
 
-        const userData = {username: username, qr: qrUrl, totpSecret: secret, factor2: this.factorName};
-        const sessionData = {username: username, totpSecret: secret, factor2: this.factorName}
+        const userData = {username: user.username, qr: qrUrl, totpSecret: secret, factor2: this.factorName};
+        const sessionData = {username: user.username, totpSecret: secret, factor2: this.factorName}
         return { userData, sessionData};
     }
 
-    async reprepareAuthentication(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined> {
+    async reprepareConfiguration(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined> {
         const { qrUrl, secret, factor2 } = await this.getSecretFromSession(username, sessionKey);
         return { userData: {qr: qrUrl, totpSecret: secret, factor2: factor2}, secrets: {totpSecret: secret}}
     }
@@ -67,9 +67,13 @@ export class TotpAuthenticator extends Authenticator {
         }
     }
 
-    async createSecrets(username : string, _params: AuthenticationParameters, _repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
+    async createPersistentSecrets(username : string, _params: AuthenticationParameters, _repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         const { secret } = await this.createSecret(username);
         return { totpSecret: secret };
+    }
+
+    async createOneTimeSecrets(_user : User) : Promise<Partial<UserSecretsInputFields>> {
+        return { }
     }
 
     canCreateUser() : boolean {

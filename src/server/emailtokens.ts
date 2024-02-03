@@ -426,4 +426,5 @@ export class TokenEmailer {
     static validateEmail(email : string|undefined)  {
         if (email==undefined || !TokenEmailer.isEmailValid(email)) throw new CrossauthError(ErrorCode.InvalidEmail);
     }
+
 }

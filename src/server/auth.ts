@@ -1,5 +1,5 @@
 import { CrossauthError, ErrorCode } from '../error.ts';
-import type { User, UserSecretsInputFields, Key } from '../interfaces.ts';
+import type { User, UserInputFields, UserSecretsInputFields, Key } from '../interfaces.ts';
 
 /** Parameters needed for this this class to authenticator a user (besides username)
  * An example is `password`
@@ -27,8 +27,8 @@ export interface AuthenticationOptions {
 export abstract class Authenticator {
 
     abstract skipEmailVerificationOnSignup() : boolean;
-    abstract prepareAuthentication(username : string) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any} }|undefined>;
-    abstract reprepareAuthentication(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined>;
+    abstract prepareConfiguration(user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any} }|undefined>;
+    abstract reprepareConfiguration(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}|undefined>;
     friendlyName : string;
     factorName : string = ""; // overridden when registered to backend
 
@@ -47,7 +47,8 @@ export abstract class Authenticator {
      */
     abstract authenticateUser(user : User|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void>;
 
-    abstract createSecrets(username : string, params: AuthenticationParameters, repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>>;
+    abstract createPersistentSecrets(username : string, params: AuthenticationParameters, repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>>;
+    abstract createOneTimeSecrets(user : User) : Promise<Partial<UserSecretsInputFields>>;
 
     abstract canCreateUser() : boolean;
     abstract canUpdateUser() : boolean;

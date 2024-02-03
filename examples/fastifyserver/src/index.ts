@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import { PrismaClient } from '@prisma/client';
-import { FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator } from 'crossauth/server';
+import { FastifyCookieAuthServer, PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from 'crossauth/server';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
@@ -45,15 +45,17 @@ let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
 
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
 let totpAuthenticator = new TotpAuthenticator("FastifyTest");
+let emailAuthenticator = new EmailAuthenticator();
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyCookieAuthServer(userStorage, keyStorage,{
     localpassword: lpAuthenticator,
     totp: totpAuthenticator,
+    email: emailAuthenticator,
 }, {
     app: app,
     views: path.join(__dirname, '../views'),
-    allowedFactor2: "none, totp",
+    allowedFactor2: "none, totp, email",
     enableEmailVerification: false,
 });
 

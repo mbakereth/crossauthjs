@@ -2,8 +2,8 @@ import { type User, UserSecrets, type Key, getJsonData, UserInputFields, UserSec
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
 import { AuthenticationParameters, Authenticator } from './auth';
-import type { UsernamePasswordAuthenticatorOptions }  from "./password";
-import { TokenEmailer, TokenEmailerOptions } from './email.ts';
+import type { UsernamePasswordAuthenticatorOptions }  from "./authenticators/passwordauth";
+import { TokenEmailer, TokenEmailerOptions } from './emailtokens.ts';
 import { CrossauthLogger, j } from '../logger.ts';
 import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth';
 import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth';
@@ -126,7 +126,6 @@ export class Backend {
      */
     async authenticateUser(user : User, secrets : UserSecrets, params : AuthenticationParameters) : Promise<void> {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
-
         await this.authenticators[user.factor1].authenticateUser(user, secrets, params);
     }
 
@@ -162,10 +161,10 @@ export class Backend {
         }
 
         let sessionCookie : Cookie;
-        if (!bypass2FA && secrets && secrets.totpSecret && secrets.totpSecret != "") {
+        if (!bypass2FA && user.factor2 && user.factor2 != "") {
             // create an anonymous session and store the username in it
-            const { sessionCookie: newSssionCookie } = await this.initiateTwoFactorLogin(user);
-            sessionCookie = newSssionCookie;
+            const { sessionCookie: newSesionCookie } = await this.initiateTwoFactorLogin(user);
+            sessionCookie = newSesionCookie;
         } else {
             const sessionKey = await this.session.createSessionKey(user.id, extraFields);
             //await this.sessionStorage.saveSession(user.id, sessionKey.value, sessionKey.dateCreated, sessionKey.expires);
@@ -393,10 +392,11 @@ export class Backend {
     async createUser(user : UserInputFields, params: AuthenticationParameters, repeatParams?: AuthenticationParameters)
         : Promise<User> {
         if (!(this.authenticators[user.factor1])) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
-        let secrets = await this.authenticators[user.factor1].createSecrets(user.username, params, repeatParams);
+        const skipEmailVerification = this.authenticators[user.factor1].skipEmailVerificationOnSignup() == true;
+        let secrets = await this.authenticators[user.factor1].createPersistentSecrets(user.username, params, repeatParams);
         const newUser = await this.userStorage.createUser(user, secrets);
-        if (this.enableEmailVerification && this.tokenEmailer) {
-            await this.tokenEmailer?.sendEmailVerificationToken(newUser.id, undefined)
+        if (!skipEmailVerification && this.enableEmailVerification && this.tokenEmailer) {
+            await this.tokenEmailer?.sendEmailVerificationToken(newUser.id, undefined);
         }
         return newUser;
     }
@@ -425,18 +425,18 @@ export class Backend {
         if (!this.authenticators[user.factor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
         const authenticator = this.authenticators[user.factor2];
         const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const factor2Data = await authenticator.prepareAuthentication(user.username);
+        const factor2Data = await authenticator.prepareConfiguration(user);
         const userData = (factor2Data == undefined) ? {} : factor2Data.userData;
         const sessionData = (factor2Data == undefined) ? {} : factor2Data.sessionData;
 
-        const factor1Secrets = await this.authenticators[user.factor1].createSecrets(user.username, params, repeatParams);
+        const factor1Secrets = await this.authenticators[user.factor1].createPersistentSecrets(user.username, params, repeatParams);
         user.state = "awaitingtwofactorsetup";
         await this.keyStorage.updateData(
             SessionCookie.hashSessionKey(sessionId), 
             "2fa",
             sessionData);
 
-        const newUser = await this.userStorage.createUser(user, factor1Secrets);    
+        const newUser = await this.userStorage.createUser(user, factor1Secrets);  
         return {userId: newUser.id, userData};
     }
 
@@ -449,7 +449,7 @@ export class Backend {
         if (newFactor2 && newFactor2 != "none") {
             if (!this.authenticators[newFactor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
             const authenticator = this.authenticators[newFactor2];
-            const factor2Data = await authenticator.prepareAuthentication(user.username);
+            const factor2Data = await authenticator.prepareConfiguration(user);
             const userData = (factor2Data == undefined) ? {} : factor2Data.userData;
             const sessionData = (factor2Data == undefined) ? {} : factor2Data.sessionData;
 
@@ -479,7 +479,7 @@ export class Backend {
         const sessionKey = await this.keyStorage.getKey(SessionCookie.hashSessionKey(sessionId));
         const authenticator = this.authenticators[factor2];
 
-        const resp = await authenticator.reprepareAuthentication(username, sessionKey);
+        const resp = await authenticator.reprepareConfiguration(username, sessionKey);
         const userData = (resp == undefined) ? {} : resp.userData;
         const secrets = (resp == undefined) ? {} : resp.secrets;
 
@@ -487,7 +487,7 @@ export class Backend {
         return {userId: user.id, userData, secrets};      
     }
     
-    async completeTwoFactorSignup(secrets : Partial<UserSecretsInputFields>, sessionId : string) : Promise<User> {
+    async completeTwoFactorSetup(secrets : Partial<UserSecretsInputFields>, sessionId : string) : Promise<User> {
         let newSignup = false;
         if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions not enabled");
         let {user, key} = await this.session.getUserForSessionKey(sessionId);
@@ -509,13 +509,14 @@ export class Backend {
             const resp = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             user = resp.user;
         }
+        const skipEmailVerification = authenticator.skipEmailVerificationOnSignup() == true;
         const newUser = {
             id: user.id,
-            state: this.enableEmailVerification ? "awaitingemailverification" : "active",
+            state: !skipEmailVerification && this.enableEmailVerification ? "awaitingemailverification" : "active",
             factor2: data.factor2,
         }
         await this.userStorage.updateUser(newUser, newSecrets);
-        if (newSignup && this.enableEmailVerification && this.tokenEmailer) {
+        if (!skipEmailVerification && newSignup && this.enableEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(user.id, undefined)
         }
         await this.keyStorage.updateData(SessionCookie.hashSessionKey(key.value), "2fa", undefined);
@@ -538,7 +539,9 @@ export class Backend {
     async initiateTwoFactorLogin(
         user : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string}>  {
         if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
-        const {sessionCookie} = await this.createAnonymousSession({data: JSON.stringify({"2fa": {username: user.username, twoFactorInitiated: true, factor2: user.factor2}})});
+        const authenticator = this.authenticators[user.factor2];
+        const secrets = await authenticator.createOneTimeSecrets(user);
+        const {sessionCookie} = await this.createAnonymousSession({data: JSON.stringify({"2fa": {username: user.username, twoFactorInitiated: true, factor2: user.factor2, ...secrets}})});
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
@@ -555,11 +558,13 @@ export class Backend {
         if (!this.session|| !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
         let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
         if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
-        let { username, factor2 } = getJsonData(key)["2fa"];
+        let data = getJsonData(key)["2fa"];
+        let username = data.username;
+        let factor2 = data.factor2;
         const {user, secrets} = await this.userStorage.getUserByUsername(username);
         const authenticator = this.authenticators[factor2];
         if (!authenticator) throw new CrossauthError(ErrorCode.Configuration, "Second factor " + factor2 + " not enabled");
-        await authenticator.authenticateUser(user, secrets, params);
+        await authenticator.authenticateUser(user, {...secrets, ...data}, params);
 
         const newSessionKey = await this.session.createSessionKey(user.id, extraFields);
         await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(key.value));
@@ -630,7 +635,7 @@ export class Backend {
         let {user, secrets} = await this.userStorage.getUserByUsername(username);
         const factor = factorNumber == 1 ? user.factor1 : user.factor2;
         await this.authenticators[factor].authenticateUser(user, secrets, oldParams);
-        const newSecrets = await this.authenticators[user.factor1].createSecrets(user.username, newParams, repeatParams);
+        const newSecrets = await this.authenticators[user.factor1].createPersistentSecrets(user.username, newParams, repeatParams);
         await this.userStorage.updateUser({id: user.id}, 
             newSecrets,
         );
@@ -688,7 +693,7 @@ export class Backend {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
         await this.userStorage.updateUser(
             {id: user.id},
-            await this.authenticators[factor].createSecrets(user.username, params, repeatParams),
+            await this.authenticators[factor].createPersistentSecrets(user.username, params, repeatParams),
         );
         //this.keyStorage.deleteKey(TokenEmailer.hashPasswordResetToken(token));
 

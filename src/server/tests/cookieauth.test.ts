@@ -2,7 +2,7 @@ import { test, expect, beforeAll } from 'vitest';
 import { DoubleSubmitCsrfToken, SessionCookie } from '../cookieauth';
 import { Hasher } from '../hasher';
 import { Backend } from '../backend';
-import { LocalPasswordAuthenticator } from '../password';
+import { LocalPasswordAuthenticator } from '../authenticators/passwordauth';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
 import { CrossauthError } from '../../error';

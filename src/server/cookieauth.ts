@@ -1,7 +1,7 @@
 import type { User, Key } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage';
-import { type TokenEmailerOptions } from './email.ts';
+import { type TokenEmailerOptions } from './emailtokens.ts';
 import { Hasher } from './hasher';
 import { CrossauthLogger, j } from '../logger.ts';
 import { setParameter, ParamType } from './utils.ts';
