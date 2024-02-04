@@ -38,7 +38,6 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         app: app,
         views: path.join(__dirname, '../views'),
         secret: "ABCDEFG",
-        enableSessions: true,
         allowedFactor2: "none, totp, email",
         ...options,
     });

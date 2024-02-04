@@ -37,7 +37,6 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         app: app,
         views: path.join(__dirname, '../views'),
         secret: "ABCDEFG",
-        enableSessions: true,
         allowedFactor2: "none, totp",
         ...options,
     });
@@ -226,7 +225,7 @@ test('FastifyServer.api.wrongCsrf', async () => {
     // Error on invalid token
     res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "abc", csrfToken: csrfToken} })
     body = JSON.parse(res.body);
-    expect(body.errorCodeName).toBe("InvalidKey");
+    expect(body.errorCodeName).toBe("InvalidCsrf");
     expect(body.ok).toBe(false);
     expect(res.statusCode).toBe(401);
 
@@ -235,7 +234,7 @@ test('FastifyServer.api.wrongCsrf', async () => {
     const csrfCookie2 = csrfTokens?.makeCsrfCookie(Hasher.randomValue(16));
     res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie2?.value||""}, payload: {username: "bob", password: "abc", csrfToken: csrfToken2} })
     body = JSON.parse(res.body);
-    expect(body.errorCodeName).toBe("InvalidKey");
+    expect(body.errorCodeName).toBe("InvalidCsrf");
     expect(body.ok).toBe(false);
     expect(res.statusCode).toBe(401);
 });

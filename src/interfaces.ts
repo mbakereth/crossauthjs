@@ -54,7 +54,6 @@ export interface UserSecretsInputFields {
     totpSecret? : string,
     token?: string,
     expiry?: number,
-    [key:string]: string|number|Date|undefined,
 }
 
 export interface UserSecrets extends UserSecretsInputFields {

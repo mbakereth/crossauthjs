@@ -182,7 +182,7 @@ export class DoubleSubmitCsrfToken {
 
     private unmaskCsrfToken(maskAndToken : string) {
         const parts = maskAndToken.split(".");
-        if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidKey, "CSRF token in header or form not in correct format");
+        if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidCsrf, "CSRF token in header or form not in correct format");
         const mask = parts[0];
         const maskedToken = parts[1];
         return Hasher.xor(maskedToken, mask);
@@ -204,17 +204,23 @@ export class DoubleSubmitCsrfToken {
         const formOrHeaderToken = this.unmaskCsrfToken(formOrHeaderValue);
 
         // cookie contains unmasked token and signature.  Verify the signature
-        const cookieToken = Hasher.unsign(cookieValue, this.secret).v;
+        let cookieToken : string;
+        try {
+            cookieToken = Hasher.unsign(cookieValue, this.secret).v;
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            throw new CrossauthError(ErrorCode.InvalidCsrf, "Invalid CSRF cookie");
+        }
 
         if (cookieToken != formOrHeaderToken) {
             CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token received - form/header value does not match", csrfCookieHash: Hasher.hash(cookieValue)}));
-            throw new CrossauthError(ErrorCode.InvalidKey);
+            throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
     }
 
     /**
-     * Validates the passed CSRF token.  
+     * Validates the passed CSRF cookie (doesn't check it matches the token, just that the cookie is valid).  
      * 
      * To be valid:
      *     * The signature in the cookie must match the token in the cookie
@@ -225,7 +231,14 @@ export class DoubleSubmitCsrfToken {
      * @throws {@link index!CrossauthError} with {@link index!ErrorCode} of `InvalidKey`
      */
     validateCsrfCookie(cookieValue : string)  {
-        return Hasher.unsign(cookieValue, this.secret).v;
+        try {
+            return Hasher.unsign(cookieValue, this.secret).v;
+        } catch (e) {
+            // Hasher will give us InvalidKey.  Throw a more meaningful error
+            CrossauthLogger.logger.error(j({err: e}));
+            throw new CrossauthError(ErrorCode.InvalidCsrf, "Invalid CSRF cookie");
+
+        }
     }
 }
 

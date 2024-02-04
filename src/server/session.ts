@@ -1,21 +1,18 @@
 import { type User, UserSecrets, type Key, getJsonData, UserInputFields, UserSecretsInputFields } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
-import { UserStorage, KeyStorage } from './storage';
-import { AuthenticationParameters, Authenticator } from './auth';
-import type { UsernamePasswordAuthenticatorOptions }  from "./authenticators/passwordauth";
+import { UserStorage, KeyStorage } from './storage.ts';
+import { AuthenticationParameters, Authenticator } from './auth.ts';
+import type { UsernamePasswordAuthenticatorOptions }  from "./authenticators/passwordauth.ts";
 import { TokenEmailer, TokenEmailerOptions } from './emailtokens.ts';
 import { CrossauthLogger, j } from '../logger.ts';
-import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth';
-import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth';
+import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth.ts';
+import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth.ts';
 import { setParameter, ParamType } from './utils.ts';
 
-export interface BackendOptions extends TokenEmailerOptions {
+export interface SessionManagerOptions extends TokenEmailerOptions {
 
     /** options for csrf cookie manager */
     doubleSubmitCookieOptions? : DoubleSubmitCsrfTokenOptions,
-
-    /** Whether or not to enable session management (by cookie).  Default true */
-    enableSessions? : boolean,
 
     /** options for session cookie manager */
     sessionCookieOptions? : SessionCookieOptions,
@@ -43,12 +40,12 @@ export interface BackendOptions extends TokenEmailerOptions {
 /**
  * Class for managing sessions.
  */
-export class Backend {
+export class SessionManager {
     userStorage : UserStorage;
     keyStorage : KeyStorage;
-    private csrfTokens? : DoubleSubmitCsrfToken;
-    private enableSessions : boolean = true;
-    private session? : SessionCookie;
+    emailTokenStorage : KeyStorage;
+    private csrfTokens : DoubleSubmitCsrfToken;
+    private session : SessionCookie;
     readonly authenticators : {[key:string] : Authenticator};
     //readonly authenticator : UsernamePasswordAuthenticator;
 
@@ -67,7 +64,7 @@ export class Backend {
         userStorage : UserStorage, 
         keyStorage : KeyStorage, 
         authenticators : {[key:string] : Authenticator},
-        options : BackendOptions = {}) {
+        options : SessionManagerOptions = {}) {
 
         this.userStorage = userStorage;
         this.keyStorage = keyStorage;
@@ -78,18 +75,16 @@ export class Backend {
 
         setParameter("secret", ParamType.String, this, options, "SECRET");
 
-        setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
-        if (this.enableSessions) {
-            this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
-            this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
-        }
+        this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
+        this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
 
 
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
+        this.emailTokenStorage = this.keyStorage;
         if (this.enableEmailVerification || this.enablePasswordReset) {
             let keyStorage = this.keyStorage;
-            if (options.emailTokenStorage) keyStorage = options.emailTokenStorage;
+            if (options.emailTokenStorage) this.emailTokenStorage = options.emailTokenStorage;
             this.tokenEmailer = new TokenEmailer(this.userStorage, keyStorage, options);
         }
     }
@@ -98,50 +93,39 @@ export class Backend {
      * Returns the name used for session ID cookies.
      */
     get sessionCookieName() : string {
-        return this.session?.cookieName||"";
+        return this.session.cookieName;
     }
 
     /**
      * Returns the name used for CSRF token cookies.
      */
     get csrfCookieName() : string {
-        return this.csrfTokens?.cookieName||"";
+        return this.csrfTokens.cookieName;
     }
 
     /**
      * Returns the name used for CSRF token cookies.
      */
     get csrfHeaderName() : string {
-        return this.csrfTokens?.headerName||"";
-    }
-
-    /**
-     * Authenticates a user and returns it and its secrets.
-     * @param username the username to validate
-     * @param params parameters to pass to the authenticator
-     * @param user if this is defined, the username and authentication parameters the user and secrets are returned
-     * @returns the user and its secrets
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
-     *         `PasswordNotMatch`.
-     */
-    async authenticateUser(user : User, secrets : UserSecrets, params : AuthenticationParameters) : Promise<void> {
-        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
-        await this.authenticators[user.factor1].authenticateUser(user, secrets, params);
+        return this.csrfTokens.headerName;
     }
 
     /**
      * Performs a user login
+     * 
      *    * Authenticates the username and password
      *    * Creates a session key - if 2FA is enabled, this is an anonymous session,
      *      otherwise it is bound to the user
      *    * Returns the user (without the password hash) and the session cookie.
+     * If the user object is defined, authentication (and 2FA) is bypassed
      * @param username the username to validate
-     * @param password the password to validate
-     * @param existingSessionId if this is passed, the it will be used for the new sessionId.  If not, a new random one will be created
+     * @param params user-provided credentials (eg password) to authenticate with
+     * @param extraFields add these extra fields to the session key if authentication is successful
      * @param persist if passed, overrides the persistSessionId setting.
      * @param user if this is defined, the username and password are ignored and the given user is logged in.
      *             The 2FA step is also skipped
      * @returns the user, user secrets, and session cookie and CSRF cookie and token.
+     *          if a 2fa step is needed, it will be an anonymouos session, otherwise bound to the user
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
@@ -155,7 +139,7 @@ export class Backend {
             let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             secrets = userAndSecrets.secrets;
             user = userAndSecrets.user;
-            await this.authenticateUser(user, secrets, params);
+            await this.authenticators[user.factor1].authenticateUser(user, secrets, params);
         } else {
             let userAndSecrets = await this.userStorage.getUserByUsername(user.username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             secrets = userAndSecrets.secrets;
@@ -181,7 +165,7 @@ export class Backend {
 
         // delete any password reset tokens that still exist for this user.
         try {
-            this.keyStorage.deleteAllForUser(user.id, "p:");
+            this.emailTokenStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
@@ -200,7 +184,7 @@ export class Backend {
     /**
      * If a valid session key does not exist, create and store an anonymous one.
      * 
-     * If the session ID and/or csrfToken are passed, they are validated.  If invalid, they are recrated.
+     * @param extraFields these will be added to the created session object.
      * @returns a cookie with the session ID, a cookie with the CSRF token, a flag to indicate whether
      *          each of these was newly created and the user, which may be undefined.
      */
@@ -254,7 +238,6 @@ export class Backend {
      *         `UserNotExist` or `Expired`.
      */
     async userForSessionCookieValue(sessionCookieValue : string) : Promise<{key: Key, user: User|undefined}> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         let {key, user} = await this.session.getUserForSessionKey(sessionCookieValue);
         return {key, user};
     }
@@ -270,11 +253,10 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
-    async dataStringForSessionKey(sessionKey : string) : Promise<string|undefined> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+    async dataStringForSessionKey(sessionCookieValue : string) : Promise<string|undefined> {
         let error : CrossauthError | undefined;
         try {
-            let {key} = await this.session.getUserForSessionKey(sessionKey);
+            let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
             return key.data;
         } catch (e) {
             if (e instanceof CrossauthError) {
@@ -308,8 +290,8 @@ export class Backend {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
-    async dataForSessionKey(sessionKey : string) : Promise<{[key:string]:any}> {
-        const str = await this.dataStringForSessionKey(sessionKey);
+    async dataForSessionKey(sessionCookieValue : string) : Promise<{[key:string]:any}> {
+        const str = await this.dataStringForSessionKey(sessionCookieValue);
         if (!str || str.length == 0) return {};
         return JSON.parse(str);
     }
@@ -361,8 +343,7 @@ export class Backend {
      * @param token 
      */
     validateDoubleSubmitCsrfToken(csrfCookieValue : string|undefined, csrfFormOrHeaderValue : string|undefined) {
-        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
-        if (!csrfCookieValue || !csrfFormOrHeaderValue) throw new CrossauthError(ErrorCode.InvalidKey, "CSRF missing from either cookie or form/header value");
+        if (!csrfCookieValue || !csrfFormOrHeaderValue) throw new CrossauthError(ErrorCode.InvalidCsrf, "CSRF missing from either cookie or form/header value");
         this.csrfTokens.validateDoubleSubmitCsrfToken(csrfCookieValue, csrfFormOrHeaderValue);
     }
 
@@ -372,7 +353,6 @@ export class Backend {
      * @param token 
      */
     validateCsrfCookie(csrfCookieValue : string) {
-        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
         this.csrfTokens.validateCsrfCookie(csrfCookieValue);
     }
 
@@ -514,9 +494,7 @@ export class Backend {
      * This can be called if the user has finished signing up with factor1 but
      * closed the browser before completing factor2 setup.  Call it if the user
      * signs up again with the same factor1 credentials.
-     * @param username the username
      * @param sessionCookieValue the anonymous session ID for the user
-     * @param factor2 the second factor being set up
      * @returns `userId` the id of the created user
      *          `userData` data that can be displayed to the user in the page to 
      *           complete 2FA set up (eg the secret key and QR codee for TOTP),
@@ -525,11 +503,10 @@ export class Backend {
      *          secret but only `userData` has the QR code, since it can be
      *          generated from the shared secret.
      */
-    async repeatTwoFactorSignup(
-        username : string, 
-        sessionCookieValue : string,
-        factor2: string) : Promise<{userId: string|number, userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
+    async repeatTwoFactorSignup(sessionCookieValue: string) : Promise<{userId: string|number, userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}> {
+        const sessionData = (await this.dataForSessionKey(sessionCookieValue))["2fa"];
+        const username = sessionData.username;
+        const factor2 = sessionData.factor2;
         const sessionId = this.session.unsignCookie(sessionCookieValue);
         const hashedSessionKey = SessionCookie.hashSessionKey(sessionId);
         const sessionKey = await this.keyStorage.getKey(hashedSessionKey);
@@ -655,7 +632,7 @@ export class Backend {
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
         try {
-            this.keyStorage.deleteAllForUser(user.id, "p:");
+            this.emailTokenStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
@@ -733,7 +710,7 @@ export class Backend {
 
         // delete any password reset tokens
         try {
-            this.keyStorage.deleteAllForUser(user.id, "p:");
+            this.emailTokenStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
@@ -807,7 +784,7 @@ export class Backend {
 
         // delete all password reset tokens
         try {
-            this.keyStorage.deleteAllForUser(user.id, "p:");
+            this.emailTokenStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: user.username}));
             CrossauthLogger.logger.debug(j({err: e}));

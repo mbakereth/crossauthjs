@@ -1,7 +1,7 @@
 import { test, expect, beforeAll } from 'vitest';
 import { DoubleSubmitCsrfToken, SessionCookie } from '../cookieauth';
 import { Hasher } from '../hasher';
-import { Backend } from '../backend';
+import { SessionManager } from '../session';
 import { LocalPasswordAuthenticator } from '../authenticators/passwordauth';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
@@ -34,7 +34,7 @@ test('SessionCookie.createSessionKey', async () => {
 test('CookieSessionManager.loginGetKeyLogout', async () => {
     const keyStorage = new InMemoryKeyStorage();
     let authenticator = new LocalPasswordAuthenticator(userStorage);
-    let manager = new Backend(userStorage, keyStorage, {localpassword: authenticator}, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
+    let manager = new SessionManager(userStorage, keyStorage, {localpassword: authenticator}, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
     let {user: bob, sessionCookie: cookie } = await manager.login("bob", {password: "bobPass123"});
     const user = await manager.userForSessionKey(cookie.value);
     expect(user).toBeDefined();
@@ -46,7 +46,7 @@ test('CookieSessionManager.loginGetKeyLogout', async () => {
 test('CookieSessionManager.logoutFromAll', async() => {
     const keyStorage = new InMemoryKeyStorage();
     let authenticator = new LocalPasswordAuthenticator(userStorage);
-    let manager = new Backend(userStorage, keyStorage, {localpassword: authenticator}, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
+    let manager = new SessionManager(userStorage, keyStorage, {localpassword: authenticator}, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
     let {user: bob, sessionCookie: cookie } = await manager.login("bob", {password: "bobPass123"});
     const user = await manager.userForSessionKey(cookie.value);
     expect(user).toBeDefined();

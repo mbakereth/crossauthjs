@@ -8,7 +8,7 @@ export type {  EmailAuthenticatorOptions } from './server/authenticators/emailau
 
 export { TotpAuthenticator } from './server/authenticators/totpauth';
 
-export { Backend } from './server/backend';
+export { SessionManager as Backend } from './server/session';
 export type { CookieOptions, Cookie } from './server/cookieauth';
 
 export { PrismaUserStorage, PrismaKeyStorage } from './server/storage/prismastorage';

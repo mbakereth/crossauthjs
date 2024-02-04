@@ -4,8 +4,9 @@ import type { User, UserInputFields, UserSecretsInputFields, Key } from '../inte
 /** Parameters needed for this this class to authenticator a user (besides username)
  * An example is `password`
 */
-export interface AuthenticationParameters {
-    [key:string] : any,
+export interface AuthenticationParameters extends UserSecretsInputFields {
+    totpCode? : string,
+    token? : string,
 }
 
 /**

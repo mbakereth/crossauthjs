@@ -31,8 +31,18 @@ export enum ErrorCode {
     /** Returned with an HTTP 403 response */
     Forbidden,
 
-    /** Thrown when a session or API key was provided that is not in the key table */
+    /** Thrown when a session or API key was provided that is not in the key table.
+     * For CSRF and sesison keys, an InvalidCsrf or InvalidSession will be thrown instead
+     */
     InvalidKey,
+
+    /** Thrown if the CSRF token is invalid
+     */
+    InvalidCsrf,
+
+    /** Thrown if the session cookie is invalid
+     */
+    InvalidSession,
 
     /** Thrown when a session or API key has expired */
     Expired,
@@ -60,6 +70,9 @@ export enum ErrorCode {
 
     /** Thrown when two passwords do not match each other (eg signup) */
     PasswordMatch,
+
+    /** Thrown when a token (eg TOTP or OTP) is invalid */
+    InvalidToken,
 
     /** Thrown when a password does not match rules (length, uppercase/lowercase/digits) */
     PasswordFormat,
@@ -109,72 +122,80 @@ export class CrossauthError extends Error {
     constructor(code : ErrorCode, message : string | string[] | undefined = undefined) {
         let _message : string;
         let _httpStatus = 500;
+        if (code == ErrorCode.UserNotExist) {
+            _message = "Username does not exist";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.PasswordInvalid) {
+            _message = "Password doesn't match"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.UsernameOrPasswordInvalid) {
+            _message = "Username or password incorrect"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.EmailNotExist) {
+            _message = "No user exists with that email address"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.UserNotActive) {
+            _message = "Account is not active"
+            _httpStatus = 403;
+        } else if (code == ErrorCode.EmailNotVerified) {
+            _message = "Email address has not been verified"
+            _httpStatus = 403;
+        } else if (code == ErrorCode.TwoFactorIncomplete) {
+            _message = "Two-factor setup is not complete"
+            _httpStatus = 403;
+        } else if (code == ErrorCode.Unauthorized) {
+            _message = "Not authorized"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.Connection) {
+            _message = "Connection failure";
+        } else if (code == ErrorCode.Expired) {
+            _message = "Token has expired";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidHash) {
+            _message = "Hash is not in a valid format";
+        } else if (code == ErrorCode.InvalidKey) {
+            _message = "Key is invalid";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidCsrf) {
+            _message = "CSRF token is invalid";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidSession) {
+            _message = "Session cookie is invalid";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.UnsupportedAlgorithm) {
+            _message = "Algorithm not supported";
+        } else if (code == ErrorCode.KeyExists) {
+            _message = "Attempt to create a key that already exists";
+        } else if (code == ErrorCode.PasswordResetNeeded) {
+            _message = "User must reset password";
+            _httpStatus = 403;
+        } else if (code == ErrorCode.Configuration) {
+            _message = "There was an error in the configuration";
+        } else if (code == ErrorCode.PasswordMatch) {
+            _message = "Passwords do not match";
+            _httpStatus = 400;
+        } else if (code == ErrorCode.InvalidToken) {
+            _message = "Token is not valid";
+            _httpStatus = 400;
+        } else if (code == ErrorCode.PasswordFormat) {
+            _message = "Password format was incorrect";
+            _httpStatus = 400;
+        } else if (code == ErrorCode.UserExists) {
+            _message = "User already exists";
+            _httpStatus = 400;
+        } else if (code == ErrorCode.BadRequest) {
+            _message = "The request is invalid";
+            _httpStatus = 400;
+        } else if (code == ErrorCode.DataFormat) {
+            _message = "Session data has unexpected format";
+            _httpStatus = 500;
+        } else {
+            _message = "Unknown error";
+        }    
         if (message != undefined && !Array.isArray(message)) {
             _message = message;
         } else if (Array.isArray(message)) {
             _message = message.join(". ");
-        } else {
-            if (code == ErrorCode.UserNotExist) {
-                _message = "Username does not exist";
-                _httpStatus = 401;
-            } else if (code == ErrorCode.PasswordInvalid) {
-                _message = "Password doesn't match"
-                _httpStatus = 401;
-            } else if (code == ErrorCode.UsernameOrPasswordInvalid) {
-                _message = "Username or password incorrect"
-                _httpStatus = 401;
-            } else if (code == ErrorCode.EmailNotExist) {
-                _message = "No user exists with that email address"
-                _httpStatus = 401;
-            } else if (code == ErrorCode.UserNotActive) {
-                _message = "Account is not active"
-                _httpStatus = 403;
-            } else if (code == ErrorCode.EmailNotVerified) {
-                _message = "Email address has not been verified"
-                _httpStatus = 403;
-            } else if (code == ErrorCode.TwoFactorIncomplete) {
-                _message = "Two-factor setup is not complete"
-                _httpStatus = 403;
-            } else if (code == ErrorCode.Unauthorized) {
-                _message = "Not authorized"
-                _httpStatus = 401;
-            } else if (code == ErrorCode.Connection) {
-                _message = "Connection failure";
-            } else if (code == ErrorCode.Expired) {
-                _message = "Token has expired";
-                _httpStatus = 401;
-            } else if (code == ErrorCode.InvalidHash) {
-                _message = "Hash is not in a valid format";
-            } else if (code == ErrorCode.InvalidKey) {
-                _message = "Key is not valid";
-                _httpStatus = 401;
-            } else if (code == ErrorCode.UnsupportedAlgorithm) {
-                _message = "Algorithm not supported";
-            } else if (code == ErrorCode.KeyExists) {
-                _message = "Attempt to create a key that already exists";
-            } else if (code == ErrorCode.PasswordResetNeeded) {
-                _message = "User must reset password";
-                _httpStatus = 403;
-            } else if (code == ErrorCode.Configuration) {
-                _message = "There was an error in the configuration";
-            } else if (code == ErrorCode.PasswordMatch) {
-                _message = "Passwords do not match";
-                _httpStatus = 400;
-            } else if (code == ErrorCode.PasswordFormat) {
-                _message = "Password format was incorrect";
-                _httpStatus = 400;
-            } else if (code == ErrorCode.UserExists) {
-                _message = "User already exists";
-                _httpStatus = 400;
-            } else if (code == ErrorCode.BadRequest) {
-                _message = "The request is invalid";
-                _httpStatus = 400;
-            } else if (code == ErrorCode.DataFormat) {
-                _message = "Session data has unexpected format";
-                _httpStatus = 500;
-            } else {
-                _message = "Unknown error";
-            }    
         }
         super(_message); 
         this.code = code;

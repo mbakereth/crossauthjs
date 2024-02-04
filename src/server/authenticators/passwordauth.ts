@@ -16,11 +16,14 @@ import { Authenticator, type AuthenticationParameters , type AuthenticationOptio
  */
 function defaultPasswordValidator(params : AuthenticationParameters) : string[] {
     let errors : string[] = [];
-    const password = params.password;
-    if (password.length < 8) errors.push("Password must be at least 8 characters");
-    if (password.match(/[a-z]/) == null) errors.push("Password must contain at least one lowercase character");
-    if (password.match(/[A-Z]/) == null) errors.push("Password must contain at least one uppercase character");
-    if (password.match(/[0-9]/) == null) errors.push("Password must contain at least one digit");
+    if (!params.password) errors.push("Password not provided");
+    else {
+        const password = params.password;
+        if (password.length < 8) errors.push("Password must be at least 8 characters");
+        if (password.match(/[a-z]/) == null) errors.push("Password must contain at least one lowercase character");
+        if (password.match(/[A-Z]/) == null) errors.push("Password must contain at least one uppercase character");
+        if (password.match(/[0-9]/) == null) errors.push("Password must contain at least one digit");
+    }
     return errors;
 }
 
@@ -145,6 +148,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
     }
 
     async createPersistentSecrets(_username : string, params: AuthenticationParameters, repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
+        if (!params.password) throw new CrossauthError(ErrorCode.Unauthorized, "No password provided");
         if (repeatParams && repeatParams.password != params.password) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
