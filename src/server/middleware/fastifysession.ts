@@ -271,7 +271,6 @@ export class FastifySessionServer {
     private resetPasswordPage: string = "resetpassword.njk";
     private requestPasswordResetPage: string = "requestpasswordreset.njk";
     private emailVerifiedPage : string = "emailverified.njk";
-    private anonymousSessions = true;
     private validateUserFn : (user : UserInputFields) => string[] = defaultUserValidator;
     private createUserFn : (request : FastifyRequest<{ Body: SignupBodyType }>, userEditableFields : string[]) => UserInputFields = defaultCreateUser;
     private updateUserFn : (user : User, request : FastifyRequest<{ Body: UpdateUserBodyType }>, userEditableFields : string[]) => User = defaultUpdateUser;
