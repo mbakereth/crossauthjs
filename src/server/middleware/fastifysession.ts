@@ -399,9 +399,9 @@ export class FastifySessionServer {
             console.log("onSend", request.url, payload);
         });*/
 
-        app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+        /*app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
             console.log("preHandler", request.url, request.cookies, request.csrfToken);
-        });
+        });*/
     }    
 
 
