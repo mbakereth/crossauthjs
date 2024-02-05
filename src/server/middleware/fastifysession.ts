@@ -394,7 +394,17 @@ export class FastifySessionServer {
                 }
             }
         });
+
+        /*app.addHook('onSend', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply, payload : any) => {
+            console.log("onSend", request.url, payload);
+        });*/
+
+        app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+            console.log("preHandler", request.url, request.cookies, request.csrfToken);
+        });
     }    
+
+
 
     //////////////////
     // page endpoints
