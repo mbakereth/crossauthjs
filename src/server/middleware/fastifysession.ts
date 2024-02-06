@@ -462,7 +462,6 @@ export class FastifySessionServer {
                     // restore original request body
                     request.body = sessionData.pre2fa.body;
                     if (error) {
-                        console.log(error);
                         if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
                             return reply.redirect("/factor2?error="+ErrorCode[error.code]);
 
