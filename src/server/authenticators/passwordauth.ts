@@ -132,7 +132,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
      * @param secret secret, if used when hashing passwords, or undefined if not
      * @returns hashed password in the format used for user storage
      */
-    async hashPassword(password : string, secret? : string) {
+    static async hashPassword(password : string, secret? : string) {
         return await Hasher.passwordHash(password, {encode: true, secret: secret});
     }
 
@@ -152,7 +152,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
         if (repeatParams && repeatParams.password != params.password) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        return {password: await this.hashPassword(params.password)};
+        return {password: await LocalPasswordAuthenticator.hashPassword(params.password)};
     }
 
     async createOneTimeSecrets(_user : User) : Promise<Partial<UserSecretsInputFields>> {

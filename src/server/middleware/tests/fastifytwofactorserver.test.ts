@@ -10,7 +10,7 @@ import { EmailAuthenticator } from '../../authenticators/emailauth';
 import Jimp from 'jimp';
 import jsQR from 'jsqr';
 import { authenticator as gAuthenticator } from 'otplib';
-
+import { Hasher } from '../../hasher';
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
@@ -41,7 +41,6 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         app: app,
         views: path.join(__dirname, '../views'),
         secret: "ABCDEFG",
-        enableSessions: true,
         allowedFactor2: "none, totp, email",
         ...options,
     });
@@ -181,6 +180,45 @@ async function createEmailAccount(server : FastifyServer) {
 
     // check was successful
     expect(res.statusCode).toBe(302);
+
+};
+
+async function loginEmail(server : FastifyServer) : Promise<{sessionCookie: string, csrfCookie: string, csrfToken: string}>{
+
+    let res;
+    let body;
+
+    // Right page served 
+    res = await server.app.inject({ method: "GET", url: "/login" })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("login.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+
+    // successful login first factor
+    res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("loginfactor2.njk");
+
+    // successful login second factor
+    const sessionCookie = getSession(res);
+    const token = emailTokenData.token;
+    res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+        token: token
+    } })
+
+    expect(res.statusCode).toBe(302);
+
+    // Go to a safe page to get the csrf token
+    const sessionCookie2 = getSession(res);
+    res = await server.app.inject({ method: "GET", url: "/login" })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("login.njk");
+    
+    const {csrfCookie: csrfCookie2, csrfToken: csrfToken2} = getCsrf(res);
+    return {sessionCookie: sessionCookie2, csrfCookie: csrfCookie2, csrfToken: csrfToken2 }
 
 };
 
@@ -396,7 +434,11 @@ test('FastifyServer.turnOnTotp', async () => {
 
 test('FastifyServer.turnOffTotp', async () => {
 
-    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: false});
+    let {server, userStorage} = await makeAppWithOptions({
+        enableEmailVerification: false,
+        factor2ProtectedApiEndpoints: "",
+        factor2ProtectedPageEndpoints: "",
+    });
 
     await createTotpAccount(server);
 
@@ -680,7 +722,11 @@ test('FastifyServer.turnOnEmail', async () => {
 
 test('FastifyServer.totpToEmail', async () => {
 
-    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: false});
+    let {server, userStorage} = await makeAppWithOptions({
+        factor2ProtectedPageEndpoints: "",
+        factor2ProtectedApiEndpoints: "",
+        enableEmailVerification: false,
+    });
 
     await createTotpAccount(server);
 
@@ -744,4 +790,139 @@ test('FastifyServer.totpToEmail', async () => {
     expect(body.args.message).toBeDefined();
     const {user: user2} = await userStorage.getUserByUsername("mary");
     expect(user2.factor2).toBe("email");
+});
+
+test('FastifyServer.factor2ProtectedPage', async () => {
+    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    await createEmailAccount(server);
+    const {sessionCookie, csrfCookie, csrfToken} = await loginEmail(server);
+
+    // get change password page
+    res = await server.app.inject({ method: "GET", url: "/changepassword", cookies: {SESSIONID: sessionCookie} })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("changepassword.njk");
+
+    emailTokenData.token = "";
+
+    // submit change password
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        old_password: "maryPass123", 
+        new_password: "newPass123",
+        repeat_password: "newPass123",
+        csrfToken: csrfToken,
+    } });
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/factor2");
+
+    // get factor2 page
+    res = await server.app.inject({ method: "GET", url: "/factor2", cookies: {SESSIONID: sessionCookie} })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("factor2.njk");
+
+    expect(emailTokenData.token).not.toBe("");
+
+    // submit changepassword page
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        token: emailTokenData.token, 
+        csrfToken: csrfToken,
+    } });
+    expect(res.statusCode).toBe(200);
+    const {secrets} = await userStorage.getUserByUsername("mary");
+    const passwordsEqual = await Hasher.passwordsEqual("newPass123", secrets.password||"");
+    expect(passwordsEqual).toBe(true);
+});
+
+test('FastifyServer.factor2ProtectedPageWrongPassword', async () => {
+    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    await createEmailAccount(server);
+    const {sessionCookie, csrfCookie, csrfToken} = await loginEmail(server);
+
+    // get change password page
+    res = await server.app.inject({ method: "GET", url: "/changepassword", cookies: {SESSIONID: sessionCookie} })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("changepassword.njk");
+
+    emailTokenData.token = "";
+
+    // submit change password
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        old_password: "wrongPass123", 
+        new_password: "newPass123",
+        repeat_password: "newPass123",
+        csrfToken: csrfToken,
+    } });
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/factor2");
+
+    // get factor2 page
+    res = await server.app.inject({ method: "GET", url: "/factor2", cookies: {SESSIONID: sessionCookie} })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("factor2.njk");
+
+    expect(emailTokenData.token).not.toBe("");
+
+    // submit changepassword page
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        token: emailTokenData.token, 
+        csrfToken: csrfToken,
+    } });
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body)
+    expect(body.args.errorCodeName).toBe("UsernameOrPasswordInvalid")
+    const {secrets} = await userStorage.getUserByUsername("mary");
+    const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password||"");
+    expect(passwordsEqual).toBe(true);
+});
+
+test('FastifyServer.factor2ProtectedPageWrongToken', async () => {
+    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    await createEmailAccount(server);
+    const {sessionCookie, csrfCookie, csrfToken} = await loginEmail(server);
+
+    // get change password page
+    res = await server.app.inject({ method: "GET", url: "/changepassword", cookies: {SESSIONID: sessionCookie} })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("changepassword.njk");
+
+    emailTokenData.token = "";
+
+    // submit change password
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        old_password: "maryPass123", 
+        new_password: "newPass123",
+        repeat_password: "newPass123",
+        csrfToken: csrfToken,
+    } });
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/factor2");
+
+    // get factor2 page
+    res = await server.app.inject({ method: "GET", url: "/factor2", cookies: {SESSIONID: sessionCookie} })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("factor2.njk");
+
+    expect(emailTokenData.token).not.toBe("");
+
+    // submit changepassword page
+    res = await server.app.inject({ method: "POST", url: "/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        token: "XXXXXX", 
+        csrfToken: csrfToken,
+    } });
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/factor2?error=Unauthorized");
+    const {secrets} = await userStorage.getUserByUsername("mary");
+    const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password||"");
+    expect(passwordsEqual).toBe(true);
 });

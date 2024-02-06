@@ -61,6 +61,7 @@ export const Factor2ApiEndpoints = [
     "api/configurefactor2",
     "api/loginfactor2",
     "api/changefactor2",
+    "api/factor2",
 ];
 
 /**
@@ -115,6 +116,7 @@ export const Factor2PageEndpoints = [
     "configurefactor2",
     "loginfactor2",
     "changefactor2",
+    "factor2",
 ]
 
 /**
@@ -271,7 +273,11 @@ export class FastifyServer {
             if (this.endpoints.includes("loginfactor2")) {
                 sessionServer.addLoginFactor2Endpoints();
             }
-    
+
+            if (this.endpoints.includes("factor2")) {
+                sessionServer.addFactor2Endpoints();
+            }
+
             if (this.endpoints.includes("signup")) {
                 sessionServer.addSignupEndpoints();
             }
@@ -317,7 +323,7 @@ export class FastifyServer {
             if (this.endpoints.includes("api/loginfactor2")) {
                 sessionServer.addApiLoginFactor2Endpoints();
             }
-          
+
             if (this.endpoints.includes("api/logout")) {
                 sessionServer.addApiLogoutEndpoints();
             }

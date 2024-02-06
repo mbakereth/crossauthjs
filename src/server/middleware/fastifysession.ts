@@ -77,9 +77,14 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
     loginPage? : string;
 
     /** Template file containing the page for getting the 2nd factor after entering username and password
-     * See the class documentation for {@link FastifyServer} for more info.  Defaults to "login.njk".
+     * See the class documentation for {@link FastifyServer} for more info.  Defaults to "loginfactor2.njk".
      */
     loginFactor2Page? : string;
+
+    /** Template file containing the page for getting the 2nd factor for 2FA protected pages
+     * See the class documentation for {@link FastifyServer} for more info.  Defaults to "factor2.njk".
+     */
+    factor2Page? : string;
 
     /** Template file containing the signup page (with without error messages).  
      * See the class documentation for {@link FastifyServer} for more info.  Defaults to "signup.njk".
@@ -135,10 +140,17 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
     emailVerifiedPage? : string,
 
     allowedFactor2? : string,
+
+    factor2ProtectedPageEndpoints?: string,
+    factor2ProtectedApiEndpoints?: string,
 }
 
 export interface CsrfBodyType {
     csrfToken?: string;
+}
+
+export interface ArbitraryBodyType {
+    [key:string]: string;
 }
 
 interface LoginBodyType extends CsrfBodyType {
@@ -199,8 +211,12 @@ interface VerifyTokenParamType {
     token : string,
 }
 
-interface LoginParamsType {
+interface LoginQueryType {
     next? : string;
+}
+
+interface Factor2QueryType {
+    error? : string;
 }
 
 interface AuthenticatorDetails {
@@ -264,6 +280,7 @@ export class FastifySessionServer {
     private configureFactor2Page : string = "configurefactor2.njk";
     private loginPage : string = "login.njk";
     private loginFactor2Page : string = "loginfactor2.njk";
+    private factor2Page : string = "factor2.njk";
     private errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
     private changeFactor2Page : string = "changefactor2.njk";
@@ -284,6 +301,20 @@ export class FastifySessionServer {
 
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
+    private factor2ProtectedPageEndpoints : string[] = [
+        "/requestpasswordreset",
+        "/updateuser",
+        "/changepassword",
+        "/resetpassword",
+        "/changefactor2",
+    ]
+    private factor2ProtectedApiEndpoints : string[] = [
+        "/api/requestpasswordreset",
+        "/api/updateuser",
+        "/api/changepassword",
+        "/api/resetpassword",
+        "/api/changefactor1",
+    ]
 
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
@@ -299,6 +330,7 @@ export class FastifySessionServer {
         setParameter("configureFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
         setParameter("loginPage", ParamType.String, this, options, "LOGIN_PAGE");
         setParameter("loginFactor2Page", ParamType.String, this, options, "LOGIN_FACTOR2_PAGE");
+        setParameter("factor2Page", ParamType.String, this, options, "FACTOR2_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
         setParameter("changeFactor2Page", ParamType.String, this, options, "CHANGE_FACTOR2_PAGE");
@@ -311,6 +343,9 @@ export class FastifySessionServer {
         setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
+        setParameter("factor2ProtectedPageEndpoints", ParamType.StringArray, this, options, "ENABLE_FACTOR2_PROTECTED_PAGE_ENDPOINTS");
+        setParameter("factor2ProtectedApiEndpoints", ParamType.StringArray, this, options, "ENABLE_FACTOR2_PROTECTED_API_ENDPOINTS");
+
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
         if (options.createUserFn) this.createUserFn = options.createUserFn;
@@ -395,13 +430,58 @@ export class FastifySessionServer {
             }
         });
 
-        /*app.addHook('onSend', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply, payload : any) => {
-            console.log("onSend", request.url, payload);
-        });*/
+        app.addHook('preHandler', async (request : FastifyRequest<{Body: ArbitraryBodyType}>, reply : FastifyReply) => {
+            const sessionCookieValue = this.getSessionCookieValue(request);
+            if (!(["GET", "OPTIONS", "HEAD"].includes(request.method)) && sessionCookieValue && request.user?.factor2 && (this.factor2ProtectedPageEndpoints.includes(request.url) || this.factor2ProtectedApiEndpoints.includes(request.url))) {
+                const sessionData = await this.sessionManager.dataForSessionKey(sessionCookieValue);
+                if (("pre2fa") in sessionData) {
+                    // 2FA has started - validate it
 
-        /*app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
-            console.log("preHandler", request.url, request.cookies, request.csrfToken);
-        });*/
+                    // get secrets from the request body 
+                    const authenticator = this.authenticators[sessionData.pre2fa.factor2];
+                    const secretNames = authenticator.secretNames();
+                    let secrets : {[key:string]:string} = {};
+                    for (let field in request.body) {
+                        if (secretNames.includes(field)) secrets[field] = request.body[field];
+                    }
+
+                    const sessionCookieValue = this.getSessionCookieValue(request);
+                    if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie found");
+                    let error : CrossauthError|undefined = undefined;
+                    try {
+                        await this.sessionManager.completeTwoFactorPageVisit(request.body, sessionCookieValue);
+                    } catch (e) {
+                        if (e instanceof CrossauthError) {
+                            error = e;
+                        } else {
+                            error = new CrossauthError(ErrorCode.UnknownError);
+                        }
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        CrossauthLogger.logger.error(j({msg: error.message, user: request.body.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                    }
+                    // restore original request body
+                    request.body = sessionData.pre2fa.body;
+                    if (error) {
+                        console.log(error);
+                        if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
+                            return reply.redirect("/factor2?error="+ErrorCode[error.code]);
+
+                        } else {
+                            return reply.status(error.httpStatus).send(JSON.stringify({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}));
+                        }
+                    }
+                } else {
+                    // 2FA has not started - start it
+                    this.validateCsrfToken(request);
+                    this.sessionManager.initiateTwoFactorPageVisit(request.user, sessionCookieValue, request.body, request.url.replace(/\?.*$/,""));
+                    if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
+                        return reply.redirect("/factor2");
+                    } else {
+                        return reply.send(JSON.stringify({ok: true, factor2Required: true}));
+                    }
+                }
+            }
+        });
     }    
 
 
@@ -411,7 +491,7 @@ export class FastifySessionServer {
 
     addLoginEndpoints() {
 
-        this.app.get(this.prefix+'login', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) => {
+        this.app.get(this.prefix+'login', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'login', ip: request.ip}));
             if (request.user) return reply.redirect(request.query.next||this.loginRedirect); // already logged in
 
@@ -518,16 +598,28 @@ export class FastifySessionServer {
         });
     }
 
+    addFactor2Endpoints() {
+
+        this.app.get(this.prefix+'factor2', async (request : FastifyRequest<{Querystring : Factor2QueryType}>, reply : FastifyReply) => {
+            CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'factor2', ip: request.ip}));
+            const sessionCookie = this.getSessionCookieValue(request);
+            if (!sessionCookie) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie present");
+            const sessionData = await this.sessionManager.dataForSessionKey(sessionCookie);
+            if (!sessionData?.pre2fa) throw new CrossauthError(ErrorCode.Unauthorized, "2FA not initiated");
+            let data = {urlprefix: this.prefix, csrfToken: request.csrfToken, action: sessionData.pre2fa.url, errorCode: request.query.error};
+            return reply.view(this.factor2Page, data);
+        });
+
+    }
+
     addSignupEndpoints() {
-        this.app.get(this.prefix+'signup', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply)  => {
+        this.app.get(this.prefix+'signup', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply)  => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'signup', ip: request.ip}));
-            if (this.signupPage)  { // if is redundant but VC Code complains without it
-                let data : {urlprefix: string, next? : any, csrfToken: string|undefined, allowedFactor2: AuthenticatorDetails[]} = {urlprefix: this.prefix, csrfToken: request.csrfToken, allowedFactor2: this.allowedFactor2Details()};
-                if (request.query.next) {
-                    data["next"] = request.query.next;
-                }
-                return reply.view(this.signupPage, data);
+            let data : {urlprefix: string, next? : any, csrfToken: string|undefined, allowedFactor2: AuthenticatorDetails[]} = {urlprefix: this.prefix, csrfToken: request.csrfToken, allowedFactor2: this.allowedFactor2Details()};
+            if (request.query.next) {
+                data["next"] = request.query.next;
             }
+            return reply.view(this.signupPage, data);
         });
 
         this.app.post(this.prefix+'signup', async (request : FastifyRequest<{ Body: SignupBodyType }>, reply : FastifyReply) => {
@@ -585,7 +677,7 @@ export class FastifySessionServer {
     
     addConfigureFactor2Endpoints() {
 
-        this.app.get(this.prefix+'configurefactor2', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) => {
+        this.app.get(this.prefix+'configurefactor2', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'configurefactor2', ip: request.ip}));
             try {
                 return await this.reconfigureFactor2(request, reply, 
@@ -689,7 +781,7 @@ export class FastifySessionServer {
     }
 
     addChangePasswordEndpoints() {
-        this.app.get(this.prefix+'changepassword', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) => {
+        this.app.get(this.prefix+'changepassword', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'changepassword', ip: request.ip, user: request.user?.username}));
             if (!request.user) return this.sendPageError(reply, 401);
             if (this.changePasswordPage)  { // if is redundant but VC Code complains without it
@@ -728,7 +820,7 @@ export class FastifySessionServer {
     }
 
     addChangeFactor2Endpoints() {
-        this.app.get(this.prefix+'changefactor2', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) => {
+        this.app.get(this.prefix+'changefactor2', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'changefactor2', ip: request.ip, user: request.user?.username}));
             if (!request.user) return this.sendPageError(reply, 401);
             if (this.changeFactor2Page)  { // if is redundant but VC Code complains without it
@@ -776,7 +868,7 @@ export class FastifySessionServer {
     }
 
     addUpdateUserEndpoints() {
-        this.app.get(this.prefix+'updateuser', async (request : FastifyRequest<{Querystring : LoginParamsType}>, reply : FastifyReply) => {
+        this.app.get(this.prefix+'updateuser', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'updateuser', ip: request.ip, user: request.user?.username}));
             if (!request.user) return this.sendPageError(reply, 401);
             if (this.updateUserPage)  { // if is redundant but VC Code complains without it

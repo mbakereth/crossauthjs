@@ -129,8 +129,7 @@ export class SessionManager {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, params : AuthenticationParameters, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User, secrets: UserSecrets}> {
-        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
+    async login(username : string, params : AuthenticationParameters, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string, user: User, secrets: UserSecrets}> {
 
         let bypass2FA = user != undefined;
 
@@ -161,7 +160,7 @@ export class SessionManager {
         // create a new CSRF token, since we have a new session
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
-        const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+        const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
 
         // delete any password reset tokens that still exist for this user.
         try {
@@ -175,7 +174,7 @@ export class SessionManager {
         return {
             sessionCookie: sessionCookie,
             csrfCookie: csrfCookie,
-            csrfForOrHeaderValue: csrfForOrHeaderValue,
+            csrfFormOrHeaderValue: csrfFormOrHeaderValue,
             user: user,
             secrets: secrets,
         }
@@ -190,7 +189,6 @@ export class SessionManager {
      */
     async createAnonymousSession(extraFields: {[key: string]: any} = {}) 
     : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string}> {
-        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
 
         const key = await this.session.createSessionKey(undefined, extraFields);
         const sessionCookie = this.session.makeCookie(key, false);
@@ -210,7 +208,6 @@ export class SessionManager {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
      */
     async logout(sessionCookieValue : string) : Promise<void> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "logout called but sessions not enabled");
         const key = await this.session.getSessionKey(sessionCookieValue);
         return await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(key.value));
     }
@@ -223,7 +220,6 @@ export class SessionManager {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
      */
     async logoutFromAll(userId : string | number, except? : string|undefined) : Promise<void> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         /*await*/ return this.session.deleteAllForUser(userId, except);
     }
     
@@ -303,7 +299,6 @@ export class SessionManager {
      * @returns a signed CSRF token
      */
     async createCsrfToken() : Promise<{csrfCookie : Cookie, csrfFormOrHeaderValue : string}> {
-        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
          this.csrfTokens.makeCsrfCookie(await this.csrfTokens.createCsrfToken());
          const csrfToken = this.csrfTokens.createCsrfToken();
          const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
@@ -320,7 +315,6 @@ export class SessionManager {
      * @returns a signed CSRF token
      */
     async createCsrfFormOrHeaderValue(csrfCookieValue : string) : Promise<string> {
-        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled"); // csrf tokens always created when using sessions
         const csrfToken = this.csrfTokens.unsignCookie(csrfCookieValue);
         return this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
     }
@@ -333,7 +327,6 @@ export class SessionManager {
      * @returns user or undefined
      */
     async userForSessionKey(sessionCookieValue : string) : Promise<User|undefined> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
         return (await this.session.getUserForSessionKey(sessionCookieValue)).user;
     }
 
@@ -361,7 +354,6 @@ export class SessionManager {
      * @param sessionId the session Id to update.
      */
     async updateSessionActivity(sessionCookieValue : string) : Promise<void> {
-        if (!this.session) return;
         const key = await this.session.getSessionKey(sessionCookieValue);
         if (this.session.idleTimeout > 0) {
             this.session.updateSessionKey({
@@ -376,7 +368,6 @@ export class SessionManager {
      * @param sessionId the session Id to delete
      */
     async deleteSession(sessionCookieValue : string) : Promise<void> {
-        if (!this.session) return;
         const sessionId = this.session.unsignCookie(sessionCookieValue)
         return await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(sessionId));
     }
@@ -429,7 +420,6 @@ export class SessionManager {
         params : AuthenticationParameters, 
         sessionCookieValue : string,
         repeatParams? : AuthenticationParameters) : Promise<{userId: string|number, userData : {[key:string] : any}}> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
         if (!this.authenticators[user.factor1]) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
         if (!this.authenticators[user.factor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
         const authenticator = this.authenticators[user.factor2];
@@ -462,7 +452,6 @@ export class SessionManager {
         user : User, 
         newFactor2 : string|undefined,
         sessionCookieValue : string) : Promise<{[key:string] : any}> {
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
         const sessionId = this.session.unsignCookie(sessionCookieValue);
         if (newFactor2 && newFactor2 != "none") {
             if (!this.authenticators[newFactor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
@@ -536,7 +525,6 @@ export class SessionManager {
      */
     async completeTwoFactorSetup(params : AuthenticationParameters, sessionCookieValue : string) : Promise<User> {
         let newSignup = false;
-        if (!this.session) throw new CrossauthError(ErrorCode.Configuration, "verify2FA called but sessions not enabled");
         let {user, key} = await this.session.getUserForSessionKey(sessionCookieValue);
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         let data = getJsonData(key)["2fa"];
@@ -578,21 +566,89 @@ export class SessionManager {
      * @returns a new anonymous session cookie and corresponding CSRF cookie and token.
      */
     private async initiateTwoFactorLogin(
-        user : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string}>  {
-        if (!this.session || !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions and 2FA must be enabled for 2FA");
+        user : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string}>  {
         const authenticator = this.authenticators[user.factor2];
         const secrets = await authenticator.createOneTimeSecrets(user);
         const {sessionCookie} = await this.createAnonymousSession({data: JSON.stringify({"2fa": {username: user.username, twoFactorInitiated: true, factor2: user.factor2, ...secrets}})});
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
-        const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+        const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
 
         return {
             sessionCookie: sessionCookie,
             csrfCookie: csrfCookie,
-            csrfForOrHeaderValue: csrfForOrHeaderValue,
+            csrfFormOrHeaderValue: csrfFormOrHeaderValue,
         }
         
+    }
+
+    /**
+     * Initiates the two factor process when visiting a protected page.
+     * 
+     * Creates an anonymous session and coorresponding CSRF token
+     * @param user the user, which should aleady have been authenticated with factor1
+     * @param sessionCookieValue the logged in session associated with the user
+     * @param requestBody the parameters from the request made before being redirected to factor2 authentication
+     * @param url the requested url, including path and query parameters
+     * @returns If a token was passed a new anonymous session cookie and corresponding CSRF cookie and token.
+     */
+    async initiateTwoFactorPageVisit(
+        user : User,
+        sessionCookieValue : string,
+        requestBody : {[key:string]: any},
+        url : string|undefined) : Promise<{sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, csrfFormOrHeaderValue: string|undefined}>  {
+        const authenticator = this.authenticators[user.factor2];
+        const secrets = await authenticator.createOneTimeSecrets(user);
+
+        let sessionCookie : Cookie|undefined;
+        let csrfCookie : Cookie|undefined;
+        let csrfFormOrHeaderValue : string|undefined;
+        if (!user) {
+            // user is not logged in - create an anonymous session
+            const resp = await this.createAnonymousSession({});
+            sessionCookie = resp.sessionCookie;
+            sessionCookieValue = sessionCookie.value;
+            csrfCookie = resp.csrfCookie;
+            csrfFormOrHeaderValue = resp.csrfFormOrHeaderValue
+    
+        }
+
+        const sessionId = this.session.unsignCookie(sessionCookieValue);
+        const hashedSessionId = SessionCookie.hashSessionKey(sessionId)
+        this.keyStorage.updateData(hashedSessionId, "pre2fa", {username: user.username, factor2: user.factor2, secrets: secrets, body: requestBody, url: url});
+
+        return {
+            sessionCookie: sessionCookie,
+            csrfCookie: csrfCookie,
+            csrfFormOrHeaderValue: csrfFormOrHeaderValue,
+        }
+    }
+
+    /**
+     * Completes 2FA when visiting a protected page.  
+     * 
+     * If successful, returns.  Otherwise an exception is thrown.
+     * @param params the parameters from user input needed to authenticate (eg TOTP code)
+     * @param sessionCookieValue the session cookie value (ie still signed)
+     * @returns the user object
+     * @throws {@link index!CrossauthError} if authentication fails.
+     */
+    async completeTwoFactorPageVisit(params : AuthenticationParameters, sessionCookieValue : string) : Promise<void> {
+        let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
+        if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
+        let data = getJsonData(key);
+        if (!("pre2fa" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "Two factor authentication not initiated");
+        const {secrets} = await this.userStorage.getUserByUsername(data.pre2fa.username);
+
+        const authenticator = this.authenticators[data.pre2fa.factor2];
+        if (!authenticator) throw new CrossauthError(ErrorCode.Configuration, "Unrecognised second factor authentication");
+        const newSecrets : {[key:string] : any} = {};
+        const secretNames = authenticator.secretNames();
+        for (let secret in secrets) {
+            if (secretNames.includes(secret)) newSecrets[secret] = data[secret];
+        }
+        await authenticator.authenticateUser(undefined, {...newSecrets, ...data.pre2fa.secrets}, params);
+        await this.keyStorage.updateData(SessionCookie.hashSessionKey(key.value), "pre2fa", undefined);
     }
 
     /**
@@ -612,8 +668,7 @@ export class SessionManager {
      *          `csrfToken` the new CSRF token corresponding to the cookie
      *          `user` the newly-logged in user.
      */
-    async completeTwoFactorLogin(params : AuthenticationParameters, sessionCookieValue : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfForOrHeaderValue: string, user: User}> {
-        if (!this.session|| !this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "Sessions must be enabled for 2FA");
+    async completeTwoFactorLogin(params : AuthenticationParameters, sessionCookieValue : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string, user: User}> {
         let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
         if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
         let data = getJsonData(key)["2fa"];
@@ -630,7 +685,7 @@ export class SessionManager {
 
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
-        const csrfForOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+        const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
         try {
             this.emailTokenStorage.deleteAllForUser(user.id, "p:");
         } catch (e) {
@@ -640,7 +695,7 @@ export class SessionManager {
         return {
             sessionCookie: sessionCookie,
             csrfCookie: csrfCookie,
-            csrfForOrHeaderValue: csrfForOrHeaderValue,
+            csrfFormOrHeaderValue: csrfFormOrHeaderValue,
             user: user
         }
     }
