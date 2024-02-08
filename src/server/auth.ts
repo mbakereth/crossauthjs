@@ -33,12 +33,16 @@ export abstract class Authenticator {
     friendlyName : string;
     factorName : string = ""; // overridden when registered to backend
 
+    /** 
+     * Constructor.
+     * @param options see {@link AuthenticationOptions}
+     */
     constructor(options? : AuthenticationOptions) {
         if (!options?.friendlyName) throw new CrossauthError(ErrorCode.Configuration, "Authenticator must have a friendly name");
          this.friendlyName = options?.friendlyName;
 
     }
-    // throws Connection, UserNotExist, PasswordNotMatch
+
     /**
      * Should return the user if it exists in storage, otherwise throw {@link index!CrossauthError}:
      * with {@link index!ErrorCode} of `Connection`, `UserNotExist` or `PasswordNotMatch`
@@ -48,12 +52,46 @@ export abstract class Authenticator {
      */
     abstract authenticateUser(user : UserInputFields|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void>;
 
+    /**
+     * This method should create and return any secrets that are persisted in storage, eg hashes of passwords.
+     * 
+     * Not all authenticators have persistent secrets.
+     * @param username username to create secrets for
+     * @param params user-provided secrets (ie unhashed)
+     * @param repeatParams if present, secrets will be checked to be identical in this and `params`, throwing an exception if they are not
+     */
     abstract createPersistentSecrets(username : string, params: AuthenticationParameters, repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>>;
+
+    /**
+     * Creates one-time secrets, eg one-time codes that are sent in email or SMS.
+     * 
+     * Not all authenticators create one time secrets
+     * @param user user to create secrets for.
+     */
     abstract createOneTimeSecrets(user : User) : Promise<Partial<UserSecretsInputFields>>;
 
+    /**
+     * If true, it is expected that this authenticator allows users to be created.
+     */
     abstract canCreateUser() : boolean;
+
+    /**
+     * If true, it is expected that this authenticator allows users to be updated.
+     */
     abstract canUpdateUser() : boolean;
+
+    /**
+     * All peristent secrets created and managed by this authenticator, eg `password`
+     * 
+     * When user data is passed, it is filtered by this list.
+     */
     abstract secretNames() : string[];
+
+    /**
+     * Implementations should use this to validate secrets against local requirements,
+     * eg minimum password length.
+     * @param params user-provided secrets to validate
+     */
     abstract validateSecrets(params : AuthenticationParameters) : string[];
 }
 
