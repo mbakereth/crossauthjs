@@ -56,7 +56,7 @@ export class TotpAuthenticator extends Authenticator {
         return { userData: {qr: qrUrl, totpSecret: secret, factor2: factor2}, secrets: {totpSecret: secret}, newSessionData: undefined}
     }
 
-    async authenticateUser(_user : User|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
+    async authenticateUser(_user : UserInputFields|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!secrets.totpSecret || !params.totpCode) {
             throw new CrossauthError(ErrorCode.InvalidToken, "TOTP secret or code not given");
         }

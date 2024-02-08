@@ -6,12 +6,17 @@ import { CrossauthLogger, j } from '../..';
 import { setParameter, ParamType } from '../utils';
 import ldap from 'ldapjs';
 
+export interface LdapUser {
+    dn: string,
+    [ key : string ] : string|string[],
+}
+
 /**
  * Optional parameters for {@link PrismaUserStorage}.
  * 
  * See {@link PrismaUserStorage.constructor} for definitions.
  */
-export interface LdapStorageOptions {
+export interface LdapStorageOptions extends UserStorageOptions {
 
     /** Utl running LDAP server. eg ldap://ldap.example.com or ldap://ldap,example.com:636 
      *  No default (required)
@@ -28,6 +33,13 @@ export interface LdapStorageOptions {
     /** Defaults to "(objectclass=*)" */
     ldapSearchFilter? : string;
 
+    createUserFn?:  (user: Partial<User>, ldapUser: LdapUser) => UserInputFields;
+}
+
+function defaultCreateUserDn(user: Partial<User>, ldapUser: LdapUser) : UserInputFields {
+    
+    const uid = Array.isArray(ldapUser.uid) ? ldapUser.uid[0] : ldapUser.uid;
+    return {username: uid, state: "active", ...user};
 }
 
 export class LdapStorage extends UserStorage {
@@ -35,14 +47,15 @@ export class LdapStorage extends UserStorage {
     private ldapUrls = [];
     private ldapUserSearchBase  = "";
     private ldapUsernameAttribute = "cn";
+    private createUserFn:  (user: Partial<User>, ldapUser: LdapUser) => UserInputFields = defaultCreateUserDn;
 
-    constructor(localStorage : UserStorage, options : UserStorageOptions = {}) {
+    constructor(localStorage : UserStorage, options : LdapStorageOptions = {}) {
         super(options);
         this.localStorage = localStorage;
         setParameter("ldapUrls", ParamType.StringArray, this, options, "LDAP_URL", true);
         setParameter("ldapUserSearchBase", ParamType.String, this, options, "LDAP_USER_SEARCH_BASE");
         setParameter("ldapUsernameAttribute", ParamType.String, this, options, "LDAP_USENAME_ATTRIBUTE");
-          
+        if (options.createUserFn) this.createUserFn = options.createUserFn;
     }
 
     /**
@@ -53,7 +66,7 @@ export class LdapStorage extends UserStorage {
 
         if (!secrets.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
         const ldapUser = await this.getLdapUser(user.username, secrets.password);
-        return await super.createUser(ldapUser, {});
+        return await this.localStorage.createUser(this.createUserFn(user, ldapUser), {});
     }
 
     async getUserByUsername(
@@ -86,19 +99,24 @@ export class LdapStorage extends UserStorage {
         await this.localStorage.deleteUserByUsername(username);
     }
 
-    async getLdapUser(username : string, password : string) : Promise<User> {
+    async getLdapUser(username : string, password : string) : Promise<LdapUser> {
         let ldapClient : ldap.Client;
         try {
             const sanitizedUsername = LdapStorage.sanitizeLdapDn(username);
-            const bindDn = [this.ldapUsernameAttribute+"="+sanitizedUsername, this.ldapUserSearchBase].join(",");
+            const userDn = [this.ldapUsernameAttribute+"="+sanitizedUsername, this.ldapUserSearchBase].join(",");
             if (!password) throw new CrossauthError(ErrorCode.PasswordInvalid);
-            ldapClient = await this.ldapBind(bindDn, password);
-            return await this.searchUser(ldapClient, bindDn);
+            CrossauthLogger.logger.debug(j({msg: "LDAP search "+userDn}));
+            ldapClient = await this.ldapBind(userDn, password);
+            return await this.searchUser(ldapClient, userDn);
               
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             if (e instanceof CrossauthError) throw e;
-            throw new CrossauthError(ErrorCode.UsernameOrPasswordInvalid);
+            else if (e instanceof ldap.InvalidCredentialsError) {
+                throw new CrossauthError(ErrorCode.UsernameOrPasswordInvalid);
+            } else {
+                throw new CrossauthError(ErrorCode.Connection, "LDAP error getting user");            
+            }
         }
     }
 
@@ -109,7 +127,7 @@ export class LdapStorage extends UserStorage {
             let client = ldap.createClient({url: this.ldapUrls});
         
             client.on('connect', function () {
-                client.bind(dn, password, function (err) {
+                client.bind(dn, password, function (err : any) {
                     if (err) {
                     reject(err)
                     client.unbind()
@@ -119,17 +137,17 @@ export class LdapStorage extends UserStorage {
                 })
             });
             //Fix for issue https://github.com/shaozi/ldap-authentication/issues/13
-            client.on('timeout', (err) => {
+            client.on('timeout', (err : any) => {
                 reject(err)
             });
-            client.on('connectTimeout', (err) => {
+            client.on('connectTimeout', (err : any) => {
                 reject(err)
             });
-            client.on('error', (err) => {
+            client.on('error', (err : any) => {
                 reject(err)
             });
         
-            client.on('connectError', function (error) {
+            client.on('connectError', function (error : any) {
                 if (error) {
                     reject(error)
                     return
@@ -142,7 +160,7 @@ export class LdapStorage extends UserStorage {
         ldapClient : ldap.Client,
         userDn : string,
         attributes? : string[]
-      ) : Promise<User> {
+      ) : Promise<LdapUser> {
         return new Promise(function (resolve, reject) {
             let searchOpts : {[key:string]: any} = {
                 scope: 'base',
@@ -150,7 +168,7 @@ export class LdapStorage extends UserStorage {
             if (attributes) searchOpts.attributes = attributes;
             ldapClient.search(userDn, searchOpts, 
                 function (err : any, res : any) {
-                    let user : User|undefined = undefined;
+                    let user : LdapUser|undefined = undefined;
                     if (err) {
                         reject(err)
                         ldapClient.unbind()
@@ -177,8 +195,8 @@ export class LdapStorage extends UserStorage {
         })
     }
           
-    private static searchResultToUser(pojo : {[key:string]:any}) : User {
-        let user : User = { id: pojo.objectName, username: pojo.objectName, state: "active" }
+    private static searchResultToUser(pojo : {[key:string]:any}) : LdapUser {
+        let user : LdapUser = { dn: pojo.objectName, state: "active" }
         pojo.attributes.forEach((attribute : {type: string, values: any[]}) => {
             user[attribute.type] =
             attribute.values.length == 1 ? attribute.values[0] : attribute.values

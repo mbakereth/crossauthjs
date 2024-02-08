@@ -46,7 +46,7 @@ export abstract class Authenticator {
      * @param username the username to authenticate
      * @param password the password to authenticate
      */
-    abstract authenticateUser(user : User|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void>;
+    abstract authenticateUser(user : UserInputFields|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void>;
 
     abstract createPersistentSecrets(username : string, params: AuthenticationParameters, repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>>;
     abstract createOneTimeSecrets(user : User) : Promise<Partial<UserSecretsInputFields>>;

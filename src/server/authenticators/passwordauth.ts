@@ -78,7 +78,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
      * @returns A {@link User } object with the optional extra fields but without the hashed password.  See explaination above.
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
-    async authenticateUser(user : User, secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
+    async authenticateUser(user : UserInputFields, secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");
         if (!secrets.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
         if (!await Hasher.passwordsEqual(params.password, secrets.password, this.secret)) {

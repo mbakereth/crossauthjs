@@ -1,7 +1,6 @@
 import type { User, UserSecretsInputFields, Key, UserInputFields } from '../../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../../error.ts';
 import { UserStorage } from '../storage.ts'
-import { Hasher } from '../hasher.ts';
 import { CrossauthLogger, j } from '../../logger.ts';
 import { setParameter, ParamType } from '../utils.ts';
 import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
@@ -50,7 +49,7 @@ export class LdapAuthenticator extends Authenticator {
      * @returns A {@link User } object with the optional extra fields but without the hashed password.  See explaination above.
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
-    async authenticateUser(user : User, _secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
+    async authenticateUser(user : UserInputFields, _secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");
         await this.ldapStorage.getLdapUser(user.username, params.password);
         let localUser : User;
