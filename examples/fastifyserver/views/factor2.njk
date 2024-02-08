@@ -5,14 +5,14 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/public/style.css"/>
-    <title>Sign Up - Set up 2FA</title>
+    <title>Please enter your code</title>
 </head>
 <body>
-    <h1>Login - please enter your code</h1>
-    <form action="{action}" method="POST">
+    <h1>Please enter your code</h1>
+    <form action="{{action}}" method="POST">
 
-        {% if error %}
-            {% if error == "Unauthorized" %}
+        {% if errorCodeName %}
+            {% if errorCodeName == "InvalidToken" or errorCodeName == "Expired"%}
                 <p class="error">Please enter a valid code</p>
             {% else %}
                 <p class="error">An error has occurred</p>

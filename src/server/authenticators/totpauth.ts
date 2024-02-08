@@ -58,12 +58,12 @@ export class TotpAuthenticator extends Authenticator {
 
     async authenticateUser(_user : User|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!secrets.totpSecret || !params.totpCode) {
-            throw new CrossauthError(ErrorCode.Unauthorized, "TOTP secret or code not given");
+            throw new CrossauthError(ErrorCode.InvalidToken, "TOTP secret or code not given");
         }
         const code = params.totpCode;
         const secret = secrets.totpSecret;
         if (!gAuthenticator.check(code, secret)) {
-            throw new CrossauthError(ErrorCode.Unauthorized, "Invalid TOTP code");
+            throw new CrossauthError(ErrorCode.InvalidToken, "Invalid TOTP code");
         }
     }
 

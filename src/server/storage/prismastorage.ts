@@ -193,44 +193,26 @@ export class PrismaUserStorage extends UserStorage {
                     data: userData,
                 });
             } else {
-                /*await this.prismaClient.$transaction([
-                // @ts-ignore  (because types only exist when do prismaClient.table...)
-                this.prismaClient[this.userTable].update({
-                    where: {
-                        [this.idColumn]: user.id,
+                // @ts-ignore
+                await this.prismaClient[this.userTable].update({
+                            where: {
+                                [this.idColumn]: user.id,
+                            },
+                            data: {
+                    ...userData,
+                    secrets: {
+                        update: {
+                            where: {
+                                user_id: user.id,
+                            },
+                            data: secretsData,
+                        }
+                    }
                     },
-                    data: userData,
-                }),
-                // @ts-ignore  (because types only exist when do prismaClient.table...)
-                this.prismaClient[this.userSecretsTable].update({
-                    where: {
-                        user_id: user.id,
+                    include: {
+                    secrets: true,
                     },
-                    data: secretsData,
-                })
-            ]);*/
-        // @ts-ignore
-		await this.prismaClient[this.userTable].update({
-                    where: {
-                        [this.idColumn]: user.id,
-                    },
-                    data: {
-			...userData,
-			secrets: {
-				update: {
-					where: {
-						user_id: user.id,
-					},
-					data: secretsData,
-				}
-			}
-		    },
-		    include: {
-			secrets: true,
-		    },
                 });
-
-
             }
         } catch (e) {
             console.log(e);

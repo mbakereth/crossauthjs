@@ -68,6 +68,9 @@ export enum ErrorCode {
     /** Thrown if an email address in invalid */
     InvalidEmail,
 
+    /** Thrown if an email address in invalid */
+    InvalidUserame,
+
     /** Thrown when two passwords do not match each other (eg signup) */
     PasswordMatch,
 
@@ -137,6 +140,12 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.UserNotActive) {
             _message = "Account is not active"
             _httpStatus = 403;
+        } else if (code == ErrorCode.InvalidUserame) {
+            _message = "Username is not in an allowed format"
+            _httpStatus = 400;
+        } else if (code == ErrorCode.InvalidEmail) {
+            _message = "Email is not in an allowed format"
+            _httpStatus = 400;
         } else if (code == ErrorCode.EmailNotVerified) {
             _message = "Email address has not been verified"
             _httpStatus = 403;
@@ -173,13 +182,13 @@ export class CrossauthError extends Error {
             _message = "There was an error in the configuration";
         } else if (code == ErrorCode.PasswordMatch) {
             _message = "Passwords do not match";
-            _httpStatus = 400;
+            _httpStatus = 401;
         } else if (code == ErrorCode.InvalidToken) {
             _message = "Token is not valid";
-            _httpStatus = 400;
+            _httpStatus = 401;
         } else if (code == ErrorCode.PasswordFormat) {
             _message = "Password format was incorrect";
-            _httpStatus = 400;
+            _httpStatus = 401;
         } else if (code == ErrorCode.UserExists) {
             _message = "User already exists";
             _httpStatus = 400;

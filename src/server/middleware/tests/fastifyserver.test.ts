@@ -8,7 +8,7 @@ import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 import { TotpAuthenticator } from '../../authenticators/totpauth';
 import { Hasher } from '../../hasher';
 import { SessionCookie } from '../../cookieauth';
-
+import { CrossauthError } from '../../..';
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
@@ -44,7 +44,9 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         // Log error
         //console.log(error)
         // Send error response
-        return reply.status(409).send({ ok: false })
+        let status = 500;
+        if (error instanceof CrossauthError) status = (error as CrossauthError).httpStatus;
+        return reply.status(status).send({ ok: false })
     })
 
     return {userStorage, keyStorage, server};

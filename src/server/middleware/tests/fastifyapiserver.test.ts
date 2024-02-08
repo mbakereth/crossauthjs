@@ -9,6 +9,7 @@ import { TotpAuthenticator } from '../../authenticators/totpauth';
 import { EmailAuthenticator } from '../../authenticators/emailauth';
 import { Hasher } from '../../hasher';
 import { SessionCookie } from '../../cookieauth';
+import { CrossauthError } from '../../..';
 
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
 export var emailTokenData :  {to: string, token : string};
@@ -48,7 +49,8 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         // Log error
         //console.log(error)
         // Send error response
-        return reply.status(409).send({ ok: false })
+        const status = (error instanceof CrossauthError) ? (error as CrossauthError).httpStatus : 500;
+        return reply.status(status).send({ ok: false })
     })
       
       
@@ -390,7 +392,7 @@ test('FastifyServer.api.changePassword', async () => {
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(401);
     expect(body.errorCodeName).toBe("PasswordFormat");
 
     // check mismatched passwords caught
@@ -401,7 +403,7 @@ test('FastifyServer.api.changePassword', async () => {
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(401);
     expect(body.errorCodeName).toBe("PasswordMatch");
 
     // check successful change

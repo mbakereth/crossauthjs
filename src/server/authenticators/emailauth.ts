@@ -141,7 +141,7 @@ export class EmailAuthenticator extends Authenticator {
 
     async authenticateUser(_user : User, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (params.token != secrets?.token) {
-            throw new CrossauthError(ErrorCode.Unauthorized, "Invalid code");
+            throw new CrossauthError(ErrorCode.InvalidToken, "Invalid code");
         }
         const now = new Date().getTime();
         if (!secrets.expiry || now > secrets.expiry) {

@@ -2,7 +2,7 @@ export { UserStorage, KeyStorage as SessionStorage } from './server/storage';
 export { Authenticator } from './server/auth';
 export type { AuthenticationOptions, AuthenticationParameters } from './server/auth';
 export {  LocalPasswordAuthenticator } from './server/authenticators/passwordauth';
-export type {  UsernamePasswordAuthenticatorOptions } from './server/authenticators/passwordauth';
+export type {  LocalPasswordAuthenticatorOptions as UsernamePasswordAuthenticatorOptions } from './server/authenticators/passwordauth';
 export {  EmailAuthenticator } from './server/authenticators/emailauth';
 export type {  EmailAuthenticatorOptions } from './server/authenticators/emailauth';
 

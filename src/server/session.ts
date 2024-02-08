@@ -2,7 +2,7 @@ import { type User, UserSecrets, type Key, getJsonData, UserInputFields, UserSec
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage.ts';
 import { AuthenticationParameters, Authenticator } from './auth.ts';
-import type { UsernamePasswordAuthenticatorOptions }  from "./authenticators/passwordauth.ts";
+import type { LocalPasswordAuthenticatorOptions }  from "./authenticators/passwordauth.ts";
 import { TokenEmailer, TokenEmailerOptions } from './emailtokens.ts';
 import { CrossauthLogger, j } from '../logger.ts';
 import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth.ts';
@@ -57,7 +57,7 @@ export class SessionManager {
      * Constructor
      * @param userStorage the {@link UserStorage} instance to use, eg {@link PrismaUserStorage}.
      * @param keyStorage  the {@link KeyStorage} instance to use, eg {@link PrismaSessionStorage}.
-     * @param authenticator authenticator used to validate users  See {@link UsernamePasswordAuthenticatorOptions }.
+     * @param authenticator authenticator used to validate users  See {@link LocalPasswordAuthenticatorOptions }.
      * @param options optional parameters for authentication. See {@link CookieAuthOptions }.
      */
     constructor(
@@ -649,6 +649,24 @@ export class SessionManager {
         }
         await authenticator.authenticateUser(undefined, {...newSecrets, ...data.pre2fa.secrets}, params);
         await this.keyStorage.updateData(SessionCookie.hashSessionKey(key.value), "pre2fa", undefined);
+    }
+
+    /**
+     * Completes 2FA when visiting a protected page.  
+     * 
+     * If successful, returns.  Otherwise an exception is thrown.
+     * @param params the parameters from user input needed to authenticate (eg TOTP code)
+     * @param sessionCookieValue the session cookie value (ie still signed)
+     * @returns the 2FA data that was created on initiation
+     * @throws {@link index!CrossauthError} if authentication fails.
+     */
+    async cancelTwoFactorPageVisit(sessionCookieValue : string) : Promise<{[key:string]:any}> {
+        let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
+        if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
+        let data = getJsonData(key);
+        if (!("pre2fa" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "Two factor authentication not initiated");
+        await this.keyStorage.updateData(SessionCookie.hashSessionKey(key.value), "pre2fa", undefined);
+        return data.pre2fa;
     }
 
     /**

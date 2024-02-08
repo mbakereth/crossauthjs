@@ -62,6 +62,7 @@ export const Factor2ApiEndpoints = [
     "api/loginfactor2",
     "api/changefactor2",
     "api/factor2",
+    "api/cancelfactor2",
 ];
 
 /**
@@ -322,6 +323,10 @@ export class FastifyServer {
     
             if (this.endpoints.includes("api/loginfactor2")) {
                 sessionServer.addApiLoginFactor2Endpoints();
+            }
+
+            if (this.endpoints.includes("api/cancelfactor2")) {
+                sessionServer.addApiCancelFactor2Endpoints();
             }
 
             if (this.endpoints.includes("api/logout")) {

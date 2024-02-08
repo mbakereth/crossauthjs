@@ -28,8 +28,9 @@ function defaultPasswordValidator(params : AuthenticationParameters) : string[] 
 }
 
 
-/** Optional parameters to pass to {@link UsernamePasswordAuthenticator} constructor. */
-export interface UsernamePasswordAuthenticatorOptions extends AuthenticationOptions {
+/** Optional parameters to pass to {@link export class LocalPasswordAuthenticator extends Authenticator {
+} constructor. */
+export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions {
     secret? : string,
     enableSecretForPasswordHash? : boolean;
 
@@ -58,7 +59,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
      * @param saltLength generate a salt with this number of characters.  Defaults to 16.
      */
     constructor(_userStorage : UserStorage,
-                options : UsernamePasswordAuthenticatorOptions = {}) {
+                options : LocalPasswordAuthenticatorOptions = {}) {
         super({friendlyName: "Local password", ...options});
         setParameter("secret", ParamType.String, this, options, "HASHER_SECRET");
         setParameter("enableSecretForPasswordHash", ParamType.Boolean, this, options, "ENABLE_SECRET_FOR_PASSWORDS");
@@ -78,7 +79,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
     async authenticateUser(user : User, secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
-        if (!params.password) throw new CrossauthError(ErrorCode.Unauthorized, "Password not provided");
+        if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");
         if (!secrets.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
         if (!await Hasher.passwordsEqual(params.password, secrets.password, this.secret)) {
             CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));

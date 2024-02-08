@@ -76,11 +76,6 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
      */
     loginPage? : string;
 
-    /** Template file containing the page for getting the 2nd factor after entering username and password
-     * See the class documentation for {@link FastifyServer} for more info.  Defaults to "loginfactor2.njk".
-     */
-    loginFactor2Page? : string;
-
     /** Template file containing the page for getting the 2nd factor for 2FA protected pages
      * See the class documentation for {@link FastifyServer} for more info.  Defaults to "factor2.njk".
      */
@@ -279,7 +274,6 @@ export class FastifySessionServer {
     private signupPage : string = "signup.njk";
     private configureFactor2Page : string = "configurefactor2.njk";
     private loginPage : string = "login.njk";
-    private loginFactor2Page : string = "loginfactor2.njk";
     private factor2Page : string = "factor2.njk";
     private errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
@@ -329,7 +323,6 @@ export class FastifySessionServer {
         setParameter("signupPage", ParamType.String, this, options, "SIGNUP_PAGE");
         setParameter("configureFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
         setParameter("loginPage", ParamType.String, this, options, "LOGIN_PAGE");
-        setParameter("loginFactor2Page", ParamType.String, this, options, "LOGIN_FACTOR2_PAGE");
         setParameter("factor2Page", ParamType.String, this, options, "FACTOR2_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
@@ -361,6 +354,7 @@ export class FastifySessionServer {
         ////////////////
         // hooks
 
+        // session management: validate session and CSRF cookies and populate request.user
         app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
 
             // check if CSRF token is in cookie (and signature is valid)
@@ -430,56 +424,93 @@ export class FastifySessionServer {
             }
         });
 
+        // 2FA for endpoints that are protected by it (other than login)
         app.addHook('preHandler', async (request : FastifyRequest<{Body: ArbitraryBodyType}>, reply : FastifyReply) => {
             const sessionCookieValue = this.getSessionCookieValue(request);
-            if (!(["GET", "OPTIONS", "HEAD"].includes(request.method)) && sessionCookieValue && request.user?.factor2 && (this.factor2ProtectedPageEndpoints.includes(request.url) || this.factor2ProtectedApiEndpoints.includes(request.url))) {
-                const sessionData = await this.sessionManager.dataForSessionKey(sessionCookieValue);
-                if (("pre2fa") in sessionData) {
-                    // 2FA has started - validate it
+            if (sessionCookieValue && request.user?.factor2 && (this.factor2ProtectedPageEndpoints.includes(request.url) || this.factor2ProtectedApiEndpoints.includes(request.url))) {
+                if (!(["GET", "OPTIONS", "HEAD"].includes(request.method))) {
+                    const sessionData = await this.sessionManager.dataForSessionKey(sessionCookieValue);
+                    if (("pre2fa") in sessionData) {
+                        // 2FA has started - validate it
+                        CrossauthLogger.logger.debug("Completing 2FA");
 
-                    // get secrets from the request body 
-                    const authenticator = this.authenticators[sessionData.pre2fa.factor2];
-                    const secretNames = authenticator.secretNames();
-                    let secrets : {[key:string]:string} = {};
-                    for (let field in request.body) {
-                        if (secretNames.includes(field)) secrets[field] = request.body[field];
-                    }
-
-                    const sessionCookieValue = this.getSessionCookieValue(request);
-                    if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie found");
-                    let error : CrossauthError|undefined = undefined;
-                    try {
-                        await this.sessionManager.completeTwoFactorPageVisit(request.body, sessionCookieValue);
-                    } catch (e) {
-                        if (e instanceof CrossauthError) {
-                            error = e;
-                        } else {
-                            error = new CrossauthError(ErrorCode.UnknownError);
+                        // get secrets from the request body 
+                        const authenticator = this.authenticators[sessionData.pre2fa.factor2];
+                        const secretNames = authenticator.secretNames();
+                        let secrets : {[key:string]:string} = {};
+                        for (let field in request.body) {
+                            if (secretNames.includes(field)) secrets[field] = request.body[field];
                         }
-                        CrossauthLogger.logger.debug(j({err: e}));
-                        CrossauthLogger.logger.error(j({msg: error.message, user: request.body.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
-                    }
-                    // restore original request body
-                    request.body = sessionData.pre2fa.body;
-                    if (error) {
-                        if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
-                            return reply.redirect("/factor2?error="+ErrorCode[error.code]);
 
+                        const sessionCookieValue = this.getSessionCookieValue(request);
+                        if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie found");
+                        let error : CrossauthError|undefined = undefined;
+                        try {
+                            await this.sessionManager.completeTwoFactorPageVisit(request.body, sessionCookieValue);
+                        } catch (e) {
+                            if (e instanceof CrossauthError) {
+                                error = e;
+                            } else {
+                                error = new CrossauthError(ErrorCode.UnknownError);
+                            }
+                            CrossauthLogger.logger.debug(j({err: e}));
+                            CrossauthLogger.logger.error(j({msg: error.message, user: request.body.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                        }
+                        // restore original request body
+                        request.body = sessionData.pre2fa.body;
+                        if (error) {
+                            if (error.code == ErrorCode.Expired) {
+                                // user will not be able to complete this process - delete 
+                                CrossauthLogger.logger.debug("Error - cancelling 2FA");
+                                // the 2FA data and start again
+                                try {
+                                    await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
+                                } catch (e) {
+                                    CrossauthLogger.logger.error(j({err:e}))
+                                }
+                                request.body = {
+                                    ...request.body,
+                                    error: error.message,
+                                    errors: error.message,
+                                    errorCode: ""+error.code,
+                                    errorCodeName: ErrorCode[error.code],
+                                }
+                            } else {
+                                if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
+                                    return reply.redirect("/factor2?error="+ErrorCode[error.code]);
+
+                                } else {
+                                    return reply.status(error.httpStatus).send(JSON.stringify({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}));
+                                }
+                            }
+                        }
+                    } else {
+                        // 2FA has not started - start it
+                        this.validateCsrfToken(request);
+                        CrossauthLogger.logger.debug("Starting 2FA");
+                        this.sessionManager.initiateTwoFactorPageVisit(request.user, sessionCookieValue, request.body, request.url.replace(/\?.*$/,""));
+                        if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
+                            return reply.redirect("/factor2");
                         } else {
-                            return reply.status(error.httpStatus).send(JSON.stringify({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}));
+                            return reply.send(JSON.stringify({ok: true, factor2Required: true}));
                         }
                     }
                 } else {
-                    // 2FA has not started - start it
-                    this.validateCsrfToken(request);
-                    this.sessionManager.initiateTwoFactorPageVisit(request.user, sessionCookieValue, request.body, request.url.replace(/\?.*$/,""));
-                    if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
-                        return reply.redirect("/factor2");
-                    } else {
-                        return reply.send(JSON.stringify({ok: true, factor2Required: true}));
+                    // if we have a get request to one of the protected urls, cancel any pending 2FA
+                    const sessionCookieValue = this.getSessionCookieValue(request);
+                    if (sessionCookieValue) {
+                        const sessionData = await this.sessionManager.dataForSessionKey(sessionCookieValue);
+                        if (("pre2fa") in sessionData) {
+                            CrossauthLogger.logger.debug("Cancelling 2FA");
+                            try {
+                                await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
+                            } catch (e) {
+                                CrossauthLogger.logger.error(j({err:e}))
+                            }      
+                        }
                     }
                 }
-            }
+            } 
         });
     }    
 
@@ -519,8 +550,9 @@ export class FastifySessionServer {
                             persist: request.body.persist ? "on" : "",
                             urlprefix: this.prefix, 
                             factor2: user.factor2,
+                            action: "loginfactor2",
                         };
-                        return reply.view(this.loginFactor2Page, data);
+                        return reply.view(this.factor2Page, data);
                     }
                 });
             } catch (e) {
@@ -566,7 +598,7 @@ export class FastifySessionServer {
                 }
                 if (factor2 && factor2 in this.authenticators) {
                     return this.handleError(e, reply, (reply, error) => {
-                        return reply.view(this.loginFactor2Page, {
+                        return reply.view(this.factor2Page, {
                             error: error.message,
                             errors: error.messages, 
                             errorCode: error.code, 
@@ -576,6 +608,7 @@ export class FastifySessionServer {
                             csrfToken: request.csrfToken,
                             urlprefix: this.prefix, 
                             factor2 : factor2,
+                            action: "loginfactor2",
                         });                      
                     });                        
                 } else {
@@ -605,7 +638,12 @@ export class FastifySessionServer {
             if (!sessionCookie) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie present");
             const sessionData = await this.sessionManager.dataForSessionKey(sessionCookie);
             if (!sessionData?.pre2fa) throw new CrossauthError(ErrorCode.Unauthorized, "2FA not initiated");
-            let data = {urlprefix: this.prefix, csrfToken: request.csrfToken, action: sessionData.pre2fa.url, errorCode: request.query.error};
+            let data = {
+                urlprefix: this.prefix, 
+                csrfToken: request.csrfToken, 
+                action: sessionData.pre2fa.url, 
+                errorCodeName: request.query.error,
+                factor2: sessionData.pre2fa.factor2};
             return reply.view(this.factor2Page, data);
         });
 
@@ -1044,7 +1082,7 @@ export class FastifySessionServer {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'logout', ip: request.ip, user: request.user?.username}));
             try {
                 return await this.logout(request, reply, 
-                (reply) => {return reply.redirect(this.logoutRedirect)});
+                (reply) => {return reply.redirect(request.body.next? request.body.next : this.logoutRedirect)});
             } catch (e) {
                 CrossauthLogger.logger.error(j({msg: "Logout failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -1075,6 +1113,28 @@ export class FastifySessionServer {
                 });
             } catch (e) {
                 CrossauthLogger.logger.error(j({msg: "Login failure", user: request.body.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
+                CrossauthLogger.logger.debug(j({err: e}));
+                return this.handleError(e, reply, (reply, error) => {
+                    reply.status(this.errorStatus(e)).header(...JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
+                });
+            }
+        });
+    }
+
+    addApiCancelFactor2Endpoints() {
+
+        this.app.post(this.prefix+'api/cancelfactor2', async (request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply) => {
+            CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/cancelfactor2', ip: request.ip}));
+            if (request.user) return reply.header(...JSONHDR).send({ok: false, user : request.user}); // already logged in
+            try {
+                return await this.cancelFactor2(request, reply, 
+                (reply) => {
+                        return reply.header(...JSONHDR).send({ok: true});
+                });
+            } catch (e) {
+                const user : User|undefined = request.user;
+                const username = user || "";
+                CrossauthLogger.logger.error(j({msg: "Login failure", user: username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, reply, (reply, error) => {
                     reply.status(this.errorStatus(e)).header(...JSONHDR).send({ok: false, error: error.message, errors: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]});                    
@@ -1424,6 +1484,17 @@ export class FastifySessionServer {
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         request.csrfToken = await this.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
         return successFn(reply, user);
+    }
+
+    private async cancelFactor2(request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply, 
+        successFn : (res : FastifyReply) => void) {
+
+        this.validateCsrfToken(request);
+        const sessionCookieValue = this.getSessionCookieValue(request);
+        if (sessionCookieValue) {
+            this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
+        }
+        return successFn(reply);
     }
 
     /**

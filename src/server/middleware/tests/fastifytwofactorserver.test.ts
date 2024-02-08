@@ -11,6 +11,7 @@ import Jimp from 'jimp';
 import jsQR from 'jsqr';
 import { authenticator as gAuthenticator } from 'otplib';
 import { Hasher } from '../../hasher';
+import { CrossauthError } from '../../..';
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
@@ -53,7 +54,9 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         // Log error
         //console.log(error)
         // Send error response
-        return reply.status(409).send({ ok: false })
+        let status = 500;
+        if (error instanceof CrossauthError) status = (error as CrossauthError).httpStatus;
+        return reply.status(status).send({ ok: false })
     })
 
     return {userStorage, keyStorage, server};
@@ -199,7 +202,7 @@ async function loginEmail(server : FastifyServer) : Promise<{sessionCookie: stri
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body)
-    expect(body.template).toBe("loginfactor2.njk");
+    expect(body.template).toBe("factor2.njk");
 
     // successful login second factor
     const sessionCookie = getSession(res);
@@ -361,7 +364,7 @@ test('FastifyServer.loginTotp', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body)
-    expect(body.template).toBe("loginfactor2.njk");
+    expect(body.template).toBe("factor2.njk");
 
     const sessionCookie = getSession(res);
     const {secrets} = await userStorage.getUserByUsername("mary");
@@ -456,7 +459,7 @@ test('FastifyServer.turnOffTotp', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body)
-    expect(body.template).toBe("loginfactor2.njk");
+    expect(body.template).toBe("factor2.njk");
 
     const sessionCookie = getSession(res);
     const {secrets} = await userStorage.getUserByUsername("mary");
@@ -512,7 +515,7 @@ test('FastifyServer.reconfigureTotp', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body)
-    expect(body.template).toBe("loginfactor2.njk");
+    expect(body.template).toBe("factor2.njk");
 
     const sessionCookie = getSession(res);
     const {secrets} = await userStorage.getUserByUsername("mary");
@@ -656,7 +659,7 @@ test('FastifyServer.loginEmail', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body)
-    expect(body.template).toBe("loginfactor2.njk");
+    expect(body.template).toBe("factor2.njk");
 
     // successful login second factor
     const sessionCookie = getSession(res);
@@ -744,7 +747,7 @@ test('FastifyServer.totpToEmail', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "mary", password: "maryPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body)
-    expect(body.template).toBe("loginfactor2.njk");
+    expect(body.template).toBe("factor2.njk");
 
     const sessionCookie = getSession(res);
     const {secrets} = await userStorage.getUserByUsername("mary");
@@ -921,7 +924,7 @@ test('FastifyServer.factor2ProtectedPageWrongToken', async () => {
         csrfToken: csrfToken,
     } });
     expect(res.statusCode).toBe(302);
-    expect(res.headers.location).toBe("/factor2?error=Unauthorized");
+    expect(res.headers.location).toBe("/factor2?error=InvalidToken");
     const {secrets} = await userStorage.getUserByUsername("mary");
     const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password||"");
     expect(passwordsEqual).toBe(true);
