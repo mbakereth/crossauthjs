@@ -1,5 +1,4 @@
 import { UserStorage, UserStorageGetOptions, UserStorageOptions } from '../storage';
-import { PrismaUserStorage } from './prismastorage';
 import { User, UserSecrets, UserInputFields, UserSecretsInputFields } from '../../interfaces';
 import { CrossauthError, ErrorCode } from '../../error';
 import { CrossauthLogger, j } from '../..';
@@ -12,27 +11,29 @@ export interface LdapUser {
 }
 
 /**
- * Optional parameters for {@link PrismaUserStorage}.
- * 
- * See {@link PrismaUserStorage.constructor} for definitions.
+ * Optional parameters for {@link LdapUserStorage}.
  */
 export interface LdapStorageOptions extends UserStorageOptions {
 
-    /** Utl running LDAP server. eg ldap://ldap.example.com or ldap://ldap,example.com:636 
+    /** Utl running LDAP server. eg ldap://ldap.example.com or ldaps://ldap,example.com:1636 
      *  No default (required)
      */
     ldapUrls? : string,
 
-    /** Search base, for user queries, eg "dc=example,dc=com".  Default empty */
+    /** Search base, for user queries, eg  `ou=users,dc=example,dc=com`.  Default empty */
     ldapUserSearchBase? : string,
 
-    /** Username attribute.  Default "cn".
+    /** Username attribute for searches.  Default "cn".
      */
     ldapUsernameAttribute? : string,  
 
-    /** Defaults to "(objectclass=*)" */
-    ldapSearchFilter? : string;
-
+    /** A function to create a user object given the entry in LDAP and additional fields.
+     * The additional fields might be useful for attributes that aren't in LDAP and the
+     * user needs to be prompted for, for example email address.
+     * The default function sets `username` to `uid` from `ldapUser`,
+     * `state` to `active` and takes every field for `user` (overriding `status`
+     * and `username` if present).
+     */
     createUserFn?:  (user: Partial<User>, ldapUser: LdapUser) => UserInputFields;
 }
 
@@ -42,6 +43,16 @@ function defaultCreateUserDn(user: Partial<User>, ldapUser: LdapUser) : UserInpu
     return {username: uid, state: "active", ...user};
 }
 
+/**
+ * Wraps another user storage but with the authentication done in LDAP.
+ * 
+ * This class still needs a user to be created in another database, with 
+ * for example a user id that can be referenced in key storage, and a state
+ * variable.
+ * 
+ * An admin account is not used.  Searches are done as the user, with the user's
+ * password.
+ */
 export class LdapStorage extends UserStorage {
     private localStorage : UserStorage;
     private ldapUrls = [];
@@ -49,6 +60,11 @@ export class LdapStorage extends UserStorage {
     private ldapUsernameAttribute = "cn";
     private createUserFn:  (user: Partial<User>, ldapUser: LdapUser) => UserInputFields = defaultCreateUserDn;
 
+    /**
+     * Constructor.
+     * @param localStorage the underlying storage where users are kept (without passwords)
+     * @param options see {@link LdapStorageOptions}
+     */
     constructor(localStorage : UserStorage, options : LdapStorageOptions = {}) {
         super(options);
         this.localStorage = localStorage;
@@ -59,7 +75,12 @@ export class LdapStorage extends UserStorage {
     }
 
     /**
-     * If you enable signup, you will need to implement this method
+     * Authenticates the user in LDAP and, if valid, creates a user in local
+     * storage.
+     * 
+     * @param user passed to the default `createUserFn` to create the user object.  `username` field is used for LDAP authentication
+     * @param secrets: `password` for LDAP expected to be set here.
+     * @returns the created user object, as it appears in local storage
      */
     async createUser(user : UserInputFields, secrets : UserSecretsInputFields) 
         : Promise<User> {
@@ -69,40 +90,76 @@ export class LdapStorage extends UserStorage {
         return await this.localStorage.createUser(this.createUserFn(user, ldapUser), {});
     }
 
+    /**
+     * Gets a user from the local storage.  Does not check LDAP.
+     * @param username the username to fetch
+     * @param options passed to `localStorage`'s `getUserByUsername()`
+     * @returns the user
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
+     */
     async getUserByUsername(
         username : string, 
          options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
             return await this.localStorage.getUserByUsername(username, options);
          }
 
+    /**
+     * Gets a user from the local storage.  Does not check LDAP.
+     * @param id the user id to fetch
+     * @param options passed to `localStorage`'s `getUserByUsername()`
+     * @returns the user
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
+     */
     async getUserById(
         id : string|number, 
          options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
             return await this.localStorage.getUserById(id, options);
          }
 
+    /**
+     * Gets a user from the local storage.  Does not check LDAP.
+     * @param email the email address to fetch user by
+     * @param options passed to `localStorage`'s `getUserByUsername()`
+     * @returns the user
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
+     */
     async getUserByEmail(
         email : string | number, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
             return await this.getUserByEmail(email, options);
         }
 
+    /**
+     * Updates a user in local storage.  Does not do an LDAP update.
+     * @param user new fields for the user, plus `id` to match the user by
+     * @param _secrets ignored as secrets cannot be updated
+     * @returns 
+     */
     async updateUser(user : Partial<User>, _secrets? : Partial<UserSecrets>) : Promise<void> {
         return await this.localStorage.updateUser(user, undefined);
     }
 
     /**
-     * If your storage supports this, delete the named user from storage.
+     * Deletes a user from local storage (not from LDAP)
      * @param username username to delete
      */
     async deleteUserByUsername(username : string) : Promise<void> {
         await this.localStorage.deleteUserByUsername(username);
     }
 
+    /**
+     * Gets the user from LDAP.  Does not check local storage.
+     * 
+     * If the user doesn't exist or authentication fails, an exception is thrown
+     * @param username the username to fetch
+     * @param password the LDAP password
+     * @returns the matching {@link LdapUser}
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
+     */
     async getLdapUser(username : string, password : string) : Promise<LdapUser> {
         let ldapClient : ldap.Client;
         try {
-            const sanitizedUsername = LdapStorage.sanitizeLdapDn(username);
+            const sanitizedUsername = LdapStorage.sanitizeLdapDnForSerach(username);
             const userDn = [this.ldapUsernameAttribute+"="+sanitizedUsername, this.ldapUserSearchBase].join(",");
             if (!password) throw new CrossauthError(ErrorCode.PasswordInvalid);
             CrossauthLogger.logger.debug(j({msg: "LDAP search "+userDn}));
@@ -204,6 +261,11 @@ export class LdapStorage extends UserStorage {
         return user
     }
       
+    /**
+     * Sanitises an LDAP dn for passing to bind (escaping special characters)
+     * @param dn the dn to sanitise
+     * @returns a sanitized dn
+     */
     static sanitizeLdapDn(dn : string) : string {
         return dn.replace("\\", "\\\\")
                  .replace(",", "\\,")
@@ -215,6 +277,11 @@ export class LdapStorage extends UserStorage {
                  .trim()
     }
 
+    /**
+     * Sanitises an LDAP dn for passing to searches (escaping special characters)
+     * @param dn the dn to sanitise
+     * @returns a sanitized dn
+     */
     static sanitizeLdapDnForSerach(dn : string) : string {
         return LdapStorage.sanitizeLdapDn(dn)
                  .replace("*", "\\*")

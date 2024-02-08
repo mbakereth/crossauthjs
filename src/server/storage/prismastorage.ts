@@ -529,14 +529,6 @@ export class PrismaKeyStorage extends KeyStorage {
         try {
             let data = {...key};
             delete data.value;
-            /*let data : {[key : string] : any} = {
-                user_id : key.userId,
-                created : key.created,
-                expires : key.expires,
-            };
-            if ("lastActive" in key) {
-                data = {...data, lastActive: key.lastActive};
-            }*/
 
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             await tx[this.keyTable].update({
@@ -554,6 +546,9 @@ export class PrismaKeyStorage extends KeyStorage {
         }
     }
 
+    /**
+     * See {@link KeyStorage}.
+     */
     async updateData(keyName : string, dataName: string, value: any|undefined) : Promise<void> {
         await this.prismaClient.$transaction(async (tx) =>{
             const key = await this.getKeyWithTransaction(keyName, tx);

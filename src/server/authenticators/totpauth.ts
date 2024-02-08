@@ -6,10 +6,18 @@ import { ErrorCode, CrossauthError } from '../../error.ts';
 import { CrossauthLogger, j } from '../../logger.ts';
 import { Authenticator, type AuthenticationParameters, AuthenticationOptions } from '../auth.ts';
 
+/**
+ * Authenticator for Time-Based One-Time Passwords (TOTP), eg Google Authenticator
+ */
 export class TotpAuthenticator extends Authenticator {
 
     private appName : string;
 
+    /**
+     * Constructor
+     * @param appName this forms part of the QR code that users scan into their authenticator app.  The name will appear in their app
+     * @param options See {@link AuthenticationOptions}.
+     */
     constructor(appName : string, options? : AuthenticationOptions) {
         super({friendlyName : "Google Authenticator", ...options});
         this.appName = appName;
@@ -43,6 +51,12 @@ export class TotpAuthenticator extends Authenticator {
         
     }
 
+    /**
+     * Creates a shared secret and returns it, along with image data for the QR code to display.
+     * @param user the `username` is expected to be present.  All other fields are ignored.
+     * @returns `userData` containing `username`, `totpSecret`, `factor2` and `qr`.
+     *          `sessionData` containing the same except `qr`.
+     */
     async prepareConfiguration(user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
         const { qrUrl, secret } = await this.createSecret(user.username);
 
@@ -51,11 +65,24 @@ export class TotpAuthenticator extends Authenticator {
         return { userData, sessionData};
     }
 
+    /**
+     * For cases when the 2FA page was closed without completing.  Returns the same data as `prepareConfiguration`, 
+     * without generating a new secret
+     * @param username user to return this for
+     * @param sessionKey the session key, which should cantain the `sessionData` from `prepareConfiguration`, 
+     * @returns 
+     */
     async reprepareConfiguration(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>, newSessionData: {[key:string]: any}|undefined}|undefined> {
         const { qrUrl, secret, factor2 } = await this.getSecretFromSession(username, sessionKey);
         return { userData: {qr: qrUrl, totpSecret: secret, factor2: factor2}, secrets: {totpSecret: secret}, newSessionData: undefined}
     }
 
+    /**
+     * Authenticates the user using the saved TOTP parameters and the passed code.
+     * @param _user ignored
+     * @param secrets should contain `totpSecret` that was saved in the session data.
+     * @param params should contain `totpCode`.
+     */
     async authenticateUser(_user : UserInputFields|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!secrets.totpSecret || !params.totpCode) {
             throw new CrossauthError(ErrorCode.InvalidToken, "TOTP secret or code not given");
@@ -67,29 +94,57 @@ export class TotpAuthenticator extends Authenticator {
         }
     }
 
+    /**
+     * Creates and returns a `totpSecret`
+     * @param username the user to create these for
+     * @param _params ignored
+     * @param _repeatParams  ignored
+     * @returns the `totpSecret` field will be populated.
+     */
     async createPersistentSecrets(username : string, _params: AuthenticationParameters, _repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         const { secret } = await this.createSecret(username);
         return { totpSecret: secret };
     }
 
+    /**
+     * Does nothing for this class
+     */
     async createOneTimeSecrets(_user : User) : Promise<Partial<UserSecretsInputFields>> {
         return { }
     }
 
+    /**
+     * @returns true - this class can create users
+     */
     canCreateUser() : boolean {
         return true;
 
     }
+
+    /**
+     * @returns true - this class can update users
+     */
     canUpdateUser() : boolean {
         return true;
     }
+
+    /**
+     * @returns `totpSecret`
+     */
     secretNames() : string[] {
         return ["totpSecret"];
     }
+
+    /**
+     * Does nothing for this class
+     */
     validateSecrets(_params : AuthenticationParameters) : string[] {
         return [];
     }
 
+    /**
+     * @returns false - if email verification is enabled, it should be used for this class
+     */
     skipEmailVerificationOnSignup() : boolean {
         return false;
     }

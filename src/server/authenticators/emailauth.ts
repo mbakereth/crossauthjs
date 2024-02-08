@@ -8,6 +8,9 @@ import { randomInt }  from 'node:crypto';
 import nunjucks from "nunjucks";
 import nodemailer from 'nodemailer';
 
+/**
+ * Options for `EmailAuthenticator`
+ */
 export interface EmailAuthenticatorOptions extends AuthenticationOptions {
 
     /** The directory containing views (by default, Nunjucks templates) */
@@ -29,7 +32,6 @@ export interface EmailAuthenticatorOptions extends AuthenticationOptions {
     smtpHost? : string,
 
     /** Port the SMTP server is running on.  Default 25 */
-
     smtpPort? : number,
 
     /** Whether or not TLS is used by the SMTP server.  Default false */
@@ -45,6 +47,9 @@ export interface EmailAuthenticatorOptions extends AuthenticationOptions {
     emailAuthenticatorTokenExpires? : number,
 }
 
+/**
+ * This authenticator creates a one-time code and sends it in email
+ */
 export class EmailAuthenticator extends Authenticator {
 
     private views : string = "views";
@@ -59,6 +64,10 @@ export class EmailAuthenticator extends Authenticator {
     private smtpPassword? : string;
     private emailAuthenticatorTokenExpires : number = 60*5;
 
+    /**
+     * Constructor
+     * @param options see {@link EmailAuthenticatorOptions}
+     */
     constructor(options : EmailAuthenticatorOptions = {}) {
         super({friendlyName : "Email token", ...options});
         setParameter("views", ParamType.String, this, options, "VIEWS");
@@ -111,6 +120,12 @@ export class EmailAuthenticator extends Authenticator {
 
     }
 
+    /**
+     * Creates and emails the one-time code
+     * @param user the user to create it for.  Uses the `email` field if present, `username` otherwise (which in this case is expected to contain an email address)
+     * @returns `userData` containing `username`, `email`, `factor2`
+     *          `sessionData` containing the same plus `token` and `expiry` which is a Unix time (number).
+     */
     async prepareConfiguration(user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
 
         const token = EmailAuthenticator.zeroPad(randomInt(999999), 6);
@@ -125,6 +140,12 @@ export class EmailAuthenticator extends Authenticator {
         return { userData, sessionData};
     }
 
+    /**
+     * Creates and emails a new one-time code.
+     * @param _username ignored
+     * @param sessionKey the session containing the previously created data.
+     * @returns 
+     */
     async reprepareConfiguration(_username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>, newSessionData: {[key:string]: any}|undefined}|undefined> {
         const data = getJsonData(sessionKey)["2fa"];
         const token = EmailAuthenticator.zeroPad(randomInt(999999), 6);
@@ -139,6 +160,16 @@ export class EmailAuthenticator extends Authenticator {
         }
     }
 
+    /**
+     * Authenticates the user by comparing the user-provuded token with the one in secrets.
+     * 
+     * Validation fails if the token is incorrect or has expired.
+     * 
+     * @param _user ignored
+     * @param secrets taken from the session and should contain `token` and `expiry`
+     * @param params user input and should contain `token`
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `InvalidToken` or `Expired`.
+     */
     async authenticateUser(_user : User, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (params.token != secrets?.token) {
             throw new CrossauthError(ErrorCode.InvalidToken, "Invalid code");
@@ -149,10 +180,18 @@ export class EmailAuthenticator extends Authenticator {
         }
     }
 
+    /**
+     * Does nothing for this class
+     */
     async createPersistentSecrets(_username : string, _params: AuthenticationParameters, _repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         return { };
     }
 
+    /**
+     * Creates adn emails a new one-time code.
+     * @param user the user to create it for.  Uses the `email` field if present, `username` otherwise (which in this case is expected to contain an email address)
+     * @returns `token` and `expiry` as a Unix time (number).
+     */
     async createOneTimeSecrets(user : User) : Promise<Partial<UserSecretsInputFields>> {
         const token = EmailAuthenticator.zeroPad(randomInt(999999), 6);
         const now = new Date();
@@ -163,24 +202,47 @@ export class EmailAuthenticator extends Authenticator {
         return { token: token, expiry: expiry }
     }
 
+    /**
+     * @returns true - this class can create users
+     */
     canCreateUser() : boolean {
         return true;
 
     }
+
+    /**
+     * @returns true - this class can update users
+     */
     canUpdateUser() : boolean {
         return true;
     }
+
+    /**
+     * @returns empty - this authenticator has no persistent secrets
+     */
     secretNames() : string[] {
         return [];
     }
+
+    /**
+     * Does nothing for this class
+     */
     validateSecrets(_params : AuthenticationParameters) : string[] {
         return [];
     }
 
+    /**
+     * @returns true - as a code is sent to the registers email address, no additional email verification is needed
+     */
     skipEmailVerificationOnSignup() : boolean {
         return true;
     }
 
+    /**
+     * Returns whether or not the passed email has a valid form.
+     * @param email the email address to validate
+     * @returns true if it is valid. false otherwise
+     */
     static isEmailValid(email : string) : boolean {
         // https://stackoverflow.com/questions/46155/how-can-i-validate-an-email-address-in-javascript
         return String(email)
@@ -190,10 +252,22 @@ export class EmailAuthenticator extends Authenticator {
         ) != null;
     }
 
+
+    /**
+     * Throws an exception if an email address doesn't have a valid form.
+     * @param email the email address to validate
+     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `InvalidEmail`.
+     */
     static validateEmail(email : string|undefined)  {
         if (email==undefined || !EmailAuthenticator.isEmailValid(email)) throw new CrossauthError(ErrorCode.InvalidEmail);
     }
 
+    /**
+     * Takles a number and turns it into a zero-padded string
+     * @param num number ot pad
+     * @param places total number of required digits
+     * @returns zero-padded string
+     */
     static zeroPad(num : number, places : number) : string {
         var zero = places - num.toString().length + 1;
         return Array(+(zero > 0 && zero)).join("0") + num;

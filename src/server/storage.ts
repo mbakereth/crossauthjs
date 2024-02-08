@@ -2,12 +2,31 @@ import { CrossauthError, ErrorCode } from '../error.ts';
 import { setParameter, ParamType } from './utils';
 import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '../interfaces.ts';
 
+/**
+ * Passed to get methods in {@link UserStorage}.
+ */
 export interface UserStorageGetOptions {
+
+    /**
+     * If true, a valid user will be returned even if state is set to `awaitingemailverification`
+     */
     skipEmailVerifiedCheck? : boolean
+
+    /**
+     * If true, a valid user will be returned even if state is not set to `active`
+     */
     skipActiveCheck? : boolean
 }
 
+/**
+ * Options passed to {@link UserStorage} constructor
+ */
 export interface UserStorageOptions {
+
+    /**
+     * Fields that users are allowed to edit.  Any fields passed to a create or
+     * update call that are not in this list will be ignored.
+     */
 	userEditableFields? : string,
 }
 
@@ -68,7 +87,7 @@ export abstract class UserStorage {
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}>;
 
     /**
-     * If you enable signup, you will need to implement this method
+     * If you enable signup, you will need to implement this method if creating a USerStorage subclass
      */
     createUser(_user : UserInputFields, _secrets : UserSecretsInputFields) 
         : Promise<User> {
@@ -110,7 +129,7 @@ export abstract class KeyStorage {
     /**
      * Returns the matching key in the session storage or throws an exception if it doesn't exist.
      * 
-     * @param key the key to look up
+     * @param key the key to look up, as it will appear in this storage (typically unsigned, hashed)
      * @returns The matching Key record.
      * @throws {@link index!CrossauthError } with {@link index!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
@@ -154,6 +173,12 @@ export abstract class KeyStorage {
      */
     abstract deleteAllForUser(userId : string | number, prefix : string, except? : string) : Promise<void>;
 
+    /**
+     * The `data` field in a key entry is a JSON string.  This class should atomically update a field in it.
+     * @param keyName the name of they to update, as it appears in the table.
+     * @param dataName the field name to update
+     * @param value the new value
+     */
     abstract updateData(keyName : string, dataName : string, value: any|undefined) : Promise<void>;
 }
 

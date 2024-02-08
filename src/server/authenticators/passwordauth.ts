@@ -31,7 +31,11 @@ function defaultPasswordValidator(params : AuthenticationParameters) : string[] 
 /** Optional parameters to pass to {@link export class LocalPasswordAuthenticator extends Authenticator {
 } constructor. */
 export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions {
+
+    /** Application secret.  If defined, it is used as the secret in PBKDF2 to hash passwords */
     secret? : string,
+
+    /** If true, the `secret` will be concatenated to the salt when generating a hash for storing the password */
     enableSecretForPasswordHash? : boolean;
 
     /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
@@ -53,10 +57,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
      * See crypto.pbkdf2 for more information on the optional parameters.
      * 
      * @param userStorage an object that can getch usernames and hashed passwords from wherever they are stored, eg a database table
-     * @param iterations number of PBKDF2 iterations.  Defaults to 10000.
-     * @param keyLen length of generated hash.  Defaults to 64.
-     * @param digest digest algorithm to use.  Defaults to `sha512`.
-     * @param saltLength generate a salt with this number of characters.  Defaults to 16.
+     * @param options see {@link LocalPasswordAuthenticatorOptions}
      */
     constructor(_userStorage : UserStorage,
                 options : LocalPasswordAuthenticatorOptions = {}) {
@@ -73,9 +74,9 @@ export class LocalPasswordAuthenticator extends Authenticator {
      * these will be included in the returned User object.  `hashedPassword`, if present in the User object,
      * will be removed.
      * 
-     * @param username the username to authenticate
-     * @param password the password to hash and match against the hashed password on the user storage.
-     * @returns A {@link User } object with the optional extra fields but without the hashed password.  See explaination above.
+     * @param user the `username` field should contain the username
+     * @param secrets from the `UserSecrets` table.  `password` is expected to be present
+     * @param params the user input.  `password` is expected to be present
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
     async authenticateUser(user : UserInputFields, secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
@@ -90,24 +91,32 @@ export class LocalPasswordAuthenticator extends Authenticator {
         if (user.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
     }
 
+    /**
+     * @returns `password`
+     */
     secretNames() : string[] {
         return ["password"];
     }
 
+    /**
+     * Calls the implementor-provided `validatePasswordFn` 
+     * 
+     * This function is called to apply local password policy (password length, uppercase/lowercase etc)
+     * @param params 
+     * @returns 
+     */
     validateSecrets(params : AuthenticationParameters) : string[] {
         return this.validatePasswordFn(params);
     }
 
 
     /**
-     * Creates and returns a hashed of the passed password, with the hasing parameters encoded ready
+     * Creates and returns a hash of the passed password, with the hasing parameters encoded ready
      * for storage.
      * 
      * If salt is not provieed, a random one is greated.  If secret was passed to the constructor 
      * or in the .env, and enableSecretInPasswords was set to true, it is used as the pepper.
      * used as the pepper.
-     * 
-     * If the optional parameters `iterations`, `keyLen` or `digest` are passed, they override the class defaults,
      * 
      * @param password the password to hash
      * @param salt the salt to use.  If undefined, a random one will be generated.
@@ -148,6 +157,13 @@ export class LocalPasswordAuthenticator extends Authenticator {
         return await Hasher.passwordsEqual(password, passwordHash, secret);
     }
 
+    /**
+     * This will return p hash of the passed password.
+     * @param _username ignored
+     * @param params expected to contain `password`
+     * @param repeatParams if defined, this is expected to also contain `password` and is checked to match the one in `params`
+     * @returns the newly created password in the `password` field.
+     */
     async createPersistentSecrets(_username : string, params: AuthenticationParameters, repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         if (!params.password) throw new CrossauthError(ErrorCode.Unauthorized, "No password provided");
         if (repeatParams && repeatParams.password != params.password) {
@@ -156,20 +172,39 @@ export class LocalPasswordAuthenticator extends Authenticator {
         return {password: await LocalPasswordAuthenticator.hashPassword(params.password)};
     }
 
+    /**
+     * Does nothing for this class.
+     */
     async createOneTimeSecrets(_user : User) : Promise<Partial<UserSecretsInputFields>> {
         return { }
     }
 
+    /**
+     * @returns true - this class can create users
+     */
     canCreateUser() : boolean { return true; }
+    /**
+     * @returns true - this class can update users
+     */
     canUpdateUser() : boolean { return true; }
 
+    /**
+     * @returns false, if email verification is enabled, it should be for this authenticator too
+     */
     skipEmailVerificationOnSignup() : boolean {
         return false;
     }
+
+    /**
+     * Does nothing for this class.
+     */
     async prepareConfiguration(_user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
         return undefined;
     }
 
+    /**
+     * Does nothing for this class.
+     */
     async reprepareConfiguration(_username : string, _sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>, newSessionData: {[key:string]: any}|undefined}|undefined> {
         return undefined;
     }

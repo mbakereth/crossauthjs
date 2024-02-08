@@ -29,9 +29,6 @@ test('Ldapauth.authenticateUserInLdapNotInLocal', async () => {
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",
     });
-    const auth = new LdapAuthenticator(ldapStorage, {
-        ldapAutoCreateAccount: false,
-    })
     await expect(async () => {await ldapStorage.getUserByUsername("dave")}).rejects.toThrowError(CrossauthError);
 });
 

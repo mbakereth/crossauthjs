@@ -170,6 +170,10 @@ export class InMemoryUserStorage extends UserStorage {
         }
     }
 
+    /**
+     * Deletes the given user
+     * @param username username of user to delete
+     */
     async deleteUserByUsername(username: string): Promise<void> {
         const normalizedUser = UserStorage.normalize(String(username));
         if (normalizedUser in this.usersByUsername) {
@@ -280,6 +284,9 @@ export class InMemoryKeyStorage extends KeyStorage {
         }
     }
 
+    /**
+     * See {@link KeyStorage}.
+     */
     async updateData(keyName : string, dataName: string, value: any|undefined) : Promise<void> {
         const key = await this.getKey(keyName);
         let data : {[key:string] : any};

@@ -1,7 +1,5 @@
 import type { User, UserSecretsInputFields, Key, UserInputFields } from '../../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../../error.ts';
-import { UserStorage } from '../storage.ts'
-import { CrossauthLogger, j } from '../../logger.ts';
 import { setParameter, ParamType } from '../utils.ts';
 import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
 import { LdapStorage } from '../storage/ldapstorage.ts';
@@ -12,7 +10,10 @@ export interface LdapAuthenticatorOptions extends AuthenticationOptions {
 }
 
 /**
- * Does username/password authentication using PBKDF2 hashed passwords.
+ * Authenticates a user against LDAP.
+ * 
+ * Users are expected to be in local storage as well, as defined by `ldapStorage`.
+ * This class can optionally auto-create a user that is not already there.
  */
 export class LdapAuthenticator extends Authenticator {
 
@@ -22,13 +23,8 @@ export class LdapAuthenticator extends Authenticator {
     /**
      * Create a new authenticator.
      * 
-     * See crypto.pbkdf2 for more information on the optional parameters.
-     * 
-     * @param userStorage an object that can getch usernames and hashed passwords from wherever they are stored, eg a database table
-     * @param iterations number of PBKDF2 iterations.  Defaults to 10000.
-     * @param keyLen length of generated hash.  Defaults to 64.
-     * @param digest digest algorithm to use.  Defaults to `sha512`.
-     * @param saltLength generate a salt with this number of characters.  Defaults to 16.
+     * @param ldapStorage the storage that defines the LDAP server and databse for storing users locally
+     * @param options see {@link LdapAuthenticatorOptions}
      */
     constructor(ldapStorage : LdapStorage,
                 options : LdapAuthenticatorOptions = {}) {
@@ -40,14 +36,11 @@ export class LdapAuthenticator extends Authenticator {
     /**
      * Authenticates the user, returning a the user as a {@link User} object.
      * 
-     * If you set `extraFields` when constructing the {@link UserStorage} instance passed to the constructor,
-     * these will be included in the returned User object.  `hashedPassword`, if present in the User object,
-     * will be removed.
-     * 
-     * @param username the username to authenticate
-     * @param password the password to hash and match against the hashed password on the user storage.
-     * @returns A {@link User } object with the optional extra fields but without the hashed password.  See explaination above.
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
+     * @param user the `username` field is required and this is used for LDAP authentication.  
+     *             If `ldapAutoCreateAccount` is true, these attributes as used for user creation (see {@link LdapStorage.createUser}).
+     * @param _secrets Ignored as secrets are stored in LDAP
+     * @param params the `password` field is expected to contain the LDAP password.
+     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UsernameOrPasswordInvalid`.
      */
     async authenticateUser(user : UserInputFields, _secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");
@@ -73,32 +66,56 @@ export class LdapAuthenticator extends Authenticator {
         return ["password"];
     }
 
+    /**
+     * Does nothing as LDAP is responsible for password format (this class doesn't create password entries)
+     */
     validateSecrets(_params : AuthenticationParameters) : string[] {
         return [];
     }
 
-    async createPersistentSecrets(_username : string, params: AuthenticationParameters, repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
-        if (!params.password) throw new CrossauthError(ErrorCode.Unauthorized, "No password provided");
-        if (repeatParams && repeatParams.password != params.password) {
-            throw new CrossauthError(ErrorCode.PasswordMatch);
-        }
+    /**
+     * Does nothing in this class.
+     */
+    async createPersistentSecrets(_username : string,_params: AuthenticationParameters, _repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         return {};
     }
 
+    /**
+     * Does nothing in this class.
+     */
     async createOneTimeSecrets(_user : User) : Promise<Partial<UserSecretsInputFields>> {
         return { }
     }
 
+    /**
+     * @returns true - we can create a user (but not secrets)
+     */
     canCreateUser() : boolean { return true; }
+
+    /**
+     * 
+     * @returns true - we can update user (but not secrets).
+     */
     canUpdateUser() : boolean { return true; }
 
+    /**
+     * 
+     * @returns false - if email verification is enabled, it should happen for this authenticator
+     */
     skipEmailVerificationOnSignup() : boolean {
         return false;
     }
+
+    /**
+     * Does nothing in this class
+     */
     async prepareConfiguration(_user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
         return undefined;
     }
 
+    /**
+     * Does nothing in this class
+     */
     async reprepareConfiguration(_username : string, _sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>, newSessionData: {[key:string]: any}|undefined}|undefined> {
         return undefined;
     }
