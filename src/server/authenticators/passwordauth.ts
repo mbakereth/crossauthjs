@@ -189,6 +189,13 @@ export class LocalPasswordAuthenticator extends Authenticator {
     canUpdateUser() : boolean { return true; }
 
     /**
+     * @returns true - users can update secrets
+     */
+    canUpdateSecrets() : boolean {
+        return true;
+    }
+
+    /**
      * @returns false, if email verification is enabled, it should be for this authenticator too
      */
     skipEmailVerificationOnSignup() : boolean {

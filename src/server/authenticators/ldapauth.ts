@@ -2,7 +2,7 @@ import type { User, UserSecretsInputFields, Key, UserInputFields } from '../../i
 import { ErrorCode, CrossauthError } from '../../error.ts';
 import { setParameter, ParamType } from '../utils.ts';
 import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
-import { LdapStorage } from '../storage/ldapstorage.ts';
+import { LdapUserStorage } from '../storage/ldapstorage.ts';
 
 /** Optional parameters to pass to {@link LdapAuthenticator} constructor. */
 export interface LdapAuthenticatorOptions extends AuthenticationOptions {
@@ -18,7 +18,7 @@ export interface LdapAuthenticatorOptions extends AuthenticationOptions {
 export class LdapAuthenticator extends Authenticator {
 
     private ldapAutoCreateAccount : boolean = false;
-    private ldapStorage : LdapStorage;
+    private ldapStorage : LdapUserStorage;
 
     /**
      * Create a new authenticator.
@@ -26,7 +26,7 @@ export class LdapAuthenticator extends Authenticator {
      * @param ldapStorage the storage that defines the LDAP server and databse for storing users locally
      * @param options see {@link LdapAuthenticatorOptions}
      */
-    constructor(ldapStorage : LdapStorage,
+    constructor(ldapStorage : LdapUserStorage,
                 options : LdapAuthenticatorOptions = {}) {
         super({friendlyName: "LDAP", ...options});
         setParameter("ldapAutoCreateAccount", ParamType.Boolean, this, options, "LDAP_AUTO_CREATE_ACCOUNT");
@@ -37,7 +37,7 @@ export class LdapAuthenticator extends Authenticator {
      * Authenticates the user, returning a the user as a {@link User} object.
      * 
      * @param user the `username` field is required and this is used for LDAP authentication.  
-     *             If `ldapAutoCreateAccount` is true, these attributes as used for user creation (see {@link LdapStorage.createUser}).
+     *             If `ldapAutoCreateAccount` is true, these attributes as used for user creation (see {@link LdapUserStorage.createUser}).
      * @param _secrets Ignored as secrets are stored in LDAP
      * @param params the `password` field is expected to contain the LDAP password.
      * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UsernameOrPasswordInvalid`.
@@ -97,6 +97,13 @@ export class LdapAuthenticator extends Authenticator {
      * @returns true - we can update user (but not secrets).
      */
     canUpdateUser() : boolean { return true; }
+
+    /**
+     * @returns false - users cannot update secrets
+     */
+    canUpdateSecrets() : boolean {
+        return false;
+    }
 
     /**
      * 

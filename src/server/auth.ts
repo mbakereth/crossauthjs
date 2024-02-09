@@ -20,6 +20,12 @@ export interface AuthenticationOptions {
 
 }
 
+export interface AuthenticatorCapabilities {
+    canCreateUser: boolean,
+    canUpdateUser: boolean,
+    canUpdateSecrets: boolean,
+}
+
 /**
  * Base class for username/password authentication.
  * 
@@ -78,6 +84,11 @@ export abstract class Authenticator {
     /**
      * If true, it is expected that this authenticator allows users to be updated.
      */
+    abstract canUpdateSecrets() : boolean;
+
+    /**
+     * If true, it is expected that this authenticator allows users to change their secrets.
+     */
     abstract canUpdateUser() : boolean;
 
     /**
@@ -93,5 +104,13 @@ export abstract class Authenticator {
      * @param params user-provided secrets to validate
      */
     abstract validateSecrets(params : AuthenticationParameters) : string[];
+
+    capabilities() : AuthenticatorCapabilities {
+        return {
+            canCreateUser: this.canCreateUser(),
+            canUpdateUser: this.canUpdateUser(),
+            canUpdateSecrets: this.canUpdateSecrets(),
+        }
+    }
 }
 

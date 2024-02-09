@@ -1,4 +1,5 @@
-import { type User, UserSecrets, type Key, getJsonData, UserInputFields, UserSecretsInputFields } from '../interfaces.ts';
+import { getJsonData } from '../interfaces.ts';
+import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '../interfaces.ts';
 import { ErrorCode, CrossauthError } from '../error.ts';
 import { UserStorage, KeyStorage } from './storage.ts';
 import { AuthenticationParameters, Authenticator } from './auth.ts';
@@ -72,8 +73,6 @@ export class SessionManager {
         for (let authenticationName in this.authenticators) {
             this.authenticators[authenticationName].factorName = authenticationName;
         }
-
-        setParameter("secret", ParamType.String, this, options, "SECRET");
 
         this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
         this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});

@@ -117,7 +117,7 @@ export class DoubleSubmitCsrfToken {
      * @returns a {@link Cookie } object,
      */
     makeCsrfCookie(token : string) : Cookie {
-        const cookieValue = Hasher.sign({v: token}, this.secret)
+        const cookieValue = Hasher.sign({v: token}, this.secret, "")
         let options : CookieOptions = {}
         if (this.domain) {
             options.domain = this.domain;
@@ -144,10 +144,6 @@ export class DoubleSubmitCsrfToken {
     }
 
     unsignCookie(cookieValue : string) : string {
-        const parts = cookieValue.split(".");
-        if (parts.length != 2) {
-            throw new CrossauthError(ErrorCode.InvalidKey, "CSRF cookie is not in a valid form");
-        }
         return Hasher.unsign(cookieValue, this.secret).v;
     }
 
@@ -407,7 +403,7 @@ export class SessionCookie {
      * @returns a {@link Cookie } object,
      */
     makeCookie(sessionKey : Key, persist? : boolean) : Cookie {
-        let signedValue = Hasher.sign({v: sessionKey.value}, this.secret);
+        let signedValue = Hasher.sign({v: sessionKey.value}, this.secret, "");
         let options : CookieOptions = {}
         if (persist == undefined) persist = this.persist;
         if (this.domain) {

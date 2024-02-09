@@ -30,17 +30,20 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
 
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
-    const server = new FastifyServer(userStorage, keyStorage, {
-        localpassword: lpAuthenticator,
-        totp: totpAuthenticator,
-        email: emailAuthenticator
-    }, {
-        app: app,
-        views: path.join(__dirname, '../views'),
-        secret: "ABCDEFG",
-        allowedFactor2: "none, totp, email",
-        ...options,
-    });
+    const server = new FastifyServer(userStorage, {
+        session: {
+            keyStorage: keyStorage, 
+            authenticators: {
+                localpassword: lpAuthenticator,
+                totp: totpAuthenticator,
+                email: emailAuthenticator,
+            }}}, {
+            app: app,
+            views: path.join(__dirname, '../views'),
+            secret: "ABCDEFG",
+            allowedFactor2: "none, totp, email",
+            ...options,
+        });
     // @ts-ignore
     app.decorateReply("view",  function(template, args) {
         return {template: template, args: args};

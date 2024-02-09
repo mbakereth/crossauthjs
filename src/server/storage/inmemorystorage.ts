@@ -194,6 +194,8 @@ export class InMemoryUserStorage extends UserStorage {
  */
 export class InMemoryKeyStorage extends KeyStorage {
     private keys : { [key : string]: Key } = {};
+    private keysByUserId : { [key : string]: Key[] } = {};
+    private nonUserKeys : Key[] = [];
 
     /**
      * Constructor with user storage object to use plus optional parameters.
@@ -223,36 +225,52 @@ export class InMemoryKeyStorage extends KeyStorage {
     /**
      * Saves a session key in the session table.
      * 
-     * @param id user ID to store with the session key.  See {@link InMemoryUserStorage} for how this may differ from `username`.
+     * @param userId user ID to store with the session key.  See {@link InMemoryUserStorage} for how this may differ from `username`.
      * @param key the session key to store.
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will also be stored in the key table row
      * @throws {@link index!CrossauthError } if the key could not be stored.
      */
-    async saveKey(id : string, 
-                      key : string, dateCreated : Date, 
+    async saveKey(userId : string | number | undefined, 
+                      keyValue : string, dateCreated : Date, 
                       expires : Date | undefined, 
                       data? : string,
                       extraFields? : {[key : string]: any}) : Promise<void> {
-        this.keys[key] = {
-            value : key,
-            userId : id,
+        const key : Key = {
+            value : keyValue,
+            userId : userId,
             created: dateCreated,
             expires: expires,
             data: data,
             ...extraFields
         };
-        
+        this.keys[keyValue] = key;
+        if (userId) {
+            if (!(userId in this.keysByUserId)) {
+                this.keysByUserId[userId] = [key]
+            } else {
+                this.keysByUserId[userId].push(key);
+            }
+        } else {
+            this.nonUserKeys.push(key);
+
+        }
     }
 
     /**
      * 
      * @param key the key to delete
      */
-    async deleteKey(key : string) : Promise<void> {
-        if (key in this.keys) {
-            delete this.keys[key];
+    async deleteKey(keyValue : string) : Promise<void> {
+        if (keyValue in this.keys) {
+            const key = this.keys[keyValue];
+            if (key.userId) {
+                delete this.keysByUserId[key.userId];
+            } else {
+                this.nonUserKeys = this.nonUserKeys.filter((v) => v.value != keyValue);
+            }
+            delete this.keys[keyValue];
         }
     }
 
@@ -261,12 +279,74 @@ export class InMemoryKeyStorage extends KeyStorage {
      * 
      * @param userId : user ID to delete keys for
      */
-    async deleteAllForUser(userId : string | number, prefix: string, except : string|undefined = undefined) : Promise<void> {
-       for (const key in this.keys) {
+    async deleteAllForUser(userId : string | number | undefined | null, prefix: string, except : string|undefined = undefined) : Promise<void> {
+        for (const key in this.keys) {
             if (this.keys[key].userId == userId && (!except || key != except) && key.startsWith(prefix)) {
                 delete  this.keys[key];
             } 
-       }
+        }
+        if (userId) {
+            if (userId in this.keysByUserId) delete this.keysByUserId[userId];
+        } else {
+            this.nonUserKeys = [];
+        }
+    }
+
+    async getAllForUser(userId : string|number|undefined) : Promise<Key[]> {
+        if (!userId) return this.nonUserKeys;
+        if (userId in this.keysByUserId) return this.keysByUserId[userId];
+        return [];
+    }
+
+    async deleteMatching(key : Partial<Key>) : Promise<void> {
+        for (let keyValue in this.keys) {
+            let matches = true;
+            const thisKey = this.keys[keyValue];
+            for (let entry in key) {
+                if (entry in thisKey && thisKey[entry] != key[entry]) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                delete this.keys[keyValue];
+            }
+        }
+
+        for (let userId in this.keysByUserId) {
+            const thisKeys = this.keysByUserId[userId];
+            for (let i=0; i<thisKeys.length; ++i) {
+                let matches = true;
+                let idx = 0;
+                const thisKey = thisKeys[i];
+                for (let entry in key) {
+                    if (entry in thisKey && thisKey[entry] != key[entry]) {
+                        matches = false;
+                        idx = i;
+                        break;
+                    }
+                }
+                if (matches) {
+                    this.keysByUserId[userId] = this.keysByUserId[userId].splice(idx, 1);
+                }
+            }
+        }
+
+        for (let i=0; i<this.nonUserKeys.length; ++i) {
+            let matches = true;
+            let idx = 0;
+            const thisKey = this.nonUserKeys[i];
+            for (let entry in key) {
+                if (entry in thisKey && thisKey[entry] != key[entry]) {
+                    matches = false;
+                    idx = i;
+                    break;
+                }
+            }
+            if (matches) {
+                this.nonUserKeys = this.nonUserKeys.splice(idx, 1);
+            }
+        }
     }
 
 

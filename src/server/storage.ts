@@ -171,7 +171,16 @@ export abstract class KeyStorage {
      * 
      * @param userId : user ID to delete keys for
      */
-    abstract deleteAllForUser(userId : string | number, prefix : string, except? : string) : Promise<void>;
+    abstract deleteAllForUser(userId : string | number | undefined, prefix : string, except? : string) : Promise<void>;
+
+    /**
+     * Deletes all matching the given specs
+     * 
+     * @param userId : user ID to delete keys for
+     */
+    abstract deleteMatching(key : Partial<Key>) : Promise<void>;
+
+    abstract getAllForUser(userId : string|number|undefined) : Promise<Key[]>;
 
     /**
      * The `data` field in a key entry is a JSON string.  This class should atomically update a field in it.
@@ -180,5 +189,23 @@ export abstract class KeyStorage {
      * @param value the new value
      */
     abstract updateData(keyName : string, dataName : string, value: any|undefined) : Promise<void>;
+
+    /**
+     * Returns an object decoded from the data field as a JSON string
+     */
+    static decodeData(data : string|undefined) : {[key:string]: any} {
+        if (data == undefined || data == "") {
+            return {};
+        }
+        return JSON.parse(data);
+    }
+
+    /**
+     * Returns an object decoded from the data field as a JSON string
+     */
+    static encodeData(data? : {[key:string]: any}) : string {
+        if (!data) return "{}";
+        return JSON.stringify(data);
+    }
 }
 

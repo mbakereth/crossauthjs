@@ -121,9 +121,11 @@ export class PrismaUserStorage extends UserStorage {
             CrossauthLogger.logger.debug(j({msg: "User must reset password"}));
             throw new CrossauthError(ErrorCode.PasswordResetNeeded);
         }
-        const secrets = prismaUser.secrets;
-        delete secrets.user_id;
-        delete prismaUser.secrets;
+        const secrets = prismaUser.secrets || {};
+        if (prismaUser.secrets) {
+            delete secrets.user_id;
+            delete prismaUser.secrets;
+        }
         return {user: {...prismaUser, id: prismaUser[this.idColumn]}, secrets: {userId: prismaUser[this.idColumn], ...secrets}};
     }
 
@@ -251,17 +253,19 @@ export class PrismaUserStorage extends UserStorage {
                         usernameNormalized,
                         secrets: { 
                             create: 
-                                {password: "", ...secrets}
+                                secrets
                         }
                     },
                     include: { secrets: true},
                 });
             } else {
-                // @ts-ignore  (because types only exist when do prismaClient.table...)
-                newUser = await this.prismaClient[this.userTable].create({
-                    data: user,
-                    emailNormalized,
-                    usernameNormalized,
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            newUser = await this.prismaClient[this.userTable].create({
+                    data: {
+                        ...user,
+                        emailNormalized,
+                        usernameNormalized,
+                    }
             });
             }
         } catch (e) {
@@ -401,7 +405,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 user_id : userId,
                 value : value,
                 created : created,
-                expires : expires,
+                expires : expires||null,
                 data : data,
                 ...extraFields,
             };
@@ -456,7 +460,7 @@ export class PrismaKeyStorage extends KeyStorage {
      * 
      * @param userId : user ID to delete keys for
      */
-    async deleteAllForUser(userId : string | number, prefix : string, except? : string) : Promise<void> {
+    async deleteAllForUser(userId : string | number | undefined, prefix : string, except? : string) : Promise<void> {
         let error : CrossauthError;
         try {
             if (except) {
@@ -464,7 +468,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                     where: {
                         AND: [
-                            { user_id: userId },
+                            { user_id: userId||null },
                             { value: {startsWith: prefix} },
                             { value: { not: except } },
                         ]
@@ -476,7 +480,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                     where: {
                         AND: [
-                            { user_id: userId },
+                            { user_id: userId||null },
                             { value: {startsWith: prefix} } ,
                         ]
                     }
@@ -489,19 +493,42 @@ export class PrismaKeyStorage extends KeyStorage {
         if (error) throw error;
     }     
 
+    async deleteMatching(key : Partial<Key>) : Promise<void> {
+        try {
+            let andClause = [];
+            for (let entry in key) {
+                if (entry == "userId") {
+                    andClause.push({user_id: key[entry]});
+
+                } else {
+                    andClause.push({[entry]: key[entry]});
+                }
+            }
+            // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
+            return /*await*/ this.prismaClient[this.keyTable].deleteMany({
+                where: {
+                    AND: andClause,
+                }
+            });
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+            throw new CrossauthError(ErrorCode.Connection, "Error deleting keys");
+        }
+}
+
     /**
      * Deletes all keys from storage other than those with the given prefix
      * 
      * @param userId : user ID to delete keys for
      */
-    async deleteWithPrefix(userId : string | number, prefix : string) : Promise<void> {
+    async deleteWithPrefix(userId : string | number | undefined, prefix : string) : Promise<void> {
         let error : CrossauthError;
         try {
             // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
             return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                 where: {
                     AND: [
-                        { user_id: userId },
+                        { user_id: userId||null },
                         { value: {startsWith: prefix} },
                     ]
                 }
@@ -513,6 +540,27 @@ export class PrismaKeyStorage extends KeyStorage {
         } 
         if (error) throw error;
     }     
+
+    async getAllForUser(userId : string|number|undefined) : Promise<Key[]> {
+        let returnKeys : Key[] = [];
+        let error : CrossauthError|undefined = undefined;
+        try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            let prismaKeys =  await this.prismaClient[this.keyTable].findMany({
+                where: {
+                    user_id: userId||null
+                }
+            });
+            returnKeys = prismaKeys.map((v : Partial<Key>) => { return {...v, userId: v.user_id} });
+        } catch {
+            error = new CrossauthError(ErrorCode.InvalidKey);
+        }
+        if (error) {
+            throw error;
+        }
+        return returnKeys;
+
+    }
 
     /**
      * If the given session key exist in the database, update it with the passed values.  If it doesn't

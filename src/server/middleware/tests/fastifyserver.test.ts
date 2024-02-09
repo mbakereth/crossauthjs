@@ -25,16 +25,19 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
 
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
-    const server = new FastifyServer(userStorage, keyStorage, {
-        localpassword: lpAuthenticator,
-        totp: totpAuthenticator,
-    }, {
-        app: app,
-        views: path.join(__dirname, '../views'),
-        secret: "ABCDEFG",
-        allowedFactor2: "none, totp",
-        ...options,
-    });
+    const server = new FastifyServer(userStorage, {
+        session: {
+            keyStorage: keyStorage, 
+            authenticators: {
+                localpassword: lpAuthenticator,
+                totp: totpAuthenticator,
+            }}}, {
+            app: app,
+            views: path.join(__dirname, '../views'),
+            secret: "ABCDEFG",
+            allowedFactor2: "none, totp",
+            ...options,
+        });
     // @ts-ignore
     app.decorateReply("view",  function(template, args) {
         return {template: template, args: args};
@@ -502,4 +505,3 @@ test('FastifyServer.passwordReset', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "newPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(302);
 });
-

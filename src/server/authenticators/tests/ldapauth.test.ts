@@ -1,13 +1,13 @@
 import { test, expect } from 'vitest';
 import { InMemoryUserStorage } from '../../storage/inmemorystorage';
-import { LdapStorage } from '../../storage/ldapstorage';
+import { LdapUserStorage } from '../../storage/ldapstorage';
 import { LdapAuthenticator } from '../ldapauth';
 import { CrossauthError } from '../../..';
 import { UserInputFields } from '../../..';
 
 test('Ldapauth.authenticateUserInLdapAndLocal', async () => {
     const localStorage = new InMemoryUserStorage();
-    const ldapStorage = new LdapStorage(localStorage, {
+    const ldapStorage = new LdapUserStorage(localStorage, {
         ldapUrls: "ldap://localhost:1389",
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",
@@ -24,7 +24,7 @@ test('Ldapauth.authenticateUserInLdapAndLocal', async () => {
 
 test('Ldapauth.authenticateUserInLdapNotInLocal', async () => {
     const localStorage = new InMemoryUserStorage();
-    const ldapStorage = new LdapStorage(localStorage, {
+    const ldapStorage = new LdapUserStorage(localStorage, {
         ldapUrls: "ldap://localhost:1389",
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",
@@ -34,7 +34,7 @@ test('Ldapauth.authenticateUserInLdapNotInLocal', async () => {
 
 test('Ldapauth.authenticateUserAutoCreate', async () => {
     const localStorage = new InMemoryUserStorage();
-    const ldapStorage = new LdapStorage(localStorage, {
+    const ldapStorage = new LdapUserStorage(localStorage, {
         ldapUrls: "ldap://localhost:1389",
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",

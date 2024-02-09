@@ -185,7 +185,7 @@ export class Hasher {
     }
 
     static signableToken(payload : {[key:string]: any}, salt? : string, timestamp? : number) : string {
-        if (!salt) salt = Hasher.randomSalt();
+        if (salt == undefined) salt = Hasher.randomSalt();
         if (!timestamp) timestamp = (new Date()).getTime();
         return Buffer.from(JSON.stringify({...payload, t: timestamp, s: salt})).toString('base64url');
     }

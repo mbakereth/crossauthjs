@@ -20,7 +20,8 @@ model User {
     factor2             String      @default("")
     state               String      @default("active")
 
-    session Key[]
+    session             Key[]
+    apiKey              ApiKey[]
     secrets             UserSecrets?
 
     @@index([id])
@@ -48,3 +49,18 @@ model Key {
     @@index([user_id])
 }
 
+model ApiKey {
+    id             Int       @id @unique @default(autoincrement())
+    name           String    
+    value          String    @unique
+    user_id        Int?
+    created        DateTime
+    expires        DateTime
+    lastActive     DateTime?
+    data           String?
+    user           User?      @relation(references: [id], fields: [user_id], onDelete: Cascade)
+
+    @@index([id])
+    @@index([user_id])
+    @@unique([user_id, name], name: "userIdName")
+}

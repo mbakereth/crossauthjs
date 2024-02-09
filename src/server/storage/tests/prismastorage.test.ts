@@ -32,7 +32,7 @@ beforeAll(async () => {
     });
 });
 
-/*// test getting a user by username and by id
+// test getting a user by username and by id
 test('PrismaUserStorage.getUser', async () => {
     const {user: bob} = await userStorage.getUserByUsername("bob");
     expect(bob.username).toBe("bob");
@@ -40,7 +40,7 @@ test('PrismaUserStorage.getUser', async () => {
     const {user: bob2} = await userStorage.getUserById(id);
     expect(bob2.id).toBe(id);
     await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
-});*/
+});
 
 // test updating a field in the user table
 test("PrismaUserStorage.updateUser", async() => {
@@ -131,6 +131,74 @@ test("PeismaStorage.addData", async() => {
     expect(jsonData3.name1).toBeUndefined();
 
 });
+
+test("PrismaStorage.getAllForUser", async() => {
+    const key1 = "ABCDEF123";
+    const key2 = "ABCDEF456";
+    const key3 = "XYZ123456";
+    const keyStorage = new PrismaKeyStorage();
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    await keyStorage.deleteAllForUser(bob.id, "");
+    await keyStorage.deleteAllForUser(undefined, "");
+    const now = new Date();
+    const expiry = new Date();
+    expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
+    await keyStorage.saveKey(bob.id, key1, now, expiry);
+    await keyStorage.saveKey(bob.id, key2, now, expiry);
+    await keyStorage.saveKey(undefined, key3, now, expiry);
+    const keys = await keyStorage.getAllForUser(bob.id);
+    expect(keys.length).toBe(2);
+    expect([key1, key2]).toContain(keys[0].value);
+    expect(keys[1].value).not.toBe(key3);
+});
+
+test("PrismaStorage.getAllForUserWhenEmpty", async() => {
+    const keyStorage = new PrismaKeyStorage();
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    await keyStorage.deleteAllForUser(bob.id, "");
+    const keys = await keyStorage.getAllForUser(bob.id);
+    expect(keys.length).toBe(0);
+});
+
+test("PrismaStorage.getAllForNullUser", async() => {
+    const key1 = "ABCDEF123";
+    const key2 = "ABCDEF456";
+    const key3 = "XYZ123456";
+    const keyStorage = new PrismaKeyStorage();
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    await keyStorage.deleteAllForUser(undefined, "");
+    await keyStorage.deleteAllForUser(bob.id, "");
+    const now = new Date();
+    const expiry = new Date();
+    expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
+    await keyStorage.saveKey(bob.id, key3, now, expiry);
+    await keyStorage.saveKey(undefined, key1, now, expiry);
+    await keyStorage.saveKey(undefined, key2, now, expiry);
+    const keys = await keyStorage.getAllForUser(undefined);
+    expect(keys.length).toBe(2);
+    expect([key1, key2]).toContain(keys[0].value);
+    expect(keys[0].value).not.toBe(key3);
+    expect(keys[1].value).not.toBe(key3);
+});
+
+test("PrismaStorage.deleteMatchingForUser", async() => {
+    const key1 = "ABCDEF123";
+    const key2 = "ABCDEF456";
+    const keyStorage = new PrismaKeyStorage();
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    await keyStorage.deleteAllForUser(undefined, "");
+    await keyStorage.deleteAllForUser(bob.id, "");
+    const now = new Date();
+    const expiry = new Date();
+    expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
+    await keyStorage.saveKey(bob.id, key1, now, expiry);
+    await keyStorage.saveKey(bob.id, key2, now, expiry);
+    await keyStorage.deleteMatching({userId: bob.id, value: key1});
+    const keys = await keyStorage.getAllForUser(bob.id);
+    expect(keys.length).toBe(1);
+});
+
+
 afterAll(async () => {
     //await prismaClient.user.deleteMany({});
 });

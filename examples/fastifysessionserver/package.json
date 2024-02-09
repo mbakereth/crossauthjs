@@ -1,5 +1,5 @@
 {
-  "name": "expressserver",
+  "name": "fastifysessionserver",
   "version": "0.0.0",
   "description": "",
   "type": "module",
@@ -19,7 +19,7 @@
   "devDependencies": {
     "@types/node": "^20.10.5",
     "nodemon": "^3.0.2",
-    "prisma": "^5.7.1",
+    "prisma": "^5.9.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
@@ -27,7 +27,7 @@
     "@fastify/cookie": "^9.2.0",
     "@fastify/formbody": "^7.4.0",
     "@fastify/view": "^8.2.0",
-    "@prisma/client": "^5.7.1",
+    "@prisma/client": "^5.9.1",
     "@types/dotenv": "^8.2.0",
     "bunyan": "^1.8.15",
     "docenv": "^2.0.6",

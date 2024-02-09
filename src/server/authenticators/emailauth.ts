@@ -218,6 +218,13 @@ export class EmailAuthenticator extends Authenticator {
     }
 
     /**
+     * @returns false - users cannot update secrets
+     */
+    canUpdateSecrets() : boolean {
+        return false;
+    }
+    
+    /**
      * @returns empty - this authenticator has no persistent secrets
      */
     secretNames() : string[] {

@@ -13,7 +13,8 @@ import { CrossauthLogger, j } from '../..';
 import { setParameter, ParamType } from '../utils';
 import { FastifySessionServer } from './fastifysession';
 import type { FastifySessionServerOptions, CsrfBodyType } from './fastifysession';
-
+import { ApiKeyManager } from '../apikey';
+import { FastifyApiKeyServer, FastifyApiKeyServerOptions } from './fastifyapikey';
 
 
 /**
@@ -21,14 +22,13 @@ import type { FastifySessionServerOptions, CsrfBodyType } from './fastifysession
  * 
  * See {@link FastifyServer } constructor for description of parameters
  */
-export interface FastifyServerOptions extends FastifySessionServerOptions {
+export interface FastifyServerOptions extends FastifySessionServerOptions, FastifyApiKeyServerOptions {
 
     /** You can pass your own fastify instance or omit this, in which case Crossauth will create one */
     app? : FastifyInstance<Server, IncomingMessage, ServerResponse>,
 
     /** List of endpoints to add to the server ("login", "api/login", etc, prefixed by the `prefix` parameter.  Empty for all.  Default all. */
     endpoints? : string,
-
 }
 
 
@@ -138,8 +138,8 @@ export const AllEndpoints = [
 
 
 /**
- * This class provides a complete (but without HTML files) auth backend server with endpoints served using 
- * Fastify.
+ * This class provides a complete (but without HTML files) auth backend server for
+ * Fastify applications
  * 
  * If you do not pass an Fastify app to this class, it will create one.  By default, pages are rendered
  * with Nunjucks.  If you prefer another renderer that is compatible with Fastify, create your
@@ -150,53 +150,16 @@ export const AllEndpoints = [
  * 
  * Note that `views`, and the Nunjucls pages are not used by the API endpoints (those starting in /api).
  * 
- * **Endpoints provided**
- * 
- * All POST methods also take a csrfToken.  If user is logged in or anonymous sessions are enabled.
- * 
- * All POST methods are passed user, csrfToken, code, error and errors.
- * this is checked.
- * 
- * | METHOD | ENDPOINT                   | PATH PARAMS | GET/BODY PARAMS                          | VARIABLES PASSED         | FILE               |
- * | ------ | -------------------------- | ----------- | ---------------------------------------- | ------------------------ | ------------------ |
- * | GET    | /login                     |             | next                                     |                          | loginPage          | 
- * | POST   | /login                     |             | next, username, password                 | request params, message  | loginPage          | 
- * | POST   | /api/login                 |             | next, username, password                 |                          |                    | 
- * | POST   | /logout                    |             | next                                     |                          |                    | 
- * | POST   | /api/logout                |             | next                                     |                          |                    | 
- * | GET    | /signup                    |             | next                                     |                          | signupPage         |
- * | POST   | /signup                    |             | next, username, password, user/*         | request params, message  | signupPage         | 
- * | GET    | /changepassword            |             |                                          |                          | changePasswordPage | 
- * | POST   | /changepassword            |             | oldPassword, newPassword, repeatPassword | request params, message  | changePasswordPage | 
- * | POST   | /api/changepassword        |             | oldPassword, newPassword                 |                          |                    | 
- * | GET    | /updateuser                |             |                                          |                          | changePasswordPage | 
- * | POST   | /updateuser                |             | user_*                                   | request params, message  | changePasswordPage | 
- * | POST   | /api/updateuser            |             | user_*                                   |                          |                    | 
- * | GET    | /requestpasswordreset      |             |                                          |                          | changePasswordPage | 
- * | POST   | /requestpasswordreset      |             | email                                    | email, message           | changePasswordPage | 
- * | POST   | /api/requestpasswordreset  |             | password                                 |                          |                    | 
- * | GET    | /resetpassword             | token       |                                          |                          | changePasswordPage | 
- * | POST   | /resetpassword             |             | token, password, repeatPassword          | request params, message  | changePasswordPage | 
- * | POST   | /api/resetpassword         |             | token, password                          |                          |                    | 
- * | GET    | /verifyemail               |  token      |                                          |                          | emailVerifiedPage  | 
- * | GET    | /verifyemail               |  token      |                                          |                          | emailVerifiedPage  | 
- * | GET    | /api/userforsessionkey     |             |                                          |                          |                    | 
- * | GET    | /api/getcsrctoken          |             |                                          |                          |                    | 
- * 
- * If you have fields other than `id`, `username` and `password` in your user table, add them in 
- * `extraFields` when you create your {@link UserStorage} object.  In your signup and user update pages
- * (`signupPage`, `updateUserPage`), prefix these with `user_` in field names and they will be passed
- * into the user object when processing the form.  If there is an error processing the form, they will
- * be back as psot parameters, again prefixed with `user_`.
- * 
  *  **Using your own Fastify app**
  * 
  * If you are serving other endpoints, or you want to use something other than Nunjucks, you can create
  * and pass in your own Fastify app.
+ * 
+ * For session management, see {@link FastifySession}.
+ * For API key management, see {@link ApiKeyManager}
  */
 export class FastifyServer {
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
-    private enableSessions : boolean = true;
     private views : string = "views";
     private prefix : string = "/";
     private endpoints : string[] = [];
@@ -207,18 +170,25 @@ export class FastifyServer {
     private enablePasswordReset : boolean = true;
     private allowedFactor2 : string[] = [];
 
+
     /**
      * Creates the Fastify endpoints, optionally also the Fastify app.
      * @param optoions see {@link FastifyServerOptions}
      */
-    constructor(userStorage: UserStorage, 
-                keyStorage: KeyStorage, 
-                authenticators: {[key:string]: Authenticator}, 
+    constructor(userStorage: UserStorage, {session, apiKey} : {
+                session?: {
+                    keyStorage: KeyStorage, 
+                    authenticators: {[key:string]: Authenticator}, 
+                },
+                apiKey?: {keyStorage: KeyStorage},
+                },
                 options: FastifyServerOptions = {}) {
+
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
+        setParameter("enableapiKeys", ParamType.Boolean, this, options, "ENABLE_APIKEYS");
         setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
@@ -254,128 +224,25 @@ export class FastifyServer {
 
         this.app.decorateRequest('user', undefined);
         this.app.decorateRequest('csrfToken', undefined);
-                                
-        this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
-        if (this.enableSessions) this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
-        if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
-        if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
-        if (this.allowedFactor2.length > 0) this.endpoints = [...this.endpoints, ...Factor2PageEndpoints, ...Factor2ApiEndpoints];
+
+        if (session) 
+        {
+            this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
+            this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
+            if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
+            if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
+            if (this.allowedFactor2.length > 0) this.endpoints = [...this.endpoints, ...Factor2PageEndpoints, ...Factor2ApiEndpoints];
+        }
         setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
 
-        // validates the session id and csrftokens, creating if necessary and putting the csrf token
-        // and user in the request object.
-        if (this.enableSessions) { 
-            const sessionServer = new FastifySessionServer(this.app, this.prefix, userStorage, keyStorage, authenticators, options);
+        if (session) { 
+            const sessionServer = new FastifySessionServer(this.app, this.prefix, userStorage, session.keyStorage, session.authenticators, options);
             this.sessionServer = sessionServer; // for testing only
-            if (this.endpoints.includes("login")) {
-                sessionServer.addLoginEndpoints();
-            }
+            sessionServer.addEndpoints(this.endpoints);
+        }
 
-            if (this.endpoints.includes("loginfactor2")) {
-                sessionServer.addLoginFactor2Endpoints();
-            }
-
-            if (this.endpoints.includes("factor2")) {
-                sessionServer.addFactor2Endpoints();
-            }
-
-            if (this.endpoints.includes("signup")) {
-                sessionServer.addSignupEndpoints();
-            }
-
-            if (this.endpoints.includes("configurefactor2")) {
-                sessionServer.addConfigureFactor2Endpoints();
-            }
-
-            if (this.endpoints.includes("changefactor2")) {
-                sessionServer.addChangeFactor2Endpoints();
-            }
-
-            if (this.endpoints.includes("changepassword")) {
-                sessionServer.addChangePasswordEndpoints();
-            }
-
-            if (this.endpoints.includes("updateuser")) {
-                sessionServer.addUpdateUserEndpoints();
-            }
-
-            if (this.endpoints.includes("requestpasswordreset")) {
-                sessionServer.addRequestPasswordResetENdpoints();
-            }
-    
-            if (this.endpoints.includes("resetpassword")) {
-                if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /resetpassword");
-                sessionServer.addResetPasswordEndpoints();
-            }
-
-            if (this.endpoints.includes("verifyemail")) {
-                if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification  must be enabled for /verifyemail");
-                sessionServer.addVerifyEmailEndpoints();
-            }
-    
-            if (this.endpoints.includes("logout")) {
-                sessionServer.addLogoutEndpoints();
-    
-            }
-            if (this.endpoints.includes("api/login")) {
-                sessionServer.addApiLoginEndpoints();
-            }
-    
-            if (this.endpoints.includes("api/loginfactor2")) {
-                sessionServer.addApiLoginFactor2Endpoints();
-            }
-
-            if (this.endpoints.includes("api/cancelfactor2")) {
-                sessionServer.addApiCancelFactor2Endpoints();
-            }
-
-            if (this.endpoints.includes("api/logout")) {
-                sessionServer.addApiLogoutEndpoints();
-            }
-
-            if (this.endpoints.includes("api/signup")) {
-                sessionServer.addApiSignupEndpoints();
-            }
-
-            if (this.endpoints.includes("api/configurefactor2")) {
-                sessionServer.addApiConfigureFactor2Endpoints();
-            }
-
-            if (this.endpoints.includes("api/changepassword")) {
-                sessionServer.addApiChangePasswordEndpoints();
-            }
-
-            if (this.endpoints.includes("api/changefactor2")) {
-                sessionServer.addApiChangeFactor2Endpoints();
-            }
-
-            if (this.endpoints.includes("api/updateuser")) {
-                sessionServer.addApiUpdateUserEndpoints();
-            }
-
-            if (this.endpoints.includes("api/resetpassword")) {
-                if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /api/resetpassword");
-                sessionServer.addApiResetPasswordEndpoints();
-            }
-
-            if (this.endpoints.includes("api/requestpasswordreset")) {
-                if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /api/requestpasswordreset");
-                sessionServer.addApiRequestPasswordResetEndpoints();
-            }
-
-            if (this.endpoints.includes("api/verifyemail")) {
-                if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification must be enabled for /api/verifyemail");
-                sessionServer.addApiVerifyEmailEndpoints();
-            }
-
-            if (this.endpoints.includes("api/userforsessionkey")) {
-                sessionServer.addApiUserForSessionKeyEndpoints();
-            }
-
-            if (this.endpoints.includes("api/getcsrftoken")) {
-                sessionServer.addApiGetCsrfTokenEndpoints();
-        
-            }
+        if (apiKey) {
+            new FastifyApiKeyServer(this.app, userStorage, apiKey.keyStorage, options);
         }
     }
     

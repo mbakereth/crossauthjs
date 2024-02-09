@@ -129,6 +129,13 @@ export class TotpAuthenticator extends Authenticator {
     }
 
     /**
+     * @returns false - users cannot update secrets
+     */
+    canUpdateSecrets() : boolean {
+        return false;
+    }
+
+    /**
      * @returns `totpSecret`
      */
     secretNames() : string[] {

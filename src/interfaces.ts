@@ -13,7 +13,7 @@ export interface Key {
     expires : Date | undefined,
 
     /** the user this key is for (or undefined for an anonymous session ID) */
-    userId : string | number | undefined,
+    userId : string | number | undefined | null,
 
     /** The /time the session was last active */
     lastActive? : Date,
@@ -23,6 +23,12 @@ export interface Key {
 
     [ key : string ] : any,
 
+}
+
+export interface ApiKey extends Key {
+
+    /** A name for the key, unique to the user */
+    name : string,
 }
 
 export function getJsonData(key : Key) : {[key:string]:any} {

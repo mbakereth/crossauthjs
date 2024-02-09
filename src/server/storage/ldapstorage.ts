@@ -13,7 +13,7 @@ export interface LdapUser {
 /**
  * Optional parameters for {@link LdapUserStorage}.
  */
-export interface LdapStorageOptions extends UserStorageOptions {
+export interface LdapUserStorageOptions extends UserStorageOptions {
 
     /** Utl running LDAP server. eg ldap://ldap.example.com or ldaps://ldap,example.com:1636 
      *  No default (required)
@@ -53,7 +53,7 @@ function defaultCreateUserDn(user: Partial<User>, ldapUser: LdapUser) : UserInpu
  * An admin account is not used.  Searches are done as the user, with the user's
  * password.
  */
-export class LdapStorage extends UserStorage {
+export class LdapUserStorage extends UserStorage {
     private localStorage : UserStorage;
     private ldapUrls = [];
     private ldapUserSearchBase  = "";
@@ -63,9 +63,9 @@ export class LdapStorage extends UserStorage {
     /**
      * Constructor.
      * @param localStorage the underlying storage where users are kept (without passwords)
-     * @param options see {@link LdapStorageOptions}
+     * @param options see {@link LdapUserStorageOptions}
      */
-    constructor(localStorage : UserStorage, options : LdapStorageOptions = {}) {
+    constructor(localStorage : UserStorage, options : LdapUserStorageOptions = {}) {
         super(options);
         this.localStorage = localStorage;
         setParameter("ldapUrls", ParamType.StringArray, this, options, "LDAP_URL", true);
@@ -159,7 +159,7 @@ export class LdapStorage extends UserStorage {
     async getLdapUser(username : string, password : string) : Promise<LdapUser> {
         let ldapClient : ldap.Client;
         try {
-            const sanitizedUsername = LdapStorage.sanitizeLdapDnForSerach(username);
+            const sanitizedUsername = LdapUserStorage.sanitizeLdapDnForSerach(username);
             const userDn = [this.ldapUsernameAttribute+"="+sanitizedUsername, this.ldapUserSearchBase].join(",");
             if (!password) throw new CrossauthError(ErrorCode.PasswordInvalid);
             CrossauthLogger.logger.debug(j({msg: "LDAP search "+userDn}));
@@ -232,7 +232,7 @@ export class LdapStorage extends UserStorage {
                         return
                     }
                     res.on('searchEntry', function (entry: any) {
-                        user = LdapStorage.searchResultToUser(entry.pojo)
+                        user = LdapUserStorage.searchResultToUser(entry.pojo)
                     })
                     res.on('error', function (err : any) {
                         reject(err)
@@ -283,7 +283,7 @@ export class LdapStorage extends UserStorage {
      * @returns a sanitized dn
      */
     static sanitizeLdapDnForSerach(dn : string) : string {
-        return LdapStorage.sanitizeLdapDn(dn)
+        return LdapUserStorage.sanitizeLdapDn(dn)
                  .replace("*", "\\*")
                  .replace("(", "\\(")
                  .replace(")", "\\)");
