@@ -1,11 +1,11 @@
 {
-  "name": "fastifysessionserver",
+  "name": "@crossauth/fastifysessionserver-example",
   "version": "0.0.0",
   "description": "",
   "type": "module",
   "main": "index.ts",
   "scripts": {
-    "build": "npx tsc",
+    "build": "pnpx tsc",
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
     "postinstall": "prisma generate"
@@ -24,16 +24,21 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@crossauth/common": "workspace:^",
+    "@crossauth/server": "workspace:^",
     "@fastify/cookie": "^9.2.0",
     "@fastify/formbody": "^7.4.0",
+    "@fastify/static": "^7.0.1",
     "@fastify/view": "^8.2.0",
     "@prisma/client": "^5.9.1",
     "@types/dotenv": "^8.2.0",
+    "@types/nunjucks": "^3.2.6",
     "bunyan": "^1.8.15",
     "docenv": "^2.0.6",
     "dotenv": "^16.3.1",
     "fastify": "^4.25.2",
     "fastify-static": "^4.7.0",
+    "nunjucks": "^3.2.4",
     "tsx": "^4.7.0"
   }
 }

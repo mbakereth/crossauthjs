@@ -1,13 +1,13 @@
 import dotenv from "dotenv";
 dotenv.config();
 import { PrismaClient } from '@prisma/client';
-import { FastifyServer, PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from 'crossauth/server';
+import { FastifyServer, PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from '@crossauth/server';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
-import { CrossauthLogger } from 'crossauth';
+import { CrossauthLogger } from '@crossauth/common';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
 CrossauthLogger.logger.level = CrossauthLogger.Debug;

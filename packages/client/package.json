@@ -1,0 +1,33 @@
+{
+  "name": "@crossauth/client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "typings": "./dist/index.d.ts",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/*"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --emptyOutDir=false",
+    "preview": "vite preview",
+    "test": "vitest",
+    "doc": "typedoc"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.8",
+    "@types/supertest": "^6.0.2",
+    "typedoc": "^0.25.4",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8",
+    "vite-plugin-dts": "^3.6.4",
+    "vitest": "^1.1.0"
+  },
+  "dependencies": {
+    "@crossauth/common": "workspace:^",
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2"
+  }
+}
