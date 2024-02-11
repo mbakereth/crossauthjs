@@ -125,7 +125,7 @@ export class SessionManager {
      *             The 2FA step is also skipped
      * @returns the user, user secrets, and session cookie and CSRF cookie and token.
      *          if a 2fa step is needed, it will be an anonymouos session, otherwise bound to the user
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
+     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
     async login(username : string, params : AuthenticationParameters, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string, user: User, secrets: UserSecrets}> {
@@ -205,7 +205,7 @@ export class SessionManager {
      * 
      * Removes the given session ID from the session storage.
      * @param sessionKey the session ID to remove.
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`
      */
     async logout(sessionCookieValue : string) : Promise<void> {
         const key = await this.session.getSessionKey(sessionCookieValue);
@@ -217,7 +217,7 @@ export class SessionManager {
      * 
      * Removes the given session ID from the session storage.
      * @param except Don't log out from the matching session.
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`
      */
     async logoutFromAll(userId : string | number, except? : string|undefined) : Promise<void> {
         /*await*/ return this.session.deleteAllForUser(userId, except);
@@ -230,7 +230,7 @@ export class SessionManager {
      * 
      * @param sessionCookieValue the session key to look up in session storage
      * @returns the {@link User} (without password hash) matching the  session key
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
     async userForSessionCookieValue(sessionCookieValue : string) : Promise<{key: Key, user: User|undefined}> {
@@ -246,7 +246,7 @@ export class SessionManager {
      * 
      * @param sessionKey the session key to look up in session storage
      * @returns a string from the data field
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
     async dataStringForSessionKey(sessionCookieValue : string) : Promise<string|undefined> {
@@ -283,7 +283,7 @@ export class SessionManager {
      * 
      * @param sessionKey the session key to look up in session storage
      * @returns a string from the data field
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
     async dataForSessionKey(sessionCookieValue : string) : Promise<{[key:string]:any}> {
@@ -331,7 +331,7 @@ export class SessionManager {
     }
 
     /**
-     * Throws {@link index!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
+     * Throws {@link @crossauth/common!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
      * session ID.  Otherwise returns without error
      * @param token 
      */
@@ -341,7 +341,7 @@ export class SessionManager {
     }
 
     /**
-     * Throws {@link index!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
+     * Throws {@link @crossauth/common!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
      * session ID.  Otherwise returns without error
      * @param token 
      */
@@ -521,7 +521,7 @@ export class SessionManager {
      * @param params the parameters from user input needed to authenticate (eg TOTP code)
      * @param sessionCookieValue the session cookie value (ie still signed)
      * @returns the user object
-     * @throws {@link index!CrossauthError} if authentication fails.
+     * @throws {@link @crossauth/common!CrossauthError} if authentication fails.
      */
     async completeTwoFactorSetup(params : AuthenticationParameters, sessionCookieValue : string) : Promise<User> {
         let newSignup = false;
@@ -633,7 +633,7 @@ export class SessionManager {
      * @param params the parameters from user input needed to authenticate (eg TOTP code)
      * @param sessionCookieValue the session cookie value (ie still signed)
      * @returns the user object
-     * @throws {@link index!CrossauthError} if authentication fails.
+     * @throws {@link @crossauth/common!CrossauthError} if authentication fails.
      */
     async completeTwoFactorPageVisit(params : AuthenticationParameters, sessionCookieValue : string) : Promise<void> {
         let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
@@ -661,7 +661,7 @@ export class SessionManager {
      * @param params the parameters from user input needed to authenticate (eg TOTP code)
      * @param sessionCookieValue the session cookie value (ie still signed)
      * @returns the 2FA data that was created on initiation
-     * @throws {@link index!CrossauthError} if authentication fails.
+     * @throws {@link @crossauth/common!CrossauthError} if authentication fails.
      */
     async cancelTwoFactorPageVisit(sessionCookieValue : string) : Promise<{[key:string]:any}> {
         let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
@@ -770,7 +770,7 @@ export class SessionManager {
      * Returns the user associated with a password reset token
      * @param token the token that was emailed
      * @returns the user
-     * @throws {@link index!CrossauthError} if the token is not valid.
+     * @throws {@link @crossauth/common!CrossauthError} if the token is not valid.
      */
     async userForPasswordResetToken(token : string) : Promise<User> {
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");

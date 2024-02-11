@@ -131,7 +131,7 @@ export abstract class KeyStorage {
      * 
      * @param key the key to look up, as it will appear in this storage (typically unsigned, hashed)
      * @returns The matching Key record.
-     * @throws {@link index!CrossauthError } with {@link index!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
     abstract getKey(key : string) : Promise<Key>;
 

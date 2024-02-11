@@ -170,7 +170,7 @@ export class EmailAuthenticator extends Authenticator {
      * @param _user ignored
      * @param secrets taken from the session and should contain `token` and `expiry`
      * @param params user input and should contain `token`
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `InvalidToken` or `Expired`.
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `InvalidToken` or `Expired`.
      */
     async authenticateUser(_user : User, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (params.token != secrets?.token) {
@@ -265,7 +265,7 @@ export class EmailAuthenticator extends Authenticator {
     /**
      * Throws an exception if an email address doesn't have a valid form.
      * @param email the email address to validate
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `InvalidEmail`.
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `InvalidEmail`.
      */
     static validateEmail(email : string|undefined)  {
         if (email==undefined || !EmailAuthenticator.isEmailValid(email)) throw new CrossauthError(ErrorCode.InvalidEmail);

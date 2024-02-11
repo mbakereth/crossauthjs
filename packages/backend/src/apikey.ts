@@ -4,6 +4,11 @@ import { setParameter, ParamType } from './utils.ts';
 import { Hasher } from './hasher';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 
+const PREFIX = "api:";
+
+/**
+ * Options for {@link ApiKeyManager}.
+ */
 export interface ApiKeyManagerOptions {
 
     /** Length in bytes of the randomly-created key (before Base64 encoding and signature) */
@@ -13,11 +18,29 @@ export interface ApiKeyManagerOptions {
     secret? : string;
 }
 
+/**
+ * Manager API keys.
+ * 
+ * The caller must pass a {@link KeyStorage} object.  This must provide a string field called `name` in the returned {@link Key}
+ * objects (in other words, the databsae table behind it must have a `name` field).
+ * 
+ * Api keys have three forms in their value.  The {@link Key} object's `value` field is a base64-url-encoded random number.
+ * When the key is in a header, it is expected to be folled by a dot and a signature to protect against injection attacks.
+ * When stored in the key storage, only the unsigned part is used (before the dot), it is hashed and preceded by
+ * `prefix()`.  The signature part is dropped for storage economy.  This does not compromise security so long as the
+ * signature is always validated before comparing with the database.
+ */
 export class ApiKeyManager {
     private apiKeyStorage : KeyStorage;
     private keyLength : number = 16;
     private secret : string = "";
 
+    /**
+     * Constructor.
+     * 
+     * @param apiKeyStorage storage for API keys.  In addition to the fields {@link KeyStorage} needs, the storage also needs a string field called `name`.
+     * @param options options.  See {@link ApiKeyManagerOptions}
+     */
     constructor(apiKeyStorage: KeyStorage, options : ApiKeyManagerOptions = {}) {
         this.apiKeyStorage = apiKeyStorage;
 
@@ -25,8 +48,18 @@ export class ApiKeyManager {
         setParameter("keyLength", ParamType.String, this, options, "APIKEY_LENGTH");
     }
 
+    /**
+     * Creates a new random key and returns it, unsigned.  It is also persisted in the key storage as a 
+     * hash of the unsigned part prefixed with {@link prefix()}.
+     * @param name a name for they key.  This is for the user to refer to it (eg, for showing the keys the user has created or deleting a key)
+     * @param userId id for the user who owns this key, which may be undefined for keys not associated with a user
+     * @param data any application-specific extra data.  You may, for example, want to include scopes. eg {scope: ["read", "write"]}
+     * @param expiry expiry as a number of seconds from now
+     * @param extraFields any extra fields to save in key storage, and pass back in the {@link Key} object.
+     * @returns the new key as a {@link ApiKey} object, plus the token for the Authorization header (with the signature appended.)
+     */
     async createKey(name : string, userId : string|number|undefined, data? : {[key:string]: any}, expiry? : number,
-        extraFields?: {[key:string]: any}) : Promise<ApiKey> {
+        extraFields?: {[key:string]: any}) : Promise<{key: ApiKey, token: string}> {
         const value = Hasher.randomValue(this.keyLength);
         const created = new Date();
         const expires = expiry ? new Date(created.getTime()+expiry*1000) : undefined;
@@ -42,49 +75,72 @@ export class ApiKeyManager {
         }
         await this.apiKeyStorage.saveKey(
             userId, 
-            hashedKey, 
+            PREFIX+hashedKey, 
             created, 
             expires, 
             key.data, 
             {name: name, ...extraFields});
-        return key;
+        const token = this.signApiKeyValue(value);
+
+        return {key, token};
     }
 
-    static hashApiKeyValue(unsignedValue : string) {
+    /**
+     * Returns the hashed value of the unsigned key,
+     * @param unsignedValue 
+     * @returns 
+     */
+    private static hashApiKeyValue(unsignedValue : string) {
         return Hasher.hash(unsignedValue);
     }
 
+    /**
+     * Returns the hash of the bearer value from the Authorization header.
+     * 
+     * This has little practical value other than for reporting.  Unhashed
+     * tokens are never reported.
+     * @param unsignedValue the part of the Authorization header after "Berear ".
+     * @returns a hash of the value (without the prefix).
+     */
     static hashSignedApiKeyValue(unsignedValue : string) {
         return Hasher.hash(unsignedValue.split(".")[0]);
     }
 
-    unsignApiKeyValue(signedValue : string) : string {
+    private unsignApiKeyValue(signedValue : string) : string {
         return Hasher.unsign(signedValue, this.secret).v;
     }
 
-    signApiKeyValue(unsignedValue : string) : string {
+    private signApiKeyValue(unsignedValue : string) : string {
         return Hasher.sign({v: unsignedValue}, this.secret);
 
     }
 
-    createHeader(unsignedValue : string) {
-        return "Bearer " + this.signApiKeyValue(unsignedValue);
-    }
-
-    async getKey(signedValue : string) : Promise<ApiKey> {
+    private async getKey(signedValue : string) : Promise<ApiKey> {
         const unsignedValue = this.unsignApiKeyValue(signedValue);
         const hashedValue = ApiKeyManager.hashApiKeyValue(unsignedValue);
-        const key = await this.apiKeyStorage.getKey(hashedValue);
+        const key = await this.apiKeyStorage.getKey(PREFIX+hashedValue);
         if (!("name" in key)) throw new CrossauthError(ErrorCode.InvalidKey, "Not a valid API key");
         return {...key, name: key.name};
     }
 
-    async getKeyFromHeaderValue(headerValue : string) : Promise<ApiKey> {
+    /**
+     * Returns the {@link ApiKey} if the token is valid, throws an exception otherwise.
+     * @param headerValue the token from the Authorization header (after the "Bearer ").
+     * @returns The {@link ApiKey} object
+     * @throws {@link @crossauth/common!CrossauthError} with code `InvalidKey`
+     */
+    async validateToken(headerValue : string) : Promise<ApiKey> {
         const parts = headerValue.split(" ");
         if (parts.length != 2 || parts[0].toLowerCase() != "bearer") {
             throw new CrossauthError(ErrorCode.InvalidKey, "Not a bearer token");
         }
         return await this.getKey(parts[1]);
     }
+
+    /**
+     * In key storage, keys are stored as a hash of the unsigned value, prefix with this string.
+     * @returns the key prefix.
+     */
+    prefix() { return PREFIX;}
 
 }

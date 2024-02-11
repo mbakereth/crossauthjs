@@ -66,7 +66,7 @@ export class InMemoryUserStorage extends UserStorage {
      * 
      * @param username the username to look up
      * @returns a {@link User } and {@link UserSecrets }instance
-     * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
     async getUserByUsername(
         username : string, 
@@ -105,7 +105,7 @@ export class InMemoryUserStorage extends UserStorage {
      * 
      * @param email the emaila ddress to look up
      * @returns a {@link User } and {@link UserSecrets } instance, ie including the password hash.
-     * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
      */
     async getUserByEmail(email : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
@@ -134,7 +134,7 @@ export class InMemoryUserStorage extends UserStorage {
      * Same as {@link getUserByUsername } - userId is the username in this model,
      * @param id the user ID to match 
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
-     * @throws {@link index!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
@@ -210,7 +210,7 @@ export class InMemoryKeyStorage extends KeyStorage {
      * Returns the matching key recortd, with additional, or throws an exception.
      * @param key the key to look up in the key storage.
      * @returns the matching Key record
-     * @throws a {@link index!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
     async getKey(key : string) : Promise<Key> {
         if (this.keys && key in this.keys) {
@@ -230,7 +230,7 @@ export class InMemoryKeyStorage extends KeyStorage {
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will also be stored in the key table row
-     * @throws {@link index!CrossauthError } if the key could not be stored.
+     * @throws {@link @crossauth/common!CrossauthError } if the key could not be stored.
      */
     async saveKey(userId : string | number | undefined, 
                       keyValue : string, dateCreated : Date, 

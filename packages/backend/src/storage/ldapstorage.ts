@@ -95,7 +95,7 @@ export class LdapUserStorage extends UserStorage {
      * @param username the username to fetch
      * @param options passed to `localStorage`'s `getUserByUsername()`
      * @returns the user
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
      */
     async getUserByUsername(
         username : string, 
@@ -108,7 +108,7 @@ export class LdapUserStorage extends UserStorage {
      * @param id the user id to fetch
      * @param options passed to `localStorage`'s `getUserByUsername()`
      * @returns the user
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
      */
     async getUserById(
         id : string|number, 
@@ -121,7 +121,7 @@ export class LdapUserStorage extends UserStorage {
      * @param email the email address to fetch user by
      * @param options passed to `localStorage`'s `getUserByUsername()`
      * @returns the user
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
      */
     async getUserByEmail(
         email : string | number, 
@@ -154,7 +154,7 @@ export class LdapUserStorage extends UserStorage {
      * @param username the username to fetch
      * @param password the LDAP password
      * @returns the matching {@link LdapUser}
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `UsernameOrPasswordInvalid` or `Connection`
      */
     async getLdapUser(username : string, password : string) : Promise<LdapUser> {
         let ldapClient : ldap.Client;

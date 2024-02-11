@@ -222,7 +222,7 @@ export class TokenEmailer {
      * Send an email verification email using the Nunjucks templates.
      * 
      * The email address to send it to will be taken from the user's record in user storage.  It will 
-     * first be validated, throwing a {@link index!CrossauthError} with {@link index!ErrorCode} of
+     * first be validated, throwing a {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of
      * `InvalidEmail` if it is not valid..
      * 
      * @param userId userId to send it for

@@ -38,7 +38,7 @@ export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions
     /** If true, the `secret` will be concatenated to the salt when generating a hash for storing the password */
     enableSecretForPasswordHash? : boolean;
 
-    /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
+    /** Function that throws a {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
     validatePasswordFn? : (params : AuthenticationParameters) => string[];
 }
 
@@ -77,7 +77,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
      * @param user the `username` field should contain the username
      * @param secrets from the `UserSecrets` table.  `password` is expected to be present
      * @param params the user input.  `password` is expected to be present
-     * @throws {@link index!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
+     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
     async authenticateUser(user : UserInputFields, secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");

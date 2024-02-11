@@ -44,7 +44,7 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
     /** Page to redirect to after successful logout, default "/" */
     logoutRedirect? : string;
 
-    /** Function that throws a {@link index!CrossauthError} with {@link index!ErrorCode} `FormEnty` if the user doesn't confirm to local rules.  Doesn't validate passwords  */
+    /** Function that throws a {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `FormEnty` if the user doesn't confirm to local rules.  Doesn't validate passwords  */
     validateUserFn? : (user: UserInputFields) => string[];
 
     /** Function that creates a user from form fields.

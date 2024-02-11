@@ -39,7 +39,7 @@ export class FastifyApiKeyServer {
             if (request.headers.authorization) {
                 try {
                     CrossauthLogger.logger.debug(j({msg: "Received authorization header"}));
-                    const key = await this.apiKeyManager.getKeyFromHeaderValue(request.headers.authorization);
+                    const key = await this.apiKeyManager.validateToken(request.headers.authorization);
                     CrossauthLogger.logger.debug(j({msg: "Valid API key", hahedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                     request.apiKey = {...key, ...KeyStorage.decodeData(key.data)};
                     if (key.userId) {
@@ -48,12 +48,12 @@ export class FastifyApiKeyServer {
                             request.user = user;
                             CrossauthLogger.logger.debug(j({msg: "API key is for user", userId: user.id, hahedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                         } catch (e2) {
-                            CrossauthLogger.logger.error(j({msg: "API key has invalid user", userId: key.userId,  hashedApiKey: ApiKeyManager.hashApiKeyValue(request.headers.authorization)}));
+                            CrossauthLogger.logger.error(j({msg: "API key has invalid user", userId: key.userId,  hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                             CrossauthLogger.logger.debug(j({err: e2}));
                         }
                     }
                 } catch (e) {
-                    CrossauthLogger.logger.error(j({msg: "Invalid api key received", hashedApiKey: ApiKeyManager.hashApiKeyValue(request.headers.authorization)}));
+                    CrossauthLogger.logger.error(j({msg: "Invalid authorization header received", header: request.headers.authorization}));
                     CrossauthLogger.logger.debug(j({err: e}));
                 }
 

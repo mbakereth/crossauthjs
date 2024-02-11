@@ -24,8 +24,8 @@ async function main() {
 
   const keyStorage = new PrismaKeyStorage({prismaClient : prisma, keyTable: "apiKey"});
   const apiKeyManager = new ApiKeyManager(keyStorage);
-  const newKey = await apiKeyManager.createKey("default", user1.id, {scope: ["one", "two"]});
-  console.log("Key: " + apiKeyManager.signApiKeyValue(newKey.value));
+  const {token} = await apiKeyManager.createKey("default", user1.id, {scope: ["one", "two"]});
+  console.log("Key: " + token);
 
 }
 main()

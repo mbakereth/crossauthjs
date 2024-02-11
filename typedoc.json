@@ -1,0 +1,10 @@
+{
+  "out": "docs",
+  "entryPoints": ["packages/*"],
+  "name": "Crossauth",
+  "entryPointStrategy": "packages",
+  "includeVersion": false
+
+  // Potentially useful for debugging
+  // "logLevel": "Verbose"
+}

@@ -43,7 +43,7 @@ export function getJsonData(key : Key) : {[key:string]:any} {
 /**
  * Describes a user as fetched from the user storage (eg, database table or LDAP),
  * 
- * This is extendible with additional keys - provide them to the {@link server!UserStorage} class as `extraFields`.
+ * This is extendible with additional keys - provide them to the {@link @crossauth/server!UserStorage} class as `extraFields`.
  * You may want to do this if you want to pass additional user data back to the caller, eg real name.
  */
 export interface UserInputFields {

@@ -1,5 +1,5 @@
 /**
- * Indicates the type of error reported by {@link index!CrossauthError}
+ * Indicates the type of error reported by {@link @crossauth/common!CrossauthError}
  */
 export enum ErrorCode {
 

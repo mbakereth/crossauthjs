@@ -50,8 +50,8 @@ export abstract class Authenticator {
     }
 
     /**
-     * Should return the user if it exists in storage, otherwise throw {@link index!CrossauthError}:
-     * with {@link index!ErrorCode} of `Connection`, `UserNotExist` or `PasswordNotMatch`
+     * Should return the user if it exists in storage, otherwise throw {@link @crossauth/common!CrossauthError}:
+     * with {@link @crossauth/common!ErrorCode} of `Connection`, `UserNotExist` or `PasswordNotMatch`
      * 
      * @param username the username to authenticate
      * @param password the password to authenticate

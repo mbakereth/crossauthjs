@@ -193,7 +193,7 @@ export class DoubleSubmitCsrfToken {
      * 
      * @param token the token (with signature) to validate.
      * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} of `InvalidKey`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `InvalidKey`
      */
     validateDoubleSubmitCsrfToken(cookieValue : string, formOrHeaderValue: string)  {
         // token in form or header contains mask and masked token.  Unmask to get token back
@@ -224,7 +224,7 @@ export class DoubleSubmitCsrfToken {
      * 
      * @param token the token (with signature) to validate.
      * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} of `InvalidKey`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `InvalidKey`
      */
     validateCsrfCookie(cookieValue : string)  {
         try {
@@ -346,7 +346,7 @@ export class SessionCookie {
      * @param userId the user ID to store with the session key.
      * @param existingSessionId if passed, this will be used instead of a random one.  The expiry will be renewed
      * @returns the session key, date created and expiry.
-     * @throws {@link index!CrossauthError} with {@link index!ErrorCode} `KeyExists` if maximum
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `KeyExists` if maximum
      *          attempts exceeded trying to create a unique session id
      */
     async createSessionKey(userId : string | number | undefined, extraFields: {[key: string] : any} = {}) : Promise<Key> {
@@ -473,9 +473,9 @@ export class SessionCookie {
      * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
      * 
      * @param cookieValue the value in the session cookie
-     * @returns a {@link index!User } object, with the password hash removed, and the {@link index!Key } with the unhashed
+     * @returns a {@link @crossauth/common!User } object, with the password hash removed, and the {@link @crossauth/common!Key } with the unhashed
      *          sessionId
-     * @throws a {@link index!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
+     * @throws a {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
      */
     async getUserForSessionKey(cookieValue: string) : Promise<{user: User|undefined, key : Key}> {
         const key = await this.getSessionKey(cookieValue);
@@ -496,7 +496,7 @@ export class SessionCookie {
      * 
      * @param sessionKey the value in the session cookie
      * @returns a {@link User } object, with the password hash removed.
-     * @throws a {@link index!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId`, `Expired` or `UserNotExist`.
+     * @throws a {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId`, `Expired` or `UserNotExist`.
      */
     async getSessionKey(cookieValue: string) : Promise<Key> {
         const sessionId = this.unsignCookie(cookieValue);
