@@ -24,8 +24,8 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@crossauth/backend": "workspace:^",
     "@crossauth/common": "workspace:^",
-    "@crossauth/server": "workspace:^",
     "@fastify/cookie": "^9.2.0",
     "@fastify/formbody": "^7.4.0",
     "@fastify/static": "^7.0.1",

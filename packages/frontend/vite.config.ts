@@ -13,7 +13,7 @@ export default defineConfig({
       entry: resolve(__dirname, "./src/index.ts"),
       fileName: "index",
       formats: ['es', 'cjs', 'iife'],
-      name: "crossauth_cliente"
+      name: "crossauth_frontend"
     },
     /*watch: {
       // https://rollupjs.org/configuration-options/#watch

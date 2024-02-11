@@ -10,12 +10,12 @@ importers:
 
   examples/fastifyapikeyserver:
     dependencies:
+      '@crossauth/backend':
+        specifier: workspace:^
+        version: link:../../packages/backend
       '@crossauth/common':
         specifier: workspace:^
         version: link:../../packages/common
-      '@crossauth/server':
-        specifier: workspace:^
-        version: link:../../packages/server
       '@fastify/cookie':
         specifier: ^9.2.0
         version: 9.3.1
@@ -77,12 +77,12 @@ importers:
 
   examples/fastifysessionserver:
     dependencies:
+      '@crossauth/backend':
+        specifier: workspace:^
+        version: link:../../packages/backend
       '@crossauth/common':
         specifier: workspace:^
         version: link:../../packages/common
-      '@crossauth/server':
-        specifier: workspace:^
-        version: link:../../packages/server
       '@fastify/cookie':
         specifier: ^9.2.0
         version: 9.3.1
@@ -142,6 +142,118 @@ importers:
         specifier: ^5.3.3
         version: 5.3.3
 
+  packages/backend:
+    dependencies:
+      '@crossauth/common':
+        specifier: workspace:^
+        version: link:../common
+      '@esbuild-plugins/node-modules-polyfill':
+        specifier: ^0.2.2
+        version: 0.2.2(esbuild@0.20.0)
+      '@fastify/cookie':
+        specifier: ^9.2.0
+        version: 9.3.1
+      '@fastify/formbody':
+        specifier: ^7.4.0
+        version: 7.4.0
+      '@fastify/view':
+        specifier: ^8.2.0
+        version: 8.2.0
+      '@prisma/client':
+        specifier: ^5.9.1
+        version: 5.9.1(prisma@5.9.1)
+      '@types/cookie-parser':
+        specifier: ^1.4.6
+        version: 1.4.6
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.21
+      '@types/ldapjs':
+        specifier: ^3.0.6
+        version: 3.0.6
+      '@types/nodemailer':
+        specifier: ^6.4.14
+        version: 6.4.14
+      '@types/nunjucks':
+        specifier: ^3.2.6
+        version: 3.2.6
+      '@types/qrcode':
+        specifier: ^1.5.5
+        version: 1.5.5
+      cookie-parser:
+        specifier: ^1.4.6
+        version: 1.4.6
+      dotenv:
+        specifier: ^16.3.1
+        version: 16.4.1
+      events:
+        specifier: ^3.3.0
+        version: 3.3.0
+      express:
+        specifier: ^4.18.2
+        version: 4.18.2
+      fastify:
+        specifier: ^4.25.2
+        version: 4.26.0
+      fastify-vite:
+        specifier: ^3.0.0-beta.27
+        version: 3.0.0-beta.27(@types/node@20.11.17)
+      ldap-async:
+        specifier: ^2.1.1
+        version: 2.1.1
+      ldapjs:
+        specifier: ^3.0.7
+        version: 3.0.7
+      nodemailer:
+        specifier: ^6.9.8
+        version: 6.9.9
+      nunjucks:
+        specifier: ^3.2.4
+        version: 3.2.4
+      otplib:
+        specifier: ^12.0.1
+        version: 12.0.1
+      prisma:
+        specifier: ^5.9.1
+        version: 5.9.1
+      qrcode:
+        specifier: ^1.5.3
+        version: 1.5.3
+      sonic-boom:
+        specifier: ^3.7.0
+        version: 3.8.0
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.8
+        version: 20.11.17
+      '@types/supertest':
+        specifier: ^6.0.2
+        version: 6.0.2
+      jimp:
+        specifier: ^0.22.10
+        version: 0.22.10
+      jsqr:
+        specifier: ^1.4.0
+        version: 1.4.0
+      supertest:
+        specifier: ^6.3.3
+        version: 6.3.4
+      typedoc:
+        specifier: ^0.25.4
+        version: 0.25.8(typescript@5.3.3)
+      typescript:
+        specifier: ^5.2.2
+        version: 5.3.3
+      vite:
+        specifier: ^5.0.8
+        version: 5.1.1(@types/node@20.11.17)
+      vite-plugin-dts:
+        specifier: ^3.6.4
+        version: 3.7.2(@types/node@20.11.17)(typescript@5.3.3)(vite@5.1.1)
+      vitest:
+        specifier: ^1.1.0
+        version: 1.2.2(@types/node@20.11.17)
+
   packages/client:
     dependencies:
       '@crossauth/common':
@@ -178,6 +290,37 @@ importers:
       '@types/node':
         specifier: ^20.10.8
         version: 20.11.17
+      typedoc:
+        specifier: ^0.25.4
+        version: 0.25.8(typescript@5.3.3)
+      typescript:
+        specifier: ^5.2.2
+        version: 5.3.3
+      vite:
+        specifier: ^5.0.8
+        version: 5.1.1(@types/node@20.11.17)
+      vite-plugin-dts:
+        specifier: ^3.6.4
+        version: 3.7.2(@types/node@20.11.17)(typescript@5.3.3)(vite@5.1.1)
+      vitest:
+        specifier: ^1.1.0
+        version: 1.2.2(@types/node@20.11.17)
+
+  packages/frontend:
+    dependencies:
+      '@crossauth/common':
+        specifier: workspace:^
+        version: link:../common
+      '@esbuild-plugins/node-modules-polyfill':
+        specifier: ^0.2.2
+        version: 0.2.2(esbuild@0.20.0)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.8
+        version: 20.11.17
+      '@types/supertest':
+        specifier: ^6.0.2
+        version: 6.0.2
       typedoc:
         specifier: ^0.25.4
         version: 0.25.8(typescript@5.3.3)
@@ -5022,6 +5165,7 @@ packages:
 
   /wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+    requiresBuild: true
 
   /xhr@2.6.0:
     resolution: {integrity: sha512-/eCGLb5rxjx5e3mF1A7s+pLlR6CGyqWN91fv1JgER5mVWg1MZmlhBvy9kjcsOdRk8RrIujotWyJamfyrp+WIcA==}
