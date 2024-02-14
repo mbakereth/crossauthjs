@@ -4,8 +4,6 @@ import { setParameter, ParamType } from './utils.ts';
 import { Hasher } from './hasher';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 
-const PREFIX = "api:";
-
 /**
  * Options for {@link ApiKeyManager}.
  */
@@ -16,6 +14,12 @@ export interface ApiKeyManagerOptions {
 
     /** Server secret.  Needed for emailing tokens and for csrf tokens */
     secret? : string;
+
+    /** The prefix to add to the hashed key in storage.  Defaults to "api:" */
+    prefix? : string;
+
+    /** The name of the speak in the Authorization header.  Defaults to "ApiKey" */
+    authScheme? : string;
 }
 
 /**
@@ -27,13 +31,19 @@ export interface ApiKeyManagerOptions {
  * Api keys have three forms in their value.  The {@link Key} object's `value` field is a base64-url-encoded random number.
  * When the key is in a header, it is expected to be folled by a dot and a signature to protect against injection attacks.
  * When stored in the key storage, only the unsigned part is used (before the dot), it is hashed and preceded by
- * `prefix()`.  The signature part is dropped for storage economy.  This does not compromise security so long as the
+ * `prefix`.  The signature part is dropped for storage economy.  This does not compromise security so long as the
  * signature is always validated before comparing with the database.
  */
 export class ApiKeyManager {
     private apiKeyStorage : KeyStorage;
     private keyLength : number = 16;
     private secret : string = "";
+
+    /** The prefix to add to the hashed key in storage.  Defaults to "api:" */
+    prefix = "api";
+
+    /** The name of the speak in the Authorization header.  Defaults to "ApiKey" */
+    authScheme? : string = "ApiKey";
 
     /**
      * Constructor.
@@ -46,6 +56,8 @@ export class ApiKeyManager {
 
         setParameter("secret", ParamType.String, this, options, "SECRET", true);
         setParameter("keyLength", ParamType.String, this, options, "APIKEY_LENGTH");
+        setParameter("prefix", ParamType.String, this, options, "APIKEY_PREFIX");
+        setParameter("authScheme", ParamType.String, this, options, "APIKEY_AUTHSCHEME");
     }
 
     /**
@@ -75,7 +87,7 @@ export class ApiKeyManager {
         }
         await this.apiKeyStorage.saveKey(
             userId, 
-            PREFIX+hashedKey, 
+            this.prefix+hashedKey, 
             created, 
             expires, 
             key.data, 
@@ -116,9 +128,13 @@ export class ApiKeyManager {
     }
 
     private async getKey(signedValue : string) : Promise<ApiKey> {
+        if (this.authScheme!="" && signedValue.startsWith(this.authScheme+" ")) {
+            const regex = new RegExp(`^${this.authScheme} `);
+            signedValue = signedValue.replace(regex, "");
+        }
         const unsignedValue = this.unsignApiKeyValue(signedValue);
         const hashedValue = ApiKeyManager.hashApiKeyValue(unsignedValue);
-        const key = await this.apiKeyStorage.getKey(PREFIX+hashedValue);
+        const key = await this.apiKeyStorage.getKey(this.prefix+hashedValue);
         if (!("name" in key)) throw new CrossauthError(ErrorCode.InvalidKey, "Not a valid API key");
         return {...key, name: key.name};
     }
@@ -131,16 +147,9 @@ export class ApiKeyManager {
      */
     async validateToken(headerValue : string) : Promise<ApiKey> {
         const parts = headerValue.split(" ");
-        if (parts.length != 2 || parts[0].toLowerCase() != "bearer") {
-            throw new CrossauthError(ErrorCode.InvalidKey, "Not a bearer token");
+        if (parts.length != 2 || parts[0] != this.authScheme) {
+            throw new CrossauthError(ErrorCode.InvalidKey, `Not a ${this.authScheme} token`);
         }
         return await this.getKey(parts[1]);
     }
-
-    /**
-     * In key storage, keys are stored as a hash of the unsigned value, prefix with this string.
-     * @returns the key prefix.
-     */
-    prefix() { return PREFIX;}
-
 }

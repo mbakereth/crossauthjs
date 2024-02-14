@@ -1,11 +1,11 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { UserStorage, KeyStorage, UserStorageGetOptions, UserStorageOptions } from '../storage';
-import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key } from '@crossauth/common';
+import { UserStorage, KeyStorage, UserStorageGetOptions, UserStorageOptions, OAuthClientStorage } from '../storage';
+import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key, OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from'@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
 
-/**
+ /**
  * Optional parameters for {@link PrismaUserStorage}.
  * 
  * See {@link PrismaUserStorage.constructor} for definitions.
@@ -225,9 +225,8 @@ export class PrismaUserStorage extends UserStorage {
 
     /**
      * Create a user
-     * @param username 
-     * @param password 
-     * @param extraFields 
+     * @param user 
+     * @param secrets 
      */
     async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
                : Promise<User> {
@@ -302,6 +301,9 @@ export class PrismaUserStorage extends UserStorage {
 
 }
 
+///////////////////////////////////////////////////////////////////////////
+// KeyStorage
+
 /**
  * Optional parameters for {@link PrismaKeyStorage}.
  * 
@@ -336,18 +338,16 @@ export class PrismaKeyStorage extends KeyStorage {
      * @param userStorage an instance of {@link UserStorage } for fetching users.  If also in Prisma, this may be an instance of {@link PrismaUserStorage } but any can be used.
      * @param keyTable the (Prisma, lowercased) name of the session table.  Defaults to `session`.
      * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
-     * @param extraFields if given, these additional fields will be selected from the table into the returned Key.
      */
-    constructor({keyTable, 
-                 prismaClient} : PrismaKeyStorageOptions = {}) {
+    constructor(options : PrismaKeyStorageOptions = {}) {
         super();
-        if (keyTable) {
-            this.keyTable = keyTable;
+        if (options.keyTable) {
+            this.keyTable = options.keyTable;
         }
-        if (prismaClient == undefined) {
+        if (options.prismaClient == undefined) {
             this.prismaClient = new PrismaClient();
         } else {
-            this.prismaClient = prismaClient;
+            this.prismaClient = options.prismaClient;
         }
     }
 
@@ -616,5 +616,172 @@ export class PrismaKeyStorage extends KeyStorage {
             await this.updateKeyWithTransaction({value: key.value, data: JSON.stringify(data)}, tx)
         });
                   
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////
+// OAuthClientStorage
+
+/**
+ * Optional parameters for {@link PrismaOAuthClientStorage}.
+ * 
+ * See {@link PrismaKeyStorage.constructor} for definitions.
+ */
+export interface PrismaOAuthClientStorageOptions {
+    clientTable? : string,
+    redirectUriTable? : string,
+    prismaClient? : PrismaClient,
+}
+
+/**
+ * Implementation of {@link OAuthClientStorage } where keys stored in a database managed by
+ * the Prisma ORM.
+ */
+export class PrismaOAuthClientStorage extends OAuthClientStorage {
+    private clientTable : string = "client";
+    private requestUriTable : string = "requestUri";
+    private prismaClient : PrismaClient;
+
+    /**
+     * Constructor with user storage object to use plus optional parameters.
+     * 
+     * @param clientTable the (Prisma, lowercased) name of the client table.  Defaults to `client`.
+     * @param requestUriTable the (Prisma, lowercased) name of the RequestUri table.  Defaults to `requestUriTable`.
+     * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
+     */
+    constructor(options : PrismaKeyStorageOptions = {}) {
+        super();
+        setParameter("clientTable", ParamType.String, this, options, "OAUTH_CLIENT_TABLE");
+        setParameter("requestUriTable", ParamType.String, this, options, "OAUTH_REQUESTURI_TABLE");
+        if (options.prismaClient == undefined) {
+            this.prismaClient = new PrismaClient();
+        } else {
+            this.prismaClient = options.prismaClient;
+        }
+    }
+
+    async getClient(clientId : string) : Promise<OAuthClient> {
+        return await this.getClientWithTransaction(clientId, this.prismaClient);
+    }
+
+    /**
+     * Returns the matching Key record, or throws an exception if it doesn't exist
+     * @param key the session key to look up in the session storage.
+     * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
+     */
+    private async getClientWithTransaction(clientId : string, tx : any) : Promise<OAuthClient> {
+        try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            return  await tx[this.clientTable].findUniqueOrThrow({
+                where: {
+                    clientId: clientId
+                },
+                include: {redirectUri: true},
+            });
+        } catch {
+            CrossauthLogger.logger.debug(j({msg: "Invalid OAuth client id"}))
+            throw new CrossauthError(ErrorCode.InvalidClientId);
+        }
+    }
+    
+    /**
+     * Saves a key in the session table.
+     * 
+     * @param redirectUri array of valid redirect uri's
+     * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
+     */
+    async createClient(redirectUri: string[], extraFields : {[key:string] : any}) : Promise<OAuthClient> {
+        const maxAttempts = 10;
+
+        for (let attempt=0; attempt < maxAttempts; ++attempt) {
+            try {
+                const client = this.randomClient(redirectUri);
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                const newClient = await this.prismaClient[this.clientTable].create({
+                    data: {
+                        clientId: client.clientId,
+                        clientSecrew: client.clientSecret,
+                        ...extraFields,
+                        redirectUri: { 
+                            create: 
+                            redirectUri
+                        }
+                    },
+                    include: { redirectUri: true},
+                });
+                return newClient;
+            } catch (e) {
+                if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
+                    if (e.code == 'P2002') {
+                        if (attempt < maxAttempts) {
+                            CrossauthLogger.logger.debug(j({msg: `Attempt ${attempt} at creating a unique client ID failed`}));
+                        } else {
+                            CrossauthLogger.logger.debug(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+                            CrossauthLogger.logger.debug(j({err: e}));
+                            throw new CrossauthError(ErrorCode.KeyExists);
+                        }
+                    } else {
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
+                    }
+                } else {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
+                }
+            }
+        }
+
+        CrossauthLogger.logger.debug(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+        throw new CrossauthError(ErrorCode.KeyExists);
+
+    }
+
+    /**
+     * 
+     * @param clientId the client to delete
+     * @throws {@link @crossauth/common!CrossauthError } if the key could not be deleted.
+     */
+    async deleteClient(clientId : string) : Promise<void> {
+        try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            return /*await*/ this.prismaClient[this.keyTable].deleteMany({
+            where: {
+                clientId: clientId
+            }
+        });
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+            throw new CrossauthError(ErrorCode.Connection, "Error deleting OAuth client");
+        } 
+    }
+
+    /**
+     * If the given session key exist in the database, update it with the passed values.  If it doesn't
+     * exist, throw a CreossauthError with InvalidKey.
+     * @param client the client to update.  It will be searched on its clientId, which cannot be updated.
+     */
+    async updateClient(client : Partial<OAuthClient>) : Promise<void> {
+        await this.updateClientWithTransaction(client, this.prismaClient);
+    }
+
+    private async updateClientWithTransaction(client : Partial<OAuthClient>, tx : any) : Promise<void> {
+        if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
+        try {
+            let data = {...client};
+            delete client.clientId;
+
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            await tx[this.clientTable].update({
+                where: {
+                    clientId: client.clientId,
+                },
+                data: data
+            });
+        } catch (e) {
+            const error = new CrossauthError(ErrorCode.Connection, String(e));
+            CrossauthLogger.logger.debug(j({err: error}));
+            throw error;
+        }
     }
 }

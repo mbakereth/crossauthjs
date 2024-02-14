@@ -1,5 +1,5 @@
-import { UserStorage, KeyStorage, UserStorageGetOptions, UserStorageOptions } from '../storage';
-import { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '@crossauth/common';
+import { UserStorage, KeyStorage, UserStorageGetOptions, UserStorageOptions, OAuthClientStorage, OAuthClientStorageOptions } from '../storage';
+import { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields, OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 
@@ -32,7 +32,7 @@ export class InMemoryUserStorage extends UserStorage {
 
     /**
      * Creates a InMemoryUserStorage object, optionally overriding defaults.
-     * @param enableEmailVerification if set to `true`, a user will only be returned as valid if the `state` field is not `awaitingemailverification`.  See explaination above.
+     * @param options {@see InMemoryUserStorageOptions}
     */
     constructor(options : InMemoryUserStorageOptions = {}) {
         super(options);
@@ -40,9 +40,8 @@ export class InMemoryUserStorage extends UserStorage {
 
     /**
      * Create a user
-     * @param username 
-     * @param password 
-     * @param extraFields 
+     * @param user the user to save
+     * @param secrets optionally, secrets to save
      */
     async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
         : Promise<User> {
@@ -198,9 +197,7 @@ export class InMemoryKeyStorage extends KeyStorage {
     private nonUserKeys : Key[] = [];
 
     /**
-     * Constructor with user storage object to use plus optional parameters.
-     * 
-     * @param userStorage an instance of {@link UserStorage } for fetching users.  If also in in memory, this may be an instance of {@link InMemoryUserStorage } but any can be used.
+     * Constructor
      */
     constructor() {
         super();
@@ -230,7 +227,6 @@ export class InMemoryKeyStorage extends KeyStorage {
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will also be stored in the key table row
-     * @throws {@link @crossauth/common!CrossauthError } if the key could not be stored.
      */
     async saveKey(userId : string | number | undefined, 
                       keyValue : string, dateCreated : Date, 
@@ -382,6 +378,70 @@ export class InMemoryKeyStorage extends KeyStorage {
         }
         data[dataName] = value;
         key.data = JSON.stringify(data);
+    }
+
+}
+
+/**
+ * Implementation of {@link KeyStorage } where keys stored in memory.  Intended for testing.
+ */
+export class InMemoryOAuthClientStorage extends OAuthClientStorage {
+    private clients : { [clientId : string]: OAuthClient } = {};
+
+    /**
+     * Constructor
+     */
+    constructor(_options : OAuthClientStorageOptions = {}) {
+        super();
+    }
+
+    /**
+     * Returns the matching key recortd, with additional, or throws an exception.
+     * @param key the key to look up in the key storage.
+     * @returns the matching Key record
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
+     */
+    async getClient(clientId : string) : Promise<OAuthClient> {
+        if (this.clients && clientId in this.clients) {
+            return this.clients[clientId];
+        }
+        CrossauthLogger.logger.debug(j({msg: "Client does not exist in client storage"}));
+        let err = new CrossauthError(ErrorCode.InvalidClientId); 
+        CrossauthLogger.logger.debug(j({err: err}));
+        throw err;
+    }
+
+    /**
+     * Saves a client in the client table.
+     * 
+     * @param client the client to save.
+     */
+    async createClient(redirectUri : string[], extraFields : {[key:string]: any}) : Promise<OAuthClient> {
+        const client = {...this.randomClient(redirectUri), ...extraFields};
+        return this.clients[client.clientId] = client;
+    }
+
+    /**
+     * 
+     * @param clinetId the client to delete
+     */
+    async deleteClient(clientId : string) : Promise<void> {
+        if (clientId in this.clients) {
+            delete this.clients[clientId];
+        }
+    }
+
+    /**
+     * If the given client exists in the database, update it with the passed values.  
+     * 
+     * @param client the fields to update.  This must include `clientId` for search purposes, but this field is not updated.
+     * @throws {@link @crossauth/common!Crossauth} with `InvalidClientId` if the client id doesn't exist}
+     */
+    async updateClient(client : Partial<OAuthClient>) : Promise<void> {
+        if (client.clientId && client.clientId in this.clients) {
+            const oldClient = this.clients[client.clientId];
+            this.clients[client.clientId] = {...client, clientId: oldClient.clientId, redirectUri: client.redirectUri||oldClient.redirectUri}
+        }
     }
 
 }

@@ -16,6 +16,15 @@ export enum ErrorCode {
       * UserNotExist or PasswordNotMatch, for security reasons */
     UsernameOrPasswordInvalid,
 
+    /** This is returned if an OAuth2 client id is invalid */
+    InvalidClientId,
+
+    /** This is returned if an OAuth2 client secret is invalid */
+    InvalidClientSecret,
+
+    /** Server endpoints in this package will return this instead of InvalidClientId or InvalidClientSecret for security purposes */
+    InvalidClientIdOrSecret,
+
     /** Thrown on login attempt with a user account marked inactive */
     UserNotActive,
 
@@ -133,6 +142,15 @@ export class CrossauthError extends Error {
             _httpStatus = 401;
         } else if (code == ErrorCode.UsernameOrPasswordInvalid) {
             _message = "Username or password incorrect"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidClientId) {
+            _message = "Client id is invalid"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidClientSecret) {
+            _message = "Client secret is invalid"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidClientIdOrSecret) {
+            _message = "Client id or secret is invalid"
             _httpStatus = 401;
         } else if (code == ErrorCode.EmailNotExist) {
             _message = "No user exists with that email address"

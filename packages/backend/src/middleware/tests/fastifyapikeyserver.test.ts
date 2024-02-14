@@ -80,7 +80,7 @@ test('FastifyApiKeyServer.validKeyAuthenticates', async () => {
     let {server, apiKeyManager, userStorage} = await makeAppWithOptions();
     const { user } = await userStorage.getUserByUsername("bob");
     const {token} = await apiKeyManager.createKey("default", user.id);
-    const res = await server.app.inject({ method: "GET", url: "/", headers: {authorization: "Bearer " + token }});
+    const res = await server.app.inject({ method: "GET", url: "/", headers: {authorization: apiKeyManager.authScheme + " " + token }});
     const body = JSON.parse(res.body);
     expect(body.user.username).toBe("bob");
     expect(body.apiKey).toBeDefined();
@@ -92,7 +92,7 @@ test('FastifyApiKeyServer.invalidSignature', async () => {
     const { user } = await userStorage.getUserByUsername("bob");
     let {token} = await apiKeyManager.createKey("default", user.id);
     token = token.split(".")[0] + ".XXXXXXXXXXXXX";
-    const res = await server.app.inject({ method: "GET", url: "/", headers: {authorization: "Bearer " + token }});
+    const res = await server.app.inject({ method: "GET", url: "/", headers: {authorization: "ApiKey " + token }});
     const body = JSON.parse(res.body);
     expect(body.user).toBeUndefined();
     expect(body.apiKey).toBeUndefined();
@@ -102,7 +102,7 @@ test('FastifyApiKeyServer.invalidKey', async () => {
 
     let {server} = await makeAppWithOptions();
     const token = "YYYYYYY.XXXXXXXXXXXXX";
-    const res = await server.app.inject({ method: "GET", url: "/", headers: {authorization: "Bearer " + token }});
+    const res = await server.app.inject({ method: "GET", url: "/", headers: {authorization: "ApiKey " + token }});
     const body = JSON.parse(res.body);
     expect(body.user).toBeUndefined();
     expect(body.apiKey).toBeUndefined();
@@ -113,7 +113,7 @@ test('FastifyApiKeyServer.scopeIsPassed', async () => {
     let {server, apiKeyManager, userStorage} = await makeAppWithOptions();
     const { user } = await userStorage.getUserByUsername("bob");
     const {token} = await apiKeyManager.createKey("default", user.id, {scope: ["one", "two"]});
-    const res = await server.app.inject({ method: "GET", url: "/", headers: {authorization: "Bearer " + token }});
+    const res = await server.app.inject({ method: "GET", url: "/", headers: {authorization: "ApiKey " + token }});
     const body = JSON.parse(res.body);
     expect(body.user.username).toBe("bob");
     expect(body.apiKey.scope.length).toBe(2);
@@ -124,7 +124,7 @@ test('FastifyApiKeyServer.keyAllowsAccess', async () => {
     let {server, apiKeyManager, userStorage} = await makeAppWithOptions();
     const { user } = await userStorage.getUserByUsername("bob");
     const {token} = await apiKeyManager.createKey("default", user.id, {scope: ["one", "two"]});
-    const res = await server.app.inject({ method: "GET", url: "/protected", headers: {authorization: "Bearer " + token }});
+    const res = await server.app.inject({ method: "GET", url: "/protected", headers: {authorization: "ApiKey " + token }});
     const body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
 });
@@ -142,7 +142,7 @@ test('FastifyApiKeyServer.scopeAllowsAccess', async () => {
     let {server, apiKeyManager, userStorage} = await makeAppWithOptions();
     const { user } = await userStorage.getUserByUsername("bob");
     const {token} = await apiKeyManager.createKey("default", user.id, {scope: ["one", "two"]});
-    const res = await server.app.inject({ method: "GET", url: "/protectedScopeOne", headers: {authorization: "Bearer " + token }});
+    const res = await server.app.inject({ method: "GET", url: "/protectedScopeOne", headers: {authorization: "ApiKey " + token }});
     const body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
 });
@@ -152,7 +152,7 @@ test('FastifyApiKeyServer.scopeForbidsAccess', async () => {
     let {server, apiKeyManager, userStorage} = await makeAppWithOptions();
     const { user } = await userStorage.getUserByUsername("bob");
     const {token} = await apiKeyManager.createKey("default", user.id, {scope: ["one", "two"]});
-    const res = await server.app.inject({ method: "GET", url: "/protectedScopeThree", headers: {authorization: "Bearer " + token }});
+    const res = await server.app.inject({ method: "GET", url: "/protectedScopeThree", headers: {authorization: "ApiKey " + token }});
     const body = JSON.parse(res.body);
     expect(body.ok).toBe(false);
 });

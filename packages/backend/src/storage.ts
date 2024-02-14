@@ -1,6 +1,10 @@
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { setParameter, ParamType } from './utils';
-import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '@crossauth/common';
+import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields, OAuthClient } from '@crossauth/common';
+import { Hasher } from './hasher';
+
+const CLIENT_ID_LENGTH = 16;
+const CLIENT_SECRET_LENGTH = 16;
 
 /**
  * Passed to get methods in {@link UserStorage}.
@@ -207,5 +211,75 @@ export abstract class KeyStorage {
         if (!data) return "{}";
         return JSON.stringify(data);
     }
+}
+
+export interface OAuthClientStorageOptions {
+    /** if true, a client secret is expected in the table.  If you don't use flows for confidential clients, you do not need a secret.  Default true */
+    saveClientSecret?  : boolean,
+}
+/**
+ * Base class for storing session and API keys.
+ *
+ * This class is subclasses for various types of session key storage,  Eg {@link PrismaKeyStorage } is for storing
+ * session in a database table, managed by the Prisma ORM.
+ */
+export abstract class OAuthClientStorage {
+
+    saveClientSecret : boolean = true;
+
+    constructor(options : OAuthClientStorageOptions = {} ) {
+        setParameter("saveClientSecret", ParamType.StringArray, this, options, "OAUTH2_SAVE_CLIENT_SECRET");
+    }
+
+     /**
+     * Can be called by subclasses to create a random client ID and client secret
+     * 
+     * @param client the client to save.
+     */
+     randomClient(redirectUri : string[]) : OAuthClient {
+        const clientId = Hasher.randomValue(CLIENT_ID_LENGTH)
+        const clientSecret =  this.saveClientSecret ? Hasher.randomValue(CLIENT_SECRET_LENGTH) : undefined;
+        return {
+            clientId : clientId,
+            clientSecret : clientSecret,
+            redirectUri : redirectUri,
+        }
+    }
+    
+   // throws InvalidSessionId
+
+    /**
+     * Returns the matching key in the session storage or throws an exception if it doesn't exist.
+     * 
+     * @param clientId the clientId to look up
+     * @returns The matching Key record.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
+     */
+    abstract getClient(clientId : string) : Promise<OAuthClient>;
+
+    /**
+     * Creates and returns a new client with random ID and optionally secret.
+     * 
+     * Saves in the database
+     * 
+     * @param redirectUri an array of redirect uri's, which may be empty if checking redirect uri is not mandatory
+     * 
+     */
+    abstract createClient(redirectUri : string[], extraFields : {[key:string]: any}) : Promise<OAuthClient>;
+
+
+    /**
+     * If the given session key exists in the database, update it with the passed values.  If it doesn't
+     * exist, throw a CrossauthError with InvalidKey.
+     * @param client all fields to update (clientId will not be updated, however) 
+     */
+    abstract updateClient(client : Partial<OAuthClient>) : Promise<void>;
+
+    /**
+     * Deletes a key from storage (eg the database).
+     * 
+     * @param clientId the key to delete
+     */
+    abstract deleteClient(clientId : string) : Promise<void>;
 }
 

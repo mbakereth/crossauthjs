@@ -65,3 +65,23 @@ model ApiKey {
     @@index([user_id])
     @@unique([user_id, name], name: "userIdName")
 }
+
+model OAuthClient {
+    id             String                    @id @unique
+    clientSecret   String?
+
+    redirectUri    OAuthClientRedirectUri[]
+
+    @@index([id])
+}
+
+model OAuthClientRedirectUri {
+    id             Int         @id @unique @default(autoincrement())
+    client_id      String 
+    uri            String
+
+    client         OAuthClient @relation(references: [id], fields: [client_id], onDelete: Cascade)
+
+    @@index([id])
+}
+
