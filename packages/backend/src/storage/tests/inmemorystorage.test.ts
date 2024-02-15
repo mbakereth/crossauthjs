@@ -1,5 +1,5 @@
 import { test, expect, beforeAll } from 'vitest';
-import { InMemoryUserStorage, InMemoryKeyStorage } from '../inmemorystorage';
+import { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage } from '../inmemorystorage';
 import { CrossauthError } from '@crossauth/common';
 import { getTestUserStorage }  from './inmemorytestdata';
 
@@ -109,7 +109,7 @@ test("InMemoryKeyStorage.addData", async() => {
 
 });
 
-test("PrismaStorage.getAllForUser", async() => {
+test("InMemoryKeyStorage.getAllForUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
     const key3 = "XYZ123456";
@@ -129,7 +129,7 @@ test("PrismaStorage.getAllForUser", async() => {
     expect(keys[1].value).not.toBe(key3);
 });
 
-test("PrismaStorage.getAllForUserWhenEmpty", async() => {
+test("InMemoryKeyStorage.getAllForUserWhenEmpty", async() => {
     const keyStorage = new InMemoryKeyStorage();
     const {user: bob} = await userStorage.getUserByUsername("bob");
     await keyStorage.deleteAllForUser(bob.id, "");
@@ -137,7 +137,7 @@ test("PrismaStorage.getAllForUserWhenEmpty", async() => {
     expect(keys.length).toBe(0);
 });
 
-test("PrismaStorage.getAllForNullUser", async() => {
+test("InMemoryKeyStorage.getAllForNullUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
     const key3 = "XYZ123456";
@@ -158,7 +158,7 @@ test("PrismaStorage.getAllForNullUser", async() => {
     expect(keys[1].value).not.toBe(key3);
 });
 
-test("PrismaStorage.deleteKeyForUser", async() => {
+test("InMemoryKeyStorage.deleteKeyForUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
     const keyStorage = new InMemoryKeyStorage();
@@ -174,7 +174,7 @@ test("PrismaStorage.deleteKeyForUser", async() => {
     expect(keys.length).toBe(1);
 });
 
-test("PrismaStorage.deleteKeyForNoUser", async() => {
+test("InMemoryKeyStorage.deleteKeyForNoUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
     const keyStorage = new InMemoryKeyStorage();
@@ -187,4 +187,13 @@ test("PrismaStorage.deleteKeyForNoUser", async() => {
     await keyStorage.deleteMatching({userId: null, value: key1});
     const keys = await keyStorage.getAllForUser(undefined);
     expect(keys.length).toBe(1);
+});
+
+test('InMemoryClientStorage.createGetAndDeleteClient', async () => {
+    const clientStorage = new InMemoryOAuthClientStorage({saveClientSecret: true});
+    const newClient = await clientStorage.createClient();
+    const client = await clientStorage.getClient(newClient.clientId);
+    expect(client.clientSecret).toBe(newClient.clientSecret);
+    await clientStorage.deleteClient(newClient.clientId);
+    await expect(async () => {await clientStorage.getClient(newClient.clientId)}).rejects.toThrowError(CrossauthError);
 });

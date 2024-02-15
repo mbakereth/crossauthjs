@@ -1,15 +1,15 @@
 import { test, expect, beforeAll, afterAll } from 'vitest';
-import { PrismaUserStorage, PrismaKeyStorage } from '../prismastorage';
+import { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage } from '../prismastorage';
 import { CrossauthError } from '@crossauth/common';
 import { PrismaClient } from '@prisma/client';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 
-export var prismaClient : PrismaClient;
+//export var prismaClient : PrismaClient;
 export var userStorage : PrismaUserStorage;
 
 // for all these tests, the database will have two users: bob and alice
 beforeAll(async () => {
-    prismaClient = new PrismaClient();
+    const prismaClient = new PrismaClient();
     await prismaClient.user.deleteMany({});
     await prismaClient.key.deleteMany({});
     userStorage = new PrismaUserStorage({userEditableFields: "email, dummyField"});
@@ -196,6 +196,15 @@ test("PrismaStorage.deleteMatchingForUser", async() => {
     await keyStorage.deleteMatching({userId: bob.id, value: key1});
     const keys = await keyStorage.getAllForUser(bob.id);
     expect(keys.length).toBe(1);
+});
+
+test('PrismaStorage.createGetAndDeleteClient', async () => {
+    const clientStorage = new PrismaOAuthClientStorage({saveClientSecret: true});
+    const newClient = await clientStorage.createClient();
+    const client = await clientStorage.getClient(newClient.clientId);
+    expect(client.clientSecret).toBe(newClient.clientSecret);
+    await clientStorage.deleteClient(newClient.clientId);
+    await expect(async () => {await clientStorage.getClient(newClient.clientId)}).rejects.toThrowError(CrossauthError);
 });
 
 

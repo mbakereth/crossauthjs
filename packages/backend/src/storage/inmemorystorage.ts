@@ -416,7 +416,7 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
      * 
      * @param client the client to save.
      */
-    async createClient(redirectUri : string[], extraFields : {[key:string]: any}) : Promise<OAuthClient> {
+    async createClient(redirectUri : string[] = [], extraFields : {[key:string]: any} = {}) : Promise<OAuthClient> {
         const client = {...this.randomClient(redirectUri), ...extraFields};
         return this.clients[client.clientId] = client;
     }

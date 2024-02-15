@@ -67,12 +67,12 @@ model ApiKey {
 }
 
 model OAuthClient {
-    id             String                    @id @unique
+    clientId       String                    @id @unique
     clientSecret   String?
 
     redirectUri    OAuthClientRedirectUri[]
 
-    @@index([id])
+    @@index([clientId])
 }
 
 model OAuthClientRedirectUri {
@@ -80,7 +80,7 @@ model OAuthClientRedirectUri {
     client_id      String 
     uri            String
 
-    client         OAuthClient @relation(references: [id], fields: [client_id], onDelete: Cascade)
+    client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
 
     @@index([id])
 }
