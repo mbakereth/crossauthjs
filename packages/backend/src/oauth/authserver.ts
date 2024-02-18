@@ -46,26 +46,30 @@ export interface OAuthAuthorizationServerOptions {
     /** If true, only redirect Uri's registered for the client will be accepted */
     requireRedirectUriRegistration?: boolean,
 
+    /** Application secret key (not the one for signing JWTs).  Used to encrypt code challenge */
+    secret? : string,
+
     /** The algorithm to sign JWTs with.  Default `RS256` */
     jwtAlgorithm? : string,
 
-    /** Secret key if using a symmetric cipher for signing the JWT.  Either this or `secretKeyFile` is required when using this kind of cipher*/
-    secretKey? : string,
+    /** Secret key if using a symmetric cipher for signing the JWT.  Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
+    jwtSecretKey? : string,
 
-    /** Filename with secret key if using a symmetric cipher for signing the JWT.  Either this or `secretKey` is required when using this kind of cipher*/
-    secretKeyFile? : string,
+    /** Filename with secret key if using a symmetric cipher for signing the JWT.  Either this or `jwtSecretKey` is required when using this kind of cipher*/
+    jwtSecretKeyFile? : string,
 
-    /** Filename for the private key if using a public key cipher for signing the JWT.  Either this or `privateKey` is required when using this kind of cipher.  publicKey or publicKeyFile is also required. */
-    privateKeyFile? : string,
+    /** Filename for the private key if using a public key cipher for signing the JWT.  Either this or `jwtPrivateKey` is required when using this kind of cipher.  publicKey or publicKeyFile is also required. */
+    jwtPrivateKeyFile? : string,
 
-    /** Tthe public key if using a public key cipher for signing the JWT.  Either this or `privateKey` is required when using this kind of cipher.  publicKey or publicKeyFile is also required. */
-    privateKey? : string,
+    /** Tthe public key if using a public key cipher for signing the JWT.  Either this or `jwtPrivateKey` is required when using this kind of cipher.  publicKey or publicKeyFile is also required. */
+    jwtPrivateKey? : string,
 
-    /** Filename for the public key if using a public key cipher for signing the JWT.  Either this or `publicKey` is required when using this kind of cipher.  privateKey or privateKeyFile is also required. */
-    publicKeyFile? : string,
+    /** Filename for the public key if using a public key cipher for signing the JWT.  Either this or `jwtPublicKey` is required when using this kind of cipher.  privateKey or privateKeyFile is also required. */
+    jwtPublicKeyFile? : string,
 
-    /** The public key if using a public key cipher for signing the JWT.  Either this or `publicKeyFile` is required when using this kind of cipher.  privateKey or privateKeyFile is also required. */
-    publicKey? : string,
+    /** The public key if using a public key cipher for signing the JWT.  Either this or `jwtP
+     * ublicKeyFile` is required when using this kind of cipher.  privateKey or privateKeyFile is also required. */
+    jwtPublicKey? : string,
 
     /** Whether to persist access tokens in key storage.  Default false */
     persistAcccessToken? : boolean,
@@ -114,12 +118,13 @@ export class OAuthAuthorizationServer {
         private requireRedirectUriRegistration = true;
         private jwtAlgorithm = "RS256";
         private jwtAlgorithmChecked : Algorithm = "RS256";
-        private secretKey = "";
-        private publicKey = "";
-        private privateKey = "";
-        private secretKeyFile = "";
-        private publicKeyFile = "";
-        private privateKeyFile = "";
+        private secret = "";
+        private jwtSecretKey = "";
+        private jwtPublicKey = "";
+        private jwtPrivateKey = "";
+        private jwtSecretKeyFile = "";
+        private jwtPublicKeyFile = "";
+        private jwtPrivateKeyFile = "";
         private secretOrPrivateKey = "";
         private secretOrPublicKey = "";
         private persistAcccessToken = false;
@@ -144,12 +149,13 @@ export class OAuthAuthorizationServer {
         setParameter("saveClientSecret", ParamType.String, this, options, "OAUTH_SAVE_CLIENT_SECRET");
         setParameter("requireRedirectUriRegistration", ParamType.String, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
-        setParameter("secretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
-        setParameter("publicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
-        setParameter("privateKeyFile", ParamType.String, this, options, "JWT_PRIVATE_KEY_FILE");
-        setParameter("secretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
-        setParameter("publicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
-        setParameter("privateKey", ParamType.String, this, options, "JWT_PRIVATE_KEY");
+        setParameter("secret", ParamType.String, this, options, "SECRET");
+        setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
+        setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
+        setParameter("jwtPrivateKeyFile", ParamType.String, this, options, "JWT_PRIVATE_KEY_FILE");
+        setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
+        setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
+        setParameter("jwtPrivateKey", ParamType.String, this, options, "JWT_PRIVATE_KEY");
         setParameter("persistAcccessToken", ParamType.String, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
         setParameter("peristRefreshToken", ParamType.String, this, options, "OAUTH_PERSIST_REFRESH_TOKEN");
         setParameter("persistUserToken", ParamType.String, this, options, "OAUTH_PERSIST_USER_TOKEN");
@@ -164,37 +170,37 @@ export class OAuthAuthorizationServer {
         
         this.jwtAlgorithmChecked = algorithm(this.jwtAlgorithm);
         
-        if (this.secretKey || this.secretKeyFile) {
-            if (this.publicKey || this.publicKeyFile || this.privateKey || this.privateKeyFile) {
+        if (this.jwtSecretKey || this.jwtSecretKeyFile) {
+            if (this.jwtPublicKey || this.jwtPublicKeyFile || this.jwtPrivateKey || this.jwtPrivateKeyFile) {
                 throw new CrossauthError(ErrorCode.Configuration, "Cannot specify symmetric and public/private JWT keys")
             }
-            if (this.secretKey && this.secretKeyFile) {
+            if (this.jwtSecretKey && this.jwtSecretKeyFile) {
                 throw new CrossauthError(ErrorCode.Configuration, "Cannot specify symmetric key and file")
             }
-            if (this.secretKeyFile) {
-                this.secretKey = fs.readFileSync(this.secretKeyFile, 'utf8');
+            if (this.jwtSecretKeyFile) {
+                this.jwtSecretKey = fs.readFileSync(this.jwtSecretKeyFile, 'utf8');
             }
-        } else if ((this.privateKey || this.privateKeyFile) && (this.publicKey || this.publicKeyFile)) {
-            if (this.privateKeyFile && this.privateKey) {
+        } else if ((this.jwtPrivateKey || this.jwtPrivateKeyFile) && (this.jwtPublicKey || this.jwtPublicKeyFile)) {
+            if (this.jwtPrivateKeyFile && this.jwtPrivateKey) {
                 throw new CrossauthError(ErrorCode.Configuration, "Cannot specify both private key and private key file");
             }
-            if (this.privateKeyFile) {
-                this.privateKey = fs.readFileSync(this.privateKeyFile, 'utf8');
+            if (this.jwtPrivateKeyFile) {
+                this.jwtPrivateKey = fs.readFileSync(this.jwtPrivateKeyFile, 'utf8');
             }
-            if (this.publicKeyFile && this.publicKey) {
+            if (this.jwtPublicKeyFile && this.jwtPublicKey) {
                 throw new CrossauthError(ErrorCode.Configuration, "Cannot specify both private key and private key file");
             }
-            if (this.publicKeyFile) {
-                this.publicKey = fs.readFileSync(this.publicKeyFile, 'utf8');
+            if (this.jwtPublicKeyFile) {
+                this.jwtPublicKey = fs.readFileSync(this.jwtPublicKeyFile, 'utf8');
             }
         } else {
             throw new CrossauthError(ErrorCode.Configuration, "Must specify either a JWT secret key or a public and private key pair");
         }
-        if (this.secretKey) {
-            this.secretOrPrivateKey = this.secretOrPublicKey = this.secretKey;
+        if (this.jwtSecretKey) {
+            this.secretOrPrivateKey = this.secretOrPublicKey = this.jwtSecretKey;
         } else {
-            this.secretOrPrivateKey = this.privateKey;
-            this.secretOrPublicKey = this.publicKey;
+            this.secretOrPrivateKey = this.jwtPrivateKey;
+            this.secretOrPublicKey = this.jwtPublicKey;
         }
 
         this.keyStorage = options.keyStorage;
@@ -208,6 +214,12 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * The the OAuth2 authorize endpoint.  All parameters are expected to be
+     * strings and have be URL-decoded.
+     * 
+     * For arguments and return parameters, see OAuth2 documentation.
+     */
     async authorizeEndpoint(
         responseType : string, 
         clientId : string, 
@@ -215,7 +227,10 @@ export class OAuthAuthorizationServer {
         scope : string, 
         state : string,
         code? : string,
-        clientSecret? : string) 
+        clientSecret? : string,
+        codeChallenge? : string,
+        codeChallengeMethod? : string,
+        codeVerifier? : string) 
     : Promise<{
         code? : string,
         state? : string,
@@ -243,7 +258,7 @@ export class OAuthAuthorizationServer {
         if (responseType == "code") {
 
             try {
-                const code = await this.getAuthorizationCode(clientId, redirectUri, requestedScopes||[]);
+                const code = await this.getAuthorizationCode(clientId, redirectUri, requestedScopes||[], codeChallenge, codeChallengeMethod);
                 return {
                     code: code,
                     state: state,
@@ -266,10 +281,10 @@ export class OAuthAuthorizationServer {
 
         } else if (responseType == "token") {
 
-            if (!clientSecret) {
+            if (!clientSecret && !codeVerifier) {
                 return {
                     error : OAuthErrorCode[OAuthErrorCode.access_denied],
-                    errorDescription: "No client secret provided when requesting access token",
+                    errorDescription: "No client secret or code verifier provided when requesting access token",
                 };
             }
             if (!code) {
@@ -279,7 +294,7 @@ export class OAuthAuthorizationServer {
                 };
             }
             try {
-                return await this.getAccessToken(code, clientId, clientSecret, redirectUri);
+                return await this.getAccessToken(code, clientId, clientSecret, redirectUri, codeVerifier);
             }
             catch (e) {
                 // error creating access token given clientId, client secret redirect uri
@@ -309,7 +324,18 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[]) : Promise<string> {
+    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[], codeChallenge? : string, codeChallengeMethod? : string) : Promise<string> {
+
+        // if we have a challenge, check the method is valid
+        if (codeChallenge && !this.secret) {
+            if (!codeChallengeMethod) codeChallengeMethod = "S256";
+            if (codeChallengeMethod != "S256" && codeChallengeMethod != "plain") {
+                throw new CrossauthError(ErrorCode.invalid_request, "Code challenge method must be S256 or plain")
+            }
+                const error = new CrossauthError(ErrorCode.Configuration, "To support code challenge/verifier, you must provide the application secret");
+            CrossauthLogger.logger.error(j({err: error}));
+            throw new CrossauthError(ErrorCode.server_error, "Configuration error - cannot process code challenge");
+        }
 
         // validate client
         let client : OAuthClient;
@@ -322,7 +348,7 @@ export class OAuthAuthorizationServer {
         }
 
         // validate redirect uri
-        const decodedUri = decodeURI(redirectUri.replace("+"," "));
+        const decodedUri = redirectUri; /*decodeURI(redirectUri.replace("+"," "));*/
         this.validateRedirectUri(decodedUri);
         if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
             throw new CrossauthError(ErrorCode.invalid_request, `The redirect uri {redirectUri} is invalid`);
@@ -339,6 +365,10 @@ export class OAuthAuthorizationServer {
         if (this.authorizationCodeExpiry != null) {
             payload.exp = timeCreated + this.authorizationCodeExpiry
         }
+        if (codeChallenge) {
+            payload.challengeMethod = codeChallengeMethod;
+            payload.challenge = codeChallenge;
+        }
 
         // sign and return token
         return  new Promise((resolve, reject) => {
@@ -352,24 +382,26 @@ export class OAuthAuthorizationServer {
         });
     }
 
-    private async getAccessToken(code : string, clientId: string, clientSecret : string, redirectUri? : string) 
+    private async getAccessToken(code : string, clientId: string, clientSecret? : string, redirectUri? : string, codeVerifier? : string) 
         : Promise<{accessToken: string, refreshToken : string, tokenType: string, expiresIn?: number}> {
 
         // validate client
         let client : OAuthClient;
-        try {
-            client = await this.clientStorage.getClient(clientId);
-            Hasher.passwordsEqual(clientSecret, client.clientSecret||"")
-        }
-        catch (e) {
-            CrossauthLogger.logger.error(j({err: e}));
-            throw new CrossauthError(ErrorCode.unauthorized_client);
-        }
+            try {
+                client = await this.clientStorage.getClient(clientId);
+                if (clientSecret) {
+                    Hasher.passwordsEqual(clientSecret, client.clientSecret||"");
+                }
+            }
+            catch (e) {
+                CrossauthLogger.logger.error(j({err: e}));
+                throw new CrossauthError(ErrorCode.unauthorized_client);
+            }
 
         // validate redirect uri
         let decodedUri : string|undefined;
         if (redirectUri) {
-            decodedUri = decodeURI(redirectUri.replace("+"," "));
+            decodedUri = redirectUri; /*decodeURI(redirectUri.replace("+"," "));*/
             this.validateRedirectUri(decodedUri);
             if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
                 throw new CrossauthError(ErrorCode.invalid_request, `The redirect uri {redirectUri} is invalid`);
@@ -392,6 +424,24 @@ export class OAuthAuthorizationServer {
                 throw new CrossauthError(ErrorCode.access_denied, "Redirect Uri's do not match");
             }
         }
+
+        
+        // validate code verifier, if there is one
+        const codeChallengeMethod = authCodePayload.challengeMethod;
+        const codeChallenge = authCodePayload.challenge;
+        if (codeChallengeMethod && !codeChallenge) {
+            if (codeChallengeMethod != "plain" && codeChallengeMethod != "S256") {
+                throw new CrossauthError(ErrorCode.access_denied, "Invalid code challenge/code challenge method method in authorization code");
+            }
+        }
+        if (codeChallenge) {
+            const hashedVerifier = codeChallengeMethod == "plain" ? codeVerifier||"" : Hasher.hash(codeVerifier||"");
+            if (hashedVerifier != codeChallenge) {
+                throw new CrossauthError(ErrorCode.access_denied, "Code verifier is incorrect");
+            }
+        }
+
+
 
         const timeCreated = Math.ceil(new Date().getTime()/1000);
 
@@ -466,7 +516,7 @@ export class OAuthAuthorizationServer {
     private validateScope(scope : string) : {error?: string, errorDescription? : string, scopes? : string[]} {
         let requestedScopes = [];
         try {
-            requestedScopes = decodeURI(scope.replace("+"," ")).split(" ");
+            requestedScopes = scope.split(" "); /*decodeURI(scope.replace("+"," ")).split(" ");*/ 
         } catch (e) {
             const errorCode = ErrorCode.invalid_scope;
             const errorDescription = `Invalid scope ${scope}`;
