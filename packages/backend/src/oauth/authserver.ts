@@ -213,10 +213,16 @@ export class OAuthAuthorizationServer {
         clientId : string, 
         redirectUri : string, 
         scope : string, 
-        state : string) 
+        state : string,
+        code? : string,
+        clientSecret? : string) 
     : Promise<{
         code? : string,
         state? : string,
+        accessToken? : string,
+        refreshToken? : string,
+        tokenType? : string,
+        expiresIn? : number,
         error? : string,
         errorDescription? : string,
     }> {
@@ -224,7 +230,18 @@ export class OAuthAuthorizationServer {
         const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
         if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};        
 
+        // validate state
+        try {
+            this.validateState(state);
+        } catch (e) {
+            return {
+                error: OAuthErrorCode[OAuthErrorCode.invalid_request],
+                errorDescription: "Invalid state",
+            };
+        }
+
         if (responseType == "code") {
+
             try {
                 const code = await this.getAuthorizationCode(clientId, redirectUri, requestedScopes||[]);
                 return {
@@ -246,7 +263,46 @@ export class OAuthAuthorizationServer {
                     errorDescription: errorDescription,
                 };
             }
+
+        } else if (responseType == "token") {
+
+            if (!clientSecret) {
+                return {
+                    error : OAuthErrorCode[OAuthErrorCode.access_denied],
+                    errorDescription: "No client secret provided when requesting access token",
+                };
+            }
+            if (!code) {
+                return {
+                    error : OAuthErrorCode[OAuthErrorCode.access_denied],
+                    errorDescription: "No authorization code provided when requesting access token",
+                };
+            }
+            try {
+                const {accessToken, refreshToken, expiresIn} = await this.getAccessToken(code, clientId, clientSecret, redirectUri);
+                return {
+                    accessToken: accessToken,
+                    refreshToken: refreshToken,
+                    expiresIn: expiresIn,
+                };
+            }
+            catch (e) {
+                // error creating access token given clientId, client secret redirect uri
+                let errorCode = OAuthErrorCode.server_error;
+                let errorDescription = (e instanceof Error) ? e.message : "An unknown error occurred";
+                if (e instanceof CrossauthError) {
+                    errorCode = e.oauthCode;
+                    errorDescription = e.message;
+                }
+                CrossauthLogger.logger.error(j({err: e}));
+                return {
+                    error : OAuthErrorCode[errorCode],
+                    errorDescription: errorDescription,
+                };
+            }
+
         } else {
+
             const errorCode = ErrorCode.unsupported_response_type
             const errorDescription = `Invalid response_type ${responseType}`;
             CrossauthLogger.logger.error(j({err: new CrossauthError(errorCode, errorDescription)}));
@@ -254,6 +310,7 @@ export class OAuthAuthorizationServer {
                 error : OAuthErrorCode[errorCode],
                 errorDescription: errorDescription,
             };
+
         }
     }
 
@@ -269,7 +326,7 @@ export class OAuthAuthorizationServer {
             throw new CrossauthError(ErrorCode.unauthorized_client);
         }
 
-        // validate request uri
+        // validate redirect uri
         const decodedUri = decodeURI(redirectUri.replace("+"," "));
         this.validateRedirectUri(decodedUri);
         if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
@@ -282,6 +339,7 @@ export class OAuthAuthorizationServer {
             jti: Hasher.uuid(),
             iat: timeCreated,
             scope: scopes,
+            redirectUri: decodedUri,
         };
         if (this.authorizationCodeExpiry != null) {
             payload.exp = timeCreated + this.authorizationCodeExpiry
@@ -299,7 +357,99 @@ export class OAuthAuthorizationServer {
         });
     }
 
-    async validateAuthorizationCode(code : string) : Promise<{[key:string]: any}> {
+    private async getAccessToken(code : string, clientId: string, clientSecret : string, redirectUri? : string) 
+        : Promise<{accessToken: string, refreshToken : string, expiresIn?: number}> {
+
+        // validate client
+        let client : OAuthClient;
+        try {
+            client = await this.clientStorage.getClient(clientId);
+            Hasher.passwordsEqual(clientSecret, client.clientSecret||"")
+        }
+        catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            throw new CrossauthError(ErrorCode.unauthorized_client);
+        }
+
+        // validate redirect uri
+        let decodedUri : string|undefined;
+        if (redirectUri) {
+            decodedUri = decodeURI(redirectUri.replace("+"," "));
+            this.validateRedirectUri(decodedUri);
+            if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
+                throw new CrossauthError(ErrorCode.invalid_request, `The redirect uri {redirectUri} is invalid`);
+            }
+        }
+
+        // validate authorization code
+        const authCodePayload = (await this.validateJwt(code)).payload;
+        let scopes = [];
+        if ("scope" in authCodePayload) {
+            scopes = authCodePayload.scope;
+        }
+        if (redirectUri) {
+            if (!("redirectUri" in authCodePayload) || authCodePayload.redirectUri != decodedUri) {
+                throw new CrossauthError(ErrorCode.access_denied, "Redirect Uri's do not match");
+            }
+        }
+        if ("redirectUri" in authCodePayload) {
+            if (!redirectUri || authCodePayload.redirectUri != decodedUri) {
+                throw new CrossauthError(ErrorCode.access_denied, "Redirect Uri's do not match");
+            }
+        }
+
+        const timeCreated = Math.ceil(new Date().getTime()/1000);
+
+        // create access token payload
+        const accessTokenPayload : {[key:string]: any} = {
+            jti: Hasher.uuid(),
+            iat: timeCreated,
+            scope: scopes,
+        };
+        if (this.accessTokenExpiry != null) {
+            accessTokenPayload.exp = timeCreated + this.accessTokenExpiry
+        }
+
+        // create access token jwt
+        const accessToken : string = await new Promise((resolve, reject) => {
+            jwt.sign(accessTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked}, 
+                (error: Error | null,
+                encoded: string | undefined) => {
+                    if (encoded) resolve(encoded);
+                    else if (error) reject(error);
+                    else reject(new CrossauthError(ErrorCode.Unauthorized, "Couldn't create jwt"));
+                });
+        });
+
+        // create refresh token payload
+        const refreshTokenPayload : {[key:string]: any} = {
+            jti: Hasher.uuid(),
+            iat: timeCreated,
+            scope: scopes,
+        };
+        if (this.accessTokenExpiry != null) {
+            refreshTokenPayload.exp = timeCreated + this.accessTokenExpiry
+        }
+
+        // create access token jwt
+        const refreshToken : string = await new Promise((resolve, reject) => {
+            jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked}, 
+                (error: Error | null,
+                encoded: string | undefined) => {
+                    if (encoded) resolve(encoded);
+                    else if (error) reject(error);
+                    else reject(new CrossauthError(ErrorCode.Unauthorized, "Couldn't create jwt"));
+                });
+        });
+
+        return {
+            accessToken : accessToken,
+            refreshToken : refreshToken,
+            expiresIn : this.accessTokenExpiry==null ? undefined : this.accessTokenExpiry,
+        }
+    }
+
+    async validateJwt(code : string) : Promise<{[key:string]: any}> {
         return  new Promise((resolve, reject) => {
             jwt.verify(code, this.secretOrPublicKey, {clockTolerance: this.clockTolerance, complete: true}, 
                 (error: Error | null,
@@ -391,6 +541,16 @@ export class OAuthAuthorizationServer {
         }
         if (!valid) {
             throw new CrossauthError(ErrorCode.invalid_request, `Invalid redirect Uri ${uri}`);
+        }
+    }
+
+    redirectUri(redirectUri : string, code : string, state : string) : string {
+        return `${redirectUri}?code=${code}&stte=${state}`;
+    }
+
+    private validateState(state : string) {
+        if (!(/^[A-Za-z0-9_-]+$/.test(state))) {
+            throw new CrossauthError(ErrorCode.invalid_request);
         }
     }
 

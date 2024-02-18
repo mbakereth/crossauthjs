@@ -2,20 +2,43 @@ import { test, expect } from 'vitest';
 import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '../authserver';
 import { InMemoryOAuthClientStorage } from '../../storage/inmemorystorage';
 import { OAuthClientStorage } from '../../storage';
+import { Hasher } from '../../hasher';
 import { OAuthClient, CrossauthError } from '@crossauth/common';
 import fs from 'node:fs';
 
 async function createClient() : Promise<{clientStorage : OAuthClientStorage, client : OAuthClient}> {
     const clientStorage = new InMemoryOAuthClientStorage();
+    const clientSecret = await Hasher.passwordHash("DEF", {
+        encode: true,
+        iterations: 1000,
+        keyLen: 32,
+    });
     const inputClient = {
         clientId : "ABC",
-        clientSecret: "DEF",
+        clientSecret: clientSecret,
         clientName: "Test",
         redirectUri: ["/redirectUri"],
     };
     const client = await clientStorage.createClient(inputClient);
     return {clientStorage, client};
 
+}
+
+async function getAuthorizationCode() {
+    const {clientStorage, client} = await createClient();
+    const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
+    const authServer = new OAuthAuthorizationServer(clientStorage, {
+        privateKey : privateKey,
+        publicKeyFile : "keys/rsa-public-key.pem",
+        validateScopes : true,
+        validScopes: "read, write",
+    });
+    const inputState = "ABCXYZ";
+    const {code, error, errorDescription} 
+        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read+write", inputState);
+    expect(error).toBeUndefined();
+    expect(errorDescription).toBeUndefined();
+    return {code, client, clientStorage, authServer};
 }
 
 test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFile', async () => {
@@ -35,7 +58,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFi
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
     const decodedToken
-        = await authServer.validateAuthorizationCode(code||"");
+        = await authServer.validateJwt(code||"");
     expect(decodedToken.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[1]);
@@ -58,7 +81,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKey',
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
     const decodedToken
-        = await authServer.validateAuthorizationCode(code||"");
+        = await authServer.validateJwt(code||"");
     expect(decodedToken.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[1]);
@@ -81,7 +104,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyPrivateKeyFile',
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
     const decodedToken
-        = await authServer.validateAuthorizationCode(code||"");
+        = await authServer.validateJwt(code||"");
     expect(decodedToken.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[1]);
@@ -104,7 +127,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKeyFile', async () 
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
     const decodedToken
-        = await authServer.validateAuthorizationCode(code||"");
+        = await authServer.validateJwt(code||"");
     expect(decodedToken.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[1]);
@@ -127,7 +150,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKey', async () => {
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
     const decodedToken
-        = await authServer.validateAuthorizationCode(code||"");
+        = await authServer.validateJwt(code||"");
     expect(decodedToken.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedToken.payload.scope[1]);
@@ -207,5 +230,28 @@ test('AuthorizationServer.invalidKey', async () => {
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
-    await expect(async () => {await authServer.validateAuthorizationCode(code||"")}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await authServer.validateJwt(code||"")}).rejects.toThrowError(CrossauthError);
+    });
+
+test('AuthorizationServer.accessToken', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode();
+    const {accessToken, refreshToken, expiresIn, error, errorDescription}
+        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read+write", "ABC", code, client.clientSecret);
+    expect(error).toBeUndefined();
+    expect(errorDescription).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validateJwt(accessToken||"");
+    expect(decodedAccessToken.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[1]);
+
+    const decodedRefreshToken
+        = await authServer.validateJwt(refreshToken||"");
+    expect(decodedRefreshToken.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedRefreshToken.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedRefreshToken.payload.scope[1]);
+
+    expect(expiresIn).toBe(60*60);
 });
