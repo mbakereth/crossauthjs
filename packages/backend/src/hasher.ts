@@ -1,4 +1,4 @@
-import {  pbkdf2, createHmac, createHash, timingSafeEqual, randomBytes, randomUUID }  from 'node:crypto';
+import {  pbkdf2, createHmac, createHash, timingSafeEqual, randomBytes, randomUUID, createCipheriv, createDecipheriv }  from 'node:crypto';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { promisify } from 'node:util';
 import { CrossauthLogger, j } from '@crossauth/common';
@@ -241,4 +241,25 @@ export class Hasher {
       
     }
 
+    static symmetricEncrypt(plaintext : string, keyString : string) {
+        const iv = randomBytes(16);
+        let key = Buffer.from(keyString, 'base64url');
+        var encrypt = createCipheriv('aes-256-cbc', key, iv);
+        let encrypted = encrypt.update(plaintext);
+        encrypted = Buffer.concat([encrypted, encrypt.final()]);
+        return iv.toString('base64url') + "." + encrypted.toString('base64url');
+    }
+
+    static symmetricDecrypt(ciphertext : string, keyString : string) {
+        let key = Buffer.from(keyString, 'base64url');
+        const parts = ciphertext.split(".");
+        if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidHash, "Not AES-256-CBC ciphertext");
+        let iv = Buffer.from(parts[0], 'base64url');
+        let encryptedText = Buffer.from(parts[1], 'base64url');
+    
+        var decrypt = createDecipheriv('aes-256-cbc', key, iv);
+        let decrypted = decrypt.update(encryptedText);
+        decrypted = Buffer.concat([decrypted, decrypt.final()]);
+        return decrypted.toString();
+    }
 }

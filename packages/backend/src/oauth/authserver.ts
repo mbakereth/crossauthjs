@@ -46,8 +46,8 @@ export interface OAuthAuthorizationServerOptions {
     /** If true, only redirect Uri's registered for the client will be accepted */
     requireRedirectUriRegistration?: boolean,
 
-    /** Application secret key (not the one for signing JWTs).  Used to encrypt code challenge */
-    secret? : string,
+    /** Key for symmetric encryption of code challenges (not the one for signing JWTs). Must be base64-url encoding of 256 bits */
+    encryptionKey? : string,
 
     /** The algorithm to sign JWTs with.  Default `RS256` */
     jwtAlgorithm? : string,
@@ -118,7 +118,7 @@ export class OAuthAuthorizationServer {
         private requireRedirectUriRegistration = true;
         private jwtAlgorithm = "RS256";
         private jwtAlgorithmChecked : Algorithm = "RS256";
-        private secret = "";
+        private encryptionKey = "";
         private jwtSecretKey = "";
         private jwtPublicKey = "";
         private jwtPrivateKey = "";
@@ -149,7 +149,7 @@ export class OAuthAuthorizationServer {
         setParameter("saveClientSecret", ParamType.String, this, options, "OAUTH_SAVE_CLIENT_SECRET");
         setParameter("requireRedirectUriRegistration", ParamType.String, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
-        setParameter("secret", ParamType.String, this, options, "SECRET");
+        setParameter("encryptionKey", ParamType.String, this, options, "ENCRYPTION_KEY");
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
         setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
         setParameter("jwtPrivateKeyFile", ParamType.String, this, options, "JWT_PRIVATE_KEY_FILE");
@@ -327,7 +327,7 @@ export class OAuthAuthorizationServer {
     private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[], codeChallenge? : string, codeChallengeMethod? : string) : Promise<string> {
 
         // if we have a challenge, check the method is valid
-        if (codeChallenge && !this.secret) {
+        if (codeChallenge && !this.encryptionKey) {
             if (!codeChallengeMethod) codeChallengeMethod = "S256";
             if (codeChallengeMethod != "S256" && codeChallengeMethod != "plain") {
                 throw new CrossauthError(ErrorCode.invalid_request, "Code challenge method must be S256 or plain")
@@ -366,8 +366,9 @@ export class OAuthAuthorizationServer {
             payload.exp = timeCreated + this.authorizationCodeExpiry
         }
         if (codeChallenge) {
+            const encryptedChallenge = Hasher.symmetricEncrypt(codeChallenge, this.encryptionKey);
             payload.challengeMethod = codeChallengeMethod;
-            payload.challenge = codeChallenge;
+            payload.challenge = encryptedChallenge;
         }
 
         // sign and return token
@@ -428,13 +429,13 @@ export class OAuthAuthorizationServer {
         
         // validate code verifier, if there is one
         const codeChallengeMethod = authCodePayload.challengeMethod;
-        const codeChallenge = authCodePayload.challenge;
-        if (codeChallengeMethod && !codeChallenge) {
+        if (codeChallengeMethod && !authCodePayload.challenge) {
             if (codeChallengeMethod != "plain" && codeChallengeMethod != "S256") {
                 throw new CrossauthError(ErrorCode.access_denied, "Invalid code challenge/code challenge method method in authorization code");
             }
         }
-        if (codeChallenge) {
+        if (authCodePayload.challenge) {
+            const codeChallenge = Hasher.symmetricDecrypt(authCodePayload.challenge, this.encryptionKey);
             const hashedVerifier = codeChallengeMethod == "plain" ? codeVerifier||"" : Hasher.hash(codeVerifier||"");
             if (hashedVerifier != codeChallenge) {
                 throw new CrossauthError(ErrorCode.access_denied, "Code verifier is incorrect");

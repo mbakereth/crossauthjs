@@ -38,3 +38,11 @@ test('Hasher.xor', async () => {
     const unmaskedValue = Hasher.xor(maskedValue, mask);
     expect(unmaskedValue).toBe(value);
 });
+
+test('Hasher.symmetricEncryption', async () => {
+    const key = "xkDDElW4zZTLdIZ3AS0v0gJbh_SZZSAo6YuWDeEtBaU";
+    const plaintext = "This is the plaintext";
+    const ciphertext = Hasher.symmetricEncrypt(plaintext, key);
+    const recoveredText = Hasher.symmetricDecrypt(ciphertext, key);
+    expect(recoveredText).toBe(plaintext);
+});

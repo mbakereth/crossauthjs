@@ -33,7 +33,7 @@ async function getAuthorizationCode(challenge = false) {
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
-        secret: "ABCDEFG123890",
+        encryptionKey: "bK9CQHte6zhbirgEFwOGzc5dx6nIkf84_FIFnbc4jk8",
     });
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
@@ -317,7 +317,7 @@ test('ResourceServer.validCodeChallenge', async () => {
 test('ResourceServer.invalidCodeChallenge', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode(true);
-    const {error, errorDescription}
+    const {error}
         = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, undefined, undefined, undefined, "ABC124");
     expect(error).toBe("access_denied");
 });
