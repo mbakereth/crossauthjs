@@ -1,10 +1,6 @@
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { setParameter, ParamType } from './utils';
 import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields, OAuthClient } from '@crossauth/common';
-import { Hasher } from './hasher';
-
-const CLIENT_ID_LENGTH = 16;
-const CLIENT_SECRET_LENGTH = 16;
 
 /**
  * Passed to get methods in {@link UserStorage}.
@@ -214,8 +210,6 @@ export abstract class KeyStorage {
 }
 
 export interface OAuthClientStorageOptions {
-    /** if true, a client secret is expected in the table.  If you don't use flows for confidential clients, you do not need a secret.  Default true */
-    saveClientSecret?  : boolean,
 }
 /**
  * Base class for storing session and API keys.
@@ -225,25 +219,7 @@ export interface OAuthClientStorageOptions {
  */
 export abstract class OAuthClientStorage {
 
-    saveClientSecret : boolean = true;
-
-    constructor(options : OAuthClientStorageOptions = {} ) {
-        setParameter("saveClientSecret", ParamType.StringArray, this, options, "OAUTH2_SAVE_CLIENT_SECRET");
-    }
-
-     /**
-     * Can be called by subclasses to create a random client ID and client secret
-     * 
-     * @param client the client to save.
-     */
-     randomClient(redirectUri : string[]) : OAuthClient {
-        const clientId = Hasher.randomValue(CLIENT_ID_LENGTH)
-        const clientSecret =  this.saveClientSecret ? Hasher.randomValue(CLIENT_SECRET_LENGTH) : undefined;
-        return {
-            clientId : clientId,
-            clientSecret : clientSecret,
-            redirectUri : redirectUri,
-        }
+    constructor(_options : OAuthClientStorageOptions = {} ) {
     }
     
    // throws InvalidSessionId
@@ -265,8 +241,7 @@ export abstract class OAuthClientStorage {
      * @param redirectUri an array of redirect uri's, which may be empty if checking redirect uri is not mandatory
      * 
      */
-    abstract createClient(redirectUri : string[], extraFields : {[key:string]: any}) : Promise<OAuthClient>;
-
+    abstract createClient(client : OAuthClient) : Promise<OAuthClient>;
 
     /**
      * If the given session key exists in the database, update it with the passed values.  If it doesn't

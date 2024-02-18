@@ -20,7 +20,9 @@ beforeAll(async () => {
 async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise<{userStorage : InMemoryUserStorage, keyStorage : InMemoryKeyStorage, server: FastifyServer}> {
     const userStorage = await getTestUserStorage();
     const keyStorage = new InMemoryKeyStorage();
-    let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
+    let lpAuthenticator = new LocalPasswordAuthenticator(userStorage, {
+        pbkdf2Iterations: 1_000,
+    });
     let totpAuthenticator = new TotpAuthenticator("FastifyTest");
 
     // create a fastify server and mock view to return its arguments

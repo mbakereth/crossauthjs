@@ -190,10 +190,16 @@ test("InMemoryKeyStorage.deleteKeyForNoUser", async() => {
 });
 
 test('InMemoryClientStorage.createGetAndDeleteClient', async () => {
-    const clientStorage = new InMemoryOAuthClientStorage({saveClientSecret: true});
-    const newClient = await clientStorage.createClient();
-    const client = await clientStorage.getClient(newClient.clientId);
-    expect(client.clientSecret).toBe(newClient.clientSecret);
-    await clientStorage.deleteClient(newClient.clientId);
-    await expect(async () => {await clientStorage.getClient(newClient.clientId)}).rejects.toThrowError(CrossauthError);
+    const clientStorage = new InMemoryOAuthClientStorage();
+    const client = {
+        clientId : "ABC",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: [],
+    };
+    await clientStorage.createClient(client);
+    const getClient = await clientStorage.getClient(client.clientId);
+    expect(getClient.clientSecret).toBe(client.clientSecret);
+    await clientStorage.deleteClient(client.clientId);
+    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
 });

@@ -38,6 +38,14 @@ export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions
     /** If true, the `secret` will be concatenated to the salt when generating a hash for storing the password */
     enableSecretForPasswordHash? : boolean;
 
+    pbkdf2Digest? : string,
+
+    pbkdf2Iterations? : number,
+
+    pbkdf2SaltLength? : number,
+
+    pbkdf2KeyLength? : number,
+
     /** Function that throws a {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
     validatePasswordFn? : (params : AuthenticationParameters) => string[];
 }
@@ -49,6 +57,11 @@ export class LocalPasswordAuthenticator extends Authenticator {
 
     private secret : string|undefined = undefined;
     enableSecretForPasswords : boolean = false;
+    pbkdf2Digest? : string = "sha256";
+    pbkdf2Iterations? : number = 600_000;
+    pbkdf2SaltLength? : number = 16;
+    pbkdf2KeyLength? : number = 32;
+
     validatePasswordFn : (params : AuthenticationParameters) => string[] = defaultPasswordValidator;
 
     /**
@@ -64,6 +77,10 @@ export class LocalPasswordAuthenticator extends Authenticator {
         super({friendlyName: "Local password", ...options});
         setParameter("secret", ParamType.String, this, options, "HASHER_SECRET");
         setParameter("enableSecretForPasswordHash", ParamType.Boolean, this, options, "ENABLE_SECRET_FOR_PASSWORDS");
+        setParameter("pbkdf2Digest", ParamType.String, this, options, "PASSWORD_PBKDF2_DIGEST");
+        setParameter("pbkdf2Iterations", ParamType.String, this, options, "PASSWORD_PBKDF2_ITERATIONS");
+        setParameter("pbkdf2SaltLength", ParamType.String, this, options, "PASSWORD_PBKDF2_SALTLENGTH");
+        setParameter("pbkdf2KeyLength", ParamType.String, this, options, "PASSWORD_PBKDF2_KEYLENGTH");
         if (options.validatePasswordFn) this.validatePasswordFn = options.validatePasswordFn;
     }
 
@@ -111,7 +128,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
 
 
     /**
-     * Creates and returns a hash of the passed password, with the hasing parameters encoded ready
+     * Creates and returns a hash of the passed password, with the hashing parameters encoded ready
      * for storage.
      * 
      * If salt is not provieed, a random one is greated.  If secret was passed to the constructor 
@@ -124,8 +141,14 @@ export class LocalPasswordAuthenticator extends Authenticator {
      */
     async createPasswordHash(password : string, salt? : string) : Promise<string> {
         
-        return await Hasher.passwordHash(password, {salt: salt, encode: true, 
-            secret: this.enableSecretForPasswords ? this.secret : undefined});
+        return await Hasher.passwordHash(password, {
+            salt: salt, 
+            encode: true, 
+            secret: this.enableSecretForPasswords ? this.secret : undefined,
+            iterations: this.pbkdf2Iterations,
+            keyLen: this.pbkdf2KeyLength,
+            digest: this.pbkdf2Digest,
+        });
     }
 
     /**
@@ -134,16 +157,6 @@ export class LocalPasswordAuthenticator extends Authenticator {
      */
     async createPasswordForStorage(password : string) : Promise<string> {
         return this.createPasswordHash(password);
-    }
-
-    /**
-     * A static version of the password hasher, provided for convenience
-     * @param password : unhashed password
-     * @param secret secret, if used when hashing passwords, or undefined if not
-     * @returns hashed password in the format used for user storage
-     */
-    static async hashPassword(password : string, secret? : string) {
-        return await Hasher.passwordHash(password, {encode: true, secret: secret});
     }
 
     /**
@@ -169,7 +182,7 @@ export class LocalPasswordAuthenticator extends Authenticator {
         if (repeatParams && repeatParams.password != params.password) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
         }
-        return {password: await LocalPasswordAuthenticator.hashPassword(params.password)};
+        return {password: await this.createPasswordHash(params.password)};
     }
 
     /**

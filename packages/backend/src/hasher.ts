@@ -1,4 +1,4 @@
-import {  pbkdf2, createHmac, createHash, timingSafeEqual, randomBytes }  from 'node:crypto';
+import {  pbkdf2, createHmac, createHash, timingSafeEqual, randomBytes, randomUUID }  from 'node:crypto';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { promisify } from 'node:util';
 import { CrossauthLogger, j } from '@crossauth/common';
@@ -146,6 +146,13 @@ export class Hasher {
     }
 
     /**
+     * Creates a UUID
+     */
+    static uuid() : string {
+        return randomUUID();
+    }
+
+    /**
      * Standard hash using SHA256 (not PBKDF2 or HMAC)
      * 
      * @param plaintext text to hash
@@ -180,7 +187,7 @@ export class Hasher {
         );
         let passwordHash = hashBytes.toString('base64url');
         if (encode) passwordHash = this.encodePasswordHash(
-            passwordHash, salt, useSecret, PBKDF2_ITERATIONS, PBKDF2_KEYLENGTH, PBKDF2_DIGEST);
+            passwordHash, salt, useSecret, options.iterations||PBKDF2_ITERATIONS, options.keyLen||PBKDF2_KEYLENGTH, options.digest||PBKDF2_DIGEST);
         return passwordHash;
     }
 

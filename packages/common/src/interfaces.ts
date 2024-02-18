@@ -68,6 +68,7 @@ export interface UserSecrets extends UserSecretsInputFields {
 
 export interface OAuthClient {
     clientId : string,
+    clientName : string,
     clientSecret? : string,
     redirectUri : string[],
     [ key : string ] : any,

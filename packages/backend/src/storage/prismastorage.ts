@@ -4,6 +4,7 @@ import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key, OAuthC
 import { CrossauthError, ErrorCode } from'@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
+import { Hasher } from '../hasher';
 
  /**
  * Optional parameters for {@link PrismaUserStorage}.
@@ -686,18 +687,15 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      * @param redirectUri array of valid redirect uri's
      * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
      */
-    async createClient(redirectUri: string[] = [], extraFields : {[key:string] : any} = {}) : Promise<OAuthClient> {
+    async createClient(client : OAuthClient) : Promise<OAuthClient> {
         const maxAttempts = 10;
-
+        const {redirectUri, ...prismaClientData} = client;
         for (let attempt=0; attempt < maxAttempts; ++attempt) {
             try {
-                const client = this.randomClient(redirectUri);
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
                 const newClient = await this.prismaClient[this.clientTable].create({
                     data: {
-                        clientId: client.clientId,
-                        clientSecret: client.clientSecret,
-                        ...extraFields,
+                        ...prismaClientData,
                         redirectUri: { 
                             create: 
                             redirectUri

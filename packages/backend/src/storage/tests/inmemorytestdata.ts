@@ -4,7 +4,7 @@ import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 export async function getTestUserStorage(pepper? : string|undefined) : Promise<InMemoryUserStorage> {
     //let userStorage = new InMemoryUserStorage({userEditableFields: ["email", "dummyField"]});
     let userStorage = new InMemoryUserStorage({userEditableFields: "email, dummyField"});
-    let authenticator = new LocalPasswordAuthenticator(userStorage, {secret: pepper});
+    let authenticator = new LocalPasswordAuthenticator(userStorage, {secret: pepper, pbkdf2Iterations: 1_000});
     await Promise.all([
         userStorage.createUser({
                 username: "bob", 

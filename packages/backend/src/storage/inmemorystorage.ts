@@ -416,8 +416,7 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
      * 
      * @param client the client to save.
      */
-    async createClient(redirectUri : string[] = [], extraFields : {[key:string]: any} = {}) : Promise<OAuthClient> {
-        const client = {...this.randomClient(redirectUri), ...extraFields};
+    async createClient(client : OAuthClient) : Promise<OAuthClient> {
         return this.clients[client.clientId] = client;
     }
 
@@ -440,7 +439,7 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
     async updateClient(client : Partial<OAuthClient>) : Promise<void> {
         if (client.clientId && client.clientId in this.clients) {
             const oldClient = this.clients[client.clientId];
-            this.clients[client.clientId] = {...client, clientId: oldClient.clientId, redirectUri: client.redirectUri||oldClient.redirectUri}
+            this.clients[client.clientId] = {...client, clientName: client.clientName||oldClient.clientName, clientId: oldClient.clientId, redirectUri: client.redirectUri||oldClient.redirectUri}
         }
     }
 

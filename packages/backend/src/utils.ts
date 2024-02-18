@@ -41,10 +41,10 @@ function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvF
             instance[key] = (process.env[nameInEnvFile]||"")?.split(/ *, */);
             break;
         case ParamType.String:
-            instance[key] = process.env[nameInEnvFile];
+            instance[key] = process.env[nameInEnvFile]=="null" ? null : process.env[nameInEnvFile];
             break;
         case ParamType.Number:
-            instance[key] = Number(process.env[nameInEnvFile]);
+            instance[key] = process.env[nameInEnvFile]=="null" ? null : Number(process.env[nameInEnvFile]);
             break;
         case ParamType.Boolean:
             instance[key] = ["1", "true"].includes(process.env[nameInEnvFile]?.toLowerCase()||"");

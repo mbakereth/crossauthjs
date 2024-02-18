@@ -68,6 +68,7 @@ model ApiKey {
 
 model OAuthClient {
     clientId       String                    @id @unique
+    clientName     String
     clientSecret   String?
 
     redirectUri    OAuthClientRedirectUri[]

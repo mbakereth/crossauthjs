@@ -1,10 +1,24 @@
 /**
+ * Errors that can be returned from OAuth2 endpoints
+ */
+export enum OAuthErrorCode {
+    /** Thrown when a given username does not exist, eg during login */
+    invalid_request = 101,
+    unauthorized_client = 102,
+    access_denied = 103,
+    unsupported_response_type = 104,
+    invalid_scope = 105,
+    server_error = 106,
+    temporarily_unavailable = 107,
+  };
+  
+/**
  * Indicates the type of error reported by {@link @crossauth/common!CrossauthError}
  */
 export enum ErrorCode {
 
     /** Thrown when a given username does not exist, eg during login */
-	UserNotExist,
+	UserNotExist = 0,
 
     /** Thrown when a password does not match, eg during login or signup */
     PasswordInvalid,
@@ -24,6 +38,9 @@ export enum ErrorCode {
 
     /** Server endpoints in this package will return this instead of InvalidClientId or InvalidClientSecret for security purposes */
     InvalidClientIdOrSecret,
+
+    /** This is returned a request is made with a redirect Uri that is not registered */
+    InvalidRedirectUri,
 
     /** Thrown on login attempt with a user account marked inactive */
     UserNotActive,
@@ -103,6 +120,29 @@ export enum ErrorCode {
 
     /** Thrown for an condition not convered above. */
     UnknownError,
+
+    // OAuthErrors 
+
+    /** OAuth invalid_request - See RFC 6749 */
+    invalid_request = 101,
+
+    /** OAuth unauthorized_client - See RFC 6749 */
+    unauthorized_client = 102,
+
+    /** OAuth access_denied - See RFC 6749 */
+    access_denied = 103,
+
+    /** OAuth unsupported_response_type - See RFC 6749 */
+    unsupported_response_type = 104,
+
+    /** OAuth invalid_scope - See RFC 6749 */
+    invalid_scope = 105,
+
+    /** OAuth server_error - See RFC 6749 */
+    server_error = 106,
+
+    /** OAuth temporarily_unavailable - See RFC 6749 */
+    temporarily_unavailable = 107,
 }
 
 /**
@@ -151,6 +191,9 @@ export class CrossauthError extends Error {
             _httpStatus = 401;
         } else if (code == ErrorCode.InvalidClientIdOrSecret) {
             _message = "Client id or secret is invalid"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidRedirectUri) {
+            _message = "Redirect Uri is not registered"
             _httpStatus = 401;
         } else if (code == ErrorCode.EmailNotExist) {
             _message = "No user exists with that email address"
@@ -216,6 +259,24 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.DataFormat) {
             _message = "Session data has unexpected format";
             _httpStatus = 500;
+        } else if (code == ErrorCode.invalid_request) {
+            _message = "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.";
+            _httpStatus = 400;
+        } else if (code == ErrorCode.unauthorized_client) {
+            _message = "The client is not authorized to request an authorization code using this method.";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.access_denied) {
+            _message = "The resource owner or authorization server denied the request";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.unsupported_response_type) {
+            _message = "The authorization server does not support obtaining an authorization code using this method";
+            _httpStatus = 400;
+        } else if (code == ErrorCode.invalid_scope) {
+            _message = "The requested scope is invalid, unknown, or malformed";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.server_error) {
+            _message = "The authorization server encountered an unexpected condition that prevented it from fulfilling the request.";
+            _httpStatus = 500;
         } else {
             _message = "Unknown error";
         }    
@@ -233,4 +294,14 @@ export class CrossauthError extends Error {
         else this.messages = [_message];
     }
 
+    get oauthCode() : OAuthErrorCode {
+        try {
+            return OAuthErrorCode[ErrorCode[this.code] as keyof typeof OAuthErrorCode];
+        } catch (e) {
+        return OAuthErrorCode.server_error;
+        }
+    }
+    
+
 }
+
