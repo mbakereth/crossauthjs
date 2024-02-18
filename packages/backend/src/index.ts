@@ -33,6 +33,11 @@ export type { FastifyServerOptions as FastifyCookieAuthServerOptions  } from './
 export { Hasher } from './hasher';
 export type { PasswordHash } from './hasher';
 
+// OAuth
+export { OAuthAuthorizationServer } from './oauth/authserver';
+export type { OAuthAuthorizationServerOptions } from './oauth/authserver';
+export { OAuthResourceServer } from './oauth/resserver';
+
 import type { User, ApiKey } from '@crossauth/common'
 
 declare module 'fastify' {

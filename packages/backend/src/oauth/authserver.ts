@@ -279,12 +279,7 @@ export class OAuthAuthorizationServer {
                 };
             }
             try {
-                const {accessToken, refreshToken, expiresIn} = await this.getAccessToken(code, clientId, clientSecret, redirectUri);
-                return {
-                    accessToken: accessToken,
-                    refreshToken: refreshToken,
-                    expiresIn: expiresIn,
-                };
+                return await this.getAccessToken(code, clientId, clientSecret, redirectUri);
             }
             catch (e) {
                 // error creating access token given clientId, client secret redirect uri
@@ -358,7 +353,7 @@ export class OAuthAuthorizationServer {
     }
 
     private async getAccessToken(code : string, clientId: string, clientSecret : string, redirectUri? : string) 
-        : Promise<{accessToken: string, refreshToken : string, expiresIn?: number}> {
+        : Promise<{accessToken: string, refreshToken : string, tokenType: string, expiresIn?: number}> {
 
         // validate client
         let client : OAuthClient;
@@ -446,6 +441,7 @@ export class OAuthAuthorizationServer {
             accessToken : accessToken,
             refreshToken : refreshToken,
             expiresIn : this.accessTokenExpiry==null ? undefined : this.accessTokenExpiry,
+            tokenType: "Bearer",
         }
     }
 
