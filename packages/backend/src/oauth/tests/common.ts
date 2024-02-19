@@ -35,7 +35,7 @@ export async function getAuthorizationCode({challenge, aud} : {challenge?: boole
         encryptionKey: "bK9CQHte6zhbirgEFwOGzc5dx6nIkf84_FIFnbc4jk8",
         issueRefreshToken: true,
     };
-    if (aud) options.jwtAudiences = aud;
+    if (aud) options.resourceServers = aud;
     const authServer = new OAuthAuthorizationServer(clientStorage, options);
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;

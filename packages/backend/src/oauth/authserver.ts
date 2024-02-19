@@ -32,10 +32,10 @@ function algorithm(value : string) : Algorithm {
 export interface OAuthAuthorizationServerOptions {
 
     /** JWT issuer, eg https://yoursite.com.  Required (no default) */
-    jwtIssuer? : string,
+    oauthIssuer? : string,
 
     /** JWT issuer, eg https://yoursite.com.  Required (no default) */
-    jwtAudiences? : string,
+    resourceServers? : string,
 
     /** PBKDF2 HMAC for hashing client secret */
     pbkdf2Digest? : string;
@@ -130,8 +130,8 @@ export interface OAuthAuthorizationServerOptions {
 export class OAuthAuthorizationServer {
 
         private clientStorage : OAuthClientStorage;
-        private jwtIssuer : string = "";
-        private jwtAudiences : string[]|null = null;
+        private oauthIssuer : string = "";
+        private resourceServers : string[]|null = null;
         private pbkdf2Digest = "sha256";
         private pbkdf2Iterations = 40000;
         private pbkdf2KeyLength = 32;
@@ -167,8 +167,8 @@ export class OAuthAuthorizationServer {
     constructor(clientStorage: OAuthClientStorage, options: OAuthAuthorizationServerOptions) {
         this.clientStorage = clientStorage;
 
-        setParameter("jwtIssuer", ParamType.String, this, options, "JWT_ISSUER", true);
-        setParameter("jwtAudiences", ParamType.String, this, options, "JWT_AUDIENCES");
+        setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
+        setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
         setParameter("pbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
         setParameter("pbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
         setParameter("pbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
@@ -390,7 +390,7 @@ export class OAuthAuthorizationServer {
             jti: Hasher.uuid(),
             iat: timeCreated,
             scope: scopes,
-            aud: this.jwtIssuer,
+            aud: this.oauthIssuer,
             redirect_uri: decodedUri,
             type: "code",
         };
@@ -468,8 +468,8 @@ export class OAuthAuthorizationServer {
                 throw new CrossauthError(ErrorCode.access_denied, "Redirect Uri's do not match");
             }
         }
-        if ((Array.isArray(authCodePayload.aud) && !authCodePayload.aud.includes(this.jwtIssuer)) ||
-            (!Array.isArray(authCodePayload.aud) && authCodePayload.aud != this.jwtIssuer)) {
+        if ((Array.isArray(authCodePayload.aud) && !authCodePayload.aud.includes(this.oauthIssuer)) ||
+            (!Array.isArray(authCodePayload.aud) && authCodePayload.aud != this.oauthIssuer)) {
                 throw new CrossauthError(ErrorCode.access_denied, "Authorization code not intended for this issuer");
         }
 
@@ -500,7 +500,7 @@ export class OAuthAuthorizationServer {
         const accessTokenPayload : {[key:string]: any} = {
             jti: accessTokenJti,
             iat: timeCreated,
-            iss: this.jwtIssuer,
+            iss: this.oauthIssuer,
             scope: scopes,
             sub: username,
             preferred_username: username,
@@ -510,8 +510,8 @@ export class OAuthAuthorizationServer {
             accessTokenPayload.exp = timeCreated + this.accessTokenExpiry
             dateAccessTokenExpires = new Date(timeCreated+this.accessTokenExpiry*1000 + this.clockTolerance*1000);
         }
-        if (this.jwtAudiences) {
-            accessTokenPayload.aud = this.jwtAudiences;
+        if (this.resourceServers) {
+            accessTokenPayload.aud = this.resourceServers;
         }
 
         // create access token jwt
@@ -541,7 +541,7 @@ export class OAuthAuthorizationServer {
         const refreshTokenPayload : {[key:string]: any} = {
             jti: refreshTokenJti,
             iat: timeCreated,
-            iss: this.jwtIssuer,
+            iss: this.oauthIssuer,
             scope: scopes,
             preferred_username: username,
             sub: username,
@@ -551,8 +551,8 @@ export class OAuthAuthorizationServer {
             refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry;
             dateRefreshTokenExpires = new Date(timeCreated+this.refreshTokenExpiry*1000 + this.clockTolerance*1000);
         }
-        if (this.jwtAudiences) {
-            refreshTokenPayload.aud = this.jwtAudiences;
+        if (this.resourceServers) {
+            refreshTokenPayload.aud = this.resourceServers;
         }
 
         let refreshToken : string|undefined;

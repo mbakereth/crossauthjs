@@ -9,6 +9,9 @@ import fs from 'node:fs';
 
 export interface OAuthResourceServerOptions {
 
+    /** Name for this resource server.  The `aud` field in the JWT must match this */
+    resourceServerName? : string,
+
     /** Whether to persist access tokens in key storage.  Default false */
     persistAcccessToken? : boolean,
 
@@ -31,13 +34,13 @@ export interface OAuthResourceServerOptions {
     /** Number of seconds tolerance when checking expiration.  Default 10 */
     clockTolerance? : number,
 
-    /** Set this to restrict the issuers (as set in {@link OAuthAuthorizationServer}) that will be valid in the JWT */
-    jwtIssuers? : string,
+    /** Set this to restrict the issuers (as set in {@link OAuthAuthorizationServer}) that will be valid in the JWT.  Required */
+    oauthIssuers? : string,
 }
 
 export class OAuthResourceServer {
     
-    private name : string;
+    private resourceServerName : string = "";
     private persistAcccessToken = false;
     private keyStorage? : KeyStorage;
     private jwtSecretKey = "";
@@ -46,17 +49,17 @@ export class OAuthResourceServer {
     private jwtPublicKey = "";
     private secretOrPublicKey = "";
     private clockTolerance : number = 10;
-    private jwtIssuers : string[]|undefined = undefined;
+    private oauthIssuers : string[]|undefined = undefined;
 
-    constructor(name: string, options : OAuthResourceServerOptions = {}) {
-        this.name = name;
+    constructor(options : OAuthResourceServerOptions = {}) {
 
+        setParameter("resourceServerName", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER", true);
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
         setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
         setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
         setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
-        setParameter("jwtIssuers", ParamType.StringArray, this, options, "JWT_ISSUER");
+        setParameter("oauthIssuers", ParamType.StringArray, this, options, "OAUTH_ISSUER", true);
 
         if (this.jwtSecretKey || this.jwtSecretKeyFile) {
             if (this.jwtPublicKey || this.jwtPublicKeyFile) {
@@ -107,17 +110,17 @@ export class OAuthResourceServer {
                 return undefined;
             }
         }
-        if (this.jwtIssuers) {
-            if ((Array.isArray(this.jwtIssuers) && !this.jwtIssuers.includes(decoded.payload.iss)) ||
-                (!Array.isArray(this.jwtIssuers) && this.jwtIssuers != decoded.payload.iss)) {
+        if (this.oauthIssuers) {
+            if ((Array.isArray(this.oauthIssuers) && !this.oauthIssuers.includes(decoded.payload.iss)) ||
+                (!Array.isArray(this.oauthIssuers) && this.oauthIssuers != decoded.payload.iss)) {
                 CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.payload.iss} in access token`}));
                 return undefined;
 
             }
         }
         if (decoded.payload.aud) {
-            if ((Array.isArray(decoded.payload.aud) && !decoded.payload.aud.includes(this.name)) ||
-                (!Array.isArray(decoded.payload.aud) && decoded.payload.aud != this.name)) {
+            if ((Array.isArray(decoded.payload.aud) && !decoded.payload.aud.includes(this.resourceServerName)) ||
+                (!Array.isArray(decoded.payload.aud) && decoded.payload.aud != this.resourceServerName)) {
                     CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.payload.aud} in access token`}));
                     return undefined;    
                 }
