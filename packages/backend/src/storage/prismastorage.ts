@@ -4,7 +4,6 @@ import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key, OAuthC
 import { CrossauthError, ErrorCode } from'@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
-import { Hasher } from '../hasher';
 
  /**
  * Optional parameters for {@link PrismaUserStorage}.
@@ -630,6 +629,7 @@ export class PrismaKeyStorage extends KeyStorage {
  */
 export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptions {
     clientTable? : string,
+    redirectUriTable? : string,
     prismaClient? : PrismaClient,
 }
 
@@ -639,6 +639,7 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
  */
 export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private clientTable : string = "oAuthClient";
+    private redirectUriTable : string = "oAuthRedirectUri";
     private prismaClient : PrismaClient;
 
     /**
@@ -649,6 +650,8 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      */
     constructor(options : PrismaOAuthClientStorageOptions = {}) {
         super();
+        setParameter("clientTable", ParamType.String, this, options, "OAUTH_CLIENT_TABLE");
+        setParameter("redirectUriTable", ParamType.String, this, options, "OAUTH_REDIRECTURI_TABLE");
         if (options.prismaClient == undefined) {
             this.prismaClient = new PrismaClient();
         } else {
@@ -680,30 +683,37 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             throw new CrossauthError(ErrorCode.InvalidClientId);
         }
     }
-    
-    /**
+
+        /**
      * Saves a key in the session table.
      * 
      * @param redirectUri array of valid redirect uri's
      * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
      */
     async createClient(client : OAuthClient) : Promise<OAuthClient> {
+        return this.prismaClient.$transaction(async (tx) => {
+            return await this.createClientWithTransaction(client, tx);
+        });
+    }
+
+    /**
+     * Saves a key in the session table.
+     * 
+     * @param redirectUri array of valid redirect uri's
+     * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
+     */
+    private async createClientWithTransaction(client : OAuthClient, tx : any) : Promise<OAuthClient> {
         const maxAttempts = 10;
         const {redirectUri, ...prismaClientData} = client;
+        let newClient : OAuthClient|undefined;
         for (let attempt=0; attempt < maxAttempts; ++attempt) {
             try {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
-                const newClient = await this.prismaClient[this.clientTable].create({
-                    data: {
-                        ...prismaClientData,
-                        redirectUri: { 
-                            create: 
-                            redirectUri
-                        }
-                    },
-                    include: { redirectUri: true},
+                newClient = await tx[this.clientTable].create({
+                    data: prismaClientData,
                 });
-                return newClient;
+                break;
+                //return newClient;
             } catch (e) {
                 if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                     if (e.code == 'P2002') {
@@ -711,7 +721,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                             CrossauthLogger.logger.debug(j({msg: `Attempt ${attempt} at creating a unique client ID failed`}));
                         } else {
                             CrossauthLogger.logger.debug(j({err: e}));
-                            throw new CrossauthError(ErrorCode.KeyExists, "Attempt to create key that already exists. Stack trace follows");
+                            throw new CrossauthError(ErrorCode.KeyExists, "Attempt to create an OAuth client with a clientId that already exists. Stack trace follows");
                         }
                     } else {
                         CrossauthLogger.logger.debug(j({err: e}));
@@ -723,10 +733,31 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 }
             }
         }
+        if (!newClient) {
+            CrossauthLogger.logger.error(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+            throw new CrossauthError(ErrorCode.KeyExists);    
+        }
 
-        CrossauthLogger.logger.error(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
-        throw new CrossauthError(ErrorCode.KeyExists);
-
+        try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            await tx[this.redirectUriTable].create({
+                data: redirectUri,
+            });
+            return newClient;
+        } catch (e) {
+            if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
+                if (e.code == 'P2002') {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.KeyExists, "Attempt to create an OAuth client with a redirect uri that already belongs to another client");
+                } else {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
+                }
+            } else {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
+            }
+        }
     }
 
     /**
@@ -754,14 +785,17 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      * @param client the client to update.  It will be searched on its clientId, which cannot be updated.
      */
     async updateClient(client : Partial<OAuthClient>) : Promise<void> {
-        await this.updateClientWithTransaction(client, this.prismaClient);
+        return this.prismaClient.$transaction(async (tx) => {
+            return await this.updateClientWithTransaction(client, tx);
+        });
     }
 
     private async updateClientWithTransaction(client : Partial<OAuthClient>, tx : any) : Promise<void> {
         if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
+        const redirectUri = client.redirectUri
         try {
             let data = {...client};
-            delete client.clientId;
+            delete data.clientId;
 
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             await tx[this.clientTable].update({
@@ -774,6 +808,31 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             const error = new CrossauthError(ErrorCode.Connection, String(e));
             CrossauthLogger.logger.debug(j({err: error}));
             throw error;
+        }
+
+        if (redirectUri) {
+            try {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                await tx[this.clientRedirectTable].update({
+                    where: {
+                        clientId: client.clientId,
+                    },
+                    data: redirectUri
+                });
+            } catch (e) {
+                if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
+                    if (e.code == 'P2002') {
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        throw new CrossauthError(ErrorCode.KeyExists, "Attempt to update an OAuth client with a redirect Uri that already belongs to another client");
+                    } else {
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        throw new CrossauthError(ErrorCode.Connection, "Error updating client");
+                    }
+                } else {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.Connection, "Error updating client");
+                }
+                }    
         }
     }
 }
