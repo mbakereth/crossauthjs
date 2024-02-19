@@ -2,6 +2,7 @@ import { test, expect } from 'vitest';
 import { OAuthResourceServer } from '../resserver';
 import fs from 'node:fs';
 import { getAuthorizationCode } from './common';
+import { Hasher } from '../../hasher';
 
 test('ResourceServer.validAccessToken', async () => {
 
@@ -141,4 +142,27 @@ test('ResourceServer.invalidIsser', async () => {
     const resserver = new OAuthResourceServer({jwtPublicKey: publicKey, clockTolerance: 10, oauthIssuers: "http://differentissuer:3000"});
     const authorized = await resserver.authorized(accessToken||"");
     expect(authorized).toBeUndefined();
+});
+
+test('ResourceServer.persistAccessToken', async () => {
+
+    const {authServer, client, code, keyStorage} = await getAuthorizationCode({persistAccessToken: true});
+    const {accessToken, error, errorDescription}
+        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+    expect(error).toBeUndefined();
+    expect(errorDescription).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validateJwt(accessToken||"");
+    const key = "access:"+Hasher.hash(decodedAccessToken.payload.jti);
+    const storedAccessToken = await keyStorage?.getKey(key);
+    expect(storedAccessToken?.value).toBe(key);
+    const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
+    const resserver = new OAuthResourceServer({jwtPublicKey: publicKey, clockTolerance: 10, oauthIssuers: "http://localhost:3000", persistAccessToken: true, keyStorage: keyStorage});
+    const authorized = await resserver.authorized(accessToken||"");
+    expect(authorized).toBeDefined();
+
+    await keyStorage?.deleteKey(key);
+    const unauthorized = await resserver.authorized(accessToken||"");
+    expect(unauthorized).toBeUndefined();
 });

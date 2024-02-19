@@ -85,7 +85,7 @@ export interface OAuthAuthorizationServerOptions {
     jwtPublicKey? : string,
 
     /** Whether to persist access tokens in key storage.  Default false */
-    persistAcccessToken? : boolean,
+    persistAccessToken? : boolean,
 
     /** Whether to issue a refresh token.  Default false */
     issueRefreshToken? : boolean,
@@ -97,7 +97,7 @@ export interface OAuthAuthorizationServerOptions {
     persistUserToken? : boolean,
 
     /** If true, access token will contain no data, just a random string.  This will turn persistAccessToken on.  Default false. */
-    opaqueAcccessToken? : boolean,
+    opaqueAccessToken? : boolean,
 
     /** If true, refresh token will contain no data, just a random string.  This will turn persistRefreshToken on.  Default false. */
     opaqueRefreshToken? : boolean,
@@ -149,11 +149,11 @@ export class OAuthAuthorizationServer {
         private jwtPrivateKeyFile = "";
         private secretOrPrivateKey = "";
         private secretOrPublicKey = "";
-        private persistAcccessToken = false;
+        private persistAccessToken = false;
         private issueRefreshToken = false;
         private persistRefreshToken = false;
         private persistUserToken = false;
-        private opaqueAcccessToken = false;
+        private opaqueAccessToken = false;
         private opaqueRefreshToken = false;
         private opaquetUserToken = false;
         private accessTokenExpiry : number|null = 60*60;
@@ -183,11 +183,11 @@ export class OAuthAuthorizationServer {
         setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
         setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
         setParameter("jwtPrivateKey", ParamType.String, this, options, "JWT_PRIVATE_KEY");
-        setParameter("persistAcccessToken", ParamType.String, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
+        setParameter("persistAccessToken", ParamType.String, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
         setParameter("issueRefreshToken", ParamType.String, this, options, "OAUTH_ISSUE_REFRESH_TOKEN");
         setParameter("persistRefreshToken", ParamType.String, this, options, "OAUTH_PERSIST_REFRESH_TOKEN");
         setParameter("persistUserToken", ParamType.String, this, options, "OAUTH_PERSIST_USER_TOKEN");
-        setParameter("opaqueAcccessToken", ParamType.String, this, options, "OAUTH_OPAQUE_ACCESS_TOKEN");
+        setParameter("opaqueAccessToken", ParamType.String, this, options, "OAUTH_OPAQUE_ACCESS_TOKEN");
         setParameter("opaqueRefreshToken", ParamType.String, this, options, "OAUTH_OPAQUE_REFRESH_TOKEN");
         setParameter("opaquetUserToken", ParamType.String, this, options, "OAUTH_OPAQUE_USER_TOKEN");
         setParameter("accessTokenExpiry", ParamType.Number, this, options, "OAUTH_ACCESS_TOKEN_EXPIRY");
@@ -234,11 +234,11 @@ export class OAuthAuthorizationServer {
 
         this.keyStorage = options.keyStorage;
 
-        if (this.opaqueAcccessToken) this.persistAcccessToken = true;
+        if (this.opaqueAccessToken) this.persistAccessToken = true;
         if (this.opaqueRefreshToken) this.persistRefreshToken = true
         if (this.opaquetUserToken) this.persistUserToken = true
 
-        if ((this.persistAcccessToken || this.persistRefreshToken || this.persistUserToken) && !this.keyStorage) {
+        if ((this.persistAccessToken || this.persistRefreshToken || this.persistUserToken) && !this.keyStorage) {
             throw new CrossauthError(ErrorCode.Configuration, "Key storage required for persisting tokens");
         }
     }
@@ -508,7 +508,7 @@ export class OAuthAuthorizationServer {
         };
         if (this.accessTokenExpiry != null) {
             accessTokenPayload.exp = timeCreated + this.accessTokenExpiry
-            dateAccessTokenExpires = new Date(timeCreated+this.accessTokenExpiry*1000 + this.clockTolerance*1000);
+            dateAccessTokenExpires = new Date(now.getTime()+this.accessTokenExpiry*1000 + this.clockTolerance*1000);
         }
         if (this.resourceServers) {
             accessTokenPayload.aud = this.resourceServers;
@@ -526,7 +526,7 @@ export class OAuthAuthorizationServer {
         });
 
         // persist access token if requested
-        if (this.persistAcccessToken && this.keyStorage) {
+        if (this.persistAccessToken && this.keyStorage) {
             await this.keyStorage?.saveKey(
                 undefined, // to avoid user storage dependency, we don't set this
                 "access:"+Hasher.hash(accessTokenJti),
@@ -549,7 +549,7 @@ export class OAuthAuthorizationServer {
         };
         if (this.refreshTokenExpiry != null) {
             refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry;
-            dateRefreshTokenExpires = new Date(timeCreated+this.refreshTokenExpiry*1000 + this.clockTolerance*1000);
+            dateRefreshTokenExpires = new Date(now.getTime()+this.refreshTokenExpiry*1000 + this.clockTolerance*1000);
         }
         if (this.resourceServers) {
             refreshTokenPayload.aud = this.resourceServers;

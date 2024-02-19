@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '../authserver';
-import { InMemoryOAuthClientStorage } from '../../storage/inmemorystorage';
+import { InMemoryOAuthClientStorage, InMemoryKeyStorage } from '../../storage/inmemorystorage';
 import { OAuthClientStorage } from '../../storage';
 import { Hasher } from '../../hasher';
 import { OAuthClient } from '@crossauth/common';
@@ -24,7 +24,7 @@ export async function createClient() : Promise<{clientStorage : OAuthClientStora
 
 }
 
-export async function getAuthorizationCode({challenge, aud} : {challenge?: boolean, aud?: string} = {}) {
+export async function getAuthorizationCode({challenge, aud, persistAccessToken} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean} = {}) {
     const {clientStorage, client} = await createClient();
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
     let options : OAuthAuthorizationServerOptions = {
@@ -36,6 +36,10 @@ export async function getAuthorizationCode({challenge, aud} : {challenge?: boole
         issueRefreshToken: true,
     };
     if (aud) options.resourceServers = aud;
+    if (persistAccessToken) {
+        options.persistAccessToken = true;
+        options.keyStorage = new InMemoryKeyStorage();
+    }
     const authServer = new OAuthAuthorizationServer(clientStorage, options);
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
@@ -45,6 +49,6 @@ export async function getAuthorizationCode({challenge, aud} : {challenge?: boole
         = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read write", inputState, undefined, undefined, codeChallenge);
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
-    return {code, client, clientStorage, authServer};
+    return {code, client, clientStorage, authServer, keyStorage: options.keyStorage};
 }
 

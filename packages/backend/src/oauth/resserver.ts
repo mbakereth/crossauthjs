@@ -13,7 +13,7 @@ export interface OAuthResourceServerOptions {
     resourceServerName? : string,
 
     /** Whether to persist access tokens in key storage.  Default false */
-    persistAcccessToken? : boolean,
+    persistAccessToken? : boolean,
 
     /** If persisting tokens, you need to provide a storage to persist them to */
     keyStorage? : KeyStorage,
@@ -41,7 +41,7 @@ export interface OAuthResourceServerOptions {
 export class OAuthResourceServer {
     
     private resourceServerName : string = "";
-    private persistAcccessToken = false;
+    private persistAccessToken = false;
     private keyStorage? : KeyStorage;
     private jwtSecretKey = "";
     private jwtSecretKeyFile = "";
@@ -60,6 +60,7 @@ export class OAuthResourceServer {
         setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
         setParameter("oauthIssuers", ParamType.StringArray, this, options, "OAUTH_ISSUER", true);
+        setParameter("persistAccessToken", ParamType.Boolean, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
 
         if (this.jwtSecretKey || this.jwtSecretKeyFile) {
             if (this.jwtPublicKey || this.jwtPublicKeyFile) {
@@ -88,7 +89,7 @@ export class OAuthResourceServer {
         }
         this.keyStorage = options.keyStorage;
 
-        if (this.persistAcccessToken && !this.keyStorage) {
+        if (this.persistAccessToken && !this.keyStorage) {
             throw new CrossauthError(ErrorCode.Configuration, "Must provide key storage if persisting access token");
         }
     }
@@ -96,12 +97,12 @@ export class OAuthResourceServer {
     async authorized(accessToken : string) : Promise<{[key:string]: any}|undefined> {
         const decoded = await this.validateAccessToken(accessToken);
         if (!decoded) return undefined;
-        if (this.persistAcccessToken && this.keyStorage) {
+        if (this.persistAccessToken && this.keyStorage) {
             const key = "access:" + Hasher.hash(decoded.payload.jti);
             try {
                 const tokenInStorage = await this.keyStorage.getKey(key)
-                const now = new Date().getTime();
-                if (tokenInStorage.expires && tokenInStorage.expires?.getTime() < now) {
+                const now = new Date();
+                if (tokenInStorage.expires && tokenInStorage.expires?.getTime() < now.getTime()) {
                     CrossauthLogger.logger.error("Access token expired in storage but not in JWT");
                     return undefined;
                 }
