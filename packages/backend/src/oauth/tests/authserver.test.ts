@@ -16,7 +16,12 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFi
     });
     const inputState = "ABCXYZ";
     const {code, state, error, errorDescription} 
-        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read write", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
@@ -39,7 +44,12 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKey',
     });
     const inputState = "ABCXYZ";
     const {code, state, error, errorDescription} 
-        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read write", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
@@ -62,7 +72,12 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyPrivateKeyFile',
     });
     const inputState = "ABCXYZ";
     const {code, state, error, errorDescription} 
-        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read write", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
@@ -85,7 +100,12 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKeyFile', async () 
     });
     const inputState = "ABCXYZ";
     const {code, state, error, errorDescription} 
-        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read write", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
@@ -108,7 +128,12 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKey', async () => {
     });
     const inputState = "ABCXYZ";
     const {code, state, error, errorDescription} 
-        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read write", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
@@ -130,7 +155,12 @@ test('AuthorizationServer.invalidScope', async () => {
     });
     const inputState = "ABCXYZ";
     const {error} 
-        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "unregisteredScope", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "unregisteredScope", 
+            state: inputState});
     expect(error).toBe("invalid_scope");
 });
 
@@ -145,7 +175,12 @@ test('AuthorizationServer.invalidRedirectUri', async () => {
     });
     const inputState = "ABCXYZ";
     const {error} 
-        = await authServer.authorizeEndpoint("code", client.clientId, "/invalidRedirect", "read write", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: "/invalidRedirect", 
+            scope: "read write", 
+            state: inputState});
     expect(error).toBe("invalid_request");
 });
 
@@ -173,7 +208,12 @@ test('AuthorizationServer.invalidResponseType', async () => {
     });
     const inputState = "ABCXYZ";
     const {error} 
-        = await authServer.authorizeEndpoint("x", client.clientId, client.redirectUri[0], "read write", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "x", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState});
     expect(error).toBe("unsupported_response_type");
 
 });
@@ -189,7 +229,12 @@ test('AuthorizationServer.invalidKey', async () => {
     });
     const inputState = "ABCXYZ";
     const {code, state, error, errorDescription} 
-        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read write", inputState);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
@@ -200,7 +245,14 @@ test('AuthorizationServer.accessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, refreshToken, expiresIn, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 

@@ -8,7 +8,14 @@ test('ResourceServer.validAccessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 
@@ -27,7 +34,14 @@ test('ResourceServer.invalidPublicKey', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 
@@ -46,7 +60,14 @@ test('ResourceServer.invalidAccessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 
@@ -65,7 +86,14 @@ test('ResourceServer.validCodeChallenge', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({challenge: true});
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, undefined, undefined, undefined, "ABC123");
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            codeVerifier: "ABC123"});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 
@@ -83,7 +111,14 @@ test('ResourceServer.invalidCodeChallenge', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({challenge: true});
     const {error}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, undefined, undefined, undefined, "ABC124");
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            codeVerifier: "ABC124"});
     expect(error).toBe("access_denied");
 });
 
@@ -91,7 +126,14 @@ test('ResourceServer.validAud', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({aud: "resourceserver"});
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 
@@ -110,7 +152,14 @@ test('ResourceServer.invalidAud', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({aud: "resourceserver"});
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 
@@ -129,7 +178,14 @@ test('ResourceServer.invalidIsser', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 
@@ -148,7 +204,14 @@ test('ResourceServer.persistAccessToken', async () => {
 
     const {authServer, client, code, keyStorage} = await getAuthorizationCode({persistAccessToken: true});
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "token", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: "ABC", 
+            code: code, 
+            clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
 

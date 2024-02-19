@@ -46,7 +46,13 @@ export async function getAuthorizationCode({challenge, aud, persistAccessToken} 
     const codeVerifier = "ABC123";
     if (challenge) codeChallenge = Hasher.hash(codeVerifier);
     const {code, error, errorDescription} 
-        = await authServer.authorizeEndpoint("code", client.clientId, client.redirectUri[0], "read write", inputState, undefined, undefined, codeChallenge);
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState,
+            codeChallenge: codeChallenge});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     return {code, client, clientStorage, authServer, keyStorage: options.keyStorage};

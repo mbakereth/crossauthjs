@@ -249,18 +249,30 @@ export class OAuthAuthorizationServer {
      * 
      * For arguments and return parameters, see OAuth2 documentation.
      */
-    async authorizeEndpoint(
-        responseType : string, 
-        clientId : string, 
-        redirectUri : string, 
-        scope : string, 
-        state : string,
-        code? : string,
-        clientSecret? : string,
-        codeChallenge? : string,
-        codeChallengeMethod? : string,
-        codeVerifier? : string,
-        username? : string) 
+    async authorizeGetEndpoint({
+            responseType, 
+            clientId, 
+            redirectUri, 
+            scope, 
+            state,
+            code,
+            clientSecret,
+            codeChallenge,
+            codeChallengeMethod,
+            codeVerifier,
+            username
+        } : {
+            responseType : string, 
+            clientId : string, 
+            redirectUri : string, 
+            scope : string, 
+            state : string,
+            code? : string,
+            clientSecret? : string,
+            codeChallenge? : string,
+            codeChallengeMethod? : string,
+            codeVerifier? : string,
+            username? : string}) 
     : Promise<{
         code? : string,
         state? : string,
