@@ -11,7 +11,7 @@
     "dist/*"
   ],
   "scripts": {
-    "postinstall": "npx prisma generate && npx prisma db push --force-reset",
+    "postinstall": "pnpm exec prisma generate && pnpm exec prisma db push --force-reset",
     "dev": "vite",
     "build": "vite build --emptyOutDir=false",
     "preview": "vite preview",

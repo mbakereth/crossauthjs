@@ -12,6 +12,7 @@ beforeAll(async () => {
     const prismaClient = new PrismaClient();
     await prismaClient.user.deleteMany({});
     await prismaClient.key.deleteMany({});
+    await prismaClient.oAuthClient.deleteMany({});
     userStorage = new PrismaUserStorage({userEditableFields: "email, dummyField"});
     let authenticator = new LocalPasswordAuthenticator(userStorage);
     await userStorage.createUser({
@@ -201,7 +202,7 @@ test("PrismaStorage.deleteMatchingForUser", async() => {
 test('PrismaStorage.createGetAndDeleteClient', async () => {
     const clientStorage = new PrismaOAuthClientStorage();
     const client = {
-        clientId : "ABC",
+        clientId : "ABC1",
         clientSecret: "DEF",
         clientName: "Test",
         redirectUri: [],
@@ -211,6 +212,39 @@ test('PrismaStorage.createGetAndDeleteClient', async () => {
     expect(getClient.clientSecret).toBe(client.clientSecret);
     await clientStorage.deleteClient(client.clientId);
     await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
+});
+
+test('PrismaStorage.createClientWithRedirectUris', async () => {
+    const clientStorage = new PrismaOAuthClientStorage();
+    const client = {
+        clientId : "ABC2",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["/uri1", "/uri2"],
+    }
+    await clientStorage.createClient(client);
+    const getClient = await clientStorage.getClient(client.clientId);
+    expect(getClient.clientSecret).toBe(client.clientSecret);
+    expect(getClient.redirectUri.length).toBe(2);
+    expect(["/uri1", "/uri2"]).toContain(getClient.redirectUri[0]);
+    expect(["/uri1", "/uri2"]).toContain(getClient.redirectUri[1]);
+    await clientStorage.deleteClient(client.clientId);
+    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
+});
+
+test('PrismaStorage.createAndUpdateClient', async () => {
+    const clientStorage = new PrismaOAuthClientStorage();
+    const client = {
+        clientId : "ABC3",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["/uri1", "/uri2"],
+    }
+    await clientStorage.createClient(client);
+    await clientStorage.updateClient({clientId: client.clientId, redirectUri: ["/uri3"]});
+    const getClient = await clientStorage.getClient(client.clientId);
+    expect(getClient.redirectUri.length).toBe(1);
+    expect(getClient.redirectUri[0]).toBe("/uri3");
 });
 
 

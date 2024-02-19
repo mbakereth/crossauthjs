@@ -84,5 +84,7 @@ model OAuthClientRedirectUri {
     client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
 
     @@index([id])
+    @@unique([client_id, uri], name: "redirectUriUnique")
+    //@@unique([redirect_uri], name: "redirectUriUnique") // use this to ensure only one client has any given redirect uri
 }
 

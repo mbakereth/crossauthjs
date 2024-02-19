@@ -628,8 +628,14 @@ export class PrismaKeyStorage extends KeyStorage {
  * See {@link PrismaKeyStorage.constructor} for definitions.
  */
 export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptions {
+
+    /** Prisma name of the OAuth Client table.  Default oAuthClient */
     clientTable? : string,
+
+    /** Prisma name of the OAuth Redirect Uri table.  Default oAuthClientRedirectUri */
     redirectUriTable? : string,
+
+    /** A Prisma client to use.  If not provided, one will be created */
     prismaClient? : PrismaClient,
 }
 
@@ -639,7 +645,7 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
  */
 export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private clientTable : string = "oAuthClient";
-    private redirectUriTable : string = "oAuthRedirectUri";
+    private redirectUriTable : string = "OAuthClientRedirectUri";
     private prismaClient : PrismaClient;
 
     /**
@@ -672,12 +678,15 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private async getClientWithTransaction(clientId : string, tx : any) : Promise<OAuthClient> {
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
-            return  await tx[this.clientTable].findUniqueOrThrow({
+            let client = await tx[this.clientTable].findUniqueOrThrow({
                 where: {
                     clientId: clientId
                 },
                 include: {redirectUri: true},
             });
+            const redirectUriObjects = client.redirectUri;
+            client.redirectUri = redirectUriObjects.map((x:{[key:string]:string}) => x.uri);
+            return client;
         } catch {
             CrossauthLogger.logger.error(j({msg: "Invalid OAuth client id"}))
             throw new CrossauthError(ErrorCode.InvalidClientId);
@@ -706,6 +715,8 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         const maxAttempts = 10;
         const {redirectUri, ...prismaClientData} = client;
         let newClient : OAuthClient|undefined;
+
+        // create client (without redirect uri) - may take seveal attempts to get a unique clientId
         for (let attempt=0; attempt < maxAttempts; ++attempt) {
             try {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -713,7 +724,6 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                     data: prismaClientData,
                 });
                 break;
-                //return newClient;
             } catch (e) {
                 if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                     if (e.code == 'P2002') {
@@ -721,7 +731,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                             CrossauthLogger.logger.debug(j({msg: `Attempt ${attempt} at creating a unique client ID failed`}));
                         } else {
                             CrossauthLogger.logger.debug(j({err: e}));
-                            throw new CrossauthError(ErrorCode.KeyExists, "Attempt to create an OAuth client with a clientId that already exists. Stack trace follows");
+                            throw new CrossauthError(ErrorCode.InvalidClientId, "Attempt to create an OAuth client with a clientId that already exists. Maximum attempts failed");
                         }
                     } else {
                         CrossauthLogger.logger.debug(j({err: e}));
@@ -738,17 +748,23 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             throw new CrossauthError(ErrorCode.KeyExists);    
         }
 
+        // create redirect uris
         try {
-            // @ts-ignore  (because types only exist when do prismaClient.table...)
-            await tx[this.redirectUriTable].create({
-                data: redirectUri,
-            });
+            for (let i=0; i<redirectUri.length; ++i) {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                await tx[this.redirectUriTable].create({
+                    data: {
+                        client_id: newClient.clientId,
+                        uri: redirectUri[i],
+                    }
+                });
+            }
             return newClient;
         } catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                 if (e.code == 'P2002') {
                     CrossauthLogger.logger.debug(j({err: e}));
-                    throw new CrossauthError(ErrorCode.KeyExists, "Attempt to create an OAuth client with a redirect uri that already belongs to another client");
+                    throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Attempt to create an OAuth client with a redirect uri that already belongs to another client");
                 } else {
                     CrossauthLogger.logger.debug(j({err: e}));
                     throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
@@ -792,33 +808,44 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
 
     private async updateClientWithTransaction(client : Partial<OAuthClient>, tx : any) : Promise<void> {
         if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
-        const redirectUri = client.redirectUri
+        const redirectUris = client.redirectUri;
         try {
             let data = {...client};
             delete data.clientId;
+            delete data.redirectUri;
 
-            // @ts-ignore  (because types only exist when do prismaClient.table...)
-            await tx[this.clientTable].update({
-                where: {
-                    clientId: client.clientId,
-                },
-                data: data
-            });
+            if (Object.keys(data).length > 0) {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                await tx[this.clientTable].update({
+                    where: {
+                        clientId: client.clientId,
+                    },
+                    data: data
+                });
+            }
         } catch (e) {
             const error = new CrossauthError(ErrorCode.Connection, String(e));
             CrossauthLogger.logger.debug(j({err: error}));
             throw error;
         }
 
-        if (redirectUri) {
+        if (redirectUris) {
             try {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
-                await tx[this.clientRedirectTable].update({
+                await this.prismaClient[this.redirectUriTable].deleteMany({
                     where: {
-                        clientId: client.clientId,
-                    },
-                    data: redirectUri
+                        client_id: client.clientId
+                    }
                 });
+                for (let i=0; i<redirectUris.length; ++i) { 
+                    // @ts-ignore  (because types only exist when do prismaClient.table...)
+                    await tx[this.redirectUriTable].create({
+                        data: {
+                            client_id: client.clientId,
+                            uri: redirectUris[i],
+                        }
+                    });
+                }
             } catch (e) {
                 if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                     if (e.code == 'P2002') {
