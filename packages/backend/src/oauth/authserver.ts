@@ -33,7 +33,10 @@ export interface OAuthAuthorizationServerOptions {
 
     /** JWT issuer, eg https://yoursite.com.  Required (no default) */
     jwtIssuer? : string,
-    
+
+    /** JWT issuer, eg https://yoursite.com.  Required (no default) */
+    jwtAudiences? : string,
+
     /** PBKDF2 HMAC for hashing client secret */
     pbkdf2Digest? : string;
 
@@ -128,6 +131,7 @@ export class OAuthAuthorizationServer {
 
         private clientStorage : OAuthClientStorage;
         private jwtIssuer : string = "";
+        private jwtAudiences : string[]|null = null;
         private pbkdf2Digest = "sha256";
         private pbkdf2Iterations = 40000;
         private pbkdf2KeyLength = 32;
@@ -164,6 +168,7 @@ export class OAuthAuthorizationServer {
         this.clientStorage = clientStorage;
 
         setParameter("jwtIssuer", ParamType.String, this, options, "JWT_ISSUER", true);
+        setParameter("jwtAudiences", ParamType.String, this, options, "JWT_AUDIENCES");
         setParameter("pbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
         setParameter("pbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
         setParameter("pbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
@@ -385,6 +390,7 @@ export class OAuthAuthorizationServer {
             jti: Hasher.uuid(),
             iat: timeCreated,
             scope: scopes,
+            aud: this.jwtIssuer,
             redirect_uri: decodedUri,
             type: "code",
         };
@@ -462,6 +468,10 @@ export class OAuthAuthorizationServer {
                 throw new CrossauthError(ErrorCode.access_denied, "Redirect Uri's do not match");
             }
         }
+        if ((Array.isArray(authCodePayload.aud) && !authCodePayload.aud.includes(this.jwtIssuer)) ||
+            (!Array.isArray(authCodePayload.aud) && authCodePayload.aud != this.jwtIssuer)) {
+                throw new CrossauthError(ErrorCode.access_denied, "Authorization code not intended for this issuer");
+        }
 
         
         // validate code verifier, if there is one
@@ -490,15 +500,19 @@ export class OAuthAuthorizationServer {
         const accessTokenPayload : {[key:string]: any} = {
             jti: accessTokenJti,
             iat: timeCreated,
+            iss: this.jwtIssuer,
             scope: scopes,
-            type: "access",
+            sub: username,
             preferred_username: username,
+            type: "access",
         };
         if (this.accessTokenExpiry != null) {
             accessTokenPayload.exp = timeCreated + this.accessTokenExpiry
             dateAccessTokenExpires = new Date(timeCreated+this.accessTokenExpiry*1000 + this.clockTolerance*1000);
         }
-        console.log(accessTokenPayload);
+        if (this.jwtAudiences) {
+            accessTokenPayload.aud = this.jwtAudiences;
+        }
 
         // create access token jwt
         const accessToken : string = await new Promise((resolve, reject) => {
@@ -527,12 +541,18 @@ export class OAuthAuthorizationServer {
         const refreshTokenPayload : {[key:string]: any} = {
             jti: refreshTokenJti,
             iat: timeCreated,
+            iss: this.jwtIssuer,
             scope: scopes,
+            preferred_username: username,
+            sub: username,
             type: "refresh",
         };
         if (this.refreshTokenExpiry != null) {
             refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry;
             dateRefreshTokenExpires = new Date(timeCreated+this.refreshTokenExpiry*1000 + this.clockTolerance*1000);
+        }
+        if (this.jwtAudiences) {
+            refreshTokenPayload.aud = this.jwtAudiences;
         }
 
         let refreshToken : string|undefined;

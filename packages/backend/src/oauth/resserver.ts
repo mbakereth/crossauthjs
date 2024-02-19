@@ -1,9 +1,10 @@
+import { OAuthAuthorizationServer } from './authserver';
 import jwt from 'jsonwebtoken';
 import { KeyStorage } from '../storage';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import { CrossauthLogger, j } from '@crossauth/common';
-import { CrossauthError, ErrorCode, OAuthClient, OAuthErrorCode } from '@crossauth/common';
+import { CrossauthError, ErrorCode } from '@crossauth/common';
 import fs from 'node:fs';
 
 export interface OAuthResourceServerOptions {
@@ -29,10 +30,14 @@ export interface OAuthResourceServerOptions {
 
     /** Number of seconds tolerance when checking expiration.  Default 10 */
     clockTolerance? : number,
+
+    /** Set this to restrict the issuers (as set in {@link OAuthAuthorizationServer}) that will be valid in the JWT */
+    jwtIssuers? : string[]
 }
 
 export class OAuthResourceServer {
     
+    private name : string;
     private persistAcccessToken = false;
     private keyStorage? : KeyStorage;
     private jwtSecretKey = "";
@@ -41,13 +46,17 @@ export class OAuthResourceServer {
     private jwtPublicKey = "";
     private secretOrPublicKey = "";
     private clockTolerance : number = 10;
+    private jwtIssuers : string[]|undefined = undefined;
 
-    constructor(options : OAuthResourceServerOptions = {}) {
+    constructor(name: string, options : OAuthResourceServerOptions = {}) {
+        this.name = name;
+
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
         setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
         setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
         setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
+        setParameter("jwtIssuers", ParamType.StringArray, this, options, "JWT_ISSUER");
 
         if (this.jwtSecretKey || this.jwtSecretKeyFile) {
             if (this.jwtPublicKey || this.jwtPublicKeyFile) {
@@ -97,6 +106,21 @@ export class OAuthResourceServer {
                 CrossauthLogger.logger.error(j({err: e, msg: "Access token doesn't exist in storage"}));
                 return undefined;
             }
+        }
+        if (this.jwtIssuers) {
+            if ((Array.isArray(this.jwtIssuers) && !this.jwtIssuers.includes(decoded.payload.iss)) ||
+                (!Array.isArray(this.jwtIssuers) && this.jwtIssuers != decoded.payload.iss)) {
+                CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.payload.iss} in access token`}));
+                return undefined;
+
+            }
+        }
+        if (decoded.payload.aud) {
+            if ((Array.isArray(decoded.payload.aud) && !decoded.payload.aud.includes(this.name)) ||
+                (!Array.isArray(decoded.payload.aud) && decoded.payload.aud != this.name)) {
+                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.payload.aud} in access token`}));
+                    return undefined;    
+                }
         }
         return decoded;
     }
