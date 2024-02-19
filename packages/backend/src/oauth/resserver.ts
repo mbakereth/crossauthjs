@@ -32,7 +32,7 @@ export interface OAuthResourceServerOptions {
     clockTolerance? : number,
 
     /** Set this to restrict the issuers (as set in {@link OAuthAuthorizationServer}) that will be valid in the JWT */
-    jwtIssuers? : string[]
+    jwtIssuers? : string,
 }
 
 export class OAuthResourceServer {

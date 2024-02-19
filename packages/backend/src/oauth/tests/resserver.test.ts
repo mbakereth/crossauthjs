@@ -123,3 +123,41 @@ test('ResourceServer.invalidAud', async () => {
     const authorized = await resserver.authorized(accessToken||"");
     expect(authorized).toBeUndefined();
 });
+
+test('ResourceServer.validIsser', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode();
+    const {accessToken, error, errorDescription}
+        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+    expect(error).toBeUndefined();
+    expect(errorDescription).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validateJwt(accessToken||"");
+    expect(decodedAccessToken.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[1]);
+    const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
+    const resserver = new OAuthResourceServer("resourceserver", {jwtPublicKey: publicKey, clockTolerance: 10, jwtIssuers: "http://localhost:3000"});
+    const authorized = await resserver.authorized(accessToken||"");
+    expect(authorized).toBeDefined();
+});
+
+test('ResourceServer.invalidIsser', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode();
+    const {accessToken, error, errorDescription}
+        = await authServer.authorizeEndpoint("token", client.clientId, client.redirectUri[0], "read write", "ABC", code, client.clientSecret);
+    expect(error).toBeUndefined();
+    expect(errorDescription).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validateJwt(accessToken||"");
+    expect(decodedAccessToken.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[1]);
+    const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
+    const resserver = new OAuthResourceServer("resourceserver", {jwtPublicKey: publicKey, clockTolerance: 10, jwtIssuers: "http://differentissuer:3000"});
+    const authorized = await resserver.authorized(accessToken||"");
+    expect(authorized).toBeUndefined();
+});
