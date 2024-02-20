@@ -8,12 +8,9 @@ test('ResourceServer.validAccessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
@@ -34,12 +31,9 @@ test('ResourceServer.invalidPublicKey', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
@@ -60,12 +54,9 @@ test('ResourceServer.invalidAccessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
@@ -86,12 +77,9 @@ test('ResourceServer.validCodeChallenge', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({challenge: true});
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             codeVerifier: "ABC123"});
     expect(error).toBeUndefined();
@@ -111,12 +99,9 @@ test('ResourceServer.invalidCodeChallenge', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({challenge: true});
     const {error}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             codeVerifier: "ABC124"});
     expect(error).toBe("access_denied");
@@ -126,12 +111,9 @@ test('ResourceServer.validAud', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({aud: "resourceserver"});
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
@@ -152,12 +134,9 @@ test('ResourceServer.invalidAud', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({aud: "resourceserver"});
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
@@ -178,12 +157,9 @@ test('ResourceServer.invalidIsser', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             clientSecret: client.clientSecret});
     expect(error).toBeUndefined();
@@ -204,12 +180,9 @@ test('ResourceServer.persistAccessToken', async () => {
 
     const {authServer, client, code, keyStorage} = await getAuthorizationCode({persistAccessToken: true});
     const {accessToken, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             clientSecret: client.clientSecret});
     expect(error).toBeUndefined();

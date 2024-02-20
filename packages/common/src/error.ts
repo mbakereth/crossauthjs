@@ -11,7 +11,7 @@ export enum OAuthErrorCode {
     server_error = 106,
     temporarily_unavailable = 107,
   };
-  
+
 /**
  * Indicates the type of error reported by {@link @crossauth/common!CrossauthError}
  */
@@ -301,7 +301,30 @@ export class CrossauthError extends Error {
         return OAuthErrorCode.server_error;
         }
     }
-    
-
 }
 
+export function oauthErrorStatus(status : string) {
+    switch (status) {
+        case "invalid_request": return 400;
+        case "unauthorized_client": return 401;
+        case "access_denied": return 401;
+        case "unsupported_response_type": return 400;
+        case "invalid_scope": return 401;
+        case "server_error": 500;
+        case "temporarily_unavailable": return 500;
+    }
+    return 500;
+};
+
+export function errorCodeFromAuthErrorString(status : string) {
+    switch (status) {
+        case "invalid_request": return ErrorCode.invalid_request;
+        case "unauthorized_client": return ErrorCode.unauthorized_client;
+        case "access_denied": return ErrorCode.access_denied;
+        case "unsupported_response_type": return ErrorCode.unsupported_response_type;
+        case "invalid_scope": return ErrorCode.invalid_scope;
+        case "server_error": return ErrorCode.server_error;
+        case "temporarily_unavailable": return ErrorCode.temporarily_unavailable;
+    }
+    return ErrorCode.server_error;
+};

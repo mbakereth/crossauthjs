@@ -8,26 +8,9 @@ import { User, Key, UserInputFields } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
 import { Server, IncomingMessage, ServerResponse } from 'http'
+import { FastifyServer } from './fastifyserver';
 
 const CSRFHEADER = "X-CROSSAUTH-CSRF";
-
-const ERROR_401 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html><head>
-<title>401 Unauthorized</title>
-</head><body>
-<h1>Not Found</h1>
-<p>You are not authorized to access this URL.</p>
-</body></html>
-`
-
-const ERROR_500 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html><head>
-<title>500 Server Error</title>
-</head><body>
-<h1>Not Found</h1>
-<p>Sorry, an unknown error has occured</p>
-</body></html>
-`
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
@@ -975,7 +958,7 @@ export class FastifySessionServer {
     private addChangePasswordEndpoints() {
         this.app.get(this.prefix+'changepassword', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'changepassword', ip: request.ip, user: request.user?.username}));
-            if (!request.user) return this.sendPageError(reply, 401);
+            if (!request.user) return FastifyServer.sendPageError(reply, 401, this.errorPage);
             if (this.changePasswordPage)  { // if is redundant but VC Code complains without it
                 let data : {urlprefix: string, csrfToken: string|undefined} = {urlprefix: this.prefix, csrfToken: request.csrfToken};
                 return reply.view(this.changePasswordPage, data);
@@ -984,7 +967,7 @@ export class FastifySessionServer {
 
         this.app.post(this.prefix+'changepassword', async (request : FastifyRequest<{ Body: ChangePasswordBodyType }>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'changepassword', ip: request.ip, user: request.user?.username}));
-            if (!request.user) return this.sendPageError(reply, 401);  // not allowed here if not logged in
+            if (!request.user) return FastifyServer.sendPageError(reply, 401, this.errorPage);  // not allowed here if not logged in
             try {
                 return await this.changePassword(request, reply, 
                 (reply, _user) => {
@@ -1014,7 +997,7 @@ export class FastifySessionServer {
     private addChangeFactor2Endpoints() {
         this.app.get(this.prefix+'changefactor2', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'changefactor2', ip: request.ip, user: request.user?.username}));
-            if (!request.user) return this.sendPageError(reply, 401);
+            if (!request.user) return FastifyServer.sendPageError(reply, 401, this.errorPage);
             if (this.changeFactor2Page)  { // if is redundant but VC Code complains without it
                 let data = {
                     urlprefix: this.prefix, 
@@ -1029,7 +1012,7 @@ export class FastifySessionServer {
 
         this.app.post(this.prefix+'changefactor2', async (request : FastifyRequest<{ Body: ChangeFactor2BodyType }>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'changefactor2', ip: request.ip, user: request.user?.username}));
-            if (!request.user) return this.sendPageError(reply, 401);
+            if (!request.user) return FastifyServer.sendPageError(reply, 401, this.errorPage);
             try {
                 return await this.changeFactor2(request, reply, 
                     (reply, data, _user) => {
@@ -1062,7 +1045,7 @@ export class FastifySessionServer {
     private addUpdateUserEndpoints() {
         this.app.get(this.prefix+'updateuser', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'updateuser', ip: request.ip, user: request.user?.username}));
-            if (!request.user) return this.sendPageError(reply, 401);
+            if (!request.user) return FastifyServer.sendPageError(reply, 401, this.errorPage);
             if (this.updateUserPage)  { // if is redundant but VC Code complains without it
                 let data : {urlprefix: string, csrfToken: string|undefined, user: User, allowedFactor2: {[key:string]: any}} = {
                     urlprefix: this.prefix, 
@@ -1076,7 +1059,7 @@ export class FastifySessionServer {
 
         this.app.post(this.prefix+'updateuser', async (request : FastifyRequest<{ Body: UpdateUserBodyType }>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'updateuser', ip: request.ip, user: request.user?.username}));
-            if (!request.user) return this.sendPageError(reply, 401);
+            if (!request.user) return FastifyServer.sendPageError(reply, 401, this.errorPage);
             try {
                 return await this.updateUser(request, reply, 
                 (reply, _user, emailVerificationRequired) => {
@@ -2136,9 +2119,10 @@ export class FastifySessionServer {
         return "";
     }
 
-    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) {
+    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) : Promise<string|undefined> {
 
         this.sessionManager.validateDoubleSubmitCsrfToken(this.getCsrfCookieValue(request), request.csrfToken);
+        return this.getCsrfCookieValue(request);
     }
 
     csrfToken(request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) {
@@ -2165,34 +2149,6 @@ export class FastifySessionServer {
         return token;
     }
 
-    sendPageError(reply : FastifyReply, status : number, error?: string, e? : any) {
-        let code = 0;
-        let codeName = "UnknownError";
-        if (e instanceof CrossauthError) {
-            code = e.code;
-            codeName = ErrorCode[code];
-            if (!error) error = e.message;
-        }   
-        if (!error) {
-            if (status == 401) {
-                error = "You are not authorized to access this page";
-                code = ErrorCode.Unauthorized;
-                codeName = ErrorCode[code];
-            } else if (status == 403) {
-                error = "You do not have permission to access this page";
-                code = ErrorCode.Forbidden;
-                codeName = ErrorCode[code];
-            } else {
-                error = "An unknwon error has occurred"
-            }
-        }         
-        CrossauthLogger.logger.warn(j({msg: error, errorCode: code, errorCodeName: codeName, httpStatus: status}));
-        if (this.errorPage) {
-            return reply.status(status).view(this.errorPage, {status: status, error: error, errorCode: code, errorCodeName: codeName});
-        } else {
-            return reply.status(status).send(status==401 ? ERROR_401 : ERROR_500);
-        }
-    }
 
     sendJsonError(reply : FastifyReply, status : number, error?: string, e? : any) {
         let code = 0;

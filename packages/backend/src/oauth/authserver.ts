@@ -29,6 +29,13 @@ function algorithm(value : string) : Algorithm {
     throw new CrossauthError(ErrorCode.Configuration, "Invalid JWT signing algorithm " + value)
 }
 
+export class OAuthFlows {
+    static readonly All = "all";
+    static readonly AuthorizationCode = "AuthorizationCode";
+    static readonly AuthorizationCodeWithPKCE = "AuthorizationCodeWithPKCE";
+    static readonly ClientCredentials = "ClientCredentials";
+} 
+
 export interface OAuthAuthorizationServerOptions {
 
     /** JWT issuer, eg https://yoursite.com.  Required (no default) */
@@ -38,13 +45,13 @@ export interface OAuthAuthorizationServerOptions {
     resourceServers? : string,
 
     /** PBKDF2 HMAC for hashing client secret */
-    pbkdf2Digest? : string;
+    oauthPbkdf2Digest? : string;
 
     /** PBKDF2 iterations for hashing client secret */
-    pbkdf2Iterations? : number;
+    oauthPbkdf2Iterations? : number;
 
     /** PBKDF2 key length for hashing client secret */
-    pbkdf2KeyLength? : number;
+    oauthPbkdf2KeyLength? : number;
 
     /** if true, a client secret is expected in the table.  If you don't use flows for confidential clients, you do not need a secret.  Default true */
     saveClientSecret?  : boolean,
@@ -106,7 +113,7 @@ export interface OAuthAuthorizationServerOptions {
     opaqueUserToken? : boolean,
 
     /** If persisting tokens, you need to provide a storage to persist them to */
-    keyStorage? : KeyStorage,
+    oauthKeyStorage? : KeyStorage,
 
     /** Expiry for access tokens in seconds.  If null, they don't expire.  Defult 1 hour */
     accessTokenExpiry? : number | null,
@@ -125,6 +132,9 @@ export interface OAuthAuthorizationServerOptions {
 
     /** See `validateScopes`.  This should be a comma separated list, case sensitive, default empty */
     validScopes? : string,
+
+    /** Flows to support.  A comma-separated list from {@link OAuthFlows}.  If `all`, there must be none other in the list.  Default `all` */
+    validFlows? : string,
 }
 
 export class OAuthAuthorizationServer {
@@ -132,9 +142,9 @@ export class OAuthAuthorizationServer {
         private clientStorage : OAuthClientStorage;
         private oauthIssuer : string = "";
         private resourceServers : string[]|null = null;
-        private pbkdf2Digest = "sha256";
-        private pbkdf2Iterations = 40000;
-        private pbkdf2KeyLength = 32;
+        private oauthPbkdf2Digest = "sha256";
+        private oauthPbkdf2Iterations = 40000;
+        private oauthPbkdf2KeyLength = 32;
         private saveClientSecret = true;
         private requireClientSecret : "never"|"always"|"withoutpkce" = "withoutpkce";
         private requireRedirectUriRegistration = true;
@@ -160,18 +170,19 @@ export class OAuthAuthorizationServer {
         private refreshTokenExpiry : number|null = 60*60*24;
         private authorizationCodeExpiry : number|null = 60*5;
         private clockTolerance : number = 10;
-        private keyStorage? : KeyStorage;
+        private oauthKeyStorage? : KeyStorage;
         private validateScopes : boolean = false;
         private validScopes : string[] = [];
+        validFlows : string[] = ["all"];
     
     constructor(clientStorage: OAuthClientStorage, options: OAuthAuthorizationServerOptions) {
         this.clientStorage = clientStorage;
 
         setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
         setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
-        setParameter("pbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
-        setParameter("pbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
-        setParameter("pbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
+        setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
+        setParameter("oauthPbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
+        setParameter("oauthPbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
         setParameter("saveClientSecret", ParamType.String, this, options, "OAUTH_SAVE_CLIENT_SECRET");
         setParameter("requireClientSecret", ParamType.String, this, options, "OAUTH_REQUIRE_CLIENT_SECRET");
         setParameter("requireRedirectUriRegistration", ParamType.String, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
@@ -196,7 +207,16 @@ export class OAuthAuthorizationServer {
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
         setParameter("validateScopes", ParamType.Boolean, this, options, "OAUTH_VALIDATE_SCOPES");
         setParameter("validScopes", ParamType.StringArray, this, options, "OAUTH_VALID_SCOPES");
+        setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
         
+        if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
+            this.validFlows = [
+                OAuthFlows.AuthorizationCode,
+                OAuthFlows.AuthorizationCodeWithPKCE,
+                OAuthFlows.ClientCredentials,
+            ];
+        }
+
         this.jwtAlgorithmChecked = algorithm(this.jwtAlgorithm);
         
         if (this.jwtSecretKey || this.jwtSecretKeyFile) {
@@ -232,13 +252,13 @@ export class OAuthAuthorizationServer {
             this.secretOrPublicKey = this.jwtPublicKey;
         }
 
-        this.keyStorage = options.keyStorage;
+        this.oauthKeyStorage = options.oauthKeyStorage;
 
         if (this.opaqueAccessToken) this.persistAccessToken = true;
         if (this.opaqueRefreshToken) this.persistRefreshToken = true
         if (this.opaquetUserToken) this.persistUserToken = true
 
-        if ((this.persistAccessToken || this.persistRefreshToken || this.persistUserToken) && !this.keyStorage) {
+        if ((this.persistAccessToken || this.persistRefreshToken || this.persistUserToken) && !this.oauthKeyStorage) {
             throw new CrossauthError(ErrorCode.Configuration, "Key storage required for persisting tokens");
         }
     }
@@ -255,37 +275,46 @@ export class OAuthAuthorizationServer {
             redirectUri, 
             scope, 
             state,
-            code,
-            clientSecret,
             codeChallenge,
             codeChallengeMethod,
-            codeVerifier,
-            username
         } : {
             responseType : string, 
             clientId : string, 
             redirectUri : string, 
-            scope : string, 
+            scope? : string, 
             state : string,
-            code? : string,
-            clientSecret? : string,
             codeChallenge? : string,
-            codeChallengeMethod? : string,
-            codeVerifier? : string,
-            username? : string}) 
+            codeChallengeMethod? : string}) 
     : Promise<{
         code? : string,
         state? : string,
-        accessToken? : string,
-        refreshToken? : string,
-        tokenType? : string,
-        expiresIn? : number,
         error? : string,
         errorDescription? : string,
     }> {
+        // validate responseType (because OAuth requires a different error for this)
+        if (responseType != "code") {
+            return {
+                error: OAuthErrorCode[OAuthErrorCode.unsupported_response_type],
+                errorDescription: "Unsupported response type " + responseType,
+            };
+        }
+
+        // validate flow type
+        const flow = this.inferFlowFromGet(responseType, codeChallenge);
+        if (!(this.validFlows.includes(flow||""))) {
+            return {
+                error: OAuthErrorCode[OAuthErrorCode.access_denied],
+                errorDescription: "Unsupported flow type " + flow,
+            };
+        }
+
         // validate scopes
-        const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
-        if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};        
+        let scopes : string[]|undefined;
+        if (scope) {
+            const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
+            scopes = requestedScopes;
+            if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};        
+        }
 
         // validate state
         try {
@@ -300,7 +329,7 @@ export class OAuthAuthorizationServer {
         if (responseType == "code") {
 
             try {
-                const code = await this.getAuthorizationCode(clientId, redirectUri, requestedScopes||[], codeChallenge, codeChallengeMethod);
+                const code = await this.getAuthorizationCode(clientId, redirectUri, scopes, codeChallenge, codeChallengeMethod);
                 return {
                     code: code,
                     state: state,
@@ -321,7 +350,67 @@ export class OAuthAuthorizationServer {
                 };
             }
 
-        } else if (responseType == "token") {
+
+        } else {
+
+            const errorCode = ErrorCode.unsupported_response_type
+            const errorDescription = `Invalid response_type ${responseType}`;
+            CrossauthLogger.logger.error(j({err: new CrossauthError(errorCode, errorDescription)}));
+            return {
+                error : OAuthErrorCode[errorCode],
+                errorDescription: errorDescription,
+            };
+
+        }
+    }
+
+    /**
+     * The the OAuth2 authorize endpoint.  All parameters are expected to be
+     * strings and have be URL-decoded.
+     * 
+     * For arguments and return parameters, see OAuth2 documentation.
+     */
+    async tokenPostEndpoint({
+        grantType, 
+        clientId, 
+        scope, 
+        code,
+        clientSecret,
+        codeVerifier,
+        username
+    } : {
+        grantType : string, 
+        clientId : string, 
+        scope? : string, 
+        code? : string,
+        clientSecret? : string,
+        codeVerifier? : string,
+        username? : string}) 
+    : Promise<{
+        accessToken? : string,
+        refreshToken? : string,
+        tokenType? : string,
+        expiresIn? : number,
+        error? : string,
+        errorDescription? : string,
+    }> {
+
+        // validate flow type
+        const flow = this.inferFlowFromPost(grantType, codeVerifier);
+        if (!(this.validFlows.includes(flow||""))) {
+            return {
+                error: OAuthErrorCode[OAuthErrorCode.access_denied],
+                errorDescription: "Unsupported flow type " + flow,
+            };
+        }
+
+        // validate scopes (move to client credentials)
+        /*if (scope) {
+            const {error: scopeError, errorDescription: scopeErrorDesciption} = this.validateScope(scope);
+            if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};        
+        }*/
+
+        if (grantType == "authorization_code") {
 
             if (!clientSecret && !codeVerifier) {
                 return {
@@ -336,7 +425,7 @@ export class OAuthAuthorizationServer {
                 };
             }
             try {
-                return await this.getAccessToken(code, clientId, clientSecret, redirectUri, codeVerifier, username);
+                return await this.getAccessToken(code, clientId, clientSecret, codeVerifier, username);
             }
             catch (e) {
                 // error creating access token given clientId, client secret redirect uri
@@ -355,8 +444,8 @@ export class OAuthAuthorizationServer {
 
         } else {
 
-            const errorCode = ErrorCode.unsupported_response_type
-            const errorDescription = `Invalid response_type ${responseType}`;
+            const errorCode = ErrorCode.invalid_request;
+            const errorDescription = `Invalid grant_type ${grantType}`;
             CrossauthLogger.logger.error(j({err: new CrossauthError(errorCode, errorDescription)}));
             return {
                 error : OAuthErrorCode[errorCode],
@@ -366,7 +455,33 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[], codeChallenge? : string, codeChallengeMethod? : string) : Promise<string> {
+    inferFlowFromGet(
+        responseType : string, 
+        codeChallenge? : string,
+    ) : string|undefined {
+
+        if (responseType == "code") {
+            if (codeChallenge) return OAuthFlows.AuthorizationCodeWithPKCE;
+            return OAuthFlows.AuthorizationCode;
+        }
+        return undefined;
+    }
+
+    inferFlowFromPost(
+        grantType : string, 
+        codeVerifier? : string) : string|undefined {
+
+        if (grantType == "authorization_code") {
+            if (codeVerifier) return OAuthFlows.AuthorizationCodeWithPKCE;
+            return OAuthFlows.AuthorizationCode;
+        } else if (grantType == "client_credentials") {
+            return OAuthFlows.ClientCredentials;
+        }
+        return undefined;
+
+    }
+
+    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[]|undefined, codeChallenge? : string, codeChallengeMethod? : string) : Promise<string> {
 
         // if we have a challenge, check the method is valid
         if (codeChallenge && !this.encryptionKey) {
@@ -391,7 +506,7 @@ export class OAuthAuthorizationServer {
 
         // validate redirect uri
         const decodedUri = redirectUri; /*decodeURI(redirectUri.replace("+"," "));*/
-        this.validateRedirectUri(decodedUri);
+        OAuthAuthorizationServer.validateUri(decodedUri);
         if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
             throw new CrossauthError(ErrorCode.invalid_request, `The redirect uri {redirectUri} is invalid`);
         }
@@ -401,11 +516,13 @@ export class OAuthAuthorizationServer {
         const payload : {[key:string]: any} = {
             jti: Hasher.uuid(),
             iat: timeCreated,
-            scope: scopes,
             aud: this.oauthIssuer,
             redirect_uri: decodedUri,
             type: "code",
         };
+        if (scopes) {
+            payload.scope = scopes;
+        }
         if (this.authorizationCodeExpiry != null) {
             payload.exp = timeCreated + this.authorizationCodeExpiry
         }
@@ -427,7 +544,7 @@ export class OAuthAuthorizationServer {
         });
     }
 
-    private async getAccessToken(code : string, clientId: string, clientSecret? : string, redirectUri? : string, codeVerifier? : string, username? : string) 
+    private async getAccessToken(code : string, clientId: string, clientSecret? : string, codeVerifier? : string, username? : string) 
         : Promise<{accessToken: string, refreshToken? : string, tokenType: string, expiresIn?: number}> {
 
         // make sure we have the client secret if configured to require it
@@ -454,32 +571,13 @@ export class OAuthAuthorizationServer {
                 throw new CrossauthError(ErrorCode.unauthorized_client);
             }
 
-        // validate redirect uri
-        let decodedUri : string|undefined;
-        if (redirectUri) {
-            decodedUri = redirectUri; /*decodeURI(redirectUri.replace("+"," "));*/
-            this.validateRedirectUri(decodedUri);
-            if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
-                throw new CrossauthError(ErrorCode.invalid_request, `The redirect uri {redirectUri} is invalid`);
-            }
-        }
-
         // validate authorization code
         const authCodePayload = (await this.validateJwt(code, "code")).payload;
         let scopes = [];
         if ("scope" in authCodePayload) {
             scopes = authCodePayload.scope;
         }
-        if (redirectUri) {
-            if (!("redirect_uri" in authCodePayload) || authCodePayload.redirect_uri != decodedUri) {
-                throw new CrossauthError(ErrorCode.access_denied, "Redirect Uri's do not match");
-            }
-        }
-        if ("redirect_uri" in authCodePayload) {
-            if (!redirectUri || authCodePayload.redirect_uri != decodedUri) {
-                throw new CrossauthError(ErrorCode.access_denied, "Redirect Uri's do not match");
-            }
-        }
+
         if ((Array.isArray(authCodePayload.aud) && !authCodePayload.aud.includes(this.oauthIssuer)) ||
             (!Array.isArray(authCodePayload.aud) && authCodePayload.aud != this.oauthIssuer)) {
                 throw new CrossauthError(ErrorCode.access_denied, "Authorization code not intended for this issuer");
@@ -500,8 +598,6 @@ export class OAuthAuthorizationServer {
                 throw new CrossauthError(ErrorCode.access_denied, "Code verifier is incorrect");
             }
         }
-
-
 
         const now = new Date();
         const timeCreated = Math.ceil(now.getTime()/1000);
@@ -538,8 +634,8 @@ export class OAuthAuthorizationServer {
         });
 
         // persist access token if requested
-        if (this.persistAccessToken && this.keyStorage) {
-            await this.keyStorage?.saveKey(
+        if (this.persistAccessToken && this.oauthKeyStorage) {
+            await this.oauthKeyStorage?.saveKey(
                 undefined, // to avoid user storage dependency, we don't set this
                 "access:"+Hasher.hash(accessTokenJti),
                 now,
@@ -581,8 +677,8 @@ export class OAuthAuthorizationServer {
             });
 
             // persist refresh token if requested
-            if (this.persistRefreshToken && this.keyStorage) {
-                await this.keyStorage?.saveKey(
+            if (this.persistRefreshToken && this.oauthKeyStorage) {
+                await this.oauthKeyStorage?.saveKey(
                     undefined, // to avoid user storage dependency, we don't set this
                     "refresh:"+Hasher.hash(refreshTokenJti),
                     now,
@@ -662,13 +758,13 @@ export class OAuthAuthorizationServer {
             const plaintext = OAuthAuthorizationServer.randomClientSecret();
             clientSecret = await Hasher.passwordHash(plaintext, {
                 encode: true,
-                iterations: this.pbkdf2Iterations,
-                keyLen: this.pbkdf2KeyLength,
-                digest: this.pbkdf2Digest,
+                iterations: this.oauthPbkdf2Iterations,
+                keyLen: this.oauthPbkdf2KeyLength,
+                digest: this.oauthPbkdf2Digest,
             });
         }
         redirectUri.forEach((uri) => {
-            this.validateRedirectUri(uri);
+            OAuthAuthorizationServer.validateUri(uri);
         });
         const client = {
             clientId: clientId,
@@ -679,7 +775,7 @@ export class OAuthAuthorizationServer {
         return await this.clientStorage.createClient(client);
     }
 
-    private validateRedirectUri(uri : string) {
+    static validateUri(uri : string) {
         let valid = false;
         try {
             const validUri = new URL(uri);
@@ -699,7 +795,7 @@ export class OAuthAuthorizationServer {
     }
 
     redirectUri(redirectUri : string, code : string, state : string) : string {
-        return `${redirectUri}?code=${code}&stte=${state}`;
+        return `${redirectUri}?code=${code}&state=${state}`;
     }
 
     private validateState(state : string) {

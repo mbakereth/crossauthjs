@@ -34,7 +34,7 @@ export { Hasher } from './hasher';
 export type { PasswordHash } from './hasher';
 
 // OAuth
-export { OAuthAuthorizationServer } from './oauth/authserver';
+export { OAuthAuthorizationServer, OAuthFlows } from './oauth/authserver';
 export type { OAuthAuthorizationServerOptions } from './oauth/authserver';
 export { OAuthResourceServer } from './oauth/resserver';
 

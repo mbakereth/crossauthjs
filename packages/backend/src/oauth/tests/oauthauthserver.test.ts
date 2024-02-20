@@ -245,12 +245,9 @@ test('AuthorizationServer.accessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {accessToken, refreshToken, expiresIn, error, errorDescription}
-        = await authServer.authorizeGetEndpoint({
-            responseType: "token", 
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
             clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
-            scope: "read write", 
-            state: "ABC", 
             code: code, 
             clientSecret: client.clientSecret});
     expect(error).toBeUndefined();

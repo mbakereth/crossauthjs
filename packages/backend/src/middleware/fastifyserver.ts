@@ -1,4 +1,4 @@
-import fastify, { FastifyInstance, FastifyRequest } from 'fastify';
+import fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import view from '@fastify/view';
 import fastifyFormBody from '@fastify/formbody';
 import type { FastifyCookieOptions } from '@fastify/cookie'
@@ -6,7 +6,7 @@ import cookie from '@fastify/cookie'
 import { Server, IncomingMessage, ServerResponse } from 'http'
 
 import nunjucks from "nunjucks";
-import { UserStorage, KeyStorage } from '../storage';
+import { UserStorage, KeyStorage, OAuthClientStorage } from '../storage';
 import { Authenticator } from '../auth';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
@@ -15,14 +15,46 @@ import { FastifySessionServer } from './fastifysession';
 import type { FastifySessionServerOptions, CsrfBodyType } from './fastifysession';
 import { ApiKeyManager } from '../apikey';
 import { FastifyApiKeyServer, FastifyApiKeyServerOptions } from './fastifyapikey';
+import { FastifyAuthorizationServer, type FastifyAuthorizationServerOptions } from './fastifyoauth';
 
+export const ERROR_400 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>400 Bad Request</title>
+</head><body>
+<h1>400 Bad Request</h1>
+<p>The server was unable to handle your request.</p>
+</body></html>
+`
+
+export const ERROR_401 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>401 Unauthorized</title>
+</head><body>
+<h1>401 Unauthorized</h1>
+<p>You are not authorized to access this URL.</p>
+</body></html>
+`
+
+export const ERROR_500 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>500 Server Error</title>
+</head><body>
+<h1>500 Error</h1>
+<p>Sorry, an unknown error has occured</p>
+</body></html>
+`
+export const DEFAULT_ERROR = {
+    400: ERROR_400,
+    401: ERROR_401,
+    500: ERROR_500
+}
 
 /**
  * Options for {@link FastifyServer }.
  * 
  * See {@link FastifyServer } constructor for description of parameters
  */
-export interface FastifyServerOptions extends FastifySessionServerOptions, FastifyApiKeyServerOptions {
+export interface FastifyServerOptions extends FastifySessionServerOptions, FastifyApiKeyServerOptions, FastifyAuthorizationServerOptions {
 
     /** You can pass your own fastify instance or omit this, in which case Crossauth will create one */
     app? : FastifyInstance<Server, IncomingMessage, ServerResponse>,
@@ -165,6 +197,7 @@ export class FastifyServer {
     private endpoints : string[] = [];
     // @ts-ignore
     private sessionServer? : FastifySessionServer; // only needed for testing
+    private authServer? : FastifyAuthorizationServer;
 
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = true;
@@ -175,13 +208,17 @@ export class FastifyServer {
      * Creates the Fastify endpoints, optionally also the Fastify app.
      * @param optoions see {@link FastifyServerOptions}
      */
-    constructor(userStorage: UserStorage, {session, apiKey} : {
+    constructor(userStorage: UserStorage, {session, apiKey, oAuthAuthServer} : {
                 session?: {
                     keyStorage: KeyStorage, 
                     authenticators: {[key:string]: Authenticator}, 
                 },
-                apiKey?: {keyStorage: KeyStorage},
+                apiKey?: {
+                    keyStorage: KeyStorage
                 },
+                oAuthAuthServer? : {
+                    clientStorage: OAuthClientStorage,
+                }},
                 options: FastifyServerOptions = {}) {
 
 
@@ -244,13 +281,47 @@ export class FastifyServer {
         if (apiKey) {
             new FastifyApiKeyServer(this.app, userStorage, apiKey.keyStorage, options);
         }
+
+        if (oAuthAuthServer) 
+        {
+            this.authServer = new FastifyAuthorizationServer(this.app, this, this.prefix, oAuthAuthServer.clientStorage, options);
+        }
     }
     
-    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) {
+    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) : Promise<string|undefined>{
         if (!this.sessionServer) {
             throw new CrossauthError(ErrorCode.Configuration, "Cannot validate csrf tokens if sessions not enabled");
         }
         return this.sessionServer.validateCsrfToken(request);
+    }
+
+    static sendPageError(reply : FastifyReply, status : number, errorPage? : string, error?: string, e? : any) {
+        let code = 0;
+        let codeName = "UnknownError";
+        if (e instanceof CrossauthError) {
+            code = e.code;
+            codeName = ErrorCode[code];
+            if (!error) error = e.message;
+        }   
+        if (!error) {
+            if (status == 401) {
+                error = "You are not authorized to access this page";
+                code = ErrorCode.Unauthorized;
+                codeName = ErrorCode[code];
+            } else if (status == 403) {
+                error = "You do not have permission to access this page";
+                code = ErrorCode.Forbidden;
+                codeName = ErrorCode[code];
+            } else {
+                error = "An unknwon error has occurred"
+            }
+        }         
+        CrossauthLogger.logger.warn(j({msg: error, errorCode: code, errorCodeName: codeName, httpStatus: status}));
+        if (errorPage) {
+            return reply.status(status).view(errorPage, {status: status, error: error, errorCode: code, errorCodeName: codeName});
+        } else {
+            return reply.status(status).send(status==401 ? ERROR_401 : ERROR_500);
+        }
     }
 
     /**

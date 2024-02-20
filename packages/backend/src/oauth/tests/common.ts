@@ -38,7 +38,7 @@ export async function getAuthorizationCode({challenge, aud, persistAccessToken} 
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {
         options.persistAccessToken = true;
-        options.keyStorage = new InMemoryKeyStorage();
+        options.oauthKeyStorage = new InMemoryKeyStorage();
     }
     const authServer = new OAuthAuthorizationServer(clientStorage, options);
     const inputState = "ABCXYZ";
@@ -55,6 +55,6 @@ export async function getAuthorizationCode({challenge, aud, persistAccessToken} 
             codeChallenge: codeChallenge});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
-    return {code, client, clientStorage, authServer, keyStorage: options.keyStorage};
+    return {code, client, clientStorage, authServer, keyStorage: options.oauthKeyStorage};
 }
 
