@@ -1,0 +1,37 @@
+<html>
+    <head>
+        <title>Please Log In</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+    </head>
+    <body>
+        <h1>Please Log In</h1>
+        <form method="POST" action="/login">
+            <input type="hidden" name="next" value="{{ next }}"/>
+            <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+            {% if error %}
+                <p class="error">
+                {% if errorCodeName == "UsernameOrPasswordInvalid"%}
+                    Invalid username or password
+                {% elif errorCodeName == "EmailNotVerified" %}
+                    Please verify your email before logging in
+                {% elif errorCodeName == "UserNotActive" %}
+                    This account has been deactivated
+                {% else %}
+                    {{ error }}
+                {% endif %}
+                </p>
+            {% endif %}
+            <p>
+                <label for="username">Username</label><br>
+                <input type="text" name="username" size="20" value="{{ username }}"/>
+            </p>
+            <p>
+                <label for="password">Password</label><br>
+                <input type="password" name="password" size="20" />
+            </p>
+            <p><button type="submit">Log In</button></p>
+            <p><a href="requestpasswordreset">Forgot password?</a></p>
+
+        </form>
+    </body>
+</html>

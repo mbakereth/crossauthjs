@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+import dotenv from "dotenv-flow";
 dotenv.config();
 import { PrismaClient } from '@prisma/client';
 import { FastifyServer, PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from '@crossauth/backend';

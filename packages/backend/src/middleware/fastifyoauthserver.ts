@@ -1,12 +1,15 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http'
-import { OAuthClientStorage } from '../storage';
-import { OAuthAuthorizationServer, OAuthFlows, type OAuthAuthorizationServerOptions } from '../oauth/authserver';
+import { OAuthClientStorage, KeyStorage } from '../storage';
+import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '../oauth/authserver';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import { CrossauthLogger, OAuthErrorCode, j } from '@crossauth/common';
+import { OAuthFlows } from '@crossauth/common';
 import { oauthErrorStatus, errorCodeFromAuthErrorString } from '@crossauth/common';
-import { FastifyServer, ERROR_401, ERROR_500, DEFAULT_ERROR } from './fastifyserver';
+import { FastifyServer, ERROR_500, DEFAULT_ERROR } from './fastifyserver';
+
+
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
 export interface FastifyAuthorizationServerOptions extends OAuthAuthorizationServerOptions {
@@ -22,7 +25,6 @@ interface AuthorizeQueryType {
     state: string,
     code_challenge? : string,
     code_challenge_method : string,
-    unauthorized_uri? : string,
 }
 
 interface AuthorizeBodyType {
@@ -35,7 +37,6 @@ interface AuthorizeBodyType {
     code_challenge? : string,
     code_challenge_method : string,
     authorized : string, // true or false 
-    unauthorized_uri? : string,
 }
 
 interface TokenBodyType {
@@ -51,30 +52,48 @@ interface TokenBodyType {
 
 export class FastifyAuthorizationServer {
     private app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
-    private prefix : string = "/";
+    private prefix : string;
+    private loginUrl : string;
     private authServer : OAuthAuthorizationServer;
-    private errorPage? : string;
     private oauthAuthorizePage : string = "authorize.njk";
+    private errorPage : string = "error.njk";
 
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
         fastifyServer : FastifyServer,
         prefix : string,
+        loginUrl : string,
         clientStorage : OAuthClientStorage, 
+        keyStorage : KeyStorage,
         options : FastifyAuthorizationServerOptions) {
 
         this.prefix = prefix;
+        this.loginUrl = loginUrl;
         this.app = app;
 
-        this.authServer = new OAuthAuthorizationServer(clientStorage, options);
+        this.authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, options);
 
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("oauthAuthorizePage", ParamType.String, this, options, "OAUTH_AUTHORIZE_PAGE");
 
+        app.get(this.prefix+'.well-known/openid-configuration', async (_request : FastifyRequest, reply : FastifyReply) =>  {
+            return reply.header(...JSONHDR).status(200).send(
+                this.authServer.oidcConfiguration({
+                    authorizeEndpoint: prefix+"authorize", 
+                    tokenEndpoint: prefix+"token", 
+                    jwksUri: prefix+"jwks", 
+                    additionalClaims: []}));
+        });
+
+        app.get(this.prefix+'jwks', async (_request : FastifyRequest, reply : FastifyReply) =>  {
+            return reply.header(...JSONHDR).status(200).send(
+                this.authServer.jwks());
+        });
+
         if (this.authServer.validFlows.includes(OAuthFlows.AuthorizationCode) || this.authServer.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
 
             app.get(this.prefix+'authorize', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
-                if (!request.user) return reply.redirect(302, prefix+"login?next="+encodeURI(request.url));
+                if (!request.user) return reply.redirect(302, this.loginUrl+"?next="+encodeURI(request.url));
                 return reply.view(this.oauthAuthorizePage, {
                     user: request.user,
                     response_type: request.query.response_type,
@@ -147,21 +166,13 @@ export class FastifyAuthorizationServer {
                     // resource owner did not grant access
                     const error = OAuthErrorCode[OAuthErrorCode.access_denied];
                     const errorDescription = "You have not granted access";
-                    let status = 401;
                     const errorCode = errorCodeFromAuthErrorString(error);
                     CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: errorCode, errorCodeName: error}));
-                    if (request.body.unauthorized_uri) {
-                        try {
-                            OAuthAuthorizationServer.validateUri(request.body.unauthorized_uri);
-                            return reply.redirect(request.body.unauthorized_uri); 
-                        } catch (e) {
-                            CrossauthLogger.logger.error(j({msg: `Invalid unauthorizerdUri ${request.body.unauthorized_uri}`}));
-                        }
-                    }
-                    if (this.errorPage) {
-                        return reply.status(status).view(this.errorPage, {status: status, error: errorDescription, errorCode: errorCode, errorCodeName: error});
-                    } else {
-                        return reply.status(status).send(ERROR_401);
+                    try {
+                        OAuthAuthorizationServer.validateUri(request.body.redirect_uri);
+                        return reply.redirect(request.body.redirect_uri); 
+                    } catch (e) {
+                        CrossauthLogger.logger.error(j({msg: `Couldn't send error message ${error} to ${request.body.redirect_uri}`}));
                     }
                 }
             });
@@ -191,11 +202,11 @@ export class FastifyAuthorizationServer {
                     username : username,
                 });
 
-                if (resp.error || !resp.accessToken) {
+                if (resp.error || !resp.access_token) {
                     let error = "server_error";
                     let errorDescription = "Neither code nor error received";
                     if (resp.error) error = resp.error;
-                    if (resp.errorDescription) errorDescription = resp.errorDescription;
+                    if (resp.error_description) errorDescription = resp.error_description;
                     let status = oauthErrorStatus(error);
                     const errorCode = errorCodeFromAuthErrorString(error);
                     CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: errorCode, errorCodeName: error}));

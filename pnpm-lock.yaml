@@ -47,6 +47,76 @@ importers:
       dotenv:
         specifier: ^16.3.1
         version: 16.4.1
+      dotenv-flow:
+        specifier: ^4.1.0
+        version: 4.1.0
+      fastify:
+        specifier: ^4.25.2
+        version: 4.26.0
+      nunjucks:
+        specifier: ^3.2.4
+        version: 3.2.4
+      tsx:
+        specifier: ^4.7.0
+        version: 4.7.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.5
+        version: 20.11.17
+      nodemon:
+        specifier: ^3.0.2
+        version: 3.0.3
+      prisma:
+        specifier: ^5.9.1
+        version: 5.9.1
+      ts-node:
+        specifier: ^10.9.2
+        version: 10.9.2(@types/node@20.11.17)(typescript@5.3.3)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.3.3
+
+  examples/fastifyauthserver:
+    dependencies:
+      '@crossauth/backend':
+        specifier: workspace:^
+        version: link:../../packages/backend
+      '@crossauth/common':
+        specifier: workspace:^
+        version: link:../../packages/common
+      '@fastify/cookie':
+        specifier: ^9.2.0
+        version: 9.3.1
+      '@fastify/formbody':
+        specifier: ^7.4.0
+        version: 7.4.0
+      '@fastify/static':
+        specifier: ^7.0.1
+        version: 7.0.1
+      '@fastify/view':
+        specifier: ^8.2.0
+        version: 8.2.0
+      '@prisma/client':
+        specifier: ^5.9.1
+        version: 5.9.1(prisma@5.9.1)
+      '@types/dotenv':
+        specifier: ^8.2.0
+        version: 8.2.0
+      '@types/nunjucks':
+        specifier: ^3.2.6
+        version: 3.2.6
+      bunyan:
+        specifier: ^1.8.15
+        version: 1.8.15
+      docenv:
+        specifier: ^2.0.6
+        version: 2.0.6
+      dotenv:
+        specifier: ^16.3.1
+        version: 16.4.1
+      dotenv-flow:
+        specifier: ^4.1.0
+        version: 4.1.0
       fastify:
         specifier: ^4.25.2
         version: 4.26.0
@@ -111,6 +181,9 @@ importers:
       dotenv:
         specifier: ^16.3.1
         version: 16.4.1
+      dotenv-flow:
+        specifier: ^4.1.0
+        version: 4.1.0
       fastify:
         specifier: ^4.25.2
         version: 4.26.0
@@ -254,6 +327,9 @@ importers:
       vitest:
         specifier: ^1.1.0
         version: 1.2.2(@types/node@20.11.17)
+      vitest-fetch-mock:
+        specifier: ^0.2.2
+        version: 0.2.2(vitest@1.2.2)
 
   packages/common:
     devDependencies:
@@ -2254,6 +2330,14 @@ packages:
     resolution: {integrity: sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==}
     dev: true
 
+  /cross-fetch@3.1.8:
+    resolution: {integrity: sha512-cvA+JwZoU0Xq+h6WkMvAUqPEYy92Obet6UdKLfW60qn99ftItKjB5T+BkyWOFWe2pUyfQ+IJHmpOTznqk1M6Kg==}
+    dependencies:
+      node-fetch: 2.7.0
+    transitivePeerDependencies:
+      - encoding
+    dev: true
+
   /cross-spawn@7.0.3:
     resolution: {integrity: sha512-iRDPJKUPVEND7dHPO8rkbOnPpyDygcDFtWjpeWNCgy8WP2rXcxXL8TskReQl6OrB2G7+UJrags1q15Fudc7G6w==}
     engines: {node: '>= 8'}
@@ -2355,6 +2439,13 @@ packages:
   /dom-walk@0.1.2:
     resolution: {integrity: sha512-6QvTW9mrGeIegrFXdtQi9pk7O/nSK6lSdXW2eqUspN5LWD7UTji2Fqw5V2YLjBpHEoU9Xl/eUWNpDeZvoyOv2w==}
     dev: true
+
+  /dotenv-flow@4.1.0:
+    resolution: {integrity: sha512-0cwP9jpQBQfyHwvE0cRhraZMkdV45TQedA8AAUZMsFzvmLcQyc1HPv+oX0OOYwLFjIlvgVepQ+WuQHbqDaHJZg==}
+    engines: {node: '>= 12.0.0'}
+    dependencies:
+      dotenv: 16.4.1
+    dev: false
 
   /dotenv@10.0.0:
     resolution: {integrity: sha512-rlBi9d8jpv9Sf1klPjNfFAuWDjKLwTIJJ/VxtoTwIR6hnZxcEOQCZg2oIL3MWBYw5GpUDKOEnND7LXTbIpQ03Q==}
@@ -4857,6 +4948,18 @@ packages:
       rollup: 4.10.0
     optionalDependencies:
       fsevents: 2.3.3
+    dev: true
+
+  /vitest-fetch-mock@0.2.2(vitest@1.2.2):
+    resolution: {integrity: sha512-XmH6QgTSjCWrqXoPREIdbj40T7i1xnGmAsTAgfckoO75W1IEHKR8hcPCQ7SO16RsdW1t85oUm6pcQRLeBgjVYQ==}
+    engines: {node: '>=14.14.0'}
+    peerDependencies:
+      vitest: '>=0.16.0'
+    dependencies:
+      cross-fetch: 3.1.8
+      vitest: 1.2.2(@types/node@20.11.17)
+    transitivePeerDependencies:
+      - encoding
     dev: true
 
   /vitest@1.2.2(@types/node@20.11.17):

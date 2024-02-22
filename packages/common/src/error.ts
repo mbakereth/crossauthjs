@@ -109,6 +109,9 @@ export enum ErrorCode {
     /** Thrown when a the data field of key storage is not valid json */
     DataFormat,
 
+    /** Thrown if a fetch failed */
+    FetchError,
+
     /** Thrown when attempting to create a user that already exists */
     UserExists,
 
@@ -259,6 +262,9 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.DataFormat) {
             _message = "Session data has unexpected format";
             _httpStatus = 500;
+        } else if (code == ErrorCode.FetchError) {
+            _message = "Couldn't execute a fetch";
+            _httpStatus = 500;
         } else if (code == ErrorCode.invalid_request) {
             _message = "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.";
             _httpStatus = 400;
@@ -310,8 +316,8 @@ export function oauthErrorStatus(status : string) {
         case "access_denied": return 401;
         case "unsupported_response_type": return 400;
         case "invalid_scope": return 401;
-        case "server_error": 500;
-        case "temporarily_unavailable": return 500;
+        //case "server_error": 500;
+        //case "temporarily_unavailable": return 500;
     }
     return 500;
 };

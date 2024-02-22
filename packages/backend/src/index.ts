@@ -1,6 +1,6 @@
 // storage
 export { UserStorage, KeyStorage as SessionStorage } from './storage'; 
-export { PrismaUserStorage, PrismaKeyStorage } from './storage/prismastorage';
+export { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage } from './storage/prismastorage';
 export type { PrismaUserStorageOptions, PrismaKeyStorageOptions } from './storage/prismastorage';
 export { InMemoryUserStorage, InMemoryKeyStorage } from './storage/inmemorystorage';
 export { LdapUserStorage } from './storage/ldapstorage';
@@ -28,16 +28,17 @@ export type { ApiKeyManagerOptions } from './apikey';
 // fastify
 export { FastifyServer } from './middleware/fastifyserver';
 export type { FastifyServerOptions as FastifyCookieAuthServerOptions  } from './middleware/fastifyserver';
+export { FastifyAuthorizationServer } from './middleware/fastifyoauthserver';
+export type { FastifyAuthorizationServerOptions } from './middleware/fastifyoauthserver';
 
 // hasher
 export { Hasher } from './hasher';
 export type { PasswordHash } from './hasher';
 
 // OAuth
-export { OAuthAuthorizationServer, OAuthFlows } from './oauth/authserver';
+export { OAuthAuthorizationServer } from './oauth/authserver';
 export type { OAuthAuthorizationServerOptions } from './oauth/authserver';
 export { OAuthResourceServer } from './oauth/resserver';
-
 import type { User, ApiKey } from '@crossauth/common'
 
 declare module 'fastify' {

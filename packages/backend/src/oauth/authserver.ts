@@ -2,12 +2,19 @@ import jwt, { Algorithm } from 'jsonwebtoken';
 import { KeyStorage, OAuthClientStorage } from '../storage';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
-import { CrossauthError, ErrorCode, OAuthClient, OAuthErrorCode } from '@crossauth/common';
-import { CrossauthLogger, j } from '@crossauth/common';
+import { OpenIdConfiguration, GrantType, Jwks } from '@crossauth/common';
+import { CrossauthError, ErrorCode, OAuthClient, OAuthErrorCode, OAuthTokenResponse } from '@crossauth/common';
+import { CrossauthLogger, j, type Key } from '@crossauth/common';
+import { OAuthFlows } from '@crossauth/common';
+import { createPublicKey, JsonWebKey } from 'crypto'
 import fs from 'node:fs';
 
 const CLIENT_ID_LENGTH = 16;
-const CLIENT_SECRET_LENGTH = 16;
+const CLIENT_SECRET_LENGTH = 32;
+
+const AUTHZ_CODE_PREFIX = "authz:";
+const ACCESS_TOKEN_PREFIX = "access:";
+const REFRESH_TOKEN_PREFIX = "refresh:";
 
 function algorithm(value : string) : Algorithm {
     switch (value) {
@@ -28,13 +35,6 @@ function algorithm(value : string) : Algorithm {
     }
     throw new CrossauthError(ErrorCode.Configuration, "Invalid JWT signing algorithm " + value)
 }
-
-export class OAuthFlows {
-    static readonly All = "all";
-    static readonly AuthorizationCode = "AuthorizationCode";
-    static readonly AuthorizationCodeWithPKCE = "AuthorizationCodeWithPKCE";
-    static readonly ClientCredentials = "ClientCredentials";
-} 
 
 export interface OAuthAuthorizationServerOptions {
 
@@ -66,8 +66,8 @@ export interface OAuthAuthorizationServerOptions {
     /** If true, only redirect Uri's registered for the client will be accepted */
     requireRedirectUriRegistration?: boolean,
 
-    /** Key for symmetric encryption of code challenges (not the one for signing JWTs). Must be base64-url encoding of 256 bits */
-    encryptionKey? : string,
+    /** Authorization code length, before base64url-encoding.  Default 32 */
+    authorizationCodeLength? : number,
 
     /** The algorithm to sign JWTs with.  Default `RS256` */
     jwtAlgorithm? : string,
@@ -112,9 +112,6 @@ export interface OAuthAuthorizationServerOptions {
     /** If true, user token will contain no data, just a random string.  This will turn persistUserToken on.  Default false. */
     opaqueUserToken? : boolean,
 
-    /** If persisting tokens, you need to provide a storage to persist them to */
-    oauthKeyStorage? : KeyStorage,
-
     /** Expiry for access tokens in seconds.  If null, they don't expire.  Defult 1 hour */
     accessTokenExpiry? : number | null,
 
@@ -140,6 +137,8 @@ export interface OAuthAuthorizationServerOptions {
 export class OAuthAuthorizationServer {
 
         private clientStorage : OAuthClientStorage;
+        private keyStorage : KeyStorage;
+
         private oauthIssuer : string = "";
         private resourceServers : string[]|null = null;
         private oauthPbkdf2Digest = "sha256";
@@ -150,7 +149,7 @@ export class OAuthAuthorizationServer {
         private requireRedirectUriRegistration = true;
         private jwtAlgorithm = "RS256";
         private jwtAlgorithmChecked : Algorithm = "RS256";
-        private encryptionKey = "";
+        private authorizationCodeLength = 32;
         private jwtSecretKey = "";
         private jwtPublicKey = "";
         private jwtPrivateKey = "";
@@ -170,13 +169,13 @@ export class OAuthAuthorizationServer {
         private refreshTokenExpiry : number|null = 60*60*24;
         private authorizationCodeExpiry : number|null = 60*5;
         private clockTolerance : number = 10;
-        private oauthKeyStorage? : KeyStorage;
         private validateScopes : boolean = false;
         private validScopes : string[] = [];
         validFlows : string[] = ["all"];
     
-    constructor(clientStorage: OAuthClientStorage, options: OAuthAuthorizationServerOptions) {
+    constructor(clientStorage: OAuthClientStorage, keyStorage : KeyStorage, options: OAuthAuthorizationServerOptions) {
         this.clientStorage = clientStorage;
+        this.keyStorage = keyStorage;
 
         setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
         setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
@@ -187,7 +186,7 @@ export class OAuthAuthorizationServer {
         setParameter("requireClientSecret", ParamType.String, this, options, "OAUTH_REQUIRE_CLIENT_SECRET");
         setParameter("requireRedirectUriRegistration", ParamType.String, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
-        setParameter("encryptionKey", ParamType.String, this, options, "ENCRYPTION_KEY");
+        setParameter("authorizationCodeLength", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_LENGTH");
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
         setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
         setParameter("jwtPrivateKeyFile", ParamType.String, this, options, "JWT_PRIVATE_KEY_FILE");
@@ -252,13 +251,11 @@ export class OAuthAuthorizationServer {
             this.secretOrPublicKey = this.jwtPublicKey;
         }
 
-        this.oauthKeyStorage = options.oauthKeyStorage;
-
         if (this.opaqueAccessToken) this.persistAccessToken = true;
         if (this.opaqueRefreshToken) this.persistRefreshToken = true
         if (this.opaquetUserToken) this.persistUserToken = true
 
-        if ((this.persistAccessToken || this.persistRefreshToken || this.persistUserToken) && !this.oauthKeyStorage) {
+        if ((this.persistAccessToken || this.persistRefreshToken || this.persistUserToken) && !this.keyStorage) {
             throw new CrossauthError(ErrorCode.Configuration, "Key storage required for persisting tokens");
         }
     }
@@ -386,21 +383,14 @@ export class OAuthAuthorizationServer {
         clientSecret? : string,
         codeVerifier? : string,
         username? : string}) 
-    : Promise<{
-        accessToken? : string,
-        refreshToken? : string,
-        tokenType? : string,
-        expiresIn? : number,
-        error? : string,
-        errorDescription? : string,
-    }> {
+    : Promise<OAuthTokenResponse> {
 
         // validate flow type
         const flow = this.inferFlowFromPost(grantType, codeVerifier);
         if (!(this.validFlows.includes(flow||""))) {
             return {
                 error: OAuthErrorCode[OAuthErrorCode.access_denied],
-                errorDescription: "Unsupported flow type " + flow,
+                error_description: "Unsupported flow type " + flow,
             };
         }
 
@@ -415,13 +405,13 @@ export class OAuthAuthorizationServer {
             if (!clientSecret && !codeVerifier) {
                 return {
                     error : OAuthErrorCode[OAuthErrorCode.access_denied],
-                    errorDescription: "No client secret or code verifier provided when requesting access token",
+                    error_description: "No client secret or code verifier provided when requesting access token",
                 };
             }
             if (!code) {
                 return {
                     error : OAuthErrorCode[OAuthErrorCode.access_denied],
-                    errorDescription: "No authorization code provided when requesting access token",
+                    error_description: "No authorization code provided when requesting access token",
                 };
             }
             try {
@@ -438,7 +428,7 @@ export class OAuthAuthorizationServer {
                 CrossauthLogger.logger.error(j({err: e}));
                 return {
                     error : OAuthErrorCode[errorCode],
-                    errorDescription: errorDescription,
+                    error_description: errorDescription,
                 };
             }
 
@@ -449,7 +439,7 @@ export class OAuthAuthorizationServer {
             CrossauthLogger.logger.error(j({err: new CrossauthError(errorCode, errorDescription)}));
             return {
                 error : OAuthErrorCode[errorCode],
-                errorDescription: errorDescription,
+                error_description: errorDescription,
             };
 
         }
@@ -484,14 +474,11 @@ export class OAuthAuthorizationServer {
     private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[]|undefined, codeChallenge? : string, codeChallengeMethod? : string) : Promise<string> {
 
         // if we have a challenge, check the method is valid
-        if (codeChallenge && !this.encryptionKey) {
+        if (codeChallenge) {
             if (!codeChallengeMethod) codeChallengeMethod = "S256";
             if (codeChallengeMethod != "S256" && codeChallengeMethod != "plain") {
                 throw new CrossauthError(ErrorCode.invalid_request, "Code challenge method must be S256 or plain")
             }
-                const error = new CrossauthError(ErrorCode.Configuration, "To support code challenge/verifier, you must provide the application secret");
-            CrossauthLogger.logger.error(j({err: error}));
-            throw new CrossauthError(ErrorCode.server_error, "Configuration error - cannot process code challenge");
         }
 
         // validate client
@@ -508,44 +495,45 @@ export class OAuthAuthorizationServer {
         const decodedUri = redirectUri; /*decodeURI(redirectUri.replace("+"," "));*/
         OAuthAuthorizationServer.validateUri(decodedUri);
         if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
-            throw new CrossauthError(ErrorCode.invalid_request, `The redirect uri {redirectUri} is invalid`);
+            throw new CrossauthError(ErrorCode.invalid_request, `The redirect uri ${redirectUri} is invalid`);
         }
 
-        // create response payload
-        const timeCreated = Math.ceil(new Date().getTime()/1000);
-        const payload : {[key:string]: any} = {
-            jti: Hasher.uuid(),
-            iat: timeCreated,
-            aud: this.oauthIssuer,
-            redirect_uri: decodedUri,
-            type: "code",
-        };
-        if (scopes) {
-            payload.scope = scopes;
+        // create authorization code and data to store with the key
+        const created = new Date();
+        const expires = this.authorizationCodeExpiry ? new Date(created.getTime() + this.authorizationCodeExpiry*1000 + this.clockTolerance*1000) : undefined;
+        const authzData : {[key:string]: any} = {
         }
-        if (this.authorizationCodeExpiry != null) {
-            payload.exp = timeCreated + this.authorizationCodeExpiry
+        if (scopes) {
+            authzData.scope = scopes;
         }
         if (codeChallenge) {
-            const encryptedChallenge = Hasher.symmetricEncrypt(codeChallenge, this.encryptionKey);
-            payload.challenge_method = codeChallengeMethod;
-            payload.challenge = encryptedChallenge;
+            authzData.challengeMethod = codeChallengeMethod;
+            // we store this as a hash for security.  If S256 is used, that will be a second hash
+            authzData.challenge = Hasher.hash(codeChallenge);
+        }
+        const authzDataString = JSON.stringify(authzData);
+
+        // save the code in key storage
+        let success = false;
+        let authzCode = "";
+        for (let i=0; i<10 && !success; ++i) {
+            try {
+                authzCode = Hasher.randomValue(this.authorizationCodeLength);
+                this.keyStorage.saveKey(undefined, AUTHZ_CODE_PREFIX+Hasher.hash(authzCode), created, expires, authzDataString);
+                success = true;
+            } catch (e) {
+                CrossauthLogger.logger.debug(`Attempt nmumber${i} at creating a unique authozation code failed`)
+            }
+        }
+        if (!success) {
+            throw new CrossauthError(ErrorCode.KeyExists, "Couldn't create a authorization code");
         }
 
-        // sign and return token
-        return  new Promise((resolve, reject) => {
-            jwt.sign(payload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked}, 
-                (error: Error | null,
-                encoded: string | undefined) => {
-                    if (encoded) resolve(encoded);
-                    else if (error) reject(error);
-                    else reject(new CrossauthError(ErrorCode.Unauthorized, "Couldn't create jwt"));
-                });
-        });
+        return authzCode;
     }
 
     private async getAccessToken(code : string, clientId: string, clientSecret? : string, codeVerifier? : string, username? : string) 
-        : Promise<{accessToken: string, refreshToken? : string, tokenType: string, expiresIn?: number}> {
+        : Promise<OAuthTokenResponse> {
 
         // make sure we have the client secret if configured to require it
         if (this.requireClientSecret == "always") {
@@ -572,29 +560,37 @@ export class OAuthAuthorizationServer {
             }
 
         // validate authorization code
-        const authCodePayload = (await this.validateJwt(code, "code")).payload;
-        let scopes = [];
-        if ("scope" in authCodePayload) {
-            scopes = authCodePayload.scope;
+        let authzData : {
+            scope? : string[],
+            challenge? : string,
+            challengeMethod? : string,
+            [key:string] : any, // so having anything else stored doesn't raise an exception
+        } = {};
+        let key : Key|undefined;
+        try {
+            key = await this.keyStorage.getKey(AUTHZ_CODE_PREFIX+Hasher.hash(code));
+            authzData = KeyStorage.decodeData(key.data);
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            throw new CrossauthError(ErrorCode.access_denied, "Invalid or expired authorization code");
         }
-
-        if ((Array.isArray(authCodePayload.aud) && !authCodePayload.aud.includes(this.oauthIssuer)) ||
-            (!Array.isArray(authCodePayload.aud) && authCodePayload.aud != this.oauthIssuer)) {
-                throw new CrossauthError(ErrorCode.access_denied, "Authorization code not intended for this issuer");
+        try {
+            await this.keyStorage.deleteKey(key.value);
+        } catch (e) {
+            CrossauthLogger.logger.warn(j({err: e, msg: "Couldn't delete authorization code from storatge"}));
         }
-
+        let scopes : string[]|undefined = authzData.scope;
         
         // validate code verifier, if there is one
-        const codeChallengeMethod = authCodePayload.challenge_method;
-        if (codeChallengeMethod && !authCodePayload.challenge) {
-            if (codeChallengeMethod != "plain" && codeChallengeMethod != "S256") {
-                throw new CrossauthError(ErrorCode.access_denied, "Invalid code challenge/code challenge method method in authorization code");
+        if (authzData.challengeMethod && !authzData.challenge) {
+            if (authzData.challengeMethod != "plain" && authzData.challengeMethod != "S256") {
+                throw new CrossauthError(ErrorCode.access_denied, "Invalid code challenge/code challenge method method for authorization code");
             }
         }
-        if (authCodePayload.challenge) {
-            const codeChallenge = Hasher.symmetricDecrypt(authCodePayload.challenge, this.encryptionKey);
-            const hashedVerifier = codeChallengeMethod == "plain" ? codeVerifier||"" : Hasher.hash(codeVerifier||"");
-            if (hashedVerifier != codeChallenge) {
+        if (authzData.challenge) {
+            const hashedVerifier = authzData.challengeMethod == "plain" ? codeVerifier||"" : Hasher.sha256(codeVerifier||"");
+            // we store the challenge in hashed form for security, so if S256 is used this will be a second hash
+            if (Hasher.hash(hashedVerifier) != authzData.challenge) {
                 throw new CrossauthError(ErrorCode.access_denied, "Code verifier is incorrect");
             }
         }
@@ -609,11 +605,12 @@ export class OAuthAuthorizationServer {
             jti: accessTokenJti,
             iat: timeCreated,
             iss: this.oauthIssuer,
-            scope: scopes,
             sub: username,
-            preferred_username: username,
             type: "access",
         };
+        if (scopes) {
+            accessTokenPayload.scope = scopes;
+        }
         if (this.accessTokenExpiry != null) {
             accessTokenPayload.exp = timeCreated + this.accessTokenExpiry
             dateAccessTokenExpires = new Date(now.getTime()+this.accessTokenExpiry*1000 + this.clockTolerance*1000);
@@ -634,10 +631,10 @@ export class OAuthAuthorizationServer {
         });
 
         // persist access token if requested
-        if (this.persistAccessToken && this.oauthKeyStorage) {
-            await this.oauthKeyStorage?.saveKey(
+        if (this.persistAccessToken && this.keyStorage) {
+            await this.keyStorage?.saveKey(
                 undefined, // to avoid user storage dependency, we don't set this
-                "access:"+Hasher.hash(accessTokenJti),
+                ACCESS_TOKEN_PREFIX+Hasher.hash(accessTokenJti),
                 now,
                 dateAccessTokenExpires
             );
@@ -650,11 +647,13 @@ export class OAuthAuthorizationServer {
             jti: refreshTokenJti,
             iat: timeCreated,
             iss: this.oauthIssuer,
-            scope: scopes,
             preferred_username: username,
             sub: username,
             type: "refresh",
         };
+        if (scopes) {
+            refreshTokenPayload.scope = scopes;
+        }
         if (this.refreshTokenExpiry != null) {
             refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry;
             dateRefreshTokenExpires = new Date(now.getTime()+this.refreshTokenExpiry*1000 + this.clockTolerance*1000);
@@ -677,10 +676,10 @@ export class OAuthAuthorizationServer {
             });
 
             // persist refresh token if requested
-            if (this.persistRefreshToken && this.oauthKeyStorage) {
-                await this.oauthKeyStorage?.saveKey(
+            if (this.persistRefreshToken && this.keyStorage) {
+                await this.keyStorage?.saveKey(
                     undefined, // to avoid user storage dependency, we don't set this
-                    "refresh:"+Hasher.hash(refreshTokenJti),
+                    REFRESH_TOKEN_PREFIX+Hasher.hash(refreshTokenJti),
                     now,
                     dateRefreshTokenExpires
                 );
@@ -688,10 +687,10 @@ export class OAuthAuthorizationServer {
         }
         
         return {
-            accessToken : accessToken,
-            refreshToken : refreshToken,
-            expiresIn : this.accessTokenExpiry==null ? undefined : this.accessTokenExpiry,
-            tokenType: "Bearer",
+            access_token : accessToken,
+            refresh_token : refreshToken,
+            expires_in : this.accessTokenExpiry==null ? undefined : this.accessTokenExpiry,
+            token_type: "Bearer",
         }
     }
 
@@ -783,7 +782,7 @@ export class OAuthAuthorizationServer {
         } catch (e) {
             // test if its a valid relative url
             try {
-                const validUri = new URL(uri, "https://example.com");
+                const validUri = new URL(uri);
                 valid = validUri.hash.length == 0;
             } catch (e2) {
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -795,7 +794,69 @@ export class OAuthAuthorizationServer {
     }
 
     redirectUri(redirectUri : string, code : string, state : string) : string {
-        return `${redirectUri}?code=${code}&state=${state}`;
+        const sep = redirectUri.includes("?") ? "&" : "?";
+        return `${redirectUri}${sep}code=${code}&state=${state}`;
+    }
+
+    oidcConfiguration({
+        authorizeEndpoint, 
+        tokenEndpoint,
+        jwksUri,
+        additionalClaims} : {
+            authorizeEndpoint? : string,
+            tokenEndpoint? : string,
+            jwksUri : string,
+            additionalClaims? : string[],
+        }) : OpenIdConfiguration {
+
+        let grantTypes : GrantType[] = [];
+        if (this.validFlows.includes(OAuthFlows.AuthorizationCode) || this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
+            grantTypes.push("authorization_code");
+        }
+        if (this.validFlows.includes(OAuthFlows.ClientCredentials) ) {
+            grantTypes.push("client_credentials");
+        }
+
+        const jwtAlgorithms = [
+            "HS256",
+            "HS384",
+            "HS512",
+            "RS256",
+            "RS384",
+            "RS512",
+            "ES256",
+            "ES384",
+            "ES512",
+            "PS256",
+            "PS384",
+            "PS512",
+        ];
+        if (!additionalClaims) additionalClaims = [];
+        return {
+            issuer: this.oauthIssuer,
+            authorization_endpoint: new URL(authorizeEndpoint||"authorize", this.oauthIssuer).toString(),
+            token_endpoint: new URL(tokenEndpoint||"token", this.oauthIssuer).toString(),
+            token_endpoint_auth_methods_supported: ["client_secret_post"],
+            jwks_uri: new URL(jwksUri||"jwks", this.oauthIssuer).toString(),
+            response_types_supported: ["code"],
+            response_modes_supported: ["query"],
+            grant_types_supported: grantTypes,
+            token_endpoint_auth_signing_algorithms_supported: jwtAlgorithms,
+            subject_types_supported: ["public"],
+            id_token_signing_alg_values_supported: jwtAlgorithms,
+            claims_supported: ["iss", "sub", "aud", "jti", "iat", "type", ...additionalClaims],
+            request_uri_parameter_supported: true,
+            require_request_uri_registration: this.requireRedirectUriRegistration,
+        };
+    }
+
+    jwks() : Jwks {
+        let keys : JsonWebKey[] = [];
+        if (this.jwtPublicKey) {
+            const publicKey = createPublicKey(this.jwtPublicKey).export({format: "jwk"});
+            keys.push(publicKey)
+        }
+        return { keys };
     }
 
     private validateState(state : string) {

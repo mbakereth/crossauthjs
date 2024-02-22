@@ -5,6 +5,7 @@ import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
+import { createPublicKey, JsonWebKey, KeyObject } from 'crypto'
 import fs from 'node:fs';
 
 export interface OAuthResourceServerOptions {
@@ -47,9 +48,10 @@ export class OAuthResourceServer {
     private jwtSecretKeyFile = "";
     private jwtPublicKeyFile = "";
     private jwtPublicKey = "";
-    private secretOrPublicKey = "";
     private clockTolerance : number = 10;
     private oauthIssuers : string[]|undefined = undefined;
+    
+    private keys : (KeyObject|string)[] = [];
 
     constructor(options : OAuthResourceServerOptions = {}) {
 
@@ -79,18 +81,25 @@ export class OAuthResourceServer {
             if (this.jwtPublicKeyFile) {
                 this.jwtPublicKey = fs.readFileSync(this.jwtPublicKeyFile, 'utf8');
             }
-        } else {
+        } /*else {
             throw new CrossauthError(ErrorCode.Configuration, "Must specify either a JWT secret key or a public key");
-        }
+        }*/
         if (this.jwtSecretKey) {
-            this.secretOrPublicKey = this.jwtSecretKey;
-        } else {
-            this.secretOrPublicKey = this.jwtPublicKey;
+            this.keys = [this.jwtSecretKey];
+        } else if (this.jwtPublicKey && typeof this.jwtPublicKey == "string") {
+            this.keys = [this.jwtPublicKey];
         }
         this.keyStorage = options.keyStorage;
 
         if (this.persistAccessToken && !this.keyStorage) {
             throw new CrossauthError(ErrorCode.Configuration, "Must provide key storage if persisting access token");
+        }
+    }
+
+    loadJwks(keys : JsonWebKey[]) {
+        this.keys = [];
+        for (let i=0; i<keys.length; ++i) {
+            this.keys.push(createPublicKey({key: keys[i], format: "jwk"}));
         }
     }
 
@@ -130,25 +139,31 @@ export class OAuthResourceServer {
     }
 
     private async validateAccessToken(accessToken : string) : Promise<{[key:string]: any}|undefined> {
-        return  new Promise((resolve, reject) => {
-            jwt.verify(accessToken, this.secretOrPublicKey, {clockTolerance: this.clockTolerance, complete: true}, 
-                (error: Error | null,
-                decoded: {[key:string]:any} | undefined) => {
-                    if (decoded) {
-                        if (decoded.payload.type == "access") {
-                            resolve(decoded);
-                        } else {
-                            CrossauthLogger.logger.error(j({msg: "JWT is not an access token"}));
+
+        if (this.keys.length == 0) CrossauthLogger.logger.warn("No keys loaded so cannot validate tokens");
+        for (let i=0; i<this.keys.length; ++i) {
+            const ret =  await new Promise((resolve, reject) => {
+                jwt.verify(accessToken, this.keys[i], {clockTolerance: this.clockTolerance, complete: true}, 
+                    (error: Error | null,
+                    decoded: {[key:string]:any} | undefined) => {
+                        if (decoded) {
+                            if (decoded.payload.type == "access") {
+                                resolve(decoded);
+                            } else {
+                                CrossauthLogger.logger.error(j({msg: "JWT is not an access token"}));
+                                resolve(undefined);
+                            }
+                        } else if (error) { 
+                            CrossauthLogger.logger.error(j({err: error}));
                             resolve(undefined);
+                        } else {
+                            CrossauthLogger.logger.error(j({err: error}));
+                            reject(undefined);
                         }
-                    } else if (error) { 
-                        CrossauthLogger.logger.error(j({err: error}));
-                        resolve(undefined);
-                    } else {
-                        CrossauthLogger.logger.error(j({err: error}));
-                        reject(undefined);
-                    }
-                });
-        });
+                    });
+            });
+            if (ret) return ret;
+        }
+        return undefined;
     }
 };

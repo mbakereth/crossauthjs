@@ -20,7 +20,7 @@ export default defineConfig({
     rollupOptions: {
       // make sure to externalize deps that shouldn't be bundled
       // into your library
-      external: ['prisma', '@prisma/client', 'express', '@types/express', 'nunjucks', '@types/nunjucks', 'node:crypto', 'crypto', 'fastify', '@fastify/cookie', '@fastify/view', '@fastify/formbody', 'otplib',  'qrcode', '@types/qrcode'],
+      external: ['.env', 'prisma', '@prisma/client', 'express', '@types/express', 'nunjucks', '@types/nunjucks', 'node:crypto', 'crypto', 'fastify', '@fastify/cookie', '@fastify/view', '@fastify/formbody', 'otplib',  'qrcode', '@types/qrcode'],
     },
   },
   plugins: [

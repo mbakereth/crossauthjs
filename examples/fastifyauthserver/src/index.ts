@@ -1,7 +1,7 @@
 import dotenv from "dotenv-flow";
 dotenv.config();
 import { PrismaClient } from '@prisma/client';
-import { FastifyServer, PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from '@crossauth/backend';
+import { FastifyServer, PrismaKeyStorage, PrismaUserStorage, PrismaOAuthClientStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
@@ -35,17 +35,16 @@ app.register(view, {
     });
     app.register(fastifystatic, {
         root: path.join(__dirname, '../public'),
-       prefix: '/public/', 
-      })
+        prefix: '/public/', 
+    })
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
 const prisma = new PrismaClient();
 let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email"});
 let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
+let clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
 
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
-let totpAuthenticator = new TotpAuthenticator("FastifyTest");
-let emailAuthenticator = new EmailAuthenticator();
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyServer(userStorage, {
@@ -53,26 +52,15 @@ let server = new FastifyServer(userStorage, {
         keyStorage: keyStorage,
         authenticators: {
             localpassword: lpAuthenticator,
-            totp: totpAuthenticator,
-            email: emailAuthenticator,
-    }}}, {
+        }},
+    oAuthAuthServer : {
+        clientStorage : clientStorage,
+        keyStorage: keyStorage,
+    }}, {
         app: app,
         views: path.join(__dirname, '../views'),
-        allowedFactor2: "none, totp, email",
+        allowedFactor2: "none",
         enableEmailVerification: false,
 });
-
-// create our home page
-app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    return reply.view('index.njk', {user: request.user, errors: ["AAA", "BBB"]});
-}
-);
-
-// create a sample login-protected page
-app.get('/protected', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    if (!request.user) return reply.redirect(302, "/login?next=/protected");
-    return reply.view('protected.njk', {user: request.user});
-}
-);
 
 server.start(port);

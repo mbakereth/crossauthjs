@@ -17,7 +17,7 @@ export async function createClient() : Promise<{clientStorage : OAuthClientStora
         clientId : "ABC",
         clientSecret: clientSecret,
         clientName: "Test",
-        redirectUri: ["/redirectUri"],
+        redirectUri: ["http://localhost:3000/authzcode"],
     };
     const client = await clientStorage.createClient(inputClient);
     return {clientStorage, client};
@@ -32,15 +32,14 @@ export async function getAuthorizationCode({challenge, aud, persistAccessToken} 
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
-        encryptionKey: "bK9CQHte6zhbirgEFwOGzc5dx6nIkf84_FIFnbc4jk8",
         issueRefreshToken: true,
     };
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {
         options.persistAccessToken = true;
-        options.oauthKeyStorage = new InMemoryKeyStorage();
     }
-    const authServer = new OAuthAuthorizationServer(clientStorage, options);
+    const keyStorage = new InMemoryKeyStorage();
+    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, options);
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
     const codeVerifier = "ABC123";
@@ -55,6 +54,17 @@ export async function getAuthorizationCode({challenge, aud, persistAccessToken} 
             codeChallenge: codeChallenge});
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
-    return {code, client, clientStorage, authServer, keyStorage: options.oauthKeyStorage};
+    return {code, client, clientStorage, authServer, keyStorage};
 }
 
+export async function getAccessToken() {
+
+    const {authServer, client, code, clientStorage} = await getAuthorizationCode();
+    const {access_token, error, error_description}
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: client.clientSecret});
+    return {authServer, client, code, clientStorage, access_token, error, error_description};
+};

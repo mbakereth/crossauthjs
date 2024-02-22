@@ -31,7 +31,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         clientId : "ABC",
         clientSecret: clientSecret,
         clientName: "Test",
-        redirectUri: ["/redirect"],
+        redirectUri: ["http://example.com/redirect"],
     };
     await clientStorage.createClient(client);
 
@@ -45,6 +45,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             }},
         oAuthAuthServer: {
             clientStorage,
+            keyStorage,
         }}, {
             app: app,
             views: path.join(__dirname, '../views'),
@@ -95,7 +96,6 @@ function getSession(res: any) : string {
 
 async function login(server : FastifyServer) : Promise<{sessionCookie : string, csrfCookie : string, csrfToken : string}> {
     let res;
-    let body;
 
     const {csrfCookie, csrfToken} = await getCsrf(server);
 
@@ -125,16 +125,17 @@ test('FastifyAuthServfer.authorizeRedirectsToLogin', async () => {
 
     let {server} = await makeAppWithOptions();
     let res;
+    const redirect = encodeURI("http://example.com/redirect")
     res = await server.app.inject({ 
         method: "GET", 
-        url: `/authorize?response_type=code&client_id=ABC&redirect_uri=/redirect&scope=read+write&state=ABC123`,  
+        url: `/authorize?response_type=code&client_id=ABC&redirect_uri=${redirect}&scope=read+write&state=ABC123`,  
         });
     expect(res.statusCode).toBe(302);
 });
 
 test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
 
-    let {server} = await makeAppWithOptions();
+    let {server, keyStorage} = await makeAppWithOptions();
 
     let res;
     let body;
@@ -159,7 +160,7 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
             authorized: "true",
             response_type: "code",
             client_id: "ABC",
-            redirect_uri: "/redirect",
+            redirect_uri: "http://example.com/redirect",
             scope: "read write",
             state: "ABC123",
             csrfToken: csrfToken,
@@ -171,8 +172,7 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
     const state = params.state;
     expect(state).toBe("ABC123");
     expect(code).toBeDefined();
-    // @ts-ignore
-    await server.authServer.authServer.validateJwt(code, "code");
+    await keyStorage.getKey("authz:"+Hasher.hash(code||""));
 
     res = await server.app.inject({ 
         method: "POST", 
@@ -184,8 +184,8 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
             code: code,
         }});
     body = JSON.parse(res.body);
-    expect(body.accessToken).toBeDefined();
+    expect(body.access_token).toBeDefined();
     // @ts-ignore
-    await server.authServer.authServer.validateJwt(body.accessToken, "access");
+    await server.authServer.authServer.validateJwt(body.access_token, "access");
 
 });

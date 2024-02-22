@@ -15,7 +15,7 @@ import { FastifySessionServer } from './fastifysession';
 import type { FastifySessionServerOptions, CsrfBodyType } from './fastifysession';
 import { ApiKeyManager } from '../apikey';
 import { FastifyApiKeyServer, FastifyApiKeyServerOptions } from './fastifyapikey';
-import { FastifyAuthorizationServer, type FastifyAuthorizationServerOptions } from './fastifyoauth';
+import { FastifyAuthorizationServer, type FastifyAuthorizationServerOptions } from './fastifyoauthserver';
 
 export const ERROR_400 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
@@ -193,11 +193,12 @@ export const AllEndpoints = [
 export class FastifyServer {
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
     private views : string = "views";
-    private prefix : string = "/";
+    private sessionPrefix : string = "/";
+    private oauthPrefix : string = "/";
     private endpoints : string[] = [];
     // @ts-ignore
     private sessionServer? : FastifySessionServer; // only needed for testing
-    private authServer? : FastifyAuthorizationServer;
+    readonly authServer? : FastifyAuthorizationServer;
 
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = true;
@@ -218,12 +219,14 @@ export class FastifyServer {
                 },
                 oAuthAuthServer? : {
                     clientStorage: OAuthClientStorage,
+                    keyStorage: KeyStorage
                 }},
                 options: FastifyServerOptions = {}) {
 
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
-        setParameter("prefix", ParamType.String, this, options, "PREFIX");
+        setParameter("sessionPrefix", ParamType.String, this, options, "SESSION_PREFIX");
+        setParameter("oauthPrefix", ParamType.String, this, options, "OAUTH_PREFIX");
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
         setParameter("enableapiKeys", ParamType.Boolean, this, options, "ENABLE_APIKEYS");
         setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
@@ -273,7 +276,7 @@ export class FastifyServer {
         setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
 
         if (session) { 
-            const sessionServer = new FastifySessionServer(this.app, this.prefix, userStorage, session.keyStorage, session.authenticators, options);
+            const sessionServer = new FastifySessionServer(this.app, this.sessionPrefix, userStorage, session.keyStorage, session.authenticators, options);
             this.sessionServer = sessionServer; // for testing only
             sessionServer.addEndpoints(this.endpoints);
         }
@@ -284,7 +287,7 @@ export class FastifyServer {
 
         if (oAuthAuthServer) 
         {
-            this.authServer = new FastifyAuthorizationServer(this.app, this, this.prefix, oAuthAuthServer.clientStorage, options);
+            this.authServer = new FastifyAuthorizationServer(this.app, this, this.oauthPrefix, this.sessionPrefix+"login", oAuthAuthServer.clientStorage, oAuthAuthServer.keyStorage, options);
         }
     }
     
@@ -330,7 +333,7 @@ export class FastifyServer {
      */
     start(port : number = 3000) {
         this.app.listen({ port: port}, () =>
-            CrossauthLogger.logger.info(j({msg: "Starting fastify server", port: port, prefix: this.prefix})),
+            CrossauthLogger.logger.info(j({msg: "Starting fastify server", port: port, prefix: this.sessionPrefix})),
         );
 
     }

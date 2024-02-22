@@ -1,5 +1,5 @@
 {
-  "name": "@crossauth/fastifysessionserver-example",
+  "name": "@crossauth/fastifyoauthserver-example",
   "version": "0.0.0",
   "description": "",
   "type": "module",

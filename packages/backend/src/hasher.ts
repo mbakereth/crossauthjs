@@ -159,6 +159,16 @@ export class Hasher {
      * @returns the string containing the hash 
      */
     static hash(plaintext : string) {
+        return this.sha256(plaintext);
+    }
+
+    /**
+     * Standard hash using SHA256 (not PBKDF2 or HMAC)
+     * 
+     * @param plaintext text to hash
+     * @returns the string containing the hash 
+     */
+    static sha256(plaintext : string) {
         return createHash('sha256').update(plaintext).digest('base64url')
     }
 
