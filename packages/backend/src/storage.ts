@@ -211,21 +211,21 @@ export abstract class KeyStorage {
 
 export interface OAuthClientStorageOptions {
 }
+
 /**
- * Base class for storing session and API keys.
+ * Base class for storing OAuth clients.
  *
- * This class is subclasses for various types of session key storage,  Eg {@link PrismaKeyStorage } is for storing
- * session in a database table, managed by the Prisma ORM.
+ * This class is subclassed for various types of client storage,  Eg {@link PrismaOAuthStorage } is for storing
+ * clients in a database table, managed by the Prisma ORM.
  */
 export abstract class OAuthClientStorage {
 
     constructor(_options : OAuthClientStorageOptions = {} ) {
     }
     
-   // throws InvalidSessionId
 
     /**
-     * Returns the matching key in the session storage or throws an exception if it doesn't exist.
+     * Returns the matching clinet in the storage or throws an exception if it doesn't exist.
      * 
      * @param clientId the clientId to look up
      * @returns The matching Key record.
@@ -256,5 +256,43 @@ export abstract class OAuthClientStorage {
      * @param clientId the key to delete
      */
     abstract deleteClient(clientId : string) : Promise<void>;
+}
+
+export interface OAuthAuthorizationStorageOptions {
+}
+
+/**
+ * Base class for storing scopes that have been authorized by a user (or for client credentials, for a client).
+ *
+ * This class is subclassed for various types of storage,  Eg {@link PrismaOAuthAuthorizationStorage } is for storing
+ * in a database table, managed by the Prisma ORM.
+ */
+export abstract class OAuthAuthorizationStorage {
+
+    constructor(_options : OAuthAuthorizationStorageOptions = {} ) {
+    }
+    
+    /**
+     * Returns the matching all scopes authorized for the given client and optionally user.
+     * 
+     * @param clientId the clientId to look up
+     * @param userId the userId to look up, undefined for a client authorization not user authorization
+     * @returns The matching Key record.
+     * 
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
+     */
+    abstract getAuthorizations(clientId : string, userId : string|number|undefined) : Promise<string[]>;
+
+    /**
+     * Saves a new set of authorizations for the given client and optionally user.
+     * 
+     * Deletes the old ones
+     * 
+     * @param clientId the clientId to look up
+     * @param userId the userId to look up, undefined for a client authorization not user authorization
+     * @param scopes new set of scopes, which may be empty
+     * 
+     */
+    abstract updateAuthorizations(clientId : string, userId : string|number|undefined, authorizations : string[]) : Promise<void>;
 }
 

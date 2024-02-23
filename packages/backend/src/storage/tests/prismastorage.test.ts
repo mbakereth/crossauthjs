@@ -1,19 +1,20 @@
 import { test, expect, beforeAll, afterAll } from 'vitest';
-import { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage } from '../prismastorage';
+import { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage } from '../prismastorage';
 import { CrossauthError } from '@crossauth/common';
 import { PrismaClient } from '@prisma/client';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 
 //export var prismaClient : PrismaClient;
 export var userStorage : PrismaUserStorage;
+var prismaClient = new PrismaClient();
 
 // for all these tests, the database will have two users: bob and alice
 beforeAll(async () => {
-    const prismaClient = new PrismaClient();
     await prismaClient.user.deleteMany({});
     await prismaClient.key.deleteMany({});
     await prismaClient.oAuthClient.deleteMany({});
-    userStorage = new PrismaUserStorage({userEditableFields: "email, dummyField"});
+    await prismaClient.oAuthAuthorization.deleteMany({});
+    userStorage = new PrismaUserStorage({prismaClient: prismaClient, userEditableFields: "email, dummyField"});
     let authenticator = new LocalPasswordAuthenticator(userStorage);
     await userStorage.createUser({
         username: "bob", 
@@ -63,7 +64,7 @@ test("PrismaUserStorage.updateUser", async() => {
 
 test('PrismaKeyStorage.createGetAndDeleteKey', async () => {
     const key = "ABCDEF123";
-    const keyStorage = new PrismaKeyStorage();
+    const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     const now = new Date();
     const expiry = new Date();
@@ -79,7 +80,7 @@ test('PrismaKeyStorage.createGetAndDeleteKey', async () => {
 test("PrismaKeyStorage.deleteAllKeysForUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
-    const keyStorage = new PrismaKeyStorage();
+    const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     const now = new Date();
     const expiry = new Date();
@@ -95,7 +96,7 @@ test("PrismaKeyStorage.deleteAllKeysForUser", async() => {
 test("PrismaKeyStorage.deleteAllKeysForUserExcept", async() => {
     const key1 = "ABCDEF789";
     const key2 = "ABCDEF012";
-    const keyStorage = new PrismaKeyStorage();
+    const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     const now = new Date();
     const expiry = new Date();
@@ -113,7 +114,7 @@ test("PeismaStorage.addData", async() => {
     const keyName = "XYZABC12345";
     const now = new Date();
     const expiry = new Date();
-    const keyStorage = new PrismaKeyStorage();
+    const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     await keyStorage.saveKey(bob.id, keyName, now, expiry);
     await keyStorage.updateData(keyName, "name1", "abc");
@@ -137,7 +138,7 @@ test("PrismaStorage.getAllForUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
     const key3 = "XYZ123456";
-    const keyStorage = new PrismaKeyStorage();
+    const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     await keyStorage.deleteAllForUser(bob.id, "");
     await keyStorage.deleteAllForUser(undefined, "");
@@ -154,7 +155,7 @@ test("PrismaStorage.getAllForUser", async() => {
 });
 
 test("PrismaStorage.getAllForUserWhenEmpty", async() => {
-    const keyStorage = new PrismaKeyStorage();
+    const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     await keyStorage.deleteAllForUser(bob.id, "");
     const keys = await keyStorage.getAllForUser(bob.id);
@@ -165,7 +166,7 @@ test("PrismaStorage.getAllForNullUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
     const key3 = "XYZ123456";
-    const keyStorage = new PrismaKeyStorage();
+    const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     await keyStorage.deleteAllForUser(undefined, "");
     await keyStorage.deleteAllForUser(bob.id, "");
@@ -185,7 +186,7 @@ test("PrismaStorage.getAllForNullUser", async() => {
 test("PrismaStorage.deleteMatchingForUser", async() => {
     const key1 = "ABCDEF123";
     const key2 = "ABCDEF456";
-    const keyStorage = new PrismaKeyStorage();
+    const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     await keyStorage.deleteAllForUser(undefined, "");
     await keyStorage.deleteAllForUser(bob.id, "");
@@ -200,7 +201,7 @@ test("PrismaStorage.deleteMatchingForUser", async() => {
 });
 
 test('PrismaStorage.createGetAndDeleteClient', async () => {
-    const clientStorage = new PrismaOAuthClientStorage();
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
     const client = {
         clientId : "ABC1",
         clientSecret: "DEF",
@@ -215,38 +216,171 @@ test('PrismaStorage.createGetAndDeleteClient', async () => {
 });
 
 test('PrismaStorage.createClientWithRedirectUris', async () => {
-    const clientStorage = new PrismaOAuthClientStorage();
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
     const client = {
         clientId : "ABC2",
         clientSecret: "DEF",
         clientName: "Test",
-        redirectUri: ["/uri1", "/uri2"],
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
     }
     await clientStorage.createClient(client);
     const getClient = await clientStorage.getClient(client.clientId);
     expect(getClient.clientSecret).toBe(client.clientSecret);
     expect(getClient.redirectUri.length).toBe(2);
-    expect(["/uri1", "/uri2"]).toContain(getClient.redirectUri[0]);
-    expect(["/uri1", "/uri2"]).toContain(getClient.redirectUri[1]);
+    expect(["http://client.com/uri1", "http://client.com/uri2"]).toContain(getClient.redirectUri[0]);
+    expect(["http://client.com/uri1", "http://client.com/uri2"]).toContain(getClient.redirectUri[1]);
     await clientStorage.deleteClient(client.clientId);
     await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
 });
 
 test('PrismaStorage.createAndUpdateClient', async () => {
-    const clientStorage = new PrismaOAuthClientStorage();
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
     const client = {
         clientId : "ABC3",
         clientSecret: "DEF",
         clientName: "Test",
-        redirectUri: ["/uri1", "/uri2"],
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
     }
     await clientStorage.createClient(client);
-    await clientStorage.updateClient({clientId: client.clientId, redirectUri: ["/uri3"]});
+    await clientStorage.updateClient({clientId: client.clientId, redirectUri: ["http://client.com/uri3"]});
     const getClient = await clientStorage.getClient(client.clientId);
     expect(getClient.redirectUri.length).toBe(1);
-    expect(getClient.redirectUri[0]).toBe("/uri3");
+    expect(getClient.redirectUri[0]).toBe("http://client.com/uri3");
 });
 
+test("PrismaAuthorization.createAndGetForUser", async () => {
+    await prismaClient.oAuthAuthorization.deleteMany({});
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    const client = {
+        clientId : "ABC4",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+    }
+    await clientStorage.createClient(client);
+    const client2 = {
+        clientId : "ABC5",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+    }
+    await clientStorage.createClient(client2);
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    const {user: alice} = await userStorage.getUserByUsername("alice");
+    const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient});
+    await authStorage.updateAuthorizations("ABC4", alice.id, ["read", "write"]);
+    await authStorage.updateAuthorizations("ABC5", alice.id, ["read2", "write2"]);
+    await authStorage.updateAuthorizations("ABC5", bob.id, ["read3", "write3"]);
+    const scopes = await authStorage.getAuthorizations("ABC4", alice.id);
+    expect(scopes.length).toBe(2);
+    expect(["read", "write"]).toContain(scopes[0]);
+    expect(["read", "write"]).toContain(scopes[1]);
+});
+
+test("PrismaAuthorization.createAndGetWrongClient", async () => {
+    await prismaClient.oAuthAuthorization.deleteMany({});
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    const client = {
+        clientId : "ABC4",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+    }
+    await clientStorage.createClient(client);
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient});
+    await authStorage.updateAuthorizations("ABC4", bob.id, ["read", "write"]);
+    const scopes = await authStorage.getAuthorizations("ABCD", 1);
+    expect(scopes.length).toBe(0);
+});
+
+test("PrismaAuthorization.createAndGetWrongUser", async () => {
+    await prismaClient.oAuthAuthorization.deleteMany({});
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    const client = {
+        clientId : "ABC4",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+    }
+    await clientStorage.createClient(client);
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    const {user: alice} = await userStorage.getUserByUsername("alice");
+    const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient});
+    await authStorage.updateAuthorizations("ABC4", bob.id, ["read", "write"]);
+    const scopes = await authStorage.getAuthorizations("ABC", alice.id);
+    expect(scopes.length).toBe(0);
+});
+
+test("PrismaAuthorization.createAndGetForClient", async () => {
+    await prismaClient.oAuthAuthorization.deleteMany({});
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    const client = {
+        clientId : "ABC4",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+    }
+    await clientStorage.createClient(client);
+    const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient});
+    await authStorage.updateAuthorizations("ABC4", undefined, ["read", "write"]);
+    const scopes = await authStorage.getAuthorizations("ABC4", undefined);
+    expect(scopes.length).toBe(2);
+    expect(["read", "write"]).toContain(scopes[0]);
+    expect(["read", "write"]).toContain(scopes[1]);
+});
+
+test("PrismaAuthorization.createAndGetForUserAndClientDontOverlap", async () => {
+    await prismaClient.oAuthAuthorization.deleteMany({});
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    const client = {
+        clientId : "ABC4",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+    }
+    await clientStorage.createClient(client);
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient});
+    await authStorage.updateAuthorizations("ABC4", bob.id, ["user1", "user2"]);
+    await authStorage.updateAuthorizations("ABC4", undefined, ["client1", "client1"]);
+
+    const userScopes = await authStorage.getAuthorizations("ABC4", bob.id);
+    expect(userScopes.length).toBe(2);
+    expect(["user1", "user2"]).toContain(userScopes[0]);
+    expect(["user1", "user2"]).toContain(userScopes[1]);
+
+    const clientScopes = await authStorage.getAuthorizations("ABC4", undefined);
+    expect(clientScopes.length).toBe(2);
+    expect(["client1", "client1"]).toContain(clientScopes[0]);
+    expect(["client1", "client1"]).toContain(clientScopes[1]);
+});
+
+test("PrismaAuthorization.createAndUpdateForUser", async () => {
+    await prismaClient.oAuthAuthorization.deleteMany({});
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    const client = {
+        clientId : "ABC4",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+    }
+    await clientStorage.createClient(client);
+    const {user: bob} = await userStorage.getUserByUsername("bob");
+    const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient});
+    await authStorage.updateAuthorizations("ABC4", bob.id, ["read", "write"]);
+    await authStorage.updateAuthorizations("ABC4", bob.id, ["read", "delete"]);
+    const scopes = await authStorage.getAuthorizations("ABC4", bob.id);
+    expect(scopes.length).toBe(2);
+    expect(["read", "delete"]).toContain(scopes[0]);
+    expect(["read", "delete"]).toContain(scopes[1]);
+});
 
 afterAll(async () => {
     //await prismaClient.user.deleteMany({});

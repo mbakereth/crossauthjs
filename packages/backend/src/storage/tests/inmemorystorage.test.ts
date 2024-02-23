@@ -1,5 +1,5 @@
 import { test, expect, beforeAll } from 'vitest';
-import { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage } from '../inmemorystorage';
+import { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage, InMemoryOAuthAuthorizationStorage } from '../inmemorystorage';
 import { CrossauthError } from '@crossauth/common';
 import { getTestUserStorage }  from './inmemorytestdata';
 
@@ -202,4 +202,62 @@ test('InMemoryClientStorage.createGetAndDeleteClient', async () => {
     expect(getClient.clientSecret).toBe(client.clientSecret);
     await clientStorage.deleteClient(client.clientId);
     await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
+});
+
+test("InMemoryAuthorization.createAndGetForUser", async () => {
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    await authStorage.updateAuthorizations("ABC", 1, ["read", "write"]);
+    const scopes = await authStorage.getAuthorizations("ABC", 1);
+    expect(scopes.length).toBe(2);
+    expect(["read", "write"]).toContain(scopes[0]);
+    expect(["read", "write"]).toContain(scopes[1]);
+});
+
+test("InMemoryAuthorization.createAndGetWrongClient", async () => {
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    authStorage.updateAuthorizations("ABCD", 1, ["read", "write"]);
+    const scopes = await authStorage.getAuthorizations("ABC", 1);
+    expect(scopes.length).toBe(0);
+});
+
+test("InMemoryAuthorization.createAndGetWrongUser", async () => {
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    await authStorage.updateAuthorizations("ABC", 2, ["read", "write"]);
+    const scopes = await authStorage.getAuthorizations("ABC", 1);
+    expect(scopes.length).toBe(0);
+});
+
+test("InMemoryAuthorization.createAndGetForClient", async () => {
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    await authStorage.updateAuthorizations("ABC", undefined, ["read", "write"]);
+    const scopes = await authStorage.getAuthorizations("ABC", undefined);
+    expect(scopes.length).toBe(2);
+    expect(["read", "write"]).toContain(scopes[0]);
+    expect(["read", "write"]).toContain(scopes[1]);
+});
+
+test("InMemoryAuthorization.createAndGetForUserAndClientDontOverlap", async () => {
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    await authStorage.updateAuthorizations("ABC", 1, ["user1", "user2"]);
+    await authStorage.updateAuthorizations("ABC", undefined, ["client1", "client1"]);
+
+    const userScopes = await authStorage.getAuthorizations("ABC", 1);
+    expect(userScopes.length).toBe(2);
+    expect(["user1", "user2"]).toContain(userScopes[0]);
+    expect(["user1", "user2"]).toContain(userScopes[1]);
+
+    const clientScopes = await authStorage.getAuthorizations("ABC", undefined);
+    expect(clientScopes.length).toBe(2);
+    expect(["client1", "client1"]).toContain(clientScopes[0]);
+    expect(["client1", "client1"]).toContain(clientScopes[1]);
+});
+
+test("InMemoryAuthorization.createAndUpdateForUser", async () => {
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    await authStorage.updateAuthorizations("ABC", 1, ["read", "write"]);
+    await authStorage.updateAuthorizations("ABC", 1, ["read", "delete"]);
+    const scopes = await authStorage.getAuthorizations("ABC", 1);
+    expect(scopes.length).toBe(2);
+    expect(["read", "delete"]).toContain(scopes[0]);
+    expect(["read", "delete"]).toContain(scopes[1]);
 });

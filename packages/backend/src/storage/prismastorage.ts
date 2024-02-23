@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { UserStorage, KeyStorage, UserStorageGetOptions, UserStorageOptions, OAuthClientStorage, OAuthClientStorageOptions } from '../storage';
+import { UserStorage, KeyStorage, type UserStorageGetOptions, UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage, type OAuthAuthorizationStorageOptions } from '../storage';
 import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key, OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from'@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
@@ -624,8 +624,6 @@ export class PrismaKeyStorage extends KeyStorage {
 
 /**
  * Optional parameters for {@link PrismaOAuthClientStorage}.
- * 
- * See {@link PrismaKeyStorage.constructor} for definitions.
  */
 export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptions {
 
@@ -640,7 +638,7 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
 }
 
 /**
- * Implementation of {@link OAuthClientStorage } where keys stored in a database managed by
+ * Implementation of {@link OAuthClientStorage } where clients stored in a database managed by
  * the Prisma ORM.
  */
 export class PrismaOAuthClientStorage extends OAuthClientStorage {
@@ -715,6 +713,17 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         const maxAttempts = 10;
         const {redirectUri, ...prismaClientData} = client;
         let newClient : OAuthClient|undefined;
+
+        // validate redirect uri
+        for (let i=0; i<redirectUri.length; ++i) {
+            if (redirectUri[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
+            try {
+                new URL(redirectUri[i]);
+            }
+            catch (e) {
+                throw new CrossauthError(ErrorCode.InvalidRedirectUri, `Redriect uri ${redirectUri[i]} is not valid`);
+            }
+        }
 
         // create client (without redirect uri) - may take seveal attempts to get a unique clientId
         for (let attempt=0; attempt < maxAttempts; ++attempt) {
@@ -809,6 +818,20 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private async updateClientWithTransaction(client : Partial<OAuthClient>, tx : any) : Promise<void> {
         if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
         const redirectUris = client.redirectUri;
+
+        // validate redirect uris
+        if (redirectUris) {
+        for (let i=0; i<redirectUris.length; ++i) {
+            if (redirectUris[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
+                try {
+                    new URL(redirectUris[i]);
+                }
+                catch (e) {
+                    throw new CrossauthError(ErrorCode.InvalidRedirectUri, `Redriect uri ${redirectUris[i]} is not valid`);
+                }
+            }
+        }
+
         try {
             let data = {...client};
             delete data.clientId;
@@ -861,5 +884,108 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 }
                 }    
         }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////
+// OAuthAuthorizationStorage
+
+/**
+ * Optional parameters for {@link PrismaOAuthAuthorizationStorage}.
+ */
+export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptions {
+
+    /** Prisma name of the OAuth Authorization table.  Default oAuthAuthorization */
+    authorizationTable? : string,
+
+    /** A Prisma client to use.  If not provided, one will be created */
+    prismaClient? : PrismaClient,
+}
+
+/**
+ * Implementation of {@link OAuthAuthorizationStorage } where authorizations are stored in a database managed by
+ * the Prisma ORM.
+ */
+export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
+    private authorizationTable : string = "oAuthAuthorization";
+    private prismaClient : PrismaClient;
+
+    /**
+     * Constructor with user storage object to use plus optional parameters.
+     * 
+     * @param clientTable the (Prisma, lowercased) name of the client table.  Defaults to `client`.
+     * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
+     */
+    constructor(options : PrismaOAuthClientStorageOptions = {}) {
+        super();
+        setParameter("authorizationTable", ParamType.String, this, options, "OAUTH_CLIENT_TABLE");
+        if (options.prismaClient == undefined) {
+            this.prismaClient = new PrismaClient();
+        } else {
+            this.prismaClient = options.prismaClient;
+        }
+    }
+
+    async getAuthorizations(clientId : string, userId : string|number|undefined) : Promise<string[]> {
+        try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            let rows = await this.prismaClient[this.authorizationTable].findMany({
+                where: {
+                    client_id : clientId,
+                    user_id: userId||null,
+                },
+                select: {
+                    scope: true,
+                },
+        });
+            return rows.map((row : {[key:string]:any}) => row.scope);
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({msg: "Couldn't get authorizations"}))
+            throw new CrossauthError(ErrorCode.Connection);
+        }
+    }
+
+    async updateAuthorizations(clientId : string, userId : string|number|undefined, scopes : string[]) : Promise<void> {
+        return this.prismaClient.$transaction(async (tx) => {
+            return await this.updateAuthorizationsWithTransaction(clientId, userId, scopes, tx);
+        });
+    }
+
+    /**
+     * Saves a key in the session table.
+     * 
+     * @param redirectUri array of valid redirect uri's
+     * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
+     */
+    private async updateAuthorizationsWithTransaction(clientId : string, userId : string|number|undefined, scopes : string[], tx : any) : Promise<void> {
+
+        try {
+            // delete existing authorizations
+
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            await tx[this.authorizationTable].deleteMany({
+                where: {
+                    client_id: clientId,
+                    user_id : userId||null
+                }
+            });
+
+            // add new authorizations
+            const promises : Promise<void>[] = [];
+            scopes.forEach((scope) => {
+                promises.push(tx[this.authorizationTable].create({
+                    data: {
+                        client_id : clientId,
+                        user_id : userId||null,
+                        scope : scope,
+                    },
+                }));
+            });
+            await Promise.all(promises);
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+            throw new CrossauthError(ErrorCode.Connection, "Error updating OAuth authorizations");
+        } 
     }
 }

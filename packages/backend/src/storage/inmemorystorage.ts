@@ -1,4 +1,4 @@
-import { UserStorage, KeyStorage, UserStorageGetOptions, UserStorageOptions, OAuthClientStorage, OAuthClientStorageOptions } from '../storage';
+import { UserStorage, KeyStorage, type UserStorageGetOptions, type UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage, type OAuthAuthorizationStorageOptions } from '../storage';
 import { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields, OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
@@ -443,4 +443,46 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
         }
     }
 
+}
+
+/**
+ * Implementation of {@link KeyStorage } where keys stored in memory.  Intended for testing.
+ */
+export class InMemoryOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
+    private byClientAndUser : { [clientId : string]: {[userId : string] : string[]} } = {};
+    private byClient : { [clientId : string]: string[] } = {};
+
+    /**
+     * Constructor
+     */
+    constructor(_options : OAuthAuthorizationStorageOptions = {}) {
+        super();
+    }
+
+    async getAuthorizations(clientId : string, userId : string|number|undefined) : Promise<string[]> {
+        if (userId) {
+            if (clientId in this.byClientAndUser) {
+                const byClient = this.byClientAndUser[clientId];
+                if (userId in byClient) return byClient[userId];
+            }
+        } else {
+            if (clientId in this.byClient) return this.byClient[clientId];
+        }
+        return [];
+    }
+
+    /**
+     * Saves a client in the client table.
+     * 
+     * @param client the client to save.
+     */
+    async updateAuthorizations(clientId : string, userId : string|number|undefined, scopes : string[]) : Promise<void> {
+        if (userId) {
+            if (!(clientId in this.byClientAndUser)) this.byClientAndUser[clientId] = {};
+            const byClient = this.byClientAndUser[clientId];
+            byClient[userId] = [...scopes];
+        } else {
+            this.byClient[clientId] = [...scopes];
+        }
+    }
 }
