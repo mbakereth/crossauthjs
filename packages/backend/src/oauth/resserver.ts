@@ -7,6 +7,7 @@ import { CrossauthLogger, j } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { createPublicKey, JsonWebKey, KeyObject } from 'crypto'
 import fs from 'node:fs';
+import { OpenIdConfiguration, DEFAULT_OIDCCONFIG } from '@crossauth/common';
 
 export interface OAuthResourceServerOptions {
 
@@ -37,6 +38,8 @@ export interface OAuthResourceServerOptions {
 
     /** Set this to restrict the issuers (as set in {@link OAuthAuthorizationServer}) that will be valid in the JWT.  Required */
     oauthIssuers? : string,
+
+    authServerBaseUri? : string;
 }
 
 export class OAuthResourceServer {
@@ -50,11 +53,14 @@ export class OAuthResourceServer {
     private jwtPublicKey = "";
     private clockTolerance : number = 10;
     private oauthIssuers : string[]|undefined = undefined;
-    
-    private keys : (KeyObject|string)[] = [];
+    protected oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
+    protected authServerBaseUri = "";
+
+    protected keys : (KeyObject|string)[] = [];
 
     constructor(options : OAuthResourceServerOptions = {}) {
 
+        setParameter("authServerBaseUri", ParamType.String, this, options, "OAUTH_AUTH_SERVER_BASE_URI");
         setParameter("resourceServerName", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER", true);
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
         setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
@@ -96,27 +102,94 @@ export class OAuthResourceServer {
         }
     }
 
-    loadJwks(keys : JsonWebKey[]) {
-        this.keys = [];
-        for (let i=0; i<keys.length; ++i) {
-            this.keys.push(createPublicKey({key: keys[i], format: "jwk"}));
+    async loadConfig(oidcConfig? : OpenIdConfiguration) {
+        if (oidcConfig) {
+            this.oidcConfig = oidcConfig;
+            return;
         }
+
+        if (!this.authServerBaseUri) {
+            throw new CrossauthError(ErrorCode.server_error, "Couldn't get OIDC configuration.  Either set authServerBaseUri or set config manually");
+        }
+        let resp : Response|undefined = undefined;
+        try {
+            resp = await fetch(new URL("/.well-known/openid-configuration", this.authServerBaseUri));
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+        }
+        if (!resp || !resp.ok) {
+            throw new CrossauthError(ErrorCode.server_error, "Couldn't get OIDC configuration");
+        }
+        this.oidcConfig = {...DEFAULT_OIDCCONFIG};
+
+        // fetch config
+        try {
+            const body = await resp.json();
+            for (const [key, value] of Object.entries(body)) {
+                this.oidcConfig[key] = value;
+            }
+        } catch (e) {
+            throw new CrossauthError(ErrorCode.server_error, "Unrecognized response from OIDC configuration endpoint");
+        }
+
+        // fetch keys
+        
     }
 
-    async authorized(accessToken : string) : Promise<{[key:string]: any}|undefined> {
+    async loadJwks(jwks? : {keys: JsonWebKey[]}) {
+        if (jwks) {
+            this.keys = [];
+            for (let i=0; i<jwks.keys.length; ++i) {
+                this.keys.push(createPublicKey({key: jwks.keys[i], format: "jwk"}));
+            }
+        } else {
+            if (!this.oidcConfig) {
+                throw new CrossauthError(ErrorCode.server_error, "Load OIDC config before Jwks")
+            }
+            let resp : Response|undefined = undefined;
+            try {
+                resp = await fetch(new URL(this.oidcConfig.jwks_uri));
+            } catch (e) {
+                CrossauthLogger.logger.error(j({err: e}));
+            }
+            if (!resp || !resp.ok) {
+                throw new CrossauthError(ErrorCode.server_error, "Couldn't get OIDC configuration");
+            }
+            this.keys = [];
+            try {
+                const body = await resp.json();
+                if (!("keys" in body) || !Array.isArray(body.keys)) {
+                    throw new CrossauthError(ErrorCode.server_error, "Couldn't fetch keys")
+                }
+                for (let i=0; i<body.keys.length; ++i) {
+                    try {
+                        this.keys.push(createPublicKey({key: body.keys[i], format: "jwk"}));
+                    } catch (e) {
+                        throw new CrossauthError(ErrorCode.server_error, "Couldn't load keys");
+                    }
+                }
+            } catch (e) {
+                throw new CrossauthError(ErrorCode.server_error, "Unrecognized response from OIDC configuration endpoint");
+            }
+        }
+
+    }
+
+    async tokenAuthorized(accessToken : string) : Promise<{[key:string]: any}|undefined> {
+        if (!this.keys || this.keys.length==0) {
+            if (!this.oidcConfig) {
+                this.loadConfig();
+            }
+            this.loadJwks();
+        }
         const decoded = await this.validateAccessToken(accessToken);
         if (!decoded) return undefined;
         if (this.persistAccessToken && this.keyStorage) {
             const key = "access:" + Hasher.hash(decoded.payload.jti);
-            try {
-                const tokenInStorage = await this.keyStorage.getKey(key)
-                const now = new Date();
-                if (tokenInStorage.expires && tokenInStorage.expires?.getTime() < now.getTime()) {
-                    CrossauthLogger.logger.error("Access token expired in storage but not in JWT");
-                    return undefined;
-                }
-            } catch (e) {
-                CrossauthLogger.logger.error(j({err: e, msg: "Access token doesn't exist in storage"}));
+            const tokenInStorage = await this.keyStorage.getKey(key);
+            const now = new Date();
+            if (tokenInStorage.expires && tokenInStorage.expires?.getTime() < now.getTime()) {
+                CrossauthLogger.logger.error("Access token expired in storage but not in JWT");
                 return undefined;
             }
         }

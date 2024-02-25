@@ -2185,4 +2185,17 @@ export class FastifySessionServer {
         });
         return ret;
     }
+
+    async updateSessionData(request : FastifyRequest, name : string, value : {[key:string]:any}) {
+        const sessionCookieValue = this.getSessionCookieValue(request);
+        if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
+        await this.sessionManager.updateSessionData(sessionCookieValue, name, value);
+    }
+
+    async getSessionData(request : FastifyRequest, name : string) : Promise<{[key:string]:any}|undefined>{
+        const sessionKey = this.getSessionCookieValue(request);
+        const data = sessionKey ? await this.sessionManager.dataForSessionKey(sessionKey) : undefined;
+        if (data && name in data) return data[name];
+        return undefined;
+    }
 }

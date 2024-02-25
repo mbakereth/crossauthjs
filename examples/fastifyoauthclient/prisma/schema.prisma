@@ -22,7 +22,6 @@ model User {
 
     session             Key[]
     secrets             UserSecrets?
-    authorization       OAuthAuthorization[]
 
     @@index([id])
     @@index([username])
@@ -48,42 +47,3 @@ model Key {
     @@index([id])
     @@index([user_id])
 }
-
-model OAuthClient {
-    clientId       String                    @id @unique
-    clientName     String
-    clientSecret   String?
-
-    redirectUri    OAuthClientRedirectUri[]
-
-    authorization  OAuthAuthorization[]
-
-    @@index([clientId])
-}
-
-model OAuthClientRedirectUri {
-    id             Int         @id @unique @default(autoincrement())
-    client_id      String 
-    uri            String
-
-    client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
-
-    @@index([id])
-    @@unique([client_id, uri], name: "redirectUriUnique")
-    //@@unique([redirect_uri], name: "redirectUriUnique") // use this to ensure only one client has any given redirect uri
-}
-
-
-model OAuthAuthorization {§
-    id             Int           @id @unique @default(autoincrement())
-    client_id      String    
-    user_id        Int?
-    user           User?         @relation(references: [id], fields: [user_id], onDelete: Cascade)
-    Client         OAuthClient?  @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
-    scope          String?
-
-    @@index([id])
-    @@index([client_id, user_id])
-    @@unique([client_id, user_id, scope], name: "clientUserScope")
-}
-

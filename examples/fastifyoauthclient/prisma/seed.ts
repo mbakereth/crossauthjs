@@ -10,7 +10,6 @@ let userStorage = new PrismaUserStorage({prismaClient : prisma});
 async function main() {
     await prisma.user.deleteMany();
     await prisma.key.deleteMany();
-    await prisma.oAuthClient.deleteMany();
 
     let authenticator = new LocalPasswordAuthenticator(userStorage);
     const user1 = await userStorage.createUser({
@@ -30,22 +29,8 @@ async function main() {
       password: await authenticator.createPasswordHash("alicePass123"), 
   });
   console.log({ user1, user2 })
-
-  const clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
-  const clientSecret = await Hasher.passwordHash("DEF", {
-      encode: true,
-      iterations: 1000,
-      keyLen: 32,
-  });
-  const inputClient = {
-      clientId : "ABC",
-      clientSecret: clientSecret,
-      clientName: "Example Client",
-      redirectUri: ["http://localhost:3001/authzcode"],
-  };
-  const client = await clientStorage.createClient(inputClient);
-  console.log(client);
 }
+
 main()
   .then(async () => {
     await prisma.$disconnect()

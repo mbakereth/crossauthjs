@@ -3,7 +3,7 @@ import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '
 import { CrossauthError } from '@crossauth/common';
 import fs from 'node:fs';
 import { createClient, getAuthorizationCode } from './common';
-import { InMemoryKeyStorage } from '../..';
+import { InMemoryKeyStorage, InMemoryOAuthAuthorizationStorage } from '../../storage/inmemorystorage';
 import { Hasher } from '../../hasher';
 import { KeyStorage } from '../../storage';
 
@@ -26,7 +26,6 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFi
             redirectUri: client.redirectUri[0], 
             scope: "read write", 
             state: inputState});
-            console.log(errorDescription);
     expect(error).toBeUndefined();
     expect(errorDescription).toBeUndefined();
     expect(state).toBe(inputState);
@@ -35,6 +34,94 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFi
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
     expect(["read", "write"]).toContain(data.scope[1]);
+});
+
+test('AuthorizationServer.scopePersistence', async () => {
+
+    const {clientStorage, client} = await createClient();
+    const keyStorage = new InMemoryKeyStorage();
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtPrivateKeyFile : "keys/rsa-private-key.pem",
+        jwtPublicKeyFile : "keys/rsa-public-key.pem",
+        validateScopes : true,
+        validScopes: "read, write",
+        authStorage : authStorage,
+    });
+    const inputState = "ABCXYZ";
+    const {code, state, error, errorDescription} 
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState,
+            user: {id: "bob", username: "bob", state: "active"}});
+    const scopes = await authStorage.getAuthorizations("ABC", "bob")
+    expect(scopes.length).toBe(2);
+    expect(error).toBeUndefined();
+    expect(errorDescription).toBeUndefined();
+    expect(state).toBe(inputState);
+    const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
+    const data = KeyStorage.decodeData(key.data);
+    expect(data.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(data.scope[0]);
+    expect(["read", "write"]).toContain(data.scope[1]);
+});
+
+test('AuthorizationServer.emptyScopeDisallowed', async () => {
+
+    const {clientStorage, client} = await createClient();
+    const keyStorage = new InMemoryKeyStorage();
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtPrivateKeyFile : "keys/rsa-private-key.pem",
+        jwtPublicKeyFile : "keys/rsa-public-key.pem",
+        validateScopes : true,
+        validScopes: "read, write",
+        emptyScopeIsValid: false,
+        authStorage : authStorage,
+    });
+    const inputState = "ABCXYZ";
+    const {error, errorDescription} 
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            state: inputState,
+            user: {id: "bob", username: "bob", state: "active"}});
+    const scopes = await authStorage.getAuthorizations("ABC", "bob")
+    expect(scopes.length).toBe(0);
+    expect(error).toBeDefined();
+    expect(errorDescription).toBeDefined();
+});
+
+test('AuthorizationServer.emptyScopeAllowed', async () => {
+
+    const {clientStorage, client} = await createClient();
+    const keyStorage = new InMemoryKeyStorage();
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
+    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtPrivateKeyFile : "keys/rsa-private-key.pem",
+        jwtPublicKeyFile : "keys/rsa-public-key.pem",
+        validateScopes : true,
+        validScopes: "read, write",
+        authStorage : authStorage,
+        emptyScopeIsValid: true,
+   });
+    const inputState = "ABCXYZ";
+    const {error, errorDescription} 
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            state: inputState,
+            user: {id: "bob", username: "bob", state: "active"}});
+    const scopes = await authStorage.getAuthorizations("ABC", "bob")
+    expect(scopes.length).toBe(1);
+    expect(scopes[0]).toBeNull();
+    expect(error).toBeUndefined();
+    expect(errorDescription).toBeUndefined();
 });
 
 test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKey', async () => {

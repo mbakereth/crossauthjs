@@ -1,10 +1,10 @@
 import jwt, { Algorithm } from 'jsonwebtoken';
-import { KeyStorage, OAuthClientStorage } from '../storage';
+import { KeyStorage, OAuthClientStorage, OAuthAuthorizationStorage } from '../storage';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import { OpenIdConfiguration, GrantType, Jwks } from '@crossauth/common';
 import { CrossauthError, ErrorCode, OAuthClient, OAuthErrorCode, OAuthTokenResponse } from '@crossauth/common';
-import { CrossauthLogger, j, type Key } from '@crossauth/common';
+import { CrossauthLogger, j, type Key, type User } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, JsonWebKey } from 'crypto'
 import fs from 'node:fs';
@@ -124,6 +124,9 @@ export interface OAuthAuthorizationServerOptions {
     /** Number of seconds tolerance when checking expiration.  Default 10 */
     clockTolerance? : number,
 
+    /** If false, authorization calls without a scope will be disallowed.  Default true */
+    emptyScopeIsValid? : boolean,
+
     /** If true, a requested scope must match one in the `validScopes` list or an error will be returned.  Default false. */
     validateScopes? : boolean,
 
@@ -132,12 +135,16 @@ export interface OAuthAuthorizationServerOptions {
 
     /** Flows to support.  A comma-separated list from {@link OAuthFlows}.  If `all`, there must be none other in the list.  Default `all` */
     validFlows? : string,
+
+    /** Required if emptyScopeIsValid is false */
+    authStorage? : OAuthAuthorizationStorage,
 }
 
 export class OAuthAuthorizationServer {
 
         private clientStorage : OAuthClientStorage;
         private keyStorage : KeyStorage;
+        private authStorage? : OAuthAuthorizationStorage;
 
         private oauthIssuer : string = "";
         private resourceServers : string[]|null = null;
@@ -169,6 +176,7 @@ export class OAuthAuthorizationServer {
         private refreshTokenExpiry : number|null = 60*60*24;
         private authorizationCodeExpiry : number|null = 60*5;
         private clockTolerance : number = 10;
+        private emptyScopeIsValid : boolean = true;
         private validateScopes : boolean = false;
         private validScopes : string[] = [];
         validFlows : string[] = ["all"];
@@ -176,6 +184,7 @@ export class OAuthAuthorizationServer {
     constructor(clientStorage: OAuthClientStorage, keyStorage : KeyStorage, options: OAuthAuthorizationServerOptions) {
         this.clientStorage = clientStorage;
         this.keyStorage = keyStorage;
+        this.authStorage = options.authStorage;
 
         setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
         setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
@@ -205,6 +214,7 @@ export class OAuthAuthorizationServer {
         setParameter("authorizationCodeExpiry", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_EXPIRY");
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
         setParameter("validateScopes", ParamType.Boolean, this, options, "OAUTH_VALIDATE_SCOPES");
+        setParameter("emptyScopeIsValid", ParamType.Boolean, this, options, "OAUTH_EMPTY_SCOPE_VALID");
         setParameter("validScopes", ParamType.StringArray, this, options, "OAUTH_VALID_SCOPES");
         setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
         
@@ -274,6 +284,7 @@ export class OAuthAuthorizationServer {
             state,
             codeChallenge,
             codeChallengeMethod,
+            user,
         } : {
             responseType : string, 
             clientId : string, 
@@ -281,7 +292,8 @@ export class OAuthAuthorizationServer {
             scope? : string, 
             state : string,
             codeChallenge? : string,
-            codeChallengeMethod? : string}) 
+            codeChallengeMethod? : string,
+            user? : User}) 
     : Promise<{
         code? : string,
         state? : string,
@@ -307,10 +319,24 @@ export class OAuthAuthorizationServer {
 
         // validate scopes
         let scopes : string[]|undefined;
+        let scopesIncludingNull : (string|null)[]|undefined;
+        if (!scope && !this.emptyScopeIsValid) {
+            return {error: ErrorCode[ErrorCode.invalid_scope], errorDescription: "Must provide at least one scope"};
+        }
         if (scope) {
             const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
             scopes = requestedScopes;
-            if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};        
+            scopesIncludingNull = requestedScopes;
+            if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};      
+        } else {
+            scopesIncludingNull = [null];
+        }
+        if (this.authStorage) {
+            const newScopes = scopesIncludingNull||[];
+            const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
+            const updatedScopes = [...new Set([...existingScopes, ...newScopes])];
+            CrossauthLogger.logger.debug("Updating authorizations for " + clientId + " to " + updatedScopes);
+            this.authStorage.updateAuthorizations(clientId, user?.id, updatedScopes);
         }
 
         // validate state
@@ -326,7 +352,7 @@ export class OAuthAuthorizationServer {
         if (responseType == "code") {
 
             try {
-                const code = await this.getAuthorizationCode(clientId, redirectUri, scopes, codeChallenge, codeChallengeMethod);
+                const code = await this.getAuthorizationCode(clientId, redirectUri, scopes, codeChallenge, codeChallengeMethod, user);
                 return {
                     code: code,
                     state: state,
@@ -361,6 +387,13 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    async hasAllScopes(clientId : string, user : User|undefined, requestedScopes: (string|null)[]) : Promise<boolean> {
+        if (!this.authStorage) return false;
+        const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
+        const existingRequestedScopes = requestedScopes.filter((scope) => existingScopes.includes(scope));
+        return existingRequestedScopes.length == existingScopes.length;
+    }
+
     /**
      * The the OAuth2 authorize endpoint.  All parameters are expected to be
      * strings and have be URL-decoded.
@@ -374,15 +407,13 @@ export class OAuthAuthorizationServer {
         code,
         clientSecret,
         codeVerifier,
-        username
     } : {
         grantType : string, 
         clientId : string, 
         scope? : string, 
         code? : string,
         clientSecret? : string,
-        codeVerifier? : string,
-        username? : string}) 
+        codeVerifier? : string}) 
     : Promise<OAuthTokenResponse> {
 
         // validate flow type
@@ -415,7 +446,7 @@ export class OAuthAuthorizationServer {
                 };
             }
             try {
-                return await this.getAccessToken(code, clientId, clientSecret, codeVerifier, username);
+                return await this.getAccessToken(code, clientId, clientSecret, codeVerifier);
             }
             catch (e) {
                 // error creating access token given clientId, client secret redirect uri
@@ -471,7 +502,7 @@ export class OAuthAuthorizationServer {
 
     }
 
-    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[]|undefined, codeChallenge? : string, codeChallengeMethod? : string) : Promise<string> {
+    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[]|undefined, codeChallenge? : string, codeChallengeMethod? : string, user? : User) : Promise<string> {
 
         // if we have a challenge, check the method is valid
         if (codeChallenge) {
@@ -511,6 +542,10 @@ export class OAuthAuthorizationServer {
             // we store this as a hash for security.  If S256 is used, that will be a second hash
             authzData.challenge = Hasher.hash(codeChallenge);
         }
+        if (user) {
+            authzData.username = user.username;
+            authzData.userId = user.userId;
+        }
         const authzDataString = JSON.stringify(authzData);
 
         // save the code in key storage
@@ -532,7 +567,7 @@ export class OAuthAuthorizationServer {
         return authzCode;
     }
 
-    private async getAccessToken(code : string, clientId: string, clientSecret? : string, codeVerifier? : string, username? : string) 
+    private async getAccessToken(code : string, clientId: string, clientSecret? : string, codeVerifier? : string) 
         : Promise<OAuthTokenResponse> {
 
         // make sure we have the client secret if configured to require it
@@ -564,6 +599,8 @@ export class OAuthAuthorizationServer {
             scope? : string[],
             challenge? : string,
             challengeMethod? : string,
+            userId? : number|string,
+            username? : string,
             [key:string] : any, // so having anything else stored doesn't raise an exception
         } = {};
         let key : Key|undefined;
@@ -605,7 +642,7 @@ export class OAuthAuthorizationServer {
             jti: accessTokenJti,
             iat: timeCreated,
             iss: this.oauthIssuer,
-            sub: username,
+            sub: authzData.username,
             type: "access",
         };
         if (scopes) {
@@ -647,8 +684,7 @@ export class OAuthAuthorizationServer {
             jti: refreshTokenJti,
             iat: timeCreated,
             iss: this.oauthIssuer,
-            preferred_username: username,
-            sub: username,
+            sub: authzData.username,
             type: "refresh",
         };
         if (scopes) {
@@ -841,7 +877,7 @@ export class OAuthAuthorizationServer {
             response_types_supported: ["code"],
             response_modes_supported: ["query"],
             grant_types_supported: grantTypes,
-            token_endpoint_auth_signing_algorithms_supported: jwtAlgorithms,
+            token_endpoint_auth_signing_alg_values_supported: jwtAlgorithms,
             subject_types_supported: ["public"],
             id_token_signing_alg_values_supported: jwtAlgorithms,
             claims_supported: ["iss", "sub", "aud", "jti", "iat", "type", ...additionalClaims],
@@ -877,5 +913,39 @@ export class OAuthAuthorizationServer {
      */
     static randomClientSecret() : string {
         return Hasher.randomValue(CLIENT_SECRET_LENGTH)
+    }
+
+    validateAuthorizeParameters({
+        response_type, 
+        client_id, 
+        redirect_uri, 
+        scope, 
+        state,
+        code_challenge,
+        code_challenge_method,
+    } : {
+        response_type : string, 
+        client_id : string, 
+        redirect_uri : string, 
+        scope? : string, 
+        state : string,
+        code_challenge? : string,
+        code_challenge_method? : string}) : {error? : string, error_description? : string} {
+
+        let error_description : string|undefined = undefined;
+        if (!/^[A-Za-z0-9_-]+$/.test(response_type)) error_description = "response_type is invalid";
+        else if (!/^[A-Za-z0-9_-]+$/.test(client_id)) error_description = "client_id is invalid";
+        else if (scope && !/^[A-Za-z0-9_+ -]+$/.test(scope)) error_description = "scope is invalid";
+        else if (!/^[A-Za-z0-9_-]+$/.test(state)) error_description = "state is invalid";
+        else if (code_challenge && !/^[A-Za-z0-9_-]+$/.test(code_challenge)) error_description = "code_challenge is invalid";
+        else if (code_challenge_method && !/^[A-Za-z0-9_-]+$/.test(code_challenge_method)) error_description = "code_challenge_method is invalid";
+        try {
+            new URL(redirect_uri);
+        } catch (e) {
+            error_description = "redirect_uri is invalid";
+        }
+        if (!redirect_uri || redirect_uri.includes('#')) error_description = "redirect_uri is invalid";
+        if (error_description) return {error: "invalid_request", error_description: error_description};
+        return {};
     }
 }

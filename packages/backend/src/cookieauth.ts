@@ -93,7 +93,6 @@ export class DoubleSubmitCsrfToken {
 
         // hasher options
         setParameter("secret", ParamType.String, this, options, "SECRET", true);
-        
     }
 
     /**
@@ -317,7 +316,6 @@ export class SessionCookie {
 
         // hasher options
         setParameter("secret", ParamType.String, this, options, "SECRET", true);
-        
     }
 
     private expiry(dateCreated : Date) : Date | undefined {

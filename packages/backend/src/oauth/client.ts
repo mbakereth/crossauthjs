@@ -2,6 +2,7 @@ import { OAuthClientBase, OAuthFlows } from '@crossauth/common';
 import { Hasher } from '../hasher';
 import { setParameter, ParamType } from '../utils';
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
+import { jwtDecode } from "jwt-decode";
 
 export interface OAuthClientOptions {
     authServerBaseUri : string,
@@ -41,4 +42,10 @@ export class OAuthClient extends OAuthClientBase {
     protected sha256(plaintext :string) : string {
         return Hasher.sha256(plaintext);
     }
+
+    tokenPayload(token : string) {
+        return jwtDecode(token);
+
+    }
+
 }

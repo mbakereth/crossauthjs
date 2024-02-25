@@ -17,7 +17,6 @@ export interface OpenIdConfiguration {
     response_types_supported: string[],
     response_modes_supported: ResponseMode[],
     grant_types_supported : GrantType[],
-    token_endpoint_auth_signing_algorithms_supported: string[],
     check_session_iframe? : string,
     end_session_endpoint? : string,
     acr_values_supported?: string[],
@@ -31,7 +30,7 @@ export interface OpenIdConfiguration {
     request_object_signing_alg_values_supported? : string[],
     request_object_encryption_alg_values_supported? : string[],
     request_object_encryption_enc_values_supported? : string[],
-    token_endpoint_auth_methods_supported: TokenEndpointAuthMethod[],
+    token_endpoint_auth_methods_supported?: TokenEndpointAuthMethod[],
     token_endpoint_auth_signing_alg_values_supported? : string[],
     display_values_supported? : string[],
     claim_types_supported? : ClaimType[],
@@ -50,3 +49,21 @@ export interface OpenIdConfiguration {
 export interface Jwks {
     keys: JsonWebKey[],
 }
+
+export const DEFAULT_OIDCCONFIG : OpenIdConfiguration = {
+    issuer: "",
+    authorization_endpoint: "",
+    token_endpoint: "",
+    jwks_uri : "",
+    response_types_supported: [],
+    subject_types_supported : [],
+    response_modes_supported: ["query", "fragment"],
+    grant_types_supported : ["authorization_code", "implicit"],
+    id_token_signing_alg_values_supported: [],
+    claim_types_supported : ["normal"],
+    claims_parameter_supported : false,
+    request_parameter_supported : false,
+    request_uri_parameter_supported : true,
+    require_request_uri_registration : false,
+};
+

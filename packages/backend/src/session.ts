@@ -36,6 +36,8 @@ export interface SessionManagerOptions extends TokenEmailerOptions {
      * for sessions is used.
      */
     emailTokenStorage? : KeyStorage,
+
+    siteUrl? : string,
 }
 
 /**
@@ -73,6 +75,7 @@ export class SessionManager {
         for (let authenticationName in this.authenticators) {
             this.authenticators[authenticationName].factorName = authenticationName;
         }
+
 
         this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
         this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
@@ -330,6 +333,10 @@ export class SessionManager {
         return (await this.session.getUserForSessionKey(sessionCookieValue)).user;
     }
 
+    getSessionId(sessionCookieValue : string) : string {
+        return this.session.unsignCookie(sessionCookieValue);
+    }
+
     /**
      * Throws {@link @crossauth/common!CrossauthError} with ErrorCode.InvalidKey if the passed CSRF token is not valid for the given
      * session ID.  Otherwise returns without error
@@ -363,6 +370,17 @@ export class SessionManager {
         }
     }
 
+    /**
+     * If sessionIdleTimeout is set, update the last activcity time in key storage to current time
+     * @param sessionId the session Id to update.
+     */
+    async updateSessionData(sessionCookieValue : string, name : string, value : {[key:string]:any}) : Promise<void> {
+        const sessionId = this.session.unsignCookie(sessionCookieValue);
+        const hashedSessionKey = SessionCookie.hashSessionKey(sessionId);
+        CrossauthLogger.logger.debug(j({msg: `Updating session ${hashedSessionKey} ${name}`}));
+        await this.keyStorage.updateData(hashedSessionKey, name, value);
+    }
+    
     /**
      * Deletes the given session ID from the key storage (not the cookie)
      * @param sessionId the session Id to delete

@@ -54,6 +54,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             validScopes: "read, write",
             jwtPublicKeyFile: "keys/rsa-public-key.pem",
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
+            siteUrl: `http://localhost:3000`,
             ...options,
         });
     // @ts-ignore
@@ -125,7 +126,7 @@ test('FastifyAuthServfer.authorizeRedirectsToLogin', async () => {
 
     let {server} = await makeAppWithOptions();
     let res;
-    const redirect = encodeURI("http://example.com/redirect")
+    const redirect = encodeURIComponent("http://example.com/redirect")
     res = await server.app.inject({ 
         method: "GET", 
         url: `/authorize?response_type=code&client_id=ABC&redirect_uri=${redirect}&scope=read+write&state=ABC123`,  
@@ -143,13 +144,13 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
     const {sessionCookie, csrfCookie, csrfToken} = await login(server);
     res = await server.app.inject({ 
         method: "GET", 
-        url: `/authorize?response_type=code&client_id=ABC&redirect_uri=/redirect&scope=read+write&state=ABC123`,  
+        url: `/authorize?response_type=code&client_id=ABC&redirect_uri=http://example.com/redirect&scope=read+write&state=ABC123`,  
         cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
     body = JSON.parse(res.body)
     expect(body.template).toBe("authorize.njk");
     expect(body.args.response_type).toBe("code");
     expect(body.args.client_id).toBe("ABC");
-    expect(body.args.redirect_uri).toBe("/redirect");
+    expect(body.args.redirect_uri).toBe("http://example.com/redirect");
     expect(body.args.scope).toBe("read write");
     expect(body.args.state).toBe("ABC123");
 

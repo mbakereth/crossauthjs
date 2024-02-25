@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { UserStorage, KeyStorage, type UserStorageGetOptions, UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage, type OAuthAuthorizationStorageOptions } from '../storage';
+import { UserStorage, KeyStorage, type UserStorageGetOptions, UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage } from '../storage';
 import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key, OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from'@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
@@ -217,7 +217,6 @@ export class PrismaUserStorage extends UserStorage {
                 });
             }
         } catch (e) {
-            console.log(e);
             CrossauthLogger.logger.error(j({err: e}));
             throw new CrossauthError(ErrorCode.Connection, "Error updating user");
         }
@@ -683,10 +682,10 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 include: {redirectUri: true},
             });
             const redirectUriObjects = client.redirectUri;
-            client.redirectUri = redirectUriObjects.map((x:{[key:string]:string}) => x.uri);
-            return client;
-        } catch {
-            CrossauthLogger.logger.error(j({msg: "Invalid OAuth client id"}))
+            //client.redirectUri = redirectUriObjects.map((x:{[key:string]:string}) => x.uri);
+            return {...client, clientSecret: client.clientSecret||undefined, redirectUri: redirectUriObjects.map((x:{[key:string]:any}) => x.uri)};
+        } catch (e) {
+            CrossauthLogger.logger.error(j({msg: "Invalid OAuth client id", err: e}))
             throw new CrossauthError(ErrorCode.InvalidClientId);
         }
     }
@@ -893,7 +892,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
 /**
  * Optional parameters for {@link PrismaOAuthAuthorizationStorage}.
  */
-export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptions {
+export interface PrismaOAuthAuthorizationStorageOptions extends OAuthClientStorageOptions {
 
     /** Prisma name of the OAuth Authorization table.  Default oAuthAuthorization */
     authorizationTable? : string,

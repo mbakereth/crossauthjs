@@ -2,7 +2,7 @@ import { OAuthClient, type OAuthClientOptions } from '../oauth/client.ts';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http'
 import { setParameter, ParamType } from '../utils';
-import { OAuthFlows, type OAuthTokenResponse } from '@crossauth/common';
+import { CrossauthLogger, OAuthFlows, type OAuthTokenResponse } from '@crossauth/common';
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
@@ -23,17 +23,17 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     prefix? : string,
     loginUrl? : string,
     loginProtectedFlows? : string,
-    receiveTokenFn? : (response : OAuthTokenResponse, reply : FastifyReply) => FastifyReply;
+    receiveTokenFn? : (request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply>;
 }
 
-function defaultTokenFn(response: OAuthTokenResponse, reply : FastifyReply) : FastifyReply {
-    return reply.header(...JSONHDR).status(200).send({ok: true, ...response});
+async function defaultTokenFn(_request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
+    return reply.header(...JSONHDR).status(200).send({ok: true, ...oauthResponse});
 }
 
 export class FastifyOAuthClient extends OAuthClient {
     private siteUrl : string = "/";
     private prefix : string = "/";
-    private receiveTokenFn : (response : OAuthTokenResponse, reply : FastifyReply) => FastifyReply = defaultTokenFn;
+    private receiveTokenFn : (request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply> = defaultTokenFn;
     private loginUrl : string = "";
     private loginProtectedFlows : string[] = [];
 
@@ -63,9 +63,10 @@ export class FastifyOAuthClient extends OAuthClient {
         if (this.validFlows.includes(OAuthFlows.AuthorizationCode)) {
             app.get(this.prefix+'authzcodeflow', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
                 if (!request.user && this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
-                    return reply.redirect(302, this.loginUrl+"?next="+encodeURI(request.url));
+                    return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }          
                 const url = await this.startAuthorizationCodeFlow(request.query.scope);
+                CrossauthLogger.logger.debug(`Authorization code flow: redirecting to ${url}`);
                 return reply.redirect(url);
             });
         }
@@ -73,7 +74,7 @@ export class FastifyOAuthClient extends OAuthClient {
         if (this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
             app.get(this.prefix+'authzcodeflowpkce', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
                 if (!request.user && this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
-                    return reply.redirect(302, this.loginUrl+"?next="+encodeURI(request.url));
+                    return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }               
                 const url = await this.startAuthorizationCodeFlow(request.query.scope, true);
                 return reply.redirect(url);
@@ -83,13 +84,12 @@ export class FastifyOAuthClient extends OAuthClient {
         if (this.validFlows.includes(OAuthFlows.AuthorizationCode) || this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
             app.get(this.prefix+'authzcode', async (request : FastifyRequest<{ Querystring: RedirectUriQueryType }>, reply : FastifyReply) =>  {
                 if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode))) {
-                    return reply.redirect(302, this.loginUrl+"?next="+encodeURI(request.url));
+                    return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }               
                 const resp = await this.redirectEndpoint(request.query.code, request.query.state, request.query.error, request.query.error_description);
-                return this.receiveTokenFn(resp, reply);
+                return await this.receiveTokenFn(request, reply, resp);
             });
         }
 
     }
-
 }

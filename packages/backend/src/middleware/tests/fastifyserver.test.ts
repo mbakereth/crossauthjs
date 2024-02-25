@@ -38,6 +38,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             views: path.join(__dirname, '../views'),
             secret: "ABCDEFG",
             allowedFactor2: "none, totp",
+            siteUrl: `http://localhost:3000`,
             ...options,
         });
     // @ts-ignore

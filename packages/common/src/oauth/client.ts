@@ -1,6 +1,6 @@
 import { CrossauthLogger, j } from '..';
 import { CrossauthError, ErrorCode } from '..';
-import { OpenIdConfiguration } from '..';
+import { OpenIdConfiguration, DEFAULT_OIDCCONFIG } from '..';
 
 export class OAuthFlows {
     static readonly All = "all";
@@ -79,29 +79,31 @@ export abstract class OAuthClientBase {
         this.authServerBaseUri = authServerBaseUri;
     }
 
-    async fetchConfig() {
-        const resp = await fetch(new URL("/.well-known/openid-configuration", this.authServerBaseUri));
-        if (!resp.ok) {
+    async loadConfig(oidcConfig? : OpenIdConfiguration) {
+        if (oidcConfig) {
+            CrossauthLogger.logger.debug(j({msg: "Reading OIDC config locally"}))
+            this.oidcConfig = oidcConfig;
+            return;
+        }
+
+        let resp : Response|undefined = undefined;
+        try {
+            const url = new URL("/.well-known/openid-configuration", this.authServerBaseUri);
+            CrossauthLogger.logger.debug(j({msg: `Fetching OIDC config from ${url}`}))
+            resp = await fetch(url);
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+        }
+        if (!resp || !resp.ok) {
             throw new CrossauthError(ErrorCode.server_error, "Couldn't get OIDC configuration");
         }
-        this.oidcConfig = {
-            issuer: "",
-            authorization_endpoint:  "",
-            token_endpoint: "",
-            jwks_uri: "",
-            response_types_supported: [],
-            response_modes_supported: [],
-            grant_types_supported : [],
-            token_endpoint_auth_signing_algorithms_supported: [],
-            subject_types_supported: [],
-            id_token_signing_alg_values_supported: [],
-            token_endpoint_auth_methods_supported: [],        
-        }
+        this.oidcConfig = {...DEFAULT_OIDCCONFIG};
         try {
             const body = await resp.json();
             for (const [key, value] of Object.entries(body)) {
                 this.oidcConfig[key] = value;
             }
+            CrossauthLogger.logger.debug(j({msg: `OIDC Config ${JSON.stringify(this.oidcConfig)}`}));
         } catch (e) {
             throw new CrossauthError(ErrorCode.server_error, "Unrecognized response from OIDC configuration endpoint");
         }
@@ -111,7 +113,12 @@ export abstract class OAuthClientBase {
     protected abstract sha256(plaintext :string) : string;
 
     protected async startAuthorizationCodeFlow(scope? : string, pkce : boolean=false) : Promise<string> {
-        if (!this.oidcConfig) await this.fetchConfig();
+        CrossauthLogger.logger.debug(j({msg: "Starting authorization code flow"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.response_types_supported.includes("code")
+            || !this.oidcConfig?.response_modes_supported.includes("query")) {
+            throw new CrossauthError(ErrorCode.invalid_request, "Server does not support authorization code flow");
+        }
         if (!this.oidcConfig?.authorization_endpoint) {
             throw new CrossauthError(ErrorCode.server_error, "Cannot get authorize endpoint");
         }
@@ -122,12 +129,12 @@ export abstract class OAuthClientBase {
         const base = this.oidcConfig.authorization_endpoint;
         let url = base 
             + "?response_type=code"
-            + "&client_id=" + encodeURI(this.clientId)
-            + "&state=" + encodeURI(this.state)
-            + "&redirect_uri=" + encodeURI(this.redirectUri);
+            + "&client_id=" + encodeURIComponent(this.clientId)
+            + "&state=" + encodeURIComponent(this.state)
+            + "&redirect_uri=" + encodeURIComponent(this.redirectUri);
 
         if (scope) {
-            url += "&scope=" + encodeURI(scope);
+            url += "&scope=" + encodeURIComponent(scope);
         }
 
         if (pkce) {

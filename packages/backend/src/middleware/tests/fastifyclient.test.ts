@@ -17,7 +17,7 @@ const oidcConfiguration : OpenIdConfiguration = {
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
     grant_types_supported: ["authorization_code"],
-    token_endpoint_auth_signing_algorithms_supported: ["RS256"],
+    token_endpoint_auth_signing_alg_values_supported: ["RS256"],
     subject_types_supported: ["public"],
     id_token_signing_alg_values_supported: ["RS256"],
     claims_supported: ["iss", "sub", "aud", "jti", "iat", "type"],
@@ -49,7 +49,7 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
         validFlows: "all",
     });
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await fastifyClient.fetchConfig();
+    await fastifyClient.loadConfig();
 
     let res;
 
@@ -79,7 +79,7 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
 });
 
 test('FastifyOAuthClient.authzcodeflowWithLoginRedirects', async () => {
-    const {authServer} = await getAccessToken();
+    await getAccessToken();
 
     const app = fastify({logger: false});
 
@@ -92,7 +92,7 @@ test('FastifyOAuthClient.authzcodeflowWithLoginRedirects', async () => {
         loginUrl: "/login",
     });
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await fastifyClient.fetchConfig();
+    await fastifyClient.loadConfig();
 
     let res;
 

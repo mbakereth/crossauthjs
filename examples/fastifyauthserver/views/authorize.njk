@@ -1,0 +1,52 @@
+<html>
+    <head>
+        <title>Authorization Server</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+        <script>
+            function deny() {
+                let authorized = document.getElementById('authorized'); 
+                authorized.value = "false";
+                document.getElementById("form").submit();
+            }
+        </script>
+    </head>
+    <body>
+        <div style="max-width: 640px; margin: auto;">
+        <h1>Please Allow Authorization</h1>
+        <form method="POST" id="form" action="/authorize">
+            <input type="hidden" name="response_type" value="{{ response_type }}"/>
+            <input type="hidden" name="client_id" value="{{ client_id }}"/>
+            <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}"/>
+            <input type="hidden" name="scope" value="{{ scope }}"/>
+            <input type="hidden" name="state" value="{{ state }}"/>
+            <input type="hidden" name="code_challenge" value="{{ code_challenge }}"/>
+            <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}"/>
+            <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+            <input type="hidden" name="authorized" id="authorized" value="true"/>
+            {% if error %}
+                <p class="error">
+                    {{ error }}
+                </p>
+            {% endif %}
+            <p>
+                {{ client_name }} would like access to your account.
+
+                {% if scope %}
+                It is requesting the following permissions:
+                <ul>
+                    {% for s in scopes %}
+                        <li>{{ s }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </p>
+            <p>
+                <button type="submit">Allow</button>
+                <span style="min-width: 5ex">&nbsp;</span>
+                <button type="button" onClick="deny()">Deny</button>
+            </p>
+
+        </form>
+        </div>
+    </body>
+</html>

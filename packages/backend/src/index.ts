@@ -1,8 +1,8 @@
 // storage
-export { UserStorage, KeyStorage as SessionStorage } from './storage'; 
-export { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage } from './storage/prismastorage';
-export type { PrismaUserStorageOptions, PrismaKeyStorageOptions } from './storage/prismastorage';
-export { InMemoryUserStorage, InMemoryKeyStorage } from './storage/inmemorystorage';
+export { UserStorage, KeyStorage } from './storage'; 
+export { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage } from './storage/prismastorage';
+export type { PrismaUserStorageOptions, PrismaKeyStorageOptions, PrismaOAuthAuthorizationStorageOptions } from './storage/prismastorage';
+export { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthAuthorizationStorage } from './storage/inmemorystorage';
 export { LdapUserStorage } from './storage/ldapstorage';
 export type  { LdapUserStorageOptions } from './storage/ldapstorage';
 
@@ -30,6 +30,10 @@ export { FastifyServer } from './middleware/fastifyserver';
 export type { FastifyServerOptions as FastifyCookieAuthServerOptions  } from './middleware/fastifyserver';
 export { FastifyAuthorizationServer } from './middleware/fastifyoauthserver';
 export type { FastifyAuthorizationServerOptions } from './middleware/fastifyoauthserver';
+export { FastifyOAuthClient } from './middleware/fastifyoauthclient';
+export type { FastifyOAuthClientOptions } from './middleware/fastifyoauthclient';
+export { FastifyOAuthResourceServer } from './middleware/fastifyresserver';
+export type  { FastifyOAuthResourceServerOptions } from './middleware/fastifyresserver';
 
 // hasher
 export { Hasher } from './hasher';

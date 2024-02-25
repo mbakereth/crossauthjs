@@ -96,7 +96,7 @@ model OAuthAuthorization {§
     user_id        Int?
     user           User?         @relation(references: [id], fields: [user_id], onDelete: Cascade)
     Client         OAuthClient?  @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
-    scope          String
+    scope          String?
 
     @@index([id])
     @@index([client_id, user_id])

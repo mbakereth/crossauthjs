@@ -16,7 +16,8 @@
     "build": "vite build --emptyOutDir=false",
     "preview": "vite preview",
     "test": "vitest",
-    "doc": "typedoc"
+    "doc": "typedoc",
+    "prisma": "pnpm exec prisma"
   },
   "devDependencies": {
     "@types/node": "^20.10.8",
@@ -52,6 +53,7 @@
     "fastify": "^4.25.2",
     "fastify-vite": "^3.0.0-beta.27",
     "jsonwebtoken": "^9.0.2",
+    "jwt-decode": "^4.0.0",
     "ldap-async": "^2.1.1",
     "ldapjs": "^3.0.7",
     "nodemailer": "^6.9.8",

@@ -8,10 +8,11 @@
     "build": "pnpx tsc",
     "start": "node dist/index.js",
     "dev": "NODE_ENV=dev tsx src/index.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "prisma": "dotenv -e .env.dev pnpm exec prisma"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "dotenv -e .env.dev tsx prisma/seed.ts"
   },
   "keywords": [],
   "author": "Matthew Baker",
@@ -36,6 +37,7 @@
     "bunyan": "^1.8.15",
     "docenv": "^2.0.6",
     "dotenv": "^16.3.1",
+    "dotenv-cli": "^7.3.0",
     "dotenv-flow": "^4.1.0",
     "fastify": "^4.25.2",
     "nunjucks": "^3.2.4",

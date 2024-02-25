@@ -1,0 +1,35 @@
+<html>
+    <head>
+        <title>Client</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+
+        <script>
+            function authorize() {
+                window.location.href = '/authzcodeflow?scope=read+write';
+            }
+            function callResource() {
+                fetch("/resource")
+                .then(function(response) {return response.json()}).then(function(response) {
+                    document.getElementById("result").innerHTML = "<pre>"+JSON.stringify(response)+"</pre>"
+                })
+                .catch(function(error) {
+                    document.getElementById("result").text = error;
+                })
+            }
+        </script>
+
+        </head>
+    <body>
+        <h1>Client.  Logged in as {{ user.username }}</h1>
+
+        <p><button onClick="authorize()">Authorize</button></p>
+
+        <p><button onClick="callResource()">Call Resource</button></p>
+        <p id="result">Result will be here</p>
+
+        <form method="POST" action="logout">
+            <button type="submit">Logout</button>
+        </form>
+
+    </body>
+</html>

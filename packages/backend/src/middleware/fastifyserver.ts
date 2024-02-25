@@ -61,7 +61,7 @@ export interface FastifyServerOptions extends FastifySessionServerOptions, Fasti
 
     /** List of endpoints to add to the server ("login", "api/login", etc, prefixed by the `prefix` parameter.  Empty for all.  Default all. */
     endpoints? : string,
-}
+};
 
 
 /**
@@ -290,7 +290,7 @@ export class FastifyServer {
             this.authServer = new FastifyAuthorizationServer(this.app, this, this.oauthPrefix, this.sessionPrefix+"login", oAuthAuthServer.clientStorage, oAuthAuthServer.keyStorage, options);
         }
     }
-    
+
     async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) : Promise<string|undefined>{
         if (!this.sessionServer) {
             throw new CrossauthError(ErrorCode.Configuration, "Cannot validate csrf tokens if sessions not enabled");
@@ -325,6 +325,16 @@ export class FastifyServer {
         } else {
             return reply.status(status).send(status==401 ? ERROR_401 : ERROR_500);
         }
+    }
+
+    async updateSessionData(request : FastifyRequest, name : string, value : {[key:string]:any}) {
+        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Cannot update session data if sessions not enabled");
+        await this.sessionServer.updateSessionData(request, name, value);
+    }
+
+    async getSessionData(request : FastifyRequest, name : string, ) : Promise<{[key:string]:any}|undefined> {
+        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Cannot update session data if sessions not enabled");
+       return  await this.sessionServer.getSessionData(request, name);
     }
 
     /**

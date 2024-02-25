@@ -39,7 +39,7 @@ app.register(view, {
       })
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({datasourceUrl: "file:"+process.cwd()+"/prisma/"+process.env.DATABASE_FILE});
 let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email"});
 let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
 
@@ -60,6 +60,7 @@ let server = new FastifyServer(userStorage, {
         views: path.join(__dirname, '../views'),
         allowedFactor2: "none, totp, email",
         enableEmailVerification: false,
+        siteUrl: `http://localhost:${port}`,
 });
 
 // create our home page

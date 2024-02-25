@@ -281,7 +281,7 @@ export abstract class OAuthAuthorizationStorage {
      * 
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
-    abstract getAuthorizations(clientId : string, userId : string|number|undefined) : Promise<string[]>;
+    abstract getAuthorizations(clientId : string, userId : string|number|undefined) : Promise<(string|null)[]>;
 
     /**
      * Saves a new set of authorizations for the given client and optionally user.
@@ -293,6 +293,6 @@ export abstract class OAuthAuthorizationStorage {
      * @param scopes new set of scopes, which may be empty
      * 
      */
-    abstract updateAuthorizations(clientId : string, userId : string|number|undefined, authorizations : string[]) : Promise<void>;
+    abstract updateAuthorizations(clientId : string, userId : string|number|undefined, authorizations : (string|null)[]) : Promise<void>;
 }
 
