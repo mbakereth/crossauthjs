@@ -4,9 +4,9 @@ import { OAuthClientStorage, KeyStorage } from '../storage';
 import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '../oauth/authserver';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
-import { CrossauthError, CrossauthLogger, OAuthErrorCode, OpenIdConfiguration, j } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, OpenIdConfiguration, j } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
-import { oauthErrorStatus, errorCodeFromAuthErrorString, ErrorCode } from '@crossauth/common';
+import { ErrorCode } from '@crossauth/common';
 import { FastifyServer, ERROR_500, DEFAULT_ERROR } from './fastifyserver';
 
 
@@ -99,8 +99,6 @@ export class FastifyAuthorizationServer {
             app.get(this.prefix+'authorize', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
                 if (!request.user) return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
-                let error : string|undefined;
-                let errorDescription : string|undefined;
 
                 // this just checks they are valid strings and not empty if required, to avoid XSR vulnerabilities
                 CrossauthLogger.logger.debug(j({msg: "validating authorize parameters"}))
@@ -249,10 +247,9 @@ export class FastifyAuthorizationServer {
                     let errorDescription = "Neither code nor error received";
                     if (resp.error) error = resp.error;
                     if (resp.error_description) errorDescription = resp.error_description;
-                    let status = oauthErrorStatus(error);
-                    const errorCode = errorCodeFromAuthErrorString(error);
-                    CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: errorCode, errorCodeName: error}));
-                return reply.header(...JSONHDR).status(status).send(resp);
+                    const ce = CrossauthError.fromOAuthError(error, errorDescription);
+                    CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: ce.code, errorCodeName: ce.codeName}));
+                    return reply.header(...JSONHDR).status(ce.httpStatus).send(resp);
                 }
                 return reply.header(...JSONHDR).send(resp);
             });

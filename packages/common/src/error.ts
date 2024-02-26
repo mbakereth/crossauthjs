@@ -129,29 +129,6 @@ export enum ErrorCode {
 
     /** Thrown for an condition not convered above. */
     UnknownError,
-
-    // OAuthErrors 
-
-    /** OAuth invalid_request - See RFC 6749 */
-    invalid_request = 101,
-
-    /** OAuth unauthorized_client - See RFC 6749 */
-    unauthorized_client = 102,
-
-    /** OAuth access_denied - See RFC 6749 */
-    access_denied = 103,
-
-    /** OAuth unsupported_response_type - See RFC 6749 */
-    unsupported_response_type = 104,
-
-    /** OAuth invalid_scope - See RFC 6749 */
-    invalid_scope = 105,
-
-    /** OAuth server_error - See RFC 6749 */
-    server_error = 106,
-
-    /** OAuth temporarily_unavailable - See RFC 6749 */
-    temporarily_unavailable = 107,
 }
 
 /**
@@ -277,24 +254,6 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.FetchError) {
             _message = "Couldn't execute a fetch";
             _httpStatus = 500;
-        } else if (code == ErrorCode.invalid_request) {
-            _message = "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.";
-            _httpStatus = 400;
-        } else if (code == ErrorCode.unauthorized_client) {
-            _message = "The client is not authorized to request an authorization code using this method.";
-            _httpStatus = 401;
-        } else if (code == ErrorCode.access_denied) {
-            _message = "The resource owner or authorization server denied the request";
-            _httpStatus = 401;
-        } else if (code == ErrorCode.unsupported_response_type) {
-            _message = "The authorization server does not support obtaining an authorization code using this method";
-            _httpStatus = 400;
-        } else if (code == ErrorCode.invalid_scope) {
-            _message = "The requested scope is invalid, unknown, or malformed";
-            _httpStatus = 401;
-        } else if (code == ErrorCode.server_error) {
-            _message = "The authorization server encountered an unexpected condition that prevented it from fulfilling the request.";
-            _httpStatus = 500;
         } else {
             _message = "Unknown error";
         }    
@@ -322,43 +281,9 @@ export class CrossauthError extends Error {
             case "invalid_scope": code = ErrorCode.InvalidScope; break;
             case "server_error": code = ErrorCode.UnknownError; break;
             case "temporarily_unavailable": code = ErrorCode.Connection; break;
-            default: code = ErrorCode.server_error;
+            default: code = ErrorCode.UnknownError;
         }
         return new CrossauthError(code, error_description);
             
     }
-
-    get oauthCode() : OAuthErrorCode {
-        try {
-            return OAuthErrorCode[ErrorCode[this.code] as keyof typeof OAuthErrorCode];
-        } catch (e) {
-        return OAuthErrorCode.server_error;
-        }
-    }
 }
-
-export function oauthErrorStatus(status : string) {
-    switch (status) {
-        case "invalid_request": return 400;
-        case "unauthorized_client": return 401;
-        case "access_denied": return 401;
-        case "unsupported_response_type": return 400;
-        case "invalid_scope": return 401;
-        //case "server_error": 500;
-        //case "temporarily_unavailable": return 500;
-    }
-    return 500;
-};
-
-export function errorCodeFromAuthErrorString(status : string) {
-    switch (status) {
-        case "invalid_request": return ErrorCode.invalid_request;
-        case "unauthorized_client": return ErrorCode.unauthorized_client;
-        case "access_denied": return ErrorCode.access_denied;
-        case "unsupported_response_type": return ErrorCode.unsupported_response_type;
-        case "invalid_scope": return ErrorCode.invalid_scope;
-        case "server_error": return ErrorCode.server_error;
-        case "temporarily_unavailable": return ErrorCode.temporarily_unavailable;
-    }
-    return ErrorCode.server_error;
-};

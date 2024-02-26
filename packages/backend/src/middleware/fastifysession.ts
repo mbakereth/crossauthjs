@@ -2193,9 +2193,25 @@ export class FastifySessionServer {
     }
 
     async getSessionData(request : FastifyRequest, name : string) : Promise<{[key:string]:any}|undefined>{
-        const sessionKey = this.getSessionCookieValue(request);
-        const data = sessionKey ? await this.sessionManager.dataForSessionKey(sessionKey) : undefined;
-        if (data && name in data) return data[name];
+        const sessionCookieValue = this.getSessionCookieValue(request);
+        try {
+            const data = sessionCookieValue ? await this.sessionManager.dataForSessionKey(sessionCookieValue) : undefined;
+            if (data && name in data) return data[name];
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
+        return undefined;
+    }
+
+    async getSessionKey(request : FastifyRequest) : Promise<Key|undefined>{
+        const sessionCookieValue = this.getSessionCookieValue(request);
+        if (!sessionCookieValue) return undefined;
+        try {
+            const {key} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue) 
+            return key;
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
         return undefined;
     }
 }

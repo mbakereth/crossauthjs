@@ -712,11 +712,11 @@ export class OAuthAuthorizationServer {
         try {
             requestedScopes = scope.split(" "); /*decodeURI(scope.replace("+"," ")).split(" ");*/ 
         } catch (e) {
-            const errorCode = ErrorCode.invalid_scope;
+            const errorCode = "invalid_scope";
             const errorDescription = `Invalid scope ${scope}`;
-            CrossauthLogger.logger.error(j({err: new CrossauthError(errorCode, errorDescription)}));
+            CrossauthLogger.logger.error(j({err: CrossauthError.fromOAuthError(errorCode, errorDescription)}));
             return {
-                error : OAuthErrorCode[errorCode],
+                error : errorCode,
                 errorDescription: errorDescription,
             };
         }
@@ -724,11 +724,11 @@ export class OAuthAuthorizationServer {
             let ret : {error: string, errorDescription: string}|undefined;
             requestedScopes.forEach((requestedScope) => {
                 if (!(this.validScopes.includes(requestedScope))) {
-                    const errorCode = ErrorCode.invalid_scope;
+                    const errorCode = "invalid_scope";
                     const errorDescription = `Illegal scope ${requestedScope}`;
-                    CrossauthLogger.logger.error(j({err: new CrossauthError(errorCode, errorDescription)}));
+                    CrossauthLogger.logger.error(j({err: CrossauthError.fromOAuthError(errorCode, errorDescription)}));
                     ret = {
-                        error : OAuthErrorCode[errorCode],
+                        error : errorCode,
                         errorDescription: errorDescription,
                     };
                 }
@@ -780,7 +780,7 @@ export class OAuthAuthorizationServer {
             }
         }
         if (!valid) {
-            throw new CrossauthError(ErrorCode.invalid_request, `Invalid redirect Uri ${uri}`);
+            throw CrossauthError.fromOAuthError("invalid_request", `Invalid redirect Uri ${uri}`);
         }
     }
 
@@ -852,7 +852,7 @@ export class OAuthAuthorizationServer {
 
     private validateState(state : string) {
         if (!(/^[A-Za-z0-9_-]+$/.test(state))) {
-            throw new CrossauthError(ErrorCode.invalid_request);
+            throw CrossauthError.fromOAuthError("invalid_request");
         }
     }
 

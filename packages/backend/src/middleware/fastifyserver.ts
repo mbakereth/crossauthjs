@@ -17,7 +17,7 @@ import { ApiKeyManager } from '../apikey';
 import { FastifyApiKeyServer, FastifyApiKeyServerOptions } from './fastifyapikey';
 import { FastifyAuthorizationServer, type FastifyAuthorizationServerOptions } from './fastifyoauthserver';
 import { FastifyOAuthClient, type FastifyOAuthClientOptions } from './fastifyoauthclient';
-import { OAuthClient } from '../oauth/client';
+import { Key } from '@crossauth/common';
 
 export const ERROR_400 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
@@ -345,6 +345,11 @@ export class FastifyServer {
     async getSessionData(request : FastifyRequest, name : string, ) : Promise<{[key:string]:any}|undefined> {
         if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Cannot update session data if sessions not enabled");
        return  await this.sessionServer.getSessionData(request, name);
+    }
+
+    async getSessionKey(request : FastifyRequest) : Promise<Key|undefined> {
+        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Cannot update session data if sessions not enabled");
+       return  await this.sessionServer.getSessionKey(request);
     }
 
     /**
