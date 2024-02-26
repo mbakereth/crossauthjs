@@ -1,13 +1,13 @@
 import dotenv from "dotenv-flow";
 dotenv.config();
 import { PrismaClient } from '@prisma/client';
-import { KeyStorage, FastifyServer, FastifyOAuthClient, PrismaKeyStorage, PrismaUserStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
+import { KeyStorage, FastifyServer, FastifyOAuthClient, PrismaKeyStorage, PrismaUserStorage, PrismaOAuthAuthorizationStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
-import { CrossauthError, CrossauthLogger, oauthErrorStatus, type OAuthTokenResponse } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, type OAuthTokenResponse } from '@crossauth/common';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
@@ -49,40 +49,23 @@ let authStorage = new PrismaOAuthAuthorizationStorage({prismaClient : prisma});
 
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
 
-// in this example, we are saving the tokens as session data
-async function receiveToken(request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
-    if (oauthResponse.error) {
-        const status = oauthErrorStatus(oauthResponse.error);
-        return reply.status(status).view("error.njk", {status: status, error: oauthResponse.error_description, errorCodeName: oauthResponse.error});
-    }
-    CrossauthLogger.logger.debug("Got access token " + JSON.stringify(fastifyClient.tokenPayload(oauthResponse.access_token)));
-    try {
-        await server.updateSessionData(request, "oauth", oauthResponse);
-        return reply.status(200).view("authorized.njk", {});
-    } catch (e) {
-        const ce = e as CrossauthError;
-        return reply.status(ce.httpStatus).view("error.njk", {status: ce.httpStatus, error: ce.message, errorCodeName: ce.codeName});
-    }
-}
-
 // create the server, pointing it at the app we created and our nunjucks views directory
-var server = new FastifyServer(userStorage, {
+const server = new FastifyServer(userStorage, {
     session: {
         keyStorage: keyStorage,
         authenticators: {
             localpassword: lpAuthenticator,
-        }}}, {
+        }},
+    oAuthClient: {
+        authServerBaseUri: "http://localhost:3000",
+    }}, {
     app: app,
     views: path.join(__dirname, '../views'),
     allowedFactor2: "none",
     enableEmailVerification: false,
     siteUrl: `http://localhost:${port}`,
-});
-var fastifyClient = new FastifyOAuthClient(app, { 
-    authServerBaseUri: "http://localhost:3000",  // auth server URL
-    siteUrl: "http://localhost:3001", // my url
     validFlows: "all", // activate all OAuth flows
-    receiveTokenFn: receiveToken,
+    tokenResponseType: "saveInSession",
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {

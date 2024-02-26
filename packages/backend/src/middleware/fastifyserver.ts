@@ -16,6 +16,8 @@ import type { FastifySessionServerOptions, CsrfBodyType } from './fastifysession
 import { ApiKeyManager } from '../apikey';
 import { FastifyApiKeyServer, FastifyApiKeyServerOptions } from './fastifyapikey';
 import { FastifyAuthorizationServer, type FastifyAuthorizationServerOptions } from './fastifyoauthserver';
+import { FastifyOAuthClient, type FastifyOAuthClientOptions } from './fastifyoauthclient';
+import { OAuthClient } from '../oauth/client';
 
 export const ERROR_400 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
@@ -54,7 +56,7 @@ export const DEFAULT_ERROR = {
  * 
  * See {@link FastifyServer } constructor for description of parameters
  */
-export interface FastifyServerOptions extends FastifySessionServerOptions, FastifyApiKeyServerOptions, FastifyAuthorizationServerOptions {
+export interface FastifyServerOptions extends FastifySessionServerOptions, FastifyApiKeyServerOptions, FastifyAuthorizationServerOptions, FastifyOAuthClientOptions {
 
     /** You can pass your own fastify instance or omit this, in which case Crossauth will create one */
     app? : FastifyInstance<Server, IncomingMessage, ServerResponse>,
@@ -199,6 +201,7 @@ export class FastifyServer {
     // @ts-ignore
     private sessionServer? : FastifySessionServer; // only needed for testing
     readonly authServer? : FastifyAuthorizationServer;
+    readonly oAuthClient? : FastifyOAuthClient;
 
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = true;
@@ -209,7 +212,7 @@ export class FastifyServer {
      * Creates the Fastify endpoints, optionally also the Fastify app.
      * @param optoions see {@link FastifyServerOptions}
      */
-    constructor(userStorage: UserStorage, {session, apiKey, oAuthAuthServer} : {
+    constructor(userStorage: UserStorage, {session, apiKey, oAuthAuthServer, oAuthClient} : {
                 session?: {
                     keyStorage: KeyStorage, 
                     authenticators: {[key:string]: Authenticator}, 
@@ -220,6 +223,9 @@ export class FastifyServer {
                 oAuthAuthServer? : {
                     clientStorage: OAuthClientStorage,
                     keyStorage: KeyStorage
+                },
+                oAuthClient? : {
+                    authServerBaseUri: string,
                 }},
                 options: FastifyServerOptions = {}) {
 
@@ -288,6 +294,10 @@ export class FastifyServer {
         if (oAuthAuthServer) 
         {
             this.authServer = new FastifyAuthorizationServer(this.app, this, this.oauthPrefix, this.sessionPrefix+"login", oAuthAuthServer.clientStorage, oAuthAuthServer.keyStorage, options);
+        }
+
+        if (oAuthClient) {
+            this.oAuthClient = new FastifyOAuthClient(this, oAuthClient.authServerBaseUri, options);
         }
     }
 

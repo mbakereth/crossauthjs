@@ -365,7 +365,7 @@ export class OAuthAuthorizationServer {
         if (!this.authStorage) return false;
         const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
         const existingRequestedScopes = requestedScopes.filter((scope) => existingScopes.includes(scope));
-        return existingRequestedScopes.length == existingScopes.length;
+        return existingRequestedScopes.length == requestedScopes.length;
     }
 
     /**

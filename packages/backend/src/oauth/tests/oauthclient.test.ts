@@ -1,7 +1,7 @@
 import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, vi, beforeAll, afterAll } from 'vitest';
 import { getAccessToken } from './common';
-import { OAuthClient } from '../client.ts'
+import { OAuthClient } from '../client'
 import { OpenIdConfiguration } from '@crossauth/common';
 
 function get(name : string, url : string){
@@ -39,9 +39,8 @@ beforeAll(async () => {
 
 test('ResourceServer.validAccessToken', async () => {
     const {code, access_token} = await getAccessToken();
-
-    const oauthClient = new OAuthClient({ 
-        authServerBaseUri: "http://authserver.com",
+    
+    const oauthClient = new OAuthClient("http://authserver.com", { 
         clientId: "ABC",
         clientSecret: "DEF",
         redirectUri: "http://client.com/authzcode"

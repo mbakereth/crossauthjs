@@ -127,6 +127,7 @@ export class FastifyAuthorizationServer {
                     }
                 }
                 let hasAllScopes = false;
+                CrossauthLogger.logger.debug(j({msg: `Checking scopes ${request.query.scope} have been authorized`}))
                 if (request.query.scope) {
                     hasAllScopes = await this.authServer.hasAllScopes(request.query.client_id, request.user, request.query.scope.split(" "));
 
@@ -135,6 +136,7 @@ export class FastifyAuthorizationServer {
 
                 }
                 if (hasAllScopes) {
+                    CrossauthLogger.logger.debug(j({msg: `All scopes authorized`}))
                     // all scopes have been previously authorized - create an authorization code
                     return this.authorize(request, reply, true, {
                         responseType: request.query.response_type,
@@ -148,6 +150,7 @@ export class FastifyAuthorizationServer {
                    
                 } else {
                     // requesting new scopes - redirect to page to ask user for it
+                    CrossauthLogger.logger.debug(j({msg: `Not all scopes authorized`}))
                     try {
                         CrossauthLogger.logger.debug(j({msg: "Looking up client " + request.query.client_id}));
                         const client = await this.clientStorage.getClient(request.query.client_id);

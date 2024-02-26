@@ -2,10 +2,8 @@ import { OAuthClientBase, OAuthFlows } from '@crossauth/common';
 import { Hasher } from '../hasher';
 import { setParameter, ParamType } from '../utils';
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
-import { jwtDecode } from "jwt-decode";
 
 export interface OAuthClientOptions {
-    authServerBaseUri : string,
     stateLength? : number,
     verifierLength? : number,
     clientId? : string,
@@ -18,9 +16,9 @@ export interface OAuthClientOptions {
 export class OAuthClient extends OAuthClientBase {
     protected validFlows : string[] = [];
 
-    constructor(options : OAuthClientOptions) {
-        super(options);
-        setParameter("authServerBaseUri", ParamType.String, this, options, "OAUTH_AUTH_SERVER_BASE_URI", true);
+    constructor(authServerBaseUri : string, options : OAuthClientOptions) {
+        super({authServerBaseUri, ...options});
+        this.authServerBaseUri = authServerBaseUri;
         setParameter("stateLength", ParamType.String, this, options, "OAUTH_STATE_LENGTH");
         setParameter("verifierLength", ParamType.String, this, options, "OAUTH_VERIFIER_LENGTH");
         setParameter("clientId", ParamType.String, this, options, "OAUTH_CLIENT_ID");
@@ -42,10 +40,4 @@ export class OAuthClient extends OAuthClientBase {
     protected sha256(plaintext :string) : string {
         return Hasher.sha256(plaintext);
     }
-
-    tokenPayload(token : string) {
-        return jwtDecode(token);
-
-    }
-
 }

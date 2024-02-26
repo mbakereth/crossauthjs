@@ -1,9 +1,13 @@
 import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, beforeAll, afterAll, vi } from 'vitest';
-import { FastifyOAuthClient } from '../fastifyoauthclient';
+import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import fastify from 'fastify';
 import { OpenIdConfiguration } from '@crossauth/common';
 import { getAccessToken } from '../../oauth/tests/common';
+import { getTestUserStorage } from '../../storage/tests/inmemorytestdata';
+import { InMemoryKeyStorage } from '../..';
+import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
+import path from 'path';
 
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -36,24 +40,46 @@ beforeAll(async () => {
     fetchMocker.doMock();
 });
 
+async function makeClient(options : FastifyServerOptions = {}) : Promise<FastifyServer> {
+    const app = fastify({logger: false});
+
+    const userStorage = await getTestUserStorage();
+    const keyStorage = new InMemoryKeyStorage();
+    let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
+    return new FastifyServer(userStorage, {
+        session: {
+            keyStorage: keyStorage,
+            authenticators: {
+                localpassword: lpAuthenticator,
+            }},
+        oAuthClient: {
+            authServerBaseUri: "http://server.com",
+        }}, {
+        app: app,
+        views: path.join(__dirname, '../views'),
+        allowedFactor2: "none",
+        enableEmailVerification: false,
+        siteUrl: `http://localhost:3000`,
+        clientId: "ABC",
+        clientSecret: "DEF",
+        validFlows: "all", // activate all OAuth flows
+        tokenResponseType: "sendJson",
+        secret: "ABC",
+        ...options,
+    });
+}
 
 test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
     const {authServer} = await getAccessToken();
 
-    const app = fastify({logger: false});
+    const server = await makeClient();
 
-    const fastifyClient = new FastifyOAuthClient(app, { 
-        authServerBaseUri: "http://server.com", 
-        clientId: "ABC",
-        clientSecret: "DEF",
-        validFlows: "all",
-    });
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await fastifyClient.loadConfig();
+    if (server.oAuthClient) await server.oAuthClient.loadConfig();
 
     let res;
 
-    res = await app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
+    res = await server.app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
     const authUrl = res.headers?.location;
     expect(authUrl).toBeDefined();
     const state = get("state", authUrl||"");
@@ -81,22 +107,17 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
 test('FastifyOAuthClient.authzcodeflowWithLoginRedirects', async () => {
     await getAccessToken();
 
-    const app = fastify({logger: false});
-
-    const fastifyClient = new FastifyOAuthClient(app, { 
-        authServerBaseUri: "http://server.com", 
-        clientId: "ABC",
-        clientSecret: "DEF",
-        validFlows: "all",
+    const server = await makeClient({
         loginProtectedFlows: "all",
         loginUrl: "/login",
     });
+
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await fastifyClient.loadConfig();
+    if (server.oAuthClient) await server.oAuthClient.loadConfig();
 
     let res;
 
-    res = await app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
+    res = await server.app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
     expect(res.headers?.location).toBe("/login?next=%2Fauthzcodeflow%3Fscope%3Dread%2Bwrite")
 });
 
