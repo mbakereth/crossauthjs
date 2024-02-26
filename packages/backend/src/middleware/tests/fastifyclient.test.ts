@@ -97,7 +97,7 @@ test('FastifyOAuthClient.authzcodeflowWithLoginRedirects', async () => {
     let res;
 
     res = await app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
-    expect(res.headers?.location).toBe("/login?next=/authzcodeflow?scope=read+write")
+    expect(res.headers?.location).toBe("/login?next=%2Fauthzcodeflow%3Fscope%3Dread%2Bwrite")
 });
 
 afterAll(async () => {

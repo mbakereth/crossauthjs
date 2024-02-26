@@ -185,11 +185,16 @@ export class OAuthResourceServer {
         const decoded = await this.validateAccessToken(accessToken);
         if (!decoded) return undefined;
         if (this.persistAccessToken && this.keyStorage) {
-            const key = "access:" + Hasher.hash(decoded.payload.jti);
-            const tokenInStorage = await this.keyStorage.getKey(key);
-            const now = new Date();
-            if (tokenInStorage.expires && tokenInStorage.expires?.getTime() < now.getTime()) {
-                CrossauthLogger.logger.error("Access token expired in storage but not in JWT");
+            try {
+                const key = "access:" + Hasher.hash(decoded.payload.jti);
+                const tokenInStorage = await this.keyStorage.getKey(key);
+                const now = new Date();
+                if (tokenInStorage.expires && tokenInStorage.expires?.getTime() < now.getTime()) {
+                    CrossauthLogger.logger.error("Access token expired in storage but not in JWT");
+                    return undefined;
+                }
+            } catch (e) {
+                CrossauthLogger.logger.error(j({err: e}));
                 return undefined;
             }
         }

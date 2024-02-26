@@ -7,7 +7,7 @@
   "scripts": {
     "build": "pnpx tsc",
     "start": "node dist/index.js",
-    "dev": "NODE_ENV=dev tsx src/index.ts",
+    "dev": "dotenv -e .env.dev tsx src/index.ts",
     "postinstall": "dotenv -e .env.dev prisma generate",
     "prisma": "dotenv -e .env.dev pnpm exec prisma"
   },
