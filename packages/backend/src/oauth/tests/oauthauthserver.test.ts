@@ -19,7 +19,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFi
         validScopes: "read, write",
     });
     const inputState = "ABCXYZ";
-    const {code, state, error, errorDescription} 
+    const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -27,7 +27,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFi
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
-    expect(errorDescription).toBeUndefined();
+    expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
     const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
     const data = KeyStorage.decodeData(key.data);
@@ -49,7 +49,7 @@ test('AuthorizationServer.scopePersistence', async () => {
         authStorage : authStorage,
     });
     const inputState = "ABCXYZ";
-    const {code, state, error, errorDescription} 
+    const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -60,7 +60,7 @@ test('AuthorizationServer.scopePersistence', async () => {
     const scopes = await authStorage.getAuthorizations("ABC", "bob")
     expect(scopes.length).toBe(2);
     expect(error).toBeUndefined();
-    expect(errorDescription).toBeUndefined();
+    expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
     const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
     const data = KeyStorage.decodeData(key.data);
@@ -83,7 +83,7 @@ test('AuthorizationServer.emptyScopeDisallowed', async () => {
         authStorage : authStorage,
     });
     const inputState = "ABCXYZ";
-    const {error, errorDescription} 
+    const {error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -93,7 +93,7 @@ test('AuthorizationServer.emptyScopeDisallowed', async () => {
     const scopes = await authStorage.getAuthorizations("ABC", "bob")
     expect(scopes.length).toBe(0);
     expect(error).toBeDefined();
-    expect(errorDescription).toBeDefined();
+    expect(error_description).toBeDefined();
 });
 
 test('AuthorizationServer.emptyScopeAllowed', async () => {
@@ -110,7 +110,7 @@ test('AuthorizationServer.emptyScopeAllowed', async () => {
         emptyScopeIsValid: true,
    });
     const inputState = "ABCXYZ";
-    const {error, errorDescription} 
+    const {error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -121,7 +121,7 @@ test('AuthorizationServer.emptyScopeAllowed', async () => {
     expect(scopes.length).toBe(1);
     expect(scopes[0]).toBeNull();
     expect(error).toBeUndefined();
-    expect(errorDescription).toBeUndefined();
+    expect(error_description).toBeUndefined();
 });
 
 test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKey', async () => {
@@ -136,7 +136,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKey',
         validScopes: "read, write",
     });
     const inputState = "ABCXYZ";
-    const {code, state, error, errorDescription} 
+    const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -144,7 +144,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKey',
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
-    expect(errorDescription).toBeUndefined();
+    expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
     const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
     const data = KeyStorage.decodeData(key.data);
@@ -165,7 +165,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyPrivateKeyFile',
         validScopes: "read, write",
     });
     const inputState = "ABCXYZ";
-    const {code, state, error, errorDescription} 
+    const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -173,7 +173,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyPrivateKeyFile',
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
-    expect(errorDescription).toBeUndefined();
+    expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
     const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
     const data = KeyStorage.decodeData(key.data);
@@ -194,7 +194,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKeyFile', async () 
         validScopes: "read, write",
     });
     const inputState = "ABCXYZ";
-    const {code, state, error, errorDescription} 
+    const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -202,7 +202,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKeyFile', async () 
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
-    expect(errorDescription).toBeUndefined();
+    expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
     const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
     const data = KeyStorage.decodeData(key.data);
@@ -223,7 +223,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKey', async () => {
         validScopes: "read, write",
     });
     const inputState = "ABCXYZ";
-    const {code, state, error, errorDescription} 
+    const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -231,7 +231,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKey', async () => {
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
-    expect(errorDescription).toBeUndefined();
+    expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
     const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
     const data = KeyStorage.decodeData(key.data);
@@ -274,7 +274,7 @@ test('AuthorizationServer.invalidRedirectUri', async () => {
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
-            redirectUri: "/invalidRedirect", 
+            redirectUri: "http://example.com/invalidRedirect", 
             scope: "read write", 
             state: inputState});
     expect(error).toBe("invalid_request");
@@ -324,7 +324,7 @@ test('AuthorizationServer.invalidKey', async () => {
         validScopes: "read, write",
     });
     const inputState = "ABCXYZ";
-    const {code, state, error, errorDescription} 
+    const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -332,7 +332,7 @@ test('AuthorizationServer.invalidKey', async () => {
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
-    expect(errorDescription).toBeUndefined();
+    expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
     await expect(async () => {await authServer.validateJwt(code||"")}).rejects.toThrowError(CrossauthError);
     });

@@ -21,6 +21,7 @@ interface RedirectUriQueryType {
 export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     siteUrl ?: string,
     prefix? : string,
+    errorPage? : string,
     loginUrl? : string,
     loginProtectedFlows? : string,
     receiveTokenFn? : (request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply>;
@@ -33,6 +34,7 @@ async function defaultTokenFn(_request : FastifyRequest, reply : FastifyReply, o
 export class FastifyOAuthClient extends OAuthClient {
     private siteUrl : string = "/";
     private prefix : string = "/";
+    private errorPage : string = "error.njk";
     private receiveTokenFn : (request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply> = defaultTokenFn;
     private loginUrl : string = "";
     private loginProtectedFlows : string[] = [];
@@ -42,6 +44,7 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("siteUrl", ParamType.String, this, options, "SITE_URL", true);
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
+        setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("loginProtectedFlows", ParamType.StringArray, this, options, "OAUTH_LOGIN_PROTECTED_FLOWS");
         if (this.loginProtectedFlows.length == 1 && this.loginProtectedFlows[0] == OAuthFlows.All) {
             this.loginProtectedFlows = this.validFlows;
@@ -65,7 +68,11 @@ export class FastifyOAuthClient extends OAuthClient {
                 if (!request.user && this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
                     return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }          
-                const url = await this.startAuthorizationCodeFlow(request.query.scope);
+                const {url, error, error_description} = await this.startAuthorizationCodeFlow(request.query.scope);
+                if (error || !url) {
+                    const ce = CrossauthError.fromOAuthError(error||"server_error", error_description);
+                    return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+                }
                 CrossauthLogger.logger.debug(`Authorization code flow: redirecting to ${url}`);
                 return reply.redirect(url);
             });
@@ -76,7 +83,11 @@ export class FastifyOAuthClient extends OAuthClient {
                 if (!request.user && this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
                     return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }               
-                const url = await this.startAuthorizationCodeFlow(request.query.scope, true);
+                const {url, error, error_description} = await this.startAuthorizationCodeFlow(request.query.scope, true);
+                if (error || !url) {
+                    const ce = CrossauthError.fromOAuthError(error||"server_error", error_description);
+                    return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+                }
                 return reply.redirect(url);
             });
         }

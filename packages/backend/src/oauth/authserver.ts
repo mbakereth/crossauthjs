@@ -298,13 +298,13 @@ export class OAuthAuthorizationServer {
         code? : string,
         state? : string,
         error? : string,
-        errorDescription? : string,
+        error_description? : string,
     }> {
         // validate responseType (because OAuth requires a different error for this)
         if (responseType != "code") {
             return {
-                error: OAuthErrorCode[OAuthErrorCode.unsupported_response_type],
-                errorDescription: "Unsupported response type " + responseType,
+                error: "unsupported_response_type",
+                error_description: "Unsupported response type " + responseType,
             };
         }
 
@@ -312,8 +312,8 @@ export class OAuthAuthorizationServer {
         const flow = this.inferFlowFromGet(responseType, codeChallenge);
         if (!(this.validFlows.includes(flow||""))) {
             return {
-                error: OAuthErrorCode[OAuthErrorCode.access_denied],
-                errorDescription: "Unsupported flow type " + flow,
+                error: "access_denied",
+                error_description: "Unsupported flow type " + flow,
             };
         }
 
@@ -321,13 +321,13 @@ export class OAuthAuthorizationServer {
         let scopes : string[]|undefined;
         let scopesIncludingNull : (string|null)[]|undefined;
         if (!scope && !this.emptyScopeIsValid) {
-            return {error: ErrorCode[ErrorCode.invalid_scope], errorDescription: "Must provide at least one scope"};
+            return {error: "invalid_scope", error_description: "Must provide at least one scope"};
         }
         if (scope) {
             const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
             scopes = requestedScopes;
             scopesIncludingNull = requestedScopes;
-            if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};      
+            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};      
         } else {
             scopesIncludingNull = [null];
         }
@@ -344,44 +344,18 @@ export class OAuthAuthorizationServer {
             this.validateState(state);
         } catch (e) {
             return {
-                error: OAuthErrorCode[OAuthErrorCode.invalid_request],
-                errorDescription: "Invalid state",
+                error: "invalid_request",
+                error_description: "Invalid state",
             };
         }
 
         if (responseType == "code") {
-
-            try {
-                const code = await this.getAuthorizationCode(clientId, redirectUri, scopes, codeChallenge, codeChallengeMethod, user);
-                return {
-                    code: code,
-                    state: state,
-                };
-            }
-            catch (e) {
-                // error creating authorization code given clientId and redirect uri
-                let errorCode = OAuthErrorCode.server_error;
-                let errorDescription = (e instanceof Error) ? e.message : "An unknown error occurred";
-                if (e instanceof CrossauthError) {
-                    errorCode = e.oauthCode;
-                    errorDescription = e.message;
-                }
-                CrossauthLogger.logger.error(j({err: e}));
-                return {
-                    error : OAuthErrorCode[errorCode],
-                    errorDescription: errorDescription,
-                };
-            }
-
-
+            return await this.getAuthorizationCode(clientId, redirectUri, scopes, state, codeChallenge, codeChallengeMethod, user);
         } else {
 
-            const errorCode = ErrorCode.unsupported_response_type
-            const errorDescription = `Invalid response_type ${responseType}`;
-            CrossauthLogger.logger.error(j({err: new CrossauthError(errorCode, errorDescription)}));
             return {
-                error : OAuthErrorCode[errorCode],
-                errorDescription: errorDescription,
+                error : "unsupported_response_type",
+                error_description: `Invalid response_type ${responseType}`,
             };
 
         }
@@ -445,32 +419,13 @@ export class OAuthAuthorizationServer {
                     error_description: "No authorization code provided when requesting access token",
                 };
             }
-            try {
-                return await this.getAccessToken(code, clientId, clientSecret, codeVerifier);
-            }
-            catch (e) {
-                // error creating access token given clientId, client secret redirect uri
-                let errorCode = OAuthErrorCode.server_error;
-                let errorDescription = (e instanceof Error) ? e.message : "An unknown error occurred";
-                if (e instanceof CrossauthError) {
-                    errorCode = e.oauthCode;
-                    errorDescription = e.message;
-                }
-                CrossauthLogger.logger.error(j({err: e}));
-                return {
-                    error : OAuthErrorCode[errorCode],
-                    error_description: errorDescription,
-                };
-            }
+            return await this.getAccessToken(code, clientId, clientSecret, codeVerifier);
 
         } else {
 
-            const errorCode = ErrorCode.invalid_request;
-            const errorDescription = `Invalid grant_type ${grantType}`;
-            CrossauthLogger.logger.error(j({err: new CrossauthError(errorCode, errorDescription)}));
             return {
-                error : OAuthErrorCode[errorCode],
-                error_description: errorDescription,
+                error : "invalid_request",
+                error_description: `Invalid grant_type ${grantType}`,
             };
 
         }
@@ -502,13 +457,13 @@ export class OAuthAuthorizationServer {
 
     }
 
-    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[]|undefined, codeChallenge? : string, codeChallengeMethod? : string, user? : User) : Promise<string> {
+    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[]|undefined, state: string, codeChallenge? : string, codeChallengeMethod? : string, user? : User) : Promise<{code? : string, state? : string, error? : string, error_description? : string}> {
 
         // if we have a challenge, check the method is valid
         if (codeChallenge) {
             if (!codeChallengeMethod) codeChallengeMethod = "S256";
             if (codeChallengeMethod != "S256" && codeChallengeMethod != "plain") {
-                throw new CrossauthError(ErrorCode.invalid_request, "Code challenge method must be S256 or plain")
+                return {error: "invalid_request", error_description: "Code challenge method must be S256 or plain"};
             }
         }
 
@@ -519,14 +474,14 @@ export class OAuthAuthorizationServer {
         }
         catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            throw new CrossauthError(ErrorCode.unauthorized_client);
+            return {error: "unauthorized_client", error_description: "Client is not authorized"};
         }
 
         // validate redirect uri
         const decodedUri = redirectUri; /*decodeURI(redirectUri.replace("+"," "));*/
         OAuthAuthorizationServer.validateUri(decodedUri);
         if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
-            throw new CrossauthError(ErrorCode.invalid_request, `The redirect uri ${redirectUri} is invalid`);
+            return {error: "invalid_request", error_description: `The redirect uri ${redirectUri} is invalid`};
         }
 
         // create authorization code and data to store with the key
@@ -564,7 +519,7 @@ export class OAuthAuthorizationServer {
             throw new CrossauthError(ErrorCode.KeyExists, "Couldn't create a authorization code");
         }
 
-        return authzCode;
+        return {code: authzCode, state: state};
     }
 
     private async getAccessToken(code : string, clientId: string, clientSecret? : string, codeVerifier? : string) 
@@ -573,11 +528,11 @@ export class OAuthAuthorizationServer {
         // make sure we have the client secret if configured to require it
         if (this.requireClientSecret == "always") {
             if (!clientSecret) {
-                throw new CrossauthError(ErrorCode.access_denied, "No client secret provided");
+                return {error: "access_denied", error_description: "No client secret provided"};
             }
         } else if (this.requireClientSecret == "withoutpkce") {
             if (!clientSecret && !codeVerifier) {
-                throw new CrossauthError(ErrorCode.access_denied, "No client secret or code verifier provided");
+                return {error: "access_denied", error_description: "No client secret or code verifier provided"};
             }
         }
 
@@ -591,7 +546,7 @@ export class OAuthAuthorizationServer {
             }
             catch (e) {
                 CrossauthLogger.logger.error(j({err: e}));
-                throw new CrossauthError(ErrorCode.unauthorized_client);
+                return {error: "unauthorized_client", error_description: "The client is not authorized"};
             }
 
         // validate authorization code
@@ -609,7 +564,7 @@ export class OAuthAuthorizationServer {
             authzData = KeyStorage.decodeData(key.data);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            throw new CrossauthError(ErrorCode.access_denied, "Invalid or expired authorization code");
+            return {error: "access_denied", error_description: "Invalid or expired authorization code"};
         }
         try {
             await this.keyStorage.deleteKey(key.value);
@@ -621,14 +576,14 @@ export class OAuthAuthorizationServer {
         // validate code verifier, if there is one
         if (authzData.challengeMethod && !authzData.challenge) {
             if (authzData.challengeMethod != "plain" && authzData.challengeMethod != "S256") {
-                throw new CrossauthError(ErrorCode.access_denied, "Invalid code challenge/code challenge method method for authorization code");
+                return {error: "access_denied", error_description:  "Invalid code challenge/code challenge method method for authorization code"};
             }
         }
         if (authzData.challenge) {
             const hashedVerifier = authzData.challengeMethod == "plain" ? codeVerifier||"" : Hasher.sha256(codeVerifier||"");
             // we store the challenge in hashed form for security, so if S256 is used this will be a second hash
             if (Hasher.hash(hashedVerifier) != authzData.challenge) {
-                throw new CrossauthError(ErrorCode.access_denied, "Code verifier is incorrect");
+                return {error: "access_denied", error_description:   "Code verifier is incorrect"};
             }
         }
 

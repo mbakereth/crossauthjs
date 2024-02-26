@@ -105,22 +105,25 @@ export class FastifyAuthorizationServer {
                 // this just checks they are valid strings and not empty if required, to avoid XSR vulnerabilities
                 CrossauthLogger.logger.debug(j({msg: "validating authorize parameters"}))
                 let {error_description} = this.authServer.validateAuthorizeParameters(request.query);
+                let ce : CrossauthError|undefined = undefined;
                 if (error_description) {
-                    errorDescription = error_description;
-                    error = "invalid_request";
+                    ce = new CrossauthError(ErrorCode.BadRequest, error_description);
                     CrossauthLogger.logger.debug(j({msg: "authorize parameter invalid " + error_description}));
                 }  else {
                     CrossauthLogger.logger.debug(j({msg: "authorize parameter valid"}));
 
                 }
 
-                if (error) {
-                    let status = oauthErrorStatus(error);
-                    const errorCode = errorCodeFromAuthErrorString(error);
+                if (ce) {
                     if (this.errorPage) {
-                        return reply.status(status).view(this.errorPage, {status: status, error: errorDescription, errorCode: errorCode, errorCodeName: error});
+                        return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
                     } else {
-                        return reply.status(status).send(DEFAULT_ERROR[status]||ERROR_500);
+                        let status : "401" | "400" | "500" = "500"
+                        switch (ce.httpStatus) {
+                            case 401: status = "401" ; break;
+                            case 400: status = "400" ; break;
+                        }
+                        return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]||ERROR_500);
                     }
                 }
                 let hasAllScopes = false;
@@ -166,7 +169,7 @@ export class FastifyAuthorizationServer {
                     } catch (e) {
                         const ce = e as CrossauthError;
                         if (this.errorPage) {
-                            return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: "Invalid client given", errorCode: ErrorCode.unauthorized_client, errorCodeName: "unauthorized_client"});
+                            return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: "Invalid client given", errorCode: ErrorCode.UnauthorizedClient, errorCodeName: ErrorCode[ErrorCode.UnauthorizedClient]});
                         } else {
                             return reply.status(ce.httpStatus).send(DEFAULT_ERROR[401]);
                         }
@@ -178,33 +181,38 @@ export class FastifyAuthorizationServer {
             this.app.post(this.prefix+'authorize', async (request : FastifyRequest<{ Body: AuthorizeBodyType }>, reply : FastifyReply) => {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
 
-                let error : string|undefined;
-                let errorDescription : string|undefined;
-
                 // this should not be called if a user is not logged in
                 if (!request.user) return FastifyServer.sendPageError(reply, 401, this.errorPage);  // not allowed here if not logged in
                 let csrfCookie : string|undefined;
+                let ce : CrossauthError|undefined = undefined;
                 try {
                     csrfCookie = await this.fastifyServer.validateCsrfToken(request);
                 }
                 catch (e) {
-                    error = "server_error";
-                    errorDescription = "Invalid csrf cookie received";
-                    CrossauthLogger.logger.error(j({msg: errorDescription, hashedCsrfCookie: csrfCookie?Hasher.hash(csrfCookie) : undefined}));
+                    if (e instanceof CrossauthError) {
+                        ce = e;
+                    } else {
+                        ce = new CrossauthError(ErrorCode.UnknownError,  "Invalid csrf cookie received")
+                    }
+
+                    CrossauthLogger.logger.error(j({msg: ce.message, hashedCsrfCookie: csrfCookie?Hasher.hash(csrfCookie) : undefined}));
                 }
 
-                if (error) {
-                    let status = oauthErrorStatus(error);
-                    const errorCode = errorCodeFromAuthErrorString(error);
+                if (ce) {
                     if (this.errorPage) {
-                        return reply.status(status).view(this.errorPage, {status: status, error: errorDescription, errorCode: errorCode, errorCodeName: error});
+                        return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
                     } else {
-                        return reply.status(status).send(DEFAULT_ERROR[status]||ERROR_500);
+                        let status : "400" | "401" | "500" = "500";
+                        switch (ce.httpStatus) {
+                            case 401: status = "401" ; break;
+                            case 400: status = "400" ; break;
+                        }
+                        return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]||ERROR_500);
                     }
                 }
    
                 // Create an authorizatin code
-                if (!error) {
+                if (!ce) {
                     const authorized = request.body.authorized == "true";
                     return await this.authorize(request, reply, authorized, {
                         responseType: request.body.response_type,
@@ -283,19 +291,21 @@ export class FastifyAuthorizationServer {
             });
             code = resp.code;
             error = resp.error;
-            errorDescription = resp.errorDescription;
+            errorDescription = resp.error_description;
 
             // couldn't create an authorization code
             if (error || !code) {
-                if (!error) error = "server_error";
-                if (!errorDescription) errorDescription = "Neither code nor error received";
-                let status = oauthErrorStatus(error);
-                const errorCode = errorCodeFromAuthErrorString(error);
-                CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: errorCode, errorCodeName: error}));
+                const ce = CrossauthError.fromOAuthError(error||"server_error", errorDescription||"Neither code nor error received")
+                CrossauthLogger.logger.error(j({msg: ce.message, errorCode: ce.code, errorCodeName: ce.codeName}));
                 if (this.errorPage) {
-                    return reply.status(status).view(this.errorPage, {status: status, error: errorDescription, errorCode: errorCode, errorCodeName: error});
+                    return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
                 } else {
-                    return reply.status(status).send(DEFAULT_ERROR[status]||ERROR_500);
+                    let status : "401" | "400" | "500" = "500"
+                    switch (ce.httpStatus) {
+                        case 401: status = "401" ; break;
+                        case 400: status = "400" ; break;
+                    }
+                    return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]||ERROR_500);
                 }
             }
 
@@ -308,15 +318,13 @@ export class FastifyAuthorizationServer {
         } else {
 
             // resource owner did not grant access
-            const error = OAuthErrorCode[OAuthErrorCode.access_denied];
-            const errorDescription = "You have not granted access";
-            const errorCode = errorCodeFromAuthErrorString(error);
-            CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: errorCode, errorCodeName: error}));
+            const ce = new CrossauthError(ErrorCode.Unauthorized,  "You have not granted access");
+            CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: ce.code, errorCodeName: ce.codeName}));
             try {
                 OAuthAuthorizationServer.validateUri(redirectUri);
                 return reply.redirect(redirectUri); 
             } catch (e) {
-                CrossauthLogger.logger.error(j({msg: `Couldn't send error message ${error} to ${redirectUri}}`}));
+                CrossauthLogger.logger.error(j({msg: `Couldn't send error message ${ce.codeName} to ${redirectUri}}`}));
             }
         }
     }

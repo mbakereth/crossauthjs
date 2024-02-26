@@ -11,7 +11,7 @@
     "dist/*"
   ],
   "scripts": {
-    "postinstall": "pnpm exec prisma generate && pnpm exec prisma db push --force-reset",
+    "postinstall": "dotenv -e .env.unittest pnpm exec prisma generate",
     "dev": "vite",
     "build": "vite build --emptyOutDir=false",
     "preview": "vite preview",

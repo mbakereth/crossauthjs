@@ -51,8 +51,14 @@ export enum ErrorCode {
     /** Thrown on login attempt with a user account marked not having completed 2FA setup */
     TwoFactorIncomplete,
 
-    /** Thrown when a resource expecting authorization was access and authorization not provided or wrong */
+    /** Thrown when a resource expecting user authorization was access and authorization not provided or wrong */
     Unauthorized,
+
+    /** Thrown for the OAuth unauthorized_client error (when the client is unauthorized as opposed to the user) */
+    UnauthorizedClient,
+
+    /** Thrown for the OAuth invalid_scope error  */
+    InvalidScope,
 
     /** Returned with an HTTP 403 response */
     Forbidden,
@@ -219,6 +225,12 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.Unauthorized) {
             _message = "Not authorized"
             _httpStatus = 401;
+        } else if (code == ErrorCode.UnauthorizedClient) {
+            _message = "Client not authorized"
+            _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidScope) {
+            _message = "Invalid scope"
+            _httpStatus = 402;
         } else if (code == ErrorCode.Connection) {
             _message = "Connection failure";
         } else if (code == ErrorCode.Expired) {
@@ -298,6 +310,22 @@ export class CrossauthError extends Error {
         this.name = 'CrossauthError';
         if (Array.isArray(message)) this.messages = message;
         else this.messages = [_message];
+    }
+
+    static fromOAuthError(error : string, error_description?: string) : CrossauthError {
+        let code : ErrorCode;
+        switch (error) {
+            case "invalid_request": code = ErrorCode.BadRequest; break
+            case "unauthorized_client": code = ErrorCode.UnauthorizedClient; break;
+            case "access_denied": code = ErrorCode.Unauthorized; break;
+            case "unsupported_response_type": code = ErrorCode.BadRequest; break;
+            case "invalid_scope": code = ErrorCode.InvalidScope; break;
+            case "server_error": code = ErrorCode.UnknownError; break;
+            case "temporarily_unavailable": code = ErrorCode.Connection; break;
+            default: code = ErrorCode.server_error;
+        }
+        return new CrossauthError(code, error_description);
+            
     }
 
     get oauthCode() : OAuthErrorCode {

@@ -50,8 +50,9 @@ test('ResourceServer.validAccessToken', async () => {
 
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await oauthClient.loadConfig();
-    const url = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
-    const state = get("state",url);
+    const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
+    expect(url).toBeDefined();
+    const state = get("state",url||"");
     expect(state).toBeDefined();
     expect(state?.length).toBeGreaterThan(0);
 

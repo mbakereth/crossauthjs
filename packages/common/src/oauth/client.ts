@@ -95,7 +95,7 @@ export abstract class OAuthClientBase {
             CrossauthLogger.logger.error(j({err: e}));
         }
         if (!resp || !resp.ok) {
-            throw new CrossauthError(ErrorCode.server_error, "Couldn't get OIDC configuration");
+            throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration");
         }
         this.oidcConfig = {...DEFAULT_OIDCCONFIG};
         try {
@@ -105,26 +105,26 @@ export abstract class OAuthClientBase {
             }
             CrossauthLogger.logger.debug(j({msg: `OIDC Config ${JSON.stringify(this.oidcConfig)}`}));
         } catch (e) {
-            throw new CrossauthError(ErrorCode.server_error, "Unrecognized response from OIDC configuration endpoint");
+            throw new CrossauthError(ErrorCode.Connection, "Unrecognized response from OIDC configuration endpoint");
         }
     }
 
     protected abstract randomValue(length : number) : string;
     protected abstract sha256(plaintext :string) : string;
 
-    protected async startAuthorizationCodeFlow(scope? : string, pkce : boolean=false) : Promise<string> {
+    protected async startAuthorizationCodeFlow(scope? : string, pkce : boolean=false) : Promise<{url? : string, error? : string, error_description? : string}> {
         CrossauthLogger.logger.debug(j({msg: "Starting authorization code flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.response_types_supported.includes("code")
             || !this.oidcConfig?.response_modes_supported.includes("query")) {
-            throw new CrossauthError(ErrorCode.invalid_request, "Server does not support authorization code flow");
+            return {error: "invalid_request", error_description: "Server does not support authorization code flow"};
         }
         if (!this.oidcConfig?.authorization_endpoint) {
-            throw new CrossauthError(ErrorCode.server_error, "Cannot get authorize endpoint");
+            return {error: "server_error", error_description: "Cannot get authorize endpoint"};
         }
         this.state = this.randomValue(this.stateLength);
-        if (!this.clientId) throw new CrossauthError(ErrorCode.invalid_request, "Cannot make authorization code flow without client id");
-        if (!this.redirectUri) throw new CrossauthError(ErrorCode.invalid_request, "Cannot make authorization code flow without redirect Uri");
+        if (!this.clientId) return {error: "invalid_request", error_description: "Cannot make authorization code flow without client id"}; 
+        if (!this.redirectUri) return {error: "invalid_request", error_description:  "Cannot make authorization code flow without Redirect Uri"}; 
 
         const base = this.oidcConfig.authorization_endpoint;
         let url = base 
@@ -146,7 +146,7 @@ export abstract class OAuthClientBase {
             this.activeFlow = OAuthFlows.AuthorizationCode;
         }
 
-        return url;
+        return {url: url};
     }
 
     protected async redirectEndpoint(code? : string, state? : string, error? : string, errorDescription? : string) : Promise<OAuthTokenResponse>{
@@ -157,13 +157,13 @@ export abstract class OAuthClientBase {
         }
         if (this.state) {
             if (state != this.state) {
-                return {error: ErrorCode[ErrorCode.access_denied], error_description: "State is not valid"};
+                return {error: "access_denied", error_description: "State is not valid"};
             }
         }
         this.authzCode = code;    
 
         if (!this.oidcConfig?.token_endpoint) {
-            throw new CrossauthError(ErrorCode.server_error, "Cannot get token endpoint");
+            return {error: "server_error", error_description: "Cannot get token endpoint"};
         }
         const url = this.oidcConfig.token_endpoint;
 
@@ -173,7 +173,7 @@ export abstract class OAuthClientBase {
             grant_type = "authorization_code";
             clientSecret = this.clientSecret;
         } else {
-            return {error: ErrorCode[ErrorCode.server_error], error_description: "Unsupported flow " + OAuthFlows.AuthorizationCode};
+            return {error: "invalid_request", error_description: "Unsupported flow " + OAuthFlows.AuthorizationCode};
         }
         let params : {[key:string]:any} = {
             grant_type: grant_type,
@@ -186,7 +186,7 @@ export abstract class OAuthClientBase {
             return this.post(url, params);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            return {error: ErrorCode[ErrorCode.server_error], error_description: "Unable to get access token from server"};
+            return {error: "server_error", error_description: "Unable to get access token from server"};
         }
     }
 

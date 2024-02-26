@@ -109,7 +109,7 @@ export class OAuthResourceServer {
         }
 
         if (!this.authServerBaseUri) {
-            throw new CrossauthError(ErrorCode.server_error, "Couldn't get OIDC configuration.  Either set authServerBaseUri or set config manually");
+            throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration.  Either set authServerBaseUri or set config manually");
         }
         let resp : Response|undefined = undefined;
         try {
@@ -118,7 +118,7 @@ export class OAuthResourceServer {
             CrossauthLogger.logger.error(j({err: e}));
         }
         if (!resp || !resp.ok) {
-            throw new CrossauthError(ErrorCode.server_error, "Couldn't get OIDC configuration");
+            throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration");
         }
         this.oidcConfig = {...DEFAULT_OIDCCONFIG};
 
@@ -129,7 +129,7 @@ export class OAuthResourceServer {
                 this.oidcConfig[key] = value;
             }
         } catch (e) {
-            throw new CrossauthError(ErrorCode.server_error, "Unrecognized response from OIDC configuration endpoint");
+            throw new CrossauthError(ErrorCode.Connection, "Unrecognized response from OIDC configuration endpoint");
         }
 
         // fetch keys
@@ -144,7 +144,7 @@ export class OAuthResourceServer {
             }
         } else {
             if (!this.oidcConfig) {
-                throw new CrossauthError(ErrorCode.server_error, "Load OIDC config before Jwks")
+                throw new CrossauthError(ErrorCode.Connection, "Load OIDC config before Jwks")
             }
             let resp : Response|undefined = undefined;
             try {
@@ -153,23 +153,23 @@ export class OAuthResourceServer {
                 CrossauthLogger.logger.error(j({err: e}));
             }
             if (!resp || !resp.ok) {
-                throw new CrossauthError(ErrorCode.server_error, "Couldn't get OIDC configuration");
+                throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration");
             }
             this.keys = [];
             try {
                 const body = await resp.json();
                 if (!("keys" in body) || !Array.isArray(body.keys)) {
-                    throw new CrossauthError(ErrorCode.server_error, "Couldn't fetch keys")
+                    throw new CrossauthError(ErrorCode.Connection, "Couldn't fetch keys")
                 }
                 for (let i=0; i<body.keys.length; ++i) {
                     try {
                         this.keys.push(createPublicKey({key: body.keys[i], format: "jwk"}));
                     } catch (e) {
-                        throw new CrossauthError(ErrorCode.server_error, "Couldn't load keys");
+                        throw new CrossauthError(ErrorCode.Connection, "Couldn't load keys");
                     }
                 }
             } catch (e) {
-                throw new CrossauthError(ErrorCode.server_error, "Unrecognized response from OIDC configuration endpoint");
+                throw new CrossauthError(ErrorCode.Connection, "Unrecognized response from OIDC configuration endpoint");
             }
         }
 
