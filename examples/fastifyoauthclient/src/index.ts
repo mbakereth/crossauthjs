@@ -1,6 +1,4 @@
-import dotenv from "dotenv-flow";
-dotenv.config();
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './generated/client';
 import { KeyStorage, FastifyServer, FastifyOAuthClient, PrismaKeyStorage, PrismaUserStorage, PrismaOAuthAuthorizationStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
@@ -42,7 +40,6 @@ app.register(view, {
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
 const prisma = new PrismaClient();
-
 let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email"});
 let keyStorage : KeyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
 let authStorage = new PrismaOAuthAuthorizationStorage({prismaClient : prisma});
@@ -57,7 +54,7 @@ const server = new FastifyServer(userStorage, {
             localpassword: lpAuthenticator,
         }},
     oAuthClient: {
-        authServerBaseUri: "http://localhost:3000",
+        authServerBaseUri: process.env["AUTHORIZATION_SERVER"],
     }}, {
     app: app,
     views: path.join(__dirname, '../views'),
@@ -79,7 +76,7 @@ app.get('/resource', async (request : FastifyRequest, reply : FastifyReply) =>  
     if (!request.user) return reply.redirect(302, "/login?next=/");
     const oauthData = await server.getSessionData(request, "oauth");
     if (oauthData?.access_token) {
-        const resp = await fetch("http://localhost:3000/resource", {
+        const resp = await fetch(process.env["RESOURCE_SERVER"]+"/resource", {
             headers: {
                 "Authorization": "Bearer " + oauthData.access_token,
         }});

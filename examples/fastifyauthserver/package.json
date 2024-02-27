@@ -5,9 +5,9 @@
   "type": "module",
   "main": "index.ts",
   "scripts": {
-    "build": "pnpx tsc",
+    "build": "pnp exec tsc",
     "start": "node dist/index.js",
-    "dev": "dotenv -e .env.dev tsx src/index.ts",
+    "dev": "dotenv -e .env.dev pnpm exec tsx src/index.ts",
     "postinstall": "dotenv -e .env.dev prisma generate",
     "prisma": "dotenv -e .env.dev pnpm exec prisma"
   },

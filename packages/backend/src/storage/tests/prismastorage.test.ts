@@ -1,7 +1,7 @@
 import { test, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage } from '../prismastorage';
 import { CrossauthError } from '@crossauth/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './generated/client';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 
 //export var prismaClient : PrismaClient;
