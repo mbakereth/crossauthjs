@@ -1,4 +1,4 @@
-import { PrismaClient } from './generated/client';
+import { PrismaClient } from './generated/client/index.js';
 import { KeyStorage, FastifyServer, FastifyOAuthClient, PrismaKeyStorage, PrismaUserStorage, PrismaOAuthAuthorizationStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
@@ -62,7 +62,7 @@ const server = new FastifyServer(userStorage, {
     enableEmailVerification: false,
     siteUrl: `http://localhost:${port}`,
     validFlows: "all", // activate all OAuth flows
-    tokenResponseType: "saveInSession",
+    tokenResponseType: "saveInSessionAndLoad",
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {

@@ -24,17 +24,18 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     prefix? : string,
     errorPage? : string,
     authorizedPage? : string,
+    authorizedUrl? : string,
     loginUrl? : string,
     loginProtectedFlows? : string,
-    receiveTokenFn? : (server: FastifyServer, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply>;
-    tokenResponseType? : "sendJson" | "saveInSession" | "sendInPage" | "custom";
+    receiveTokenFn? : (client: FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply>;
+    tokenResponseType? : "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom";
 }
 
-async function sendJson(_server: FastifyServer, _request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
+async function sendJson(_client: FastifyOAuthClient, _request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
     return reply.header(...JSONHDR).status(200).send({ok: true, ...oauthResponse});
 }
 
-async function sendTokenInPage(_server: FastifyServer, _request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
+async function sendInPage(_client: FastifyOAuthClient, _request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, oauthResponse.error_description);
         return reply.status(ce.httpStatus).view("error.njk", {status: ce.httpStatus, error: ce.message, errorCodeName: ce.codeName, errorCode: ce.code});
@@ -49,7 +50,7 @@ async function sendTokenInPage(_server: FastifyServer, _request : FastifyRequest
     }
 }
 
-async function saveTokenInSession(server: FastifyServer, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
+async function saveInSessionAndLoad(client: FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, oauthResponse.error_description);
         return reply.status(ce.httpStatus).view("error.njk", {status: ce.httpStatus, error: ce.message, errorCodeName: ce.codeName, errorCode: ce.code});
@@ -57,8 +58,31 @@ async function saveTokenInSession(server: FastifyServer, request : FastifyReques
         CrossauthLogger.logger.debug("Got access token " + JSON.stringify(jwtDecode(oauthResponse.access_token)));
     }
     try {
-        await server.updateSessionData(request, "oauth", oauthResponse);
-        return reply.status(200).view("authorized.njk", {});
+        await client.server.updateSessionData(request, "oauth", oauthResponse);
+        if (!client.authorizedPage) {
+            return reply.status(500).view("error.njk", {status: 500, error: "Authorized url not configured", errorCodeName: ErrorCode[ErrorCode.Configuration], errorCode: ErrorCode.Configuration});
+        }
+        return reply.status(200).view(client.authorizedPage, {});
+    } catch (e) {
+        const ce = e as CrossauthError;
+        return reply.status(ce.httpStatus).view("error.njk", {status: ce.httpStatus, error: ce.message, errorCodeName: ce.codeName});
+    }
+}
+
+async function saveInSessionAndRedirect(client: FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
+    if (oauthResponse.error) {
+        const ce = CrossauthError.fromOAuthError(oauthResponse.error, oauthResponse.error_description);
+        return reply.status(ce.httpStatus).view("error.njk", {status: ce.httpStatus, error: ce.message, errorCodeName: ce.codeName, errorCode: ce.code});
+    } else if (oauthResponse.access_token) {
+        CrossauthLogger.logger.debug("Got access token " + JSON.stringify(jwtDecode(oauthResponse.access_token)));
+    }
+    try {
+        await client.server.updateSessionData(request, "oauth", oauthResponse);
+        if (!client.authorizedUrl) {
+            return reply.status(500).view("error.njk", {status: 500, error: "Authorized url not configured", errorCodeName: ErrorCode[ErrorCode.Configuration], errorCode: ErrorCode.Configuration});
+
+        }
+        return reply.redirect(client.authorizedUrl);
     } catch (e) {
         const ce = e as CrossauthError;
         return reply.status(ce.httpStatus).view("error.njk", {status: ce.httpStatus, error: ce.message, errorCodeName: ce.codeName});
@@ -66,15 +90,16 @@ async function saveTokenInSession(server: FastifyServer, request : FastifyReques
 }
 
 export class FastifyOAuthClient extends OAuthClient {
-    private server : FastifyServer;
+    server : FastifyServer;
     private siteUrl : string = "/";
     private prefix : string = "/";
     errorPage : string = "error.njk";
     authorizedPage : string = "authorized.njk";
-    private receiveTokenFn : (server : FastifyServer, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply> = sendJson;
+    authorizedUrl : string = "authorized.njk";
+    private receiveTokenFn : (client : FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply> = sendJson;
     private loginUrl : string = "";
     private loginProtectedFlows : string[] = [];
-    private tokenResponseType :  "sendJson" | "saveInSession" | "sendInPage" | "custom" = "sendJson";
+    private tokenResponseType :  "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom" = "sendJson";
 
     constructor(server : FastifyServer, authServerBaseUri : string, options : FastifyOAuthClientOptions) {
         super(authServerBaseUri, options);
@@ -85,6 +110,7 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("authorizedPage", ParamType.String, this, options, "AUTHORIZED_PAGE");
+        setParameter("authorizedUrl", ParamType.String, this, options, "AUTHORIZED_URL");
         setParameter("loginProtectedFlows", ParamType.StringArray, this, options, "OAUTH_LOGIN_PROTECTED_FLOWS");
         if (this.loginProtectedFlows.length == 1 && this.loginProtectedFlows[0] == OAuthFlows.All) {
             this.loginProtectedFlows = this.validFlows;
@@ -101,9 +127,11 @@ export class FastifyOAuthClient extends OAuthClient {
         } else if (this.tokenResponseType == "sendJson") {
             this.receiveTokenFn = sendJson;
         } else if (this.tokenResponseType == "sendInPage") {
-            this.receiveTokenFn = sendTokenInPage;
-        } else if (this.tokenResponseType == "saveInSession") {
-            this.receiveTokenFn = saveTokenInSession;
+            this.receiveTokenFn = sendInPage;
+        } else if (this.tokenResponseType == "saveInSessionAndLoad") {
+            this.receiveTokenFn = saveInSessionAndLoad;
+        } else if (this.tokenResponseType == "saveInSessionAndRedirect") {
+            this.receiveTokenFn = saveInSessionAndRedirect;
         }
         
         if (this,this.loginProtectedFlows.length > 0 && this.loginUrl == "") {
@@ -148,7 +176,7 @@ export class FastifyOAuthClient extends OAuthClient {
                     return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }               
                 const resp = await this.redirectEndpoint(request.query.code, request.query.state, request.query.error, request.query.error_description);
-                return await this.receiveTokenFn(this.server, request, reply, resp);
+                return await this.receiveTokenFn(this, request, reply, resp);
             });
         }
 
