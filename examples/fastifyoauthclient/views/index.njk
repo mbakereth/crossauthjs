@@ -10,9 +10,11 @@
         <p><a href="authzcodeex">Authorization code flow</a></p>
         <p><a href="clientcredentialsex">Client credentials flow</a></p>
 
-        <form method="POST" action="logout">
-            <button type="submit">Logout</button>
-        </form>
+	{% if user %}
+       	    <form method="POST" action="logout">
+                <button type="submit">Logout</button>
+            </form>
+        {% endif %}
 
     </body>
 </html>

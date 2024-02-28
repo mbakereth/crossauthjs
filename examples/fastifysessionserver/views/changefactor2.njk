@@ -9,8 +9,8 @@
             <p class="success">{{ message}}</p>
             <p><button onclick="window.location.href='{{next or '/'}}'">OK</button></p>
         {% else %}
-            {% if errors %}
-            <p class="error">{{ errors }}</p>
+            {% if errorMessages %}
+            <p class="error">{{ errorMessages }}</p>
             {% endif %}
             <form method="POST" action="changefactor2">
                 <input type="hidden" name="csrfToken" value="{{csrfToken}}"/>

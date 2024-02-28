@@ -73,6 +73,7 @@ export interface FastifyServerOptions extends FastifySessionServerOptions, Fasti
     endpoints? : string,
 };
 
+export type FastifyErrorFn = (server: FastifyServer, request : FastifyRequest, reply : FastifyReply, ce : CrossauthError) => Promise<FastifyReply>;
 
 /**
  * Endpoints that depend on sessions being enabled and display HTML
@@ -213,6 +214,7 @@ export class FastifyServer {
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = true;
     private allowedFactor2 : string[] = [];
+    errorPage : string = "error.njk";
 
 
     /**
@@ -238,6 +240,7 @@ export class FastifyServer {
 
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
+        setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("sessionPrefix", ParamType.String, this, options, "SESSION_PREFIX");
         setParameter("oauthPrefix", ParamType.String, this, options, "OAUTH_PREFIX");
         setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
@@ -315,26 +318,44 @@ export class FastifyServer {
         return this.sessionServer.validateCsrfToken(request);
     }
 
-    async errorIfCsrfInvalid(request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply, errorPage? : string) : Promise<FastifyReply|undefined> {
+    async errorIfCsrfInvalid(request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply, errorFn? : FastifyErrorFn) : Promise<FastifyReply|undefined> {
         try {
             await this.validateCsrfToken(request)
             return undefined;
         } catch (e) {
             CrossauthLogger.logger.warn(j({err: e, msg: `Attempt to access url without csrf token`, url: request.url}));
-            if (errorPage || this.sessionServer?.errorPage) {
-                return reply.status(401).view(errorPage||this.sessionServer?.errorPage||"",
-                    {error: "CSRF Token not provided", status: 401, code: ErrorCode.InvalidCsrf, codeName: ErrorCode[ErrorCode.InvalidCsrf]});
+            try {
+                if (errorFn) {
+                    const errorCode = ErrorCode.UnknownError;
+                    const errorMessage = (e instanceof Error) ? e.message : "Unknown error";
+                    const ce = (e instanceof CrossauthError) ? e as CrossauthError : new CrossauthError(errorCode, errorMessage);
+                    return errorFn(this, request, reply, ce);
+                } else if (this.sessionServer?.errorPage) {
+                    return reply.status(401).view(this.sessionServer?.errorPage||"",
+                        {errorMessage: "CSRF Token not provided", status: 401, code: ErrorCode.InvalidCsrf, codeName: ErrorCode[ErrorCode.InvalidCsrf]});
+                }
+            } catch (e2) {
+                CrossauthLogger.logger.error(j({err: e2}));
+                return reply.status(401).send(ERROR_401);                
             }
             return reply.status(401).send(ERROR_401);
         }
     }
 
-    async errorIfNotLoggedIn(request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply, errorPage? : string) : Promise<FastifyReply|undefined> {
+    async errorIfNotLoggedIn(request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply, errorFn? : FastifyErrorFn) : Promise<FastifyReply|undefined> {
         if (!request.user) {
             CrossauthLogger.logger.warn(j({msg: `Attempt to access url without csrf token`, url: request.url}));
-            if (errorPage || this.sessionServer?.errorPage) {
-                return reply.status(401).view(errorPage||this.sessionServer?.errorPage||"",
-                    {error: "CSRF Token not provided", status: 401, code: ErrorCode.InvalidCsrf, codeName: ErrorCode[ErrorCode.InvalidCsrf]});
+            try {
+                if (errorFn) {
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
+                    return errorFn(this, request, reply, ce);
+                } else if (this.sessionServer?.errorPage) {
+                    return reply.status(401).view(this.sessionServer?.errorPage||"",
+                        {errorMessage: "User is not logged in", status: 401, code: ErrorCode.Unauthorized, codeName: ErrorCode[ErrorCode.Unauthorized]});
+                }
+            } catch (e2) {
+                CrossauthLogger.logger.error(j({err: e2}));
+                return reply.status(401).send(ERROR_401);                
             }
             return reply.status(401).send(ERROR_401);
         }
@@ -363,7 +384,7 @@ export class FastifyServer {
         }         
         CrossauthLogger.logger.warn(j({msg: error, errorCode: code, errorCodeName: codeName, httpStatus: status}));
         if (errorPage) {
-            return reply.status(status).view(errorPage, {status: status, error: error, errorCode: code, errorCodeName: codeName});
+            return reply.status(status).view(errorPage, {status: status, errorMessage: error, errorCode: code, errorCodeName: codeName});
         } else {
             return reply.status(status).send(status==401 ? ERROR_401 : ERROR_500);
         }

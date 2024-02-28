@@ -63,7 +63,7 @@ let server = new FastifyServer(userStorage, {
 
 // create our home page
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    return reply.view('index.njk', {user: request.user, errors: ["AAA", "BBB"]});
+    return reply.view('index.njk', {user: request.user, errorMessages: ["AAA", "BBB"]});
 }
 );
 

@@ -193,7 +193,7 @@ export abstract class OAuthClientBase {
         }
     }
 
-    protected async clientCredentialsFlow(scope? : string) : Promise<{url? : string, params?: {[key:string]:any}, error? : string, error_description? : string}> {
+    protected async clientCredentialsFlow(scope? : string) : Promise<{[key:string]:any}> {
         CrossauthLogger.logger.debug(j({msg: "Starting client credentials flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("client_credentials")) {
@@ -214,7 +214,13 @@ export abstract class OAuthClientBase {
         }
         if (scope) params.scope = scope;
         this.activeFlow = OAuthFlows.ClientCredentials;
-        return {url: url, params: params};
+        try {
+            return await this.post(url, params);
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return {error: "server_error", error_description: "Error connecting to authorization server"};
+        }
+        //return {url: url, params: params};
     }
 
     protected async post(url : string, params : {[key:string]:any}) : Promise<{[key:string]:any}>{

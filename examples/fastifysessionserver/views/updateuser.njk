@@ -9,9 +9,9 @@
             <p class="success">{{ message }}</p>
             <p><a href="/">Home</a></p>
         {% else %}
-            {% if error %}
+            {% if errorMessage %}
                 <p class="error">
-                    {{ error }}
+                    {{ errorMessage }}
                 </p>
             {% endif %}
             <form method="POST" action="updateuser">

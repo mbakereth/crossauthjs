@@ -8,7 +8,7 @@
         {% if message %}
             <p class="success">{{ message }}</p>
         {% else %}
-            {% if error %}
+            {% if errorMessage %}
                 <p class="error">
                 {% if errorCodeName == "PasswordFormat" %}
                     Password must be at leat 8 characters, contain at least one lowercase letter, one
@@ -18,7 +18,7 @@
                 {% elif errorCodeName == "UserExists" %}
                     Username or email already exists
                 {% else %}
-                    {{ error }}
+                    {{ errorMessage }}
                 {% endif %}
                 </p>
             {% endif %}

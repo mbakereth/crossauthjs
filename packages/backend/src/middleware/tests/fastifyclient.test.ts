@@ -20,7 +20,7 @@ const oidcConfiguration : OpenIdConfiguration = {
     jwks_uri: "http://server.com/jwks",
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
-    grant_types_supported: ["authorization_code"],
+    grant_types_supported: ["authorization_code", "client_credentials"],
     token_endpoint_auth_signing_alg_values_supported: ["RS256"],
     subject_types_supported: ["public"],
     id_token_signing_alg_values_supported: ["RS256"],
@@ -40,9 +40,24 @@ beforeAll(async () => {
     fetchMocker.doMock();
 });
 
+function getCsrf(res: any) : {csrfCookie: string, csrfToken: string} {
+    const body = JSON.parse(res.body)
+    const csrfCookies = res.cookies.filter((cookie: any) => {return cookie.name == "CSRFTOKEN"});
+    expect(csrfCookies.length).toBe(1);
+    const csrfCookie = csrfCookies[0].value;
+    const csrfToken = body.args.csrfToken;
+    expect(csrfToken).toBeDefined();
+    return {csrfCookie, csrfToken};
+}
+
 async function makeClient(options : FastifyServerOptions = {}) : Promise<FastifyServer> {
     const app = fastify({logger: false});
 
+    // @ts-ignore
+    app.decorateReply("view",  function(template, args) {
+        return {template: template, args: args};
+    });
+    
     const userStorage = await getTestUserStorage();
     const keyStorage = new InMemoryKeyStorage();
     let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
@@ -64,6 +79,7 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<Fastify
         clientSecret: "DEF",
         validFlows: "all", // activate all OAuth flows
         tokenResponseType: "sendJson",
+        errorResponseType: "sendJson",
         secret: "ABC",
         ...options,
     });
@@ -130,6 +146,35 @@ test('FastifyOAuthClient.clientCredentialsFlow', async () => {
     if (server.oAuthClient) await server.oAuthClient.loadConfig();
 
     let res;
+    let body;
+
+    // get csrf token
+    res = await server.app.inject({ method: "GET", url: "/login" })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("login.njk");
+    const {csrfCookie, csrfToken} = await getCsrf(res);
+
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())}));
+    res = await server.app.inject({ method: "POST", url: "/clientcredflow", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        csrfToken: csrfToken,
+        scope: "read write",
+     }});
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    expect(body.body.grant_type).toBe("client_credentials");
+    expect(body.body.client_id).toBe("ABC");
+    expect(body.body.client_secret).toBe("DEF");
+    expect(body.body.scope).toBe("read write");
+
+    const resp = await authServer.tokenPostEndpoint({
+        grantType: body.body.grant_type, 
+        clientId : body.body.client_id, 
+        scope : body.body.scope, 
+        clientSecret : body.body.client_secret,
+    });
+    expect(resp.error).toBeUndefined();
+    expect(resp.access_token).toBeDefined();
 });
 
 afterAll(async () => {

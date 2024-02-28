@@ -10,12 +10,10 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
 }
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
     private authServer?: FastifyAuthorizationServer;
-    private userStorage? : UserStorage;
 
     constructor(options : FastifyOAuthResourceServerOptions = {}) {
         super(options);
         this.authServer = options.authServer;
-        this.userStorage = options.userStorage;
     }
 
     async authorized(request : FastifyRequest) : Promise<{authorized: boolean, tokenPayload?: {[key:string]: any}, error? : string, error_description?: string}|undefined> {

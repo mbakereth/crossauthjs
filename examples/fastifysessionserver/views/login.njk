@@ -8,7 +8,7 @@
         <form method="POST" action="/login">
             <input type="hidden" name="next" value="{{ next|safe }}"/>
             <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
-            {% if error %}
+            {% if errorMessage %}
                 <p class="error">
                 {% if errorCodeName == "UsernameOrPasswordInvalid"%}
                     Invalid username or password
@@ -17,7 +17,7 @@
                 {% elif errorCodeName == "UserNotActive" %}
                     This account has been deactivated
                 {% else %}
-                    {{ error }}
+                    {{ errorMessage }}
                 {% endif %}
                 </p>
             {% endif %}

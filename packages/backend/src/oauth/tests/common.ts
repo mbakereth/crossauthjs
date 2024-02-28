@@ -34,6 +34,7 @@ export async function getAuthServer({aud, persistAccessToken, emptyScopeIsValid}
         validScopes: "read, write",
         issueRefreshToken: true,
         emptyScopeIsValid: emptyScopeIsValid,
+        validFlows: "all",
     };
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {

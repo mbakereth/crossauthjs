@@ -114,7 +114,7 @@ export class FastifyAuthorizationServer {
 
                 if (ce) {
                     if (this.errorPage) {
-                        return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+                        return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
                     } else {
                         let status : "401" | "400" | "500" = "500"
                         switch (ce.httpStatus) {
@@ -170,7 +170,7 @@ export class FastifyAuthorizationServer {
                     } catch (e) {
                         const ce = e as CrossauthError;
                         if (this.errorPage) {
-                            return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: "Invalid client given", errorCode: ErrorCode.UnauthorizedClient, errorCodeName: ErrorCode[ErrorCode.UnauthorizedClient]});
+                            return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: "Invalid client given", errorCode: ErrorCode.UnauthorizedClient, errorCodeName: ErrorCode[ErrorCode.UnauthorizedClient]});
                         } else {
                             return reply.status(ce.httpStatus).send(DEFAULT_ERROR[401]);
                         }
@@ -201,7 +201,7 @@ export class FastifyAuthorizationServer {
 
                 if (ce) {
                     if (this.errorPage) {
-                        return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+                        return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
                     } else {
                         let status : "400" | "401" | "500" = "500";
                         switch (ce.httpStatus) {
@@ -298,7 +298,7 @@ export class FastifyAuthorizationServer {
                 const ce = CrossauthError.fromOAuthError(error||"server_error", errorDescription||"Neither code nor error received")
                 CrossauthLogger.logger.error(j({msg: ce.message, errorCode: ce.code, errorCodeName: ce.codeName}));
                 if (this.errorPage) {
-                    return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, error: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+                    return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
                 } else {
                     let status : "401" | "400" | "500" = "500"
                     switch (ce.httpStatus) {

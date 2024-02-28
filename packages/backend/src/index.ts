@@ -27,7 +27,7 @@ export type { ApiKeyManagerOptions } from './apikey';
 
 // fastify
 export { FastifyServer } from './middleware/fastifyserver';
-export type { FastifyServerOptions as FastifyCookieAuthServerOptions  } from './middleware/fastifyserver';
+export type { FastifyServerOptions, FastifyErrorFn  } from './middleware/fastifyserver';
 export { FastifyAuthorizationServer } from './middleware/fastifyoauthserver';
 export type { FastifyAuthorizationServerOptions } from './middleware/fastifyoauthserver';
 export { FastifyOAuthClient } from './middleware/fastifyoauthclient';

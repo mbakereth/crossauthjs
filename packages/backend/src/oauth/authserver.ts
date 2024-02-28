@@ -390,7 +390,6 @@ export class OAuthAuthorizationServer {
         grantType, 
         clientId, 
         scope, 
-        state,
         code,
         clientSecret,
         codeVerifier,
@@ -398,7 +397,6 @@ export class OAuthAuthorizationServer {
         grantType : string, 
         clientId : string, 
         scope? : string, 
-        state? : string,
         code? : string,
         clientSecret? : string,
         codeVerifier? : string}) 

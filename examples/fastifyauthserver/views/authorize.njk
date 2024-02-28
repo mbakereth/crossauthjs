@@ -23,9 +23,9 @@
             <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}"/>
             <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
             <input type="hidden" name="authorized" id="authorized" value="true"/>
-            {% if error %}
+            {% if errorMessage %}
                 <p class="error">
-                    {{ error }}
+                    {{ errorMessage }}
                 </p>
             {% endif %}
             <p>
