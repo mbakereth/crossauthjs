@@ -66,14 +66,23 @@ const server = new FastifyServer(userStorage, {
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    if (!request.user) return reply.redirect(302, "/login?next=/");
     return reply.view('index.njk', {user: request.user});
+}
+);
+
+app.get('/authzcodeex', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    if (!request.user) return reply.redirect(302, "/login?next=/authzcodeex");
+    return reply.view('authzcode.njk', {user: request.user});
+}
+);
+
+app.get('/clientcredentialsex', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    return reply.view('clientcredentials.njk', {user: request.user, csrfToken: request.csrfToken});
 }
 );
 
 // in this example, the API is called from the backend
 app.get('/resource', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    if (!request.user) return reply.redirect(302, "/login?next=/");
     const oauthData = await server.getSessionData(request, "oauth");
     if (oauthData?.access_token) {
         const resp = await fetch(process.env["RESOURCE_SERVER"]+"/resource", {

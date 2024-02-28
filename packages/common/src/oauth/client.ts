@@ -162,6 +162,9 @@ export abstract class OAuthClientBase {
         }
         this.authzCode = code;    
 
+        if (!this.oidcConfig?.grant_types_supported.includes("authorization_code")) {
+            return {error: "invalid_request", error_description: "Server does not support authorization code grant"};
+        }
         if (!this.oidcConfig?.token_endpoint) {
             return {error: "server_error", error_description: "Cannot get token endpoint"};
         }
@@ -188,6 +191,30 @@ export abstract class OAuthClientBase {
             CrossauthLogger.logger.error(j({err: e}));
             return {error: "server_error", error_description: "Unable to get access token from server"};
         }
+    }
+
+    protected async clientCredentialsFlow(scope? : string) : Promise<{url? : string, params?: {[key:string]:any}, error? : string, error_description? : string}> {
+        CrossauthLogger.logger.debug(j({msg: "Starting client credentials flow"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("client_credentials")) {
+            return {error: "invalid_request", error_description: "Server does not support client credentials grant"};
+        }
+        if (!this.oidcConfig?.token_endpoint) {
+            return {error: "server_error", error_description: "Cannot get token endpoint"};
+        }
+        if (!this.clientId) return {error: "invalid_request", error_description: "Cannot make client credentials flow without client id"}; 
+        if (!this.clientSecret) return {error: "invalid_request", error_description:  "Cannot make client credentials flow without client secret"}; 
+
+        const url = this.oidcConfig.token_endpoint;
+
+        let params : {[key:string]:any} = {
+            grant_type: "client_credentials",
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+        }
+        if (scope) params.scope = scope;
+        this.activeFlow = OAuthFlows.ClientCredentials;
+        return {url: url, params: params};
     }
 
     protected async post(url : string, params : {[key:string]:any}) : Promise<{[key:string]:any}>{

@@ -318,26 +318,8 @@ export class OAuthAuthorizationServer {
         }
 
         // validate scopes
-        let scopes : string[]|undefined;
-        let scopesIncludingNull : (string|null)[]|undefined;
-        if (!scope && !this.emptyScopeIsValid) {
-            return {error: "invalid_scope", error_description: "Must provide at least one scope"};
-        }
-        if (scope) {
-            const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
-            scopes = requestedScopes;
-            scopesIncludingNull = requestedScopes;
-            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};      
-        } else {
-            scopesIncludingNull = [null];
-        }
-        if (this.authStorage) {
-            const newScopes = scopesIncludingNull||[];
-            const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
-            const updatedScopes = [...new Set([...existingScopes, ...newScopes])];
-            CrossauthLogger.logger.debug("Updating authorizations for " + clientId + " to " + updatedScopes);
-            this.authStorage.updateAuthorizations(clientId, user?.id, updatedScopes);
-        }
+        const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, user);
+        if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
 
         // validate state
         try {
@@ -369,6 +351,35 @@ export class OAuthAuthorizationServer {
         return existingRequestedScopes.length == requestedScopes.length;
     }
 
+    async validateAndPersistScope(clientId : string, scope? : string,user? : User) : Promise<{scopes?: string[]|undefined, error?: string, error_description?: string}> {
+        // validate scopes
+        let scopes : string[]|undefined;
+        let scopesIncludingNull : (string|null)[]|undefined;
+        if (!scope && !this.emptyScopeIsValid) {
+            return {error: "invalid_scope", error_description: "Must provide at least one scope"};
+        }
+        if (scope) {
+            const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
+            scopes = requestedScopes;
+            scopesIncludingNull = requestedScopes;
+            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption||"Unknown error"};      
+        } else {
+            scopesIncludingNull = [null];
+        }
+        if (this.authStorage) {
+            try {
+                const newScopes = scopesIncludingNull||[];
+                const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
+                const updatedScopes = [...new Set([...existingScopes, ...newScopes])];
+                CrossauthLogger.logger.debug(j({msg: "Updating authorizations for " + clientId + " to " + updatedScopes}));
+                this.authStorage.updateAuthorizations(clientId, user?.id, updatedScopes);
+            } catch (e) {
+                CrossauthLogger.logger.error(j({err: e}));
+                return { error: "server_error", error_description: "Couldn't save scope"};
+            }
+        }
+        return {scopes: scopes};
+    }
     /**
      * The the OAuth2 authorize endpoint.  All parameters are expected to be
      * strings and have be URL-decoded.
@@ -379,6 +390,7 @@ export class OAuthAuthorizationServer {
         grantType, 
         clientId, 
         scope, 
+        state,
         code,
         clientSecret,
         codeVerifier,
@@ -386,6 +398,7 @@ export class OAuthAuthorizationServer {
         grantType : string, 
         clientId : string, 
         scope? : string, 
+        state? : string,
         code? : string,
         clientSecret? : string,
         codeVerifier? : string}) 
@@ -411,16 +424,30 @@ export class OAuthAuthorizationServer {
             if (!clientSecret && !codeVerifier) {
                 return {
                     error : OAuthErrorCode[OAuthErrorCode.access_denied],
-                    error_description: "No client secret or code verifier provided when requesting access token",
+                    error_description: "No client secret or code verifier provided for authorization coode flow",
                 };
             }
             if (!code) {
                 return {
                     error : OAuthErrorCode[OAuthErrorCode.access_denied],
-                    error_description: "No authorization code provided when requesting access token",
+                    error_description: "No authorization code provided for authorization code flow",
                 };
             }
-            return await this.getAccessToken(code, clientId, clientSecret, codeVerifier);
+            return await this.getAccessToken(clientId, code, clientSecret, codeVerifier);
+
+        } else if (grantType == "client_credentials") {
+
+            if (!clientSecret) {
+                return {
+                    error : OAuthErrorCode[OAuthErrorCode.access_denied],
+                    error_description: "No client secret provided to client credentials flow",
+                };
+            }
+            // validate scopes
+            const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
+            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
+    
+            return await this.getAccessToken(clientId, undefined, clientSecret, codeVerifier, scopes);
 
         } else {
 
@@ -523,7 +550,7 @@ export class OAuthAuthorizationServer {
         return {code: authzCode, state: state};
     }
 
-    private async getAccessToken(code : string, clientId: string, clientSecret? : string, codeVerifier? : string) 
+    private async getAccessToken(clientId: string, code? : string, clientSecret? : string, codeVerifier? : string,  scopes? : string[]) 
         : Promise<OAuthTokenResponse> {
 
         // make sure we have the client secret if configured to require it
@@ -559,20 +586,25 @@ export class OAuthAuthorizationServer {
             username? : string,
             [key:string] : any, // so having anything else stored doesn't raise an exception
         } = {};
-        let key : Key|undefined;
-        try {
-            key = await this.keyStorage.getKey(AUTHZ_CODE_PREFIX+Hasher.hash(code));
-            authzData = KeyStorage.decodeData(key.data);
-        } catch (e) {
-            CrossauthLogger.logger.error(j({err: e}));
-            return {error: "access_denied", error_description: "Invalid or expired authorization code"};
+
+        if (code) {
+
+            // recover scope, challenge and user from data persisted with authorization code
+            let key : Key|undefined;
+            try {
+                key = await this.keyStorage.getKey(AUTHZ_CODE_PREFIX+Hasher.hash(code));
+                authzData = KeyStorage.decodeData(key.data);
+            } catch (e) {
+                CrossauthLogger.logger.error(j({err: e}));
+                return {error: "access_denied", error_description: "Invalid or expired authorization code"};
+            }
+            try {
+                await this.keyStorage.deleteKey(key.value);
+            } catch (e) {
+                CrossauthLogger.logger.warn(j({err: e, msg: "Couldn't delete authorization code from storatge"}));
+            }
+            scopes = authzData.scope;
         }
-        try {
-            await this.keyStorage.deleteKey(key.value);
-        } catch (e) {
-            CrossauthLogger.logger.warn(j({err: e, msg: "Couldn't delete authorization code from storatge"}));
-        }
-        let scopes : string[]|undefined = authzData.scope;
         
         // validate code verifier, if there is one
         if (authzData.challengeMethod && !authzData.challenge) {

@@ -3,7 +3,7 @@ import { test, expect, beforeAll, afterAll, vi } from 'vitest';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import fastify from 'fastify';
 import { OpenIdConfiguration } from '@crossauth/common';
-import { getAccessToken } from '../../oauth/tests/common';
+import { getAccessToken, getAuthServer } from '../../oauth/tests/common';
 import { getTestUserStorage } from '../../storage/tests/inmemorytestdata';
 import { InMemoryKeyStorage } from '../..';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
@@ -119,6 +119,17 @@ test('FastifyOAuthClient.authzcodeflowWithLoginRedirects', async () => {
 
     res = await server.app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
     expect(res.headers?.location).toBe("/login?next=%2Fauthzcodeflow%3Fscope%3Dread%2Bwrite")
+});
+
+test('FastifyOAuthClient.clientCredentialsFlow', async () => {
+    const {authServer} = await getAuthServer();
+
+    const server = await makeClient();
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+
+    let res;
 });
 
 afterAll(async () => {

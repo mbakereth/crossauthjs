@@ -19,9 +19,15 @@ interface RedirectUriQueryType {
     error_description? : string,
 }
 
+interface ClientCredentialsBodyType {
+    scope? : string,
+    csrfToken? : string,
+}
+
 export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     siteUrl ?: string,
     prefix? : string,
+    sessionDataName? : string,
     errorPage? : string,
     authorizedPage? : string,
     authorizedUrl? : string,
@@ -58,7 +64,12 @@ async function saveInSessionAndLoad(client: FastifyOAuthClient, request : Fastif
         CrossauthLogger.logger.debug("Got access token " + JSON.stringify(jwtDecode(oauthResponse.access_token)));
     }
     try {
-        await client.server.updateSessionData(request, "oauth", oauthResponse);
+        let sessionCookieValue = client.server.getSessionCookieValue(request);
+        if (!sessionCookieValue) {
+            sessionCookieValue = await client.server.createAnonymousSession(request, reply, {[client.sessionDataName] : oauthResponse});
+        } else {
+            await client.server.updateSessionData(request, client.sessionDataName, oauthResponse);
+        }
         if (!client.authorizedPage) {
             return reply.status(500).view("error.njk", {status: 500, error: "Authorized url not configured", errorCodeName: ErrorCode[ErrorCode.Configuration], errorCode: ErrorCode.Configuration});
         }
@@ -77,7 +88,12 @@ async function saveInSessionAndRedirect(client: FastifyOAuthClient, request : Fa
         CrossauthLogger.logger.debug("Got access token " + JSON.stringify(jwtDecode(oauthResponse.access_token)));
     }
     try {
-        await client.server.updateSessionData(request, "oauth", oauthResponse);
+        let sessionCookieValue = client.server.getSessionCookieValue(request);
+        if (!sessionCookieValue) {
+            sessionCookieValue = await client.server.createAnonymousSession(request, reply, {[client.sessionDataName] : oauthResponse});
+        } else {
+            await client.server.updateSessionData(request, client.sessionDataName, oauthResponse);
+        }
         if (!client.authorizedUrl) {
             return reply.status(500).view("error.njk", {status: 500, error: "Authorized url not configured", errorCodeName: ErrorCode[ErrorCode.Configuration], errorCode: ErrorCode.Configuration});
 
@@ -96,6 +112,7 @@ export class FastifyOAuthClient extends OAuthClient {
     errorPage : string = "error.njk";
     authorizedPage : string = "authorized.njk";
     authorizedUrl : string = "authorized.njk";
+    sessionDataName : string = "oauth";
     private receiveTokenFn : (client : FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply> = sendJson;
     private loginUrl : string = "";
     private loginProtectedFlows : string[] = [];
@@ -104,6 +121,7 @@ export class FastifyOAuthClient extends OAuthClient {
     constructor(server : FastifyServer, authServerBaseUri : string, options : FastifyOAuthClientOptions) {
         super(authServerBaseUri, options);
         this.server = server;
+        setParameter("sessionDataName", ParamType.String, this, options, "OAUTH_SESSION_DATA_NAME");
         setParameter("siteUrl", ParamType.String, this, options, "SITE_URL", true);
         setParameter("tokenResponseType", ParamType.String, this, options, "OAUTH_TOKEN_RESPONSE_TYPE", true);
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
@@ -180,5 +198,19 @@ export class FastifyOAuthClient extends OAuthClient {
             });
         }
 
+        if (this.validFlows.includes(OAuthFlows.ClientCredentials)) {
+            this.server.app.post(this.prefix+'clientcredflow', async (request : FastifyRequest<{ Body: ClientCredentialsBodyType }>, reply : FastifyReply) =>  {
+                if (this.server.sessionServer) {
+                    // if sessions are enabled, require a csrf token
+                    const error = await server.errorIfCsrfInvalid(request, reply, this.errorPage);
+                    if (error) return error;
+                }
+                if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
+                    return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
+                }               
+                const resp = await this.clientCredentialsFlow(request.body.scope);
+                return await this.receiveTokenFn(this, request, reply, resp);
+            });
+        }
     }
 }

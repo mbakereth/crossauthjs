@@ -24,7 +24,7 @@ export async function createClient() : Promise<{clientStorage : OAuthClientStora
 
 }
 
-export async function getAuthorizationCode({challenge, aud, persistAccessToken} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean} = {}) {
+export async function getAuthServer({aud, persistAccessToken, emptyScopeIsValid} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean, emptyScopeIsValid? : boolean} = {}) {
     const {clientStorage, client} = await createClient();
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
     let options : OAuthAuthorizationServerOptions = {
@@ -33,6 +33,7 @@ export async function getAuthorizationCode({challenge, aud, persistAccessToken} 
         validateScopes : true,
         validScopes: "read, write",
         issueRefreshToken: true,
+        emptyScopeIsValid: emptyScopeIsValid,
     };
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {
@@ -40,6 +41,11 @@ export async function getAuthorizationCode({challenge, aud, persistAccessToken} 
     }
     const keyStorage = new InMemoryKeyStorage();
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, options);
+    return {client, clientStorage, authServer, keyStorage};
+}
+
+export async function getAuthorizationCode({challenge, aud, persistAccessToken} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean} = {}) {
+    const {client, clientStorage, authServer, keyStorage} = await getAuthServer({aud, persistAccessToken});
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
     const codeVerifier = "ABC123";

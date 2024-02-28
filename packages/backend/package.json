@@ -13,7 +13,7 @@
   "scripts": {
     "postinstall": "dotenv -e .env.unittest pnpm exec prisma generate",
     "dev": "vite",
-    "build": "vite build --emptyOutDir=false",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "dotenv -e .env.unittest vitest",
     "doc": "typedoc",

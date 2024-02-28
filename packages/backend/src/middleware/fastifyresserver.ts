@@ -2,16 +2,20 @@ import { CrossauthError, CrossauthLogger, j } from '@crossauth/common';
 import {  OAuthResourceServer, type OAuthResourceServerOptions } from '../oauth/resserver';
 import {  FastifyAuthorizationServer } from './fastifyoauthserver';
 import { FastifyRequest } from 'fastify';
+import { UserStorage } from '../storage';
 
 export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOptions {
     authServer? : FastifyAuthorizationServer,
+    userStorage? : UserStorage;
 }
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
     private authServer?: FastifyAuthorizationServer;
+    private userStorage? : UserStorage;
 
     constructor(options : FastifyOAuthResourceServerOptions = {}) {
         super(options);
         this.authServer = options.authServer;
+        this.userStorage = options.userStorage;
     }
 
     async authorized(request : FastifyRequest) : Promise<{authorized: boolean, tokenPayload?: {[key:string]: any}, error? : string, error_description?: string}|undefined> {
@@ -33,6 +37,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                         return {authorized: false};
                     }
                 }
+
             }    
         } catch (e) {
             const ce = e as CrossauthError;

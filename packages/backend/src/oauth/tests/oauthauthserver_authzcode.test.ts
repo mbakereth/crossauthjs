@@ -7,7 +7,7 @@ import { InMemoryKeyStorage, InMemoryOAuthAuthorizationStorage } from '../../sto
 import { Hasher } from '../../hasher';
 import { KeyStorage } from '../../storage';
 
-test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFile', async () => {
+test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFile', async () => {
 
     const {clientStorage, client} = await createClient();
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
@@ -36,7 +36,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKeyFi
     expect(["read", "write"]).toContain(data.scope[1]);
 });
 
-test('AuthorizationServer.scopePersistence', async () => {
+test('AuthorizationServer.AuthzCodeFlow.scopePersistence', async () => {
 
     const {clientStorage, client} = await createClient();
     const keyStorage = new InMemoryKeyStorage();
@@ -69,7 +69,7 @@ test('AuthorizationServer.scopePersistence', async () => {
     expect(["read", "write"]).toContain(data.scope[1]);
 });
 
-test('AuthorizationServer.emptyScopeDisallowed', async () => {
+test('AuthorizationServer.AuthzCodeFlow.emptyScopeDisallowed', async () => {
 
     const {clientStorage, client} = await createClient();
     const keyStorage = new InMemoryKeyStorage();
@@ -96,7 +96,7 @@ test('AuthorizationServer.emptyScopeDisallowed', async () => {
     expect(error_description).toBeDefined();
 });
 
-test('AuthorizationServer.emptyScopeAllowed', async () => {
+test('AuthorizationServer.AuthzCodeFlow.emptyScopeAllowed', async () => {
 
     const {clientStorage, client} = await createClient();
     const keyStorage = new InMemoryKeyStorage();
@@ -124,7 +124,7 @@ test('AuthorizationServer.emptyScopeAllowed', async () => {
     expect(error_description).toBeUndefined();
 });
 
-test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKey', async () => {
+test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFilePrivateKey', async () => {
 
     const {clientStorage, client} = await createClient();
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
@@ -153,7 +153,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyFilePrivateKey',
     expect(["read", "write"]).toContain(data.scope[1]);
 });
 
-test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyPrivateKeyFile', async () => {
+test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyPrivateKeyFile', async () => {
 
     const {clientStorage, client} = await createClient();
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
@@ -182,7 +182,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestPublicKeyPrivateKeyFile',
     expect(["read", "write"]).toContain(data.scope[1]);
 });
 
-test('AuthorizationServer.validAuthorizationCodeRequestSecretKeyFile', async () => {
+test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKeyFile', async () => {
 
     const {clientStorage, client} = await createClient();
     //const publicKey = fs.readFileSync("keys/secretkey.txt", 'utf8');
@@ -211,7 +211,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKeyFile', async () 
     expect(["read", "write"]).toContain(data.scope[1]);
 });
 
-test('AuthorizationServer.validAuthorizationCodeRequestSecretKey', async () => {
+test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKey', async () => {
 
     const {clientStorage, client} = await createClient();
     const secretKey = fs.readFileSync("keys/secretkey.txt", 'utf8');
@@ -240,7 +240,7 @@ test('AuthorizationServer.validAuthorizationCodeRequestSecretKey', async () => {
     expect(["read", "write"]).toContain(data.scope[1]);
 });
 
-test('AuthorizationServer.invalidScope', async () => {
+test('AuthorizationServer.AuthzCodeFlow.invalidScope', async () => {
 
     const {clientStorage, client} = await createClient();
     const authServer = new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), {
@@ -260,7 +260,7 @@ test('AuthorizationServer.invalidScope', async () => {
     expect(error).toBe("invalid_scope");
 });
 
-test('AuthorizationServer.invalidRedirectUri', async () => {
+test('AuthorizationServer.AuthzCodeFlow.invalidRedirectUri', async () => {
 
     const {clientStorage, client} = await createClient();
     const authServer = new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), {
@@ -280,7 +280,7 @@ test('AuthorizationServer.invalidRedirectUri', async () => {
     expect(error).toBe("invalid_request");
 });
 
-test('AuthorizationServer.invalidKeyInConstructor', async () => {
+test('AuthorizationServer.AuthzCodeFlow.invalidKeyInConstructor', async () => {
 
     const {clientStorage} = await createClient();
     const options : OAuthAuthorizationServerOptions = {
@@ -294,7 +294,7 @@ test('AuthorizationServer.invalidKeyInConstructor', async () => {
     await expect(async () => {new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), options)}).rejects.toThrowError(CrossauthError);
 });
 
-test('AuthorizationServer.invalidResponseType', async () => {
+test('AuthorizationServer.AuthzCodeFlow.invalidResponseType', async () => {
     const {clientStorage, client} = await createClient();
     const authServer = new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
@@ -314,7 +314,7 @@ test('AuthorizationServer.invalidResponseType', async () => {
 
 });
 
-test('AuthorizationServer.invalidKey', async () => {
+test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
 
     const {clientStorage, client} = await createClient();
     const authServer = new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), {
@@ -337,7 +337,7 @@ test('AuthorizationServer.invalidKey', async () => {
     await expect(async () => {await authServer.validateJwt(code||"")}).rejects.toThrowError(CrossauthError);
     });
 
-test('AuthorizationServer.accessToken', async () => {
+test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, refresh_token, expires_in, error, error_description}
@@ -364,7 +364,7 @@ test('AuthorizationServer.accessToken', async () => {
     expect(expires_in).toBe(60*60);
 });
 
-test('AuthorizationServer.oidcConfiguration', async () => {
+test('AuthorizationServer.AuthzCodeFlow.oidcConfiguration', async () => {
     const {authServer} = await getAuthorizationCode();
  
     const wellKnown = authServer.oidcConfiguration({
@@ -377,7 +377,7 @@ test('AuthorizationServer.oidcConfiguration', async () => {
     expect(wellKnown.jwks_uri).toBe(process.env.CROSSAUTH_OAUTH_ISSUER+"/jwks");
 });
 
-test('AuthorizationServer.jwks', async () => {
+test('AuthorizationServer.AuthzCodeFlow.jwks', async () => {
     const {authServer} = await getAuthorizationCode();
     const jwks = authServer.jwks();
     expect(jwks.keys.length).toBe(1);

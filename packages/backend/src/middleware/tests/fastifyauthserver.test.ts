@@ -190,3 +190,27 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
     await server.authServer.authServer.validateJwt(body.access_token, "access");
 
 });
+
+test('FastifyAuthServfer.getAccessTokenWClientCredentials', async () => {
+
+    let {server, keyStorage} = await makeAppWithOptions();
+
+    let res;
+    let body;
+
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        payload: {
+            grant_type: "client_credentials",
+            client_id: "ABC",
+            client_secret: "DEF",
+            scope: "read write",
+            state: "ABCDEF",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeDefined();
+    // @ts-ignore
+    await server.authServer.authServer.validateJwt(body.access_token, "access");
+
+});

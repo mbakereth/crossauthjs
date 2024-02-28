@@ -302,7 +302,7 @@ export class FastifySessionServer {
     private configureFactor2Page : string = "configurefactor2.njk";
     private loginPage : string = "login.njk";
     private factor2Page : string = "factor2.njk";
-    private errorPage : string = "error.njk";
+    readonly errorPage : string = "error.njk";
     private changePasswordPage : string = "changepassword.njk";
     private changeFactor2Page : string = "changefactor2.njk";
     private updateUserPage : string = "updateuser.njk";
@@ -2041,11 +2041,12 @@ export class FastifySessionServer {
 
     }
 
-    async createAnonymousSession(request : FastifyRequest, reply : FastifyReply) : Promise<string> {
+    async createAnonymousSession(request : FastifyRequest, reply : FastifyReply, data? : {[key:string]:any}) : Promise<string> {
         CrossauthLogger.logger.debug(j({msg: "Creating session ID"}));
 
         // get custom fields from implentor-provided function
         let extraFields = this.addToSession ? this.addToSession(request) : {}
+        if (data) extraFields.data = JSON.stringify(data);
 
         // create session, setting the session cookie, CSRF cookie and CSRF token 
         let { sessionCookie, csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createAnonymousSession(extraFields);

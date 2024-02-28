@@ -36,6 +36,14 @@ export const ERROR_401 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <p>You are not authorized to access this URL.</p>
 </body></html>
 `
+export const ERROR_403= `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>403 Forbidden</title>
+</head><body>
+<h1>403 Forbidden</h1>
+<p>You are not authorized to make this request.</p>
+</body></html>
+`
 
 export const ERROR_500 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
@@ -198,8 +206,7 @@ export class FastifyServer {
     private sessionPrefix : string = "/";
     private oauthPrefix : string = "/";
     private endpoints : string[] = [];
-    // @ts-ignore
-    private sessionServer? : FastifySessionServer; // only needed for testing
+    readonly sessionServer? : FastifySessionServer; 
     readonly authServer? : FastifyAuthorizationServer;
     readonly oAuthClient? : FastifyOAuthClient;
 
@@ -308,6 +315,31 @@ export class FastifyServer {
         return this.sessionServer.validateCsrfToken(request);
     }
 
+    async errorIfCsrfInvalid(request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply, errorPage? : string) : Promise<FastifyReply|undefined> {
+        try {
+            await this.validateCsrfToken(request)
+            return undefined;
+        } catch (e) {
+            CrossauthLogger.logger.warn(j({err: e, msg: `Attempt to access url without csrf token`, url: request.url}));
+            if (errorPage || this.sessionServer?.errorPage) {
+                return reply.status(401).view(errorPage||this.sessionServer?.errorPage||"",
+                    {error: "CSRF Token not provided", status: 401, code: ErrorCode.InvalidCsrf, codeName: ErrorCode[ErrorCode.InvalidCsrf]});
+            }
+            return reply.status(401).send(ERROR_401);
+        }
+    }
+
+    async errorIfNotLoggedIn(request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply, errorPage? : string) : Promise<FastifyReply|undefined> {
+        if (!request.user) {
+            CrossauthLogger.logger.warn(j({msg: `Attempt to access url without csrf token`, url: request.url}));
+            if (errorPage || this.sessionServer?.errorPage) {
+                return reply.status(401).view(errorPage||this.sessionServer?.errorPage||"",
+                    {error: "CSRF Token not provided", status: 401, code: ErrorCode.InvalidCsrf, codeName: ErrorCode[ErrorCode.InvalidCsrf]});
+            }
+            return reply.status(401).send(ERROR_401);
+        }
+    }
+
     static sendPageError(reply : FastifyReply, status : number, errorPage? : string, error?: string, e? : any) {
         let code = 0;
         let codeName = "UnknownError";
@@ -350,6 +382,17 @@ export class FastifyServer {
     async getSessionKey(request : FastifyRequest) : Promise<Key|undefined> {
         if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Cannot update session data if sessions not enabled");
        return  await this.sessionServer.getSessionKey(request);
+    }
+
+    getSessionCookieValue(request : FastifyRequest) : string|undefined {
+        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Cannot update session data if sessions not enabled");
+        return  this.sessionServer.getSessionCookieValue(request);
+    }
+
+    async createAnonymousSession(request : FastifyRequest, reply : FastifyReply, data? : {[key:string]:any}) : Promise<string>  {
+        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
+        console.log("Create anonymous session");
+        return await this.sessionServer.createAnonymousSession(request, reply, data);
     }
 
     /**

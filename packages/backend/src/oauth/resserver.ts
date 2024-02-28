@@ -213,7 +213,7 @@ export class OAuthResourceServer {
                     return undefined;    
                 }
         }
-        return decoded;
+        return decoded.payload;
     }
 
     private async validateAccessToken(accessToken : string) : Promise<{[key:string]: any}|undefined> {

@@ -45,7 +45,7 @@ interface TokenBodyType {
     client_secret: string,
     redirect_uri : string,
     scope? : string,
-    state: string,
+    state?: string,
     code? : string,
     code_verifier? : string,
 }
