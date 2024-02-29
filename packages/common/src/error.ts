@@ -42,6 +42,9 @@ export enum ErrorCode {
     /** This is returned a request is made with a redirect Uri that is not registered */
     InvalidRedirectUri,
 
+    /** This is returned a request is made with a an oauth flow name that is not recognized */
+    InvalidOAuthFlow,
+
     /** Thrown on login attempt with a user account marked inactive */
     UserNotActive,
 
@@ -181,6 +184,9 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.InvalidRedirectUri) {
             _message = "Redirect Uri is not registered"
             _httpStatus = 401;
+        } else if (code == ErrorCode.InvalidOAuthFlow) {
+            _message = "Invalid OAuth flow type"
+            _httpStatus = 500;
         } else if (code == ErrorCode.EmailNotExist) {
             _message = "No user exists with that email address"
             _httpStatus = 401;

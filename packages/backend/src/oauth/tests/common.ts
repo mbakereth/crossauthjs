@@ -3,7 +3,7 @@ import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '
 import { InMemoryOAuthClientStorage, InMemoryKeyStorage } from '../../storage/inmemorystorage';
 import { OAuthClientStorage } from '../../storage';
 import { Hasher } from '../../hasher';
-import { OAuthClient } from '@crossauth/common';
+import { OAuthClient, OAuthFlows } from '@crossauth/common';
 import fs from 'node:fs';
 
 export async function createClient() : Promise<{clientStorage : OAuthClientStorage, client : OAuthClient}> {
@@ -18,6 +18,7 @@ export async function createClient() : Promise<{clientStorage : OAuthClientStora
         clientSecret: clientSecret,
         clientName: "Test",
         redirectUri: ["http://localhost:3000/authzcode"],
+        validFlow: OAuthFlows.allFlows(),
     };
     const client = await clientStorage.createClient(inputClient);
     return {clientStorage, client};

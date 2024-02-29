@@ -56,7 +56,7 @@ model OAuthClient {
     clientSecret   String?
 
     redirectUri    OAuthClientRedirectUri[]
-
+    validFlow      OAuthClientValidFlow[]
     authorization  OAuthAuthorization[]
 
     @@index([clientId])
@@ -71,6 +71,18 @@ model OAuthClientRedirectUri {
 
     @@index([id])
     @@unique([client_id, uri], name: "redirectUriUnique")
+    //@@unique([redirect_uri], name: "redirectUriUnique") // use this to ensure only one client has any given redirect uri
+}
+
+model OAuthClientValidFlow {
+    id             Int         @id @unique @default(autoincrement())
+    client_id      String 
+    flow           String
+
+    client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
+
+    @@index([id])
+    @@unique([client_id, flow], name: "flowUnique")
     //@@unique([redirect_uri], name: "redirectUriUnique") // use this to ensure only one client has any given redirect uri
 }
 

@@ -6,7 +6,7 @@ import { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage } f
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 import { Hasher } from '../../hasher';
-import { CrossauthError } from '@crossauth/common';
+import { CrossauthError, OAuthFlows } from '@crossauth/common';
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
@@ -32,6 +32,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         clientSecret: clientSecret,
         clientName: "Test",
         redirectUri: ["http://example.com/redirect"],
+        validFlow: OAuthFlows.allFlows(),
     };
     await clientStorage.createClient(client);
 
@@ -193,7 +194,7 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
 
 test('FastifyAuthServfer.getAccessTokenWClientCredentials', async () => {
 
-    let {server, keyStorage} = await makeAppWithOptions();
+    let {server} = await makeAppWithOptions();
 
     let res;
     let body;

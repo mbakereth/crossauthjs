@@ -53,16 +53,6 @@ export interface OAuthAuthorizationServerOptions {
     /** PBKDF2 key length for hashing client secret */
     oauthPbkdf2KeyLength? : number;
 
-    /** if true, a client secret is expected in the table.  If you don't use flows for confidential clients, you do not need a secret.  Default true */
-    saveClientSecret?  : boolean,
-
-    /** `never` = client secret doesn't have to be provided (though if it is for a `token` request, it is validated).
-     *  `always` = client secret always has to be provided for for `token` requests.
-     *  `withoutpkce` client secret only has to be provided on `token` requests if a code challenge is not used (if it is provided though, it is checked).
-     *  Default `withoutpkce`
-     */
-    requireClientSecret? : string,
-
     /** If true, only redirect Uri's registered for the client will be accepted */
     requireRedirectUriRegistration?: boolean,
 
@@ -151,8 +141,6 @@ export class OAuthAuthorizationServer {
         private oauthPbkdf2Digest = "sha256";
         private oauthPbkdf2Iterations = 40000;
         private oauthPbkdf2KeyLength = 32;
-        private saveClientSecret = true;
-        private requireClientSecret : "never"|"always"|"withoutpkce" = "withoutpkce";
         private requireRedirectUriRegistration = true;
         private jwtAlgorithm = "RS256";
         private jwtAlgorithmChecked : Algorithm = "RS256";
@@ -191,8 +179,6 @@ export class OAuthAuthorizationServer {
         setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
         setParameter("oauthPbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
         setParameter("oauthPbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
-        setParameter("saveClientSecret", ParamType.String, this, options, "OAUTH_SAVE_CLIENT_SECRET");
-        setParameter("requireClientSecret", ParamType.String, this, options, "OAUTH_REQUIRE_CLIENT_SECRET");
         setParameter("requireRedirectUriRegistration", ParamType.String, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
         setParameter("authorizationCodeLength", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_LENGTH");
@@ -308,12 +294,29 @@ export class OAuthAuthorizationServer {
             };
         }
 
+        // validate client
+        let client : OAuthClient;
+        try {
+            client = await this.clientStorage.getClient(clientId);
+        }
+        catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return {error: "unauthorized_client", error_description: "Client is not authorized"};
+        }
+
+
         // validate flow type
         const flow = this.inferFlowFromGet(responseType, codeChallenge);
-        if (!(this.validFlows.includes(flow||""))) {
+        if (!flow || !(this.validFlows.includes(flow))) {
             return {
                 error: "access_denied",
                 error_description: "Unsupported flow type " + flow,
+            };
+        }
+        if (!client.validFlow.includes(flow)) {
+            return {
+                error: "unauthorized_client",
+                error_description: "Client does not support " + flow,
             };
         }
 
@@ -332,7 +335,7 @@ export class OAuthAuthorizationServer {
         }
 
         if (responseType == "code") {
-            return await this.getAuthorizationCode(clientId, redirectUri, scopes, state, codeChallenge, codeChallengeMethod, user);
+            return await this.getAuthorizationCode(client, redirectUri, scopes, state, codeChallenge, codeChallengeMethod, user);
         } else {
 
             return {
@@ -402,12 +405,36 @@ export class OAuthAuthorizationServer {
         codeVerifier? : string}) 
     : Promise<OAuthTokenResponse> {
 
+        // get client
+        let client : OAuthClient;
+        try {
+            client = await this.clientStorage.getClient(clientId);
+        } catch (e) {
+            return {
+                error: "access_denied",
+                error_description: "client id does not exist",
+            }
+        }
+        if (client.secret && !clientSecret) {
+            return {
+                error: "access_denied",
+                error_description: "Client secret is required for this client",
+            }
+
+        }
+
         // validate flow type
         const flow = this.inferFlowFromPost(grantType, codeVerifier);
-        if (!(this.validFlows.includes(flow||""))) {
+        if (!flow || !(this.validFlows.includes(flow))) {
             return {
-                error: OAuthErrorCode[OAuthErrorCode.access_denied],
+                error: "access_denied",
                 error_description: "Unsupported flow type " + flow,
+            };
+        }
+        if (!client.validFlow.includes(flow)) {
+            return {
+                error: "unauthorized_client",
+                error_description: "Client does not support " + flow,
             };
         }
 
@@ -421,17 +448,17 @@ export class OAuthAuthorizationServer {
 
             if (!clientSecret && !codeVerifier) {
                 return {
-                    error : OAuthErrorCode[OAuthErrorCode.access_denied],
+                    error : "access_denied",
                     error_description: "No client secret or code verifier provided for authorization coode flow",
                 };
             }
             if (!code) {
                 return {
-                    error : OAuthErrorCode[OAuthErrorCode.access_denied],
+                    error : "access_denied",
                     error_description: "No authorization code provided for authorization code flow",
                 };
             }
-            return await this.getAccessToken(clientId, code, clientSecret, codeVerifier);
+            return await this.getAccessToken(client, code, clientSecret, codeVerifier);
 
         } else if (grantType == "client_credentials") {
 
@@ -445,7 +472,7 @@ export class OAuthAuthorizationServer {
             const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
             if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
     
-            return await this.getAccessToken(clientId, undefined, clientSecret, codeVerifier, scopes);
+            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes);
 
         } else {
 
@@ -483,7 +510,7 @@ export class OAuthAuthorizationServer {
 
     }
 
-    private async getAuthorizationCode(clientId: string, redirectUri : string, scopes: string[]|undefined, state: string, codeChallenge? : string, codeChallengeMethod? : string, user? : User) : Promise<{code? : string, state? : string, error? : string, error_description? : string}> {
+    private async getAuthorizationCode(client: OAuthClient, redirectUri : string, scopes: string[]|undefined, state: string, codeChallenge? : string, codeChallengeMethod? : string, user? : User) : Promise<{code? : string, state? : string, error? : string, error_description? : string}> {
 
         // if we have a challenge, check the method is valid
         if (codeChallenge) {
@@ -493,22 +520,13 @@ export class OAuthAuthorizationServer {
             }
         }
 
-        // validate client
-        let client : OAuthClient;
-        try {
-            client = await this.clientStorage.getClient(clientId);
-        }
-        catch (e) {
-            CrossauthLogger.logger.error(j({err: e}));
-            return {error: "unauthorized_client", error_description: "Client is not authorized"};
-        }
-
         // validate redirect uri
         const decodedUri = redirectUri; /*decodeURI(redirectUri.replace("+"," "));*/
         OAuthAuthorizationServer.validateUri(decodedUri);
         if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
             return {error: "invalid_request", error_description: `The redirect uri ${redirectUri} is invalid`};
         }
+
 
         // create authorization code and data to store with the key
         const created = new Date();
@@ -548,32 +566,21 @@ export class OAuthAuthorizationServer {
         return {code: authzCode, state: state};
     }
 
-    private async getAccessToken(clientId: string, code? : string, clientSecret? : string, codeVerifier? : string,  scopes? : string[]) 
+    private async getAccessToken(client: OAuthClient, code? : string, clientSecret? : string, codeVerifier? : string,  scopes? : string[]) 
         : Promise<OAuthTokenResponse> {
 
-        // make sure we have the client secret if configured to require it
-        if (this.requireClientSecret == "always") {
-            if (!clientSecret) {
-                return {error: "access_denied", error_description: "No client secret provided"};
-            }
-        } else if (this.requireClientSecret == "withoutpkce") {
-            if (!clientSecret && !codeVerifier) {
-                return {error: "access_denied", error_description: "No client secret or code verifier provided"};
-            }
-        }
-
-        // validate client
-        let client : OAuthClient;
-            try {
-                client = await this.clientStorage.getClient(clientId);
-                if (clientSecret) {
-                    Hasher.passwordsEqual(clientSecret, client.clientSecret||"");
+        // validate client secret
+        try {
+            if (client.clientSecret) {
+                    Hasher.passwordsEqual(clientSecret||"", client.clientSecret||"");
+                } else {
+                    throw new CrossauthError(ErrorCode.Unauthorized, "Client secret is required for this client");
                 }
-            }
-            catch (e) {
-                CrossauthLogger.logger.error(j({err: e}));
-                return {error: "unauthorized_client", error_description: "The client is not authorized"};
-            }
+        }
+        catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return {error: "access_denied", error_description: "The client is not authorized"};
+        }
 
         // validate authorization code
         let authzData : {
@@ -772,10 +779,10 @@ export class OAuthAuthorizationServer {
 
     }
 
-    async createClient(name : string, redirectUri : string[]) : Promise<OAuthClient> {
+    async createClient(name : string, redirectUri : string[], validFlow? : string[], confidential=true) : Promise<OAuthClient> {
         const clientId = OAuthAuthorizationServer.randomClientId();
         let clientSecret : string|undefined = undefined;
-        if (this.saveClientSecret) {
+        if (confidential) {
             const plaintext = OAuthAuthorizationServer.randomClientSecret();
             clientSecret = await Hasher.passwordHash(plaintext, {
                 encode: true,
@@ -787,11 +794,15 @@ export class OAuthAuthorizationServer {
         redirectUri.forEach((uri) => {
             OAuthAuthorizationServer.validateUri(uri);
         });
+        if (!validFlow) {
+            validFlow = OAuthFlows.allFlows();
+        }
         const client = {
             clientId: clientId,
             clientSecret: clientSecret,
             clientName : name,
             redirectUri : redirectUri,
+            validFlow: validFlow,
         }
         return await this.clientStorage.createClient(client);
     }

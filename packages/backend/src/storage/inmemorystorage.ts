@@ -439,7 +439,13 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
     async updateClient(client : Partial<OAuthClient>) : Promise<void> {
         if (client.clientId && client.clientId in this.clients) {
             const oldClient = this.clients[client.clientId];
-            this.clients[client.clientId] = {...client, clientName: client.clientName||oldClient.clientName, clientId: oldClient.clientId, redirectUri: client.redirectUri||oldClient.redirectUri}
+            this.clients[client.clientId] = {
+                ...client, 
+                clientName: client.clientName||oldClient.clientName, 
+                clientId: oldClient.clientId, 
+                redirectUri: client.redirectUri||oldClient.redirectUri,
+                validFlow: client.validFlow||oldClient.validFlow,
+            }
         }
     }
 

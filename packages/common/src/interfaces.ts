@@ -71,5 +71,6 @@ export interface OAuthClient {
     clientName : string,
     clientSecret? : string,
     redirectUri : string[],
+    validFlow : string[],
     [ key : string ] : any,
 }

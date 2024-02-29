@@ -1,7 +1,7 @@
 import { PrismaClient } from '../src/generated/client/index.js';
 import { LocalPasswordAuthenticator } from '@crossauth/backend';
 import { PrismaUserStorage, PrismaOAuthClientStorage, Hasher } from '@crossauth/backend';
-import { CrossauthLogger } from '@crossauth/common';
+import { CrossauthLogger, OAuthFlows } from '@crossauth/common';
 
 const prisma = new PrismaClient();
 
@@ -42,6 +42,7 @@ async function main() {
       clientSecret: clientSecret,
       clientName: "Example Client",
       redirectUri: ["http://localhost:3001/authzcode"],
+      validFlow: OAuthFlows.allFlows(),
   };
   const client = await clientStorage.createClient(inputClient);
   console.log(client);

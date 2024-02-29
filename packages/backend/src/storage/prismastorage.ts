@@ -1,11 +1,11 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { UserStorage, KeyStorage, type UserStorageGetOptions, UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage } from '../storage';
 import { User, UserSecrets, UserInputFields, UserSecretsInputFields, Key, OAuthClient } from '@crossauth/common';
-import { CrossauthError, ErrorCode } from'@crossauth/common';
+import { CrossauthError, ErrorCode, OAuthFlows } from'@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
 
- /**
+/**
  * Optional parameters for {@link PrismaUserStorage}.
  * 
  * See {@link PrismaUserStorage.constructor} for definitions.
@@ -629,6 +629,9 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
     /** Prisma name of the OAuth Client table.  Default oAuthClient */
     clientTable? : string,
 
+    /** Prisma name of the OAuth valid flows table.  Default oClientValidFlow */
+    validFlowTable? : string,
+
     /** Prisma name of the OAuth Redirect Uri table.  Default oAuthClientRedirectUri */
     redirectUriTable? : string,
 
@@ -643,6 +646,7 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
 export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private clientTable : string = "oAuthClient";
     private redirectUriTable : string = "OAuthClientRedirectUri";
+    private validFlowTable : string = "OAuthClientValidFlow";
     private prismaClient : PrismaClient;
 
     /**
@@ -655,6 +659,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         super();
         setParameter("clientTable", ParamType.String, this, options, "OAUTH_CLIENT_TABLE");
         setParameter("redirectUriTable", ParamType.String, this, options, "OAUTH_REDIRECTURI_TABLE");
+        setParameter("validFlowTable", ParamType.String, this, options, "OAUTH_VALID_FLOW_TABLE");
         if (options.prismaClient == undefined) {
             this.prismaClient = new PrismaClient();
         } else {
@@ -679,18 +684,23 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 where: {
                     clientId: clientId
                 },
-                include: {redirectUri: true},
+                include: {redirectUri: true, validFlow: true},
             });
             const redirectUriObjects = client.redirectUri;
-            //client.redirectUri = redirectUriObjects.map((x:{[key:string]:string}) => x.uri);
-            return {...client, clientSecret: client.clientSecret||undefined, redirectUri: redirectUriObjects.map((x:{[key:string]:any}) => x.uri)};
+            const validFlowObjects = client.validFlow;
+            return {
+                ...client, 
+                clientSecret: client.clientSecret||undefined, 
+                redirectUri: redirectUriObjects.map((x:{[key:string]:any}) => x.uri), 
+                validFlow: validFlowObjects.map((x:{[key:string]:any}) => x.flow)
+            };
         } catch (e) {
             CrossauthLogger.logger.error(j({msg: "Invalid OAuth client id", err: e}))
             throw new CrossauthError(ErrorCode.InvalidClientId);
         }
     }
 
-        /**
+    /**
      * Saves a key in the session table.
      * 
      * @param redirectUri array of valid redirect uri's
@@ -710,7 +720,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      */
     private async createClientWithTransaction(client : OAuthClient, tx : any) : Promise<OAuthClient> {
         const maxAttempts = 10;
-        const {redirectUri, ...prismaClientData} = client;
+        const {redirectUri, validFlow, ...prismaClientData} = client;
         let newClient : OAuthClient|undefined;
 
         // validate redirect uri
@@ -724,7 +734,13 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             }
         }
 
-        // create client (without redirect uri) - may take seveal attempts to get a unique clientId
+        // validate valid flows
+        for (let i=0; i<validFlow.length; ++i) {
+            if (!OAuthFlows.isValidFlow(validFlow[0])) throw new CrossauthError(ErrorCode.InvalidOAuthFlow, "Redirect Uri's may not contain page fragments");
+        }
+        
+        
+        // create client (without redirect uri and valid flows) - may take seveal attempts to get a unique clientId
         for (let attempt=0; attempt < maxAttempts; ++attempt) {
             try {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -767,7 +783,6 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                     }
                 });
             }
-            return newClient;
         } catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                 if (e.code == 'P2002') {
@@ -782,6 +797,29 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
             }
         }
+
+        // create valid flows
+        try {
+            for (let i=0; i<validFlow.length; ++i) {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                await tx[this.validFlowTable].create({
+                    data: {
+                        client_id: newClient.clientId,
+                        flow: validFlow[i],
+                    }
+                });
+            }
+        } catch (e) {
+            if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
+            } else {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
+            }
+        }
+
+        return {...newClient, redirectUri: redirectUri, validFlow: validFlow};
     }
 
     /**
@@ -817,11 +855,12 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private async updateClientWithTransaction(client : Partial<OAuthClient>, tx : any) : Promise<void> {
         if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
         const redirectUris = client.redirectUri;
+        const validFlows = client.validFlow;
 
         // validate redirect uris
         if (redirectUris) {
-        for (let i=0; i<redirectUris.length; ++i) {
-            if (redirectUris[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
+            for (let i=0; i<redirectUris.length; ++i) {
+                if (redirectUris[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
                 try {
                     new URL(redirectUris[i]);
                 }
@@ -830,11 +869,20 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 }
             }
         }
+        
 
+        // validate valid flows
+        if (validFlows) {
+            for (let i=0; i<validFlows.length; ++i) {
+                if (!OAuthFlows.isValidFlow(validFlows[i])) throw new CrossauthError(ErrorCode.InvalidOAuthFlow, "Redirect Uri's may not contain page fragments");
+            }
+        }
+    
         try {
             let data = {...client};
             delete data.clientId;
             delete data.redirectUri;
+            delete data.validFlow;
 
             if (Object.keys(data).length > 0) {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -881,8 +929,37 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                     CrossauthLogger.logger.debug(j({err: e}));
                     throw new CrossauthError(ErrorCode.Connection, "Error updating client");
                 }
-                }    
+            }    
         }
+
+        if (validFlows) {
+            try {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                await this.prismaClient[this.validFlowTable].deleteMany({
+                    where: {
+                        client_id: client.clientId
+                    }
+                });
+                for (let i=0; i<validFlows.length; ++i) { 
+                    // @ts-ignore  (because types only exist when do prismaClient.table...)
+                    await tx[this.validFlowTable].create({
+                        data: {
+                            client_id: client.clientId,
+                            flow: validFlows[i],
+                        }
+                    });
+                }
+            } catch (e) {
+                if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.Connection, "Error updating client");
+                } else {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.Connection, "Error updating client");
+                }
+            }    
+        }
+
     }
 }
 

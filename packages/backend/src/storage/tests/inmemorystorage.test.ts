@@ -196,12 +196,31 @@ test('InMemoryClientStorage.createGetAndDeleteClient', async () => {
         clientSecret: "DEF",
         clientName: "Test",
         redirectUri: [],
+        validFlow: [],
     };
     await clientStorage.createClient(client);
     const getClient = await clientStorage.getClient(client.clientId);
     expect(getClient.clientSecret).toBe(client.clientSecret);
     await clientStorage.deleteClient(client.clientId);
     await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
+});
+
+test('InMemoryClientStorage.createAndUpdateValidFlows', async () => {
+    const clientStorage = new InMemoryOAuthClientStorage();
+    const client = {
+        clientId : "ABC3b",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+        validFlow: ["AuthorizationCode", "AuthorizationCodeWithPKCE"],
+    }
+    await clientStorage.createClient(client);
+    const getClient1 = await clientStorage.getClient(client.clientId);
+    expect(getClient1.validFlow.length).toBe(2);
+    await clientStorage.updateClient({clientId: client.clientId, validFlow: ["ClientCredentials"]});
+    const getClient2 = await clientStorage.getClient(client.clientId);
+    expect(getClient2.validFlow.length).toBe(1);
+    expect(getClient2.validFlow[0]).toBe("ClientCredentials");
 });
 
 test("InMemoryAuthorization.createAndGetForUser", async () => {
@@ -261,3 +280,4 @@ test("InMemoryAuthorization.createAndUpdateForUser", async () => {
     expect(["read", "delete"]).toContain(scopes[0]);
     expect(["read", "delete"]).toContain(scopes[1]);
 });
+
