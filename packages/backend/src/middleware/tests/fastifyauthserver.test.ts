@@ -1,12 +1,12 @@
 import { beforeAll, afterEach, expect, test, vi } from 'vitest'
 import path from 'path';
 import fastify from 'fastify';
-import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
 import { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage } from '../../storage/inmemorystorage';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
-import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 import { Hasher } from '../../hasher';
 import { CrossauthError, OAuthFlows } from '@crossauth/common';
+import { LocalPasswordAuthenticator } from '../..';
+import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
@@ -38,6 +38,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
 
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
+    const authenticator = new LocalPasswordAuthenticator(userStorage);
     const server = new FastifyServer(userStorage, {
         session: {
             keyStorage: keyStorage, 
@@ -56,6 +57,8 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             jwtPublicKeyFile: "keys/rsa-public-key.pem",
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
             siteUrl: `http://localhost:3000`,
+            userStorage,
+            authenticator,
             ...options,
         });
     // @ts-ignore

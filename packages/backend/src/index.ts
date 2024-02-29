@@ -7,7 +7,7 @@ export { LdapUserStorage } from './storage/ldapstorage';
 export type  { LdapUserStorageOptions } from './storage/ldapstorage';
 
 // authenticators
-export { Authenticator } from './auth';
+export { Authenticator, PasswordAuthenticator } from './auth';
 export type { AuthenticationOptions, AuthenticationParameters, AuthenticatorCapabilities } from './auth';
 export {  LocalPasswordAuthenticator } from './authenticators/passwordauth';
 export type {  LocalPasswordAuthenticatorOptions } from './authenticators/passwordauth';

@@ -5,7 +5,7 @@ import type { User, UserInputFields, UserSecretsInputFields, Key } from '@crossa
  * An example is `password`
 */
 export interface AuthenticationParameters extends UserSecretsInputFields {
-    totpCode? : string,
+    otp? : string,
     token? : string,
 }
 
@@ -114,3 +114,6 @@ export abstract class Authenticator {
     }
 }
 
+export abstract class PasswordAuthenticator extends Authenticator {
+    secretNames() {return ["password"];}
+}

@@ -1,7 +1,7 @@
 import type { User, UserSecretsInputFields, Key, UserInputFields } from '@crossauth/common';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils.ts';
-import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
+import { PasswordAuthenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
 import { LdapUserStorage } from '../storage/ldapstorage.ts';
 
 /** Optional parameters to pass to {@link LdapAuthenticator} constructor. */
@@ -15,7 +15,7 @@ export interface LdapAuthenticatorOptions extends AuthenticationOptions {
  * Users are expected to be in local storage as well, as defined by `ldapStorage`.
  * This class can optionally auto-create a user that is not already there.
  */
-export class LdapAuthenticator extends Authenticator {
+export class LdapAuthenticator extends PasswordAuthenticator {
 
     private ldapAutoCreateAccount : boolean = false;
     private ldapStorage : LdapUserStorage;
@@ -60,10 +60,6 @@ export class LdapAuthenticator extends Authenticator {
         if (localUser.state == "awaitingtwofactorsetup") throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
         if (localUser.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
         if (localUser.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
-    }
-
-    secretNames() : string[] {
-        return ["password"];
     }
 
     /**

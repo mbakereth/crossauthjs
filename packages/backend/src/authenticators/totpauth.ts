@@ -83,13 +83,13 @@ export class TotpAuthenticator extends Authenticator {
      * Authenticates the user using the saved TOTP parameters and the passed code.
      * @param _user ignored
      * @param secrets should contain `totpSecret` that was saved in the session data.
-     * @param params should contain `totpCode`.
+     * @param params should contain `otp`.
      */
     async authenticateUser(_user : UserInputFields|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
-        if (!secrets.totpSecret || !params.totpCode) {
+        if (!secrets.totpSecret || !params.otp) {
             throw new CrossauthError(ErrorCode.InvalidToken, "TOTP secret or code not given");
         }
-        const code = params.totpCode;
+        const code = params.otp;
         const secret = secrets.totpSecret;
         if (!gAuthenticator.check(code, secret)) {
             throw new CrossauthError(ErrorCode.InvalidToken, "Invalid TOTP code");

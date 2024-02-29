@@ -4,7 +4,7 @@ import { UserStorage } from '../storage.ts'
 import { Hasher } from '../hasher.ts';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils.ts';
-import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
+import { PasswordAuthenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
 
 /**
  * Default password validator.
@@ -53,7 +53,7 @@ export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions
 /**
  * Does username/password authentication using PBKDF2 hashed passwords.
  */
-export class LocalPasswordAuthenticator extends Authenticator {
+export class LocalPasswordAuthenticator extends PasswordAuthenticator {
 
     private secret : string|undefined = undefined;
     enableSecretForPasswords : boolean = false;
@@ -106,13 +106,6 @@ export class LocalPasswordAuthenticator extends Authenticator {
         if (user.state == "awaitingtwofactorsetup") throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
         if (user.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
         if (user.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
-    }
-
-    /**
-     * @returns `password`
-     */
-    secretNames() : string[] {
-        return ["password"];
     }
 
     /**

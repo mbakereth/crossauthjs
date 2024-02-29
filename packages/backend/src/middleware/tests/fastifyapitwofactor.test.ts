@@ -109,7 +109,7 @@ async function createTotpAccount(server : FastifyServer) {
         const code = gAuthenticator.generate(secret);
         res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
-            totpCode: code
+            otp: code,
         } })
         body = JSON.parse(res.body)
         if (body.ok == true) break;
@@ -252,7 +252,7 @@ test('FastifyServer.api.signupTotpWithEmailVerification', async () => {
         const code = gAuthenticator.generate(secret);
         res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
-            totpCode: code
+            otp: code
         } })
         body = JSON.parse(res.body)
         if (body.ok == true) break;
@@ -293,7 +293,7 @@ test('FastifyServer.api.loginTotp', async () => {
         const code = gAuthenticator.generate(secrets.totpSecret||"");
         res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
-            totpCode: code
+            otp: code
         } })
         body = JSON.parse(res.body)
         if (body.ok == true) break;
@@ -336,7 +336,7 @@ test('FastifyServer.api.turnOnTotp', async () => {
         const code = gAuthenticator.generate(secret);
         res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
-            totpCode: code
+            otp: code,
         } })
         body = JSON.parse(res.body)
         if (body.ok == true) break;
@@ -372,7 +372,7 @@ test('FastifyServer.api.turnOffTotp', async () => {
         const code = gAuthenticator.generate(secrets.totpSecret||"");
         res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
-            totpCode: code
+            otp: code
         } })
         body = JSON.parse(res.body)
         if (body.ok == true) break;
@@ -419,7 +419,7 @@ test('FastifyServer.api.reconfigureTotp', async () => {
         const code = gAuthenticator.generate(secrets.totpSecret||"");
         res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
-            totpCode: code
+            otp: code,
         } })
         body = JSON.parse(res.body)
         if (body.ok == true) break;
@@ -442,7 +442,7 @@ test('FastifyServer.api.reconfigureTotp', async () => {
         const code = gAuthenticator.generate(secret);
         res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie2, SESSIONID: sessionCookie2}, payload: {
             csrfToken: csrfToken2,
-            totpCode: code
+            otp: code
         } })
         body = JSON.parse(res.body)
         if (body.ok == true) break;

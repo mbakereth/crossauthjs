@@ -141,7 +141,7 @@ interface LoginBodyType extends CsrfBodyType {
 interface LoginFactor2BodyType extends CsrfBodyType {
     persist? : boolean,
     next? : string,
-    totpCode? : string,
+    otptring,
     token? : string,
 }
 
@@ -155,7 +155,7 @@ interface SignupBodyType extends LoginBodyType {
 interface ConfigureFactor2BodyType extends CsrfBodyType {
     next? : string,
     persist? : boolean,
-    totpCode? : string,
+    otp? : string,
     token? : string,
     [key:string] : any,
 }

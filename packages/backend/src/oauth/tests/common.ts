@@ -5,6 +5,8 @@ import { OAuthClientStorage } from '../../storage';
 import { Hasher } from '../../hasher';
 import { OAuthClient, OAuthFlows } from '@crossauth/common';
 import fs from 'node:fs';
+import { LocalPasswordAuthenticator } from '../..';
+import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
 
 export async function createClient(secretRequired = true) : Promise<{clientStorage : OAuthClientStorage, client : OAuthClient}> {
     const clientStorage = new InMemoryOAuthClientStorage();
@@ -41,6 +43,8 @@ export async function getAuthServer({
 } = {}) {
     const {clientStorage, client} = await createClient(secretRequired == undefined || secretRequired == true);
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
+    const userStorage = await getTestUserStorage();
+    const authenticator = new LocalPasswordAuthenticator(userStorage);
     let options : OAuthAuthorizationServerOptions = {
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
@@ -49,6 +53,8 @@ export async function getAuthServer({
         issueRefreshToken: true,
         emptyScopeIsValid: emptyScopeIsValid,
         validFlows: "all",
+        userStorage,
+        authenticator,
     };
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {

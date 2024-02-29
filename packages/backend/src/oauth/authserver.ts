@@ -1,5 +1,6 @@
 import jwt, { Algorithm } from 'jsonwebtoken';
-import { KeyStorage, OAuthClientStorage, OAuthAuthorizationStorage } from '../storage';
+import { KeyStorage, UserStorage, OAuthClientStorage, OAuthAuthorizationStorage } from '../storage';
+import { Authenticator } from '../auth';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import { OpenIdConfiguration, GrantType, Jwks } from '@crossauth/common';
@@ -134,12 +135,20 @@ export interface OAuthAuthorizationServerOptions {
 
     /** Required if emptyScopeIsValid is false */
     authStorage? : OAuthAuthorizationStorage,
+
+    /** Required if activating the password flow */
+    userStorage? : UserStorage;
+
+    /** Required if activating the password flow */
+    authenticator? : Authenticator;
 }
 
 export class OAuthAuthorizationServer {
 
         private clientStorage : OAuthClientStorage;
         private keyStorage : KeyStorage;
+        private userStorage? : UserStorage;
+        private authenticator? : Authenticator;
         private authStorage? : OAuthAuthorizationStorage;
 
         private oauthIssuer : string = "";
@@ -180,7 +189,9 @@ export class OAuthAuthorizationServer {
     constructor(clientStorage: OAuthClientStorage, keyStorage : KeyStorage, options: OAuthAuthorizationServerOptions) {
         this.clientStorage = clientStorage;
         this.keyStorage = keyStorage;
+        this.userStorage = options.userStorage;
         this.authStorage = options.authStorage;
+        this.authenticator = options.authenticator;
 
         setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
         setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
@@ -259,6 +270,10 @@ export class OAuthAuthorizationServer {
 
         if ((this.persistAccessToken || this.persistRefreshToken || this.persistUserToken) && !this.keyStorage) {
             throw new CrossauthError(ErrorCode.Configuration, "Key storage required for persisting tokens");
+        }
+
+        if (this.validFlows.includes(OAuthFlows.Password) && (!this.userStorage || !this.authenticator)) {
+            throw new CrossauthError(ErrorCode.Configuration, "If password flow is enabled, userStorage and authenticator must be provided");
         }
     }
 
@@ -402,6 +417,8 @@ export class OAuthAuthorizationServer {
         clientSecret,
         codeVerifier,
         refreshToken,
+        username,
+        password,
     } : {
         grantType : string, 
         clientId : string, 
@@ -409,7 +426,9 @@ export class OAuthAuthorizationServer {
         code? : string,
         clientSecret? : string,
         codeVerifier? : string,
-        refreshToken? : string}) 
+        refreshToken? : string,
+        username? : string,
+        password? : string}) 
     : Promise<OAuthTokenResponse> {
 
         // get client
@@ -501,6 +520,35 @@ export class OAuthAuthorizationServer {
             const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
             if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
     
+            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes, createRefreshToken);
+
+        } else if (grantType == "password") {
+
+            // validate scopes
+            const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
+            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
+    
+            // validate username and password
+            if (!username || !password) {
+                return {
+                    error: "access_denied",
+                    error_description: "username and/or password not provided for password flow",
+                }
+            }
+            try {
+                if (!this.userStorage || !this.authenticator) {
+                    // already checked in constructor but VS code doesn't know
+                    return {error: "server_error", error_description: "Password authentication not configured"};
+                }
+                const {user, secrets} = await this.userStorage.getUserByUsername(username);
+                await this.authenticator.authenticateUser(user, secrets, {password: password})
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                return {
+                    error: "access_denied",
+                    error_description: "Username and/or password do not match",
+                }
+            }
             return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes, createRefreshToken);
 
         } else {
