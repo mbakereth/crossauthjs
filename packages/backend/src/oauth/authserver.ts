@@ -483,11 +483,17 @@ export class OAuthAuthorizationServer {
                     error_description: "No authorization code provided for authorization code flow",
                 };
             }
-            return await this.getAccessToken(client, code, clientSecret, codeVerifier, undefined, undefined, createRefreshToken);
+            return await this.getAccessToken(client, code, clientSecret, codeVerifier, undefined, createRefreshToken);
 
         } else if (grantType == "refresh_token") {
     
-            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, undefined, refreshToken, createRefreshToken);
+            if (!this.validRefreshToken(refreshToken||"")) {
+                return {
+                    error: "access_denied",
+                    error_description: "Refresh token is invalid",
+                }
+            }
+            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, undefined, createRefreshToken);
 
         } else if (grantType == "client_credentials") {
 
@@ -495,7 +501,7 @@ export class OAuthAuthorizationServer {
             const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
             if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
     
-            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes, undefined, createRefreshToken);
+            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes, createRefreshToken);
 
         } else {
 
@@ -595,22 +601,21 @@ export class OAuthAuthorizationServer {
         return {code: authzCode, state: state};
     }
 
-    private async getAccessToken(client: OAuthClient, code? : string, clientSecret? : string, codeVerifier? : string,  scopes? : string[], refreshToken? : string, issueRefreshToken = false) 
+    private async getAccessToken(client: OAuthClient, code? : string, clientSecret? : string, codeVerifier? : string,  scopes? : string[], issueRefreshToken = false) 
         : Promise<OAuthTokenResponse> {
 
         // validate client secret
+        let passwordCorrect = true;
         try {
             if (client.clientSecret) {
-                if (!await Hasher.passwordsEqual(clientSecret||"", client.clientSecret||"")) {
-                        throw new CrossauthError(ErrorCode.Unauthorized, "Invalid client secret");
-                    }
-                }
-        }
-        catch (e) {
+                passwordCorrect = await Hasher.passwordsEqual(clientSecret||"", client.clientSecret||"");
+            }
+        } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             const message = e instanceof CrossauthError ? e.message : "Couldn't validate client";
             return {error: "server_error", error_description: message};
         }
+        if (!passwordCorrect) return {error: "access_denied", error_description: "Invalid client secret"};
 
         // validate authorization code
         let authzData : {
@@ -700,8 +705,9 @@ export class OAuthAuthorizationServer {
             );
         }
 
-        if (issueRefreshToken) {
+        let newRefreshToken : string|undefined = undefined;
 
+        if (issueRefreshToken) {
             // create refresh token payload
             const refreshTokenJti = Hasher.uuid();
             let dateRefreshTokenExpires : Date|undefined;
@@ -724,7 +730,7 @@ export class OAuthAuthorizationServer {
             }
 
             // create refresh token jwt
-            refreshToken = await new Promise((resolve, reject) => {
+            newRefreshToken = await new Promise((resolve, reject) => {
                 jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked}, 
                     (error: Error | null,
                     encoded: string | undefined) => {
@@ -747,13 +753,55 @@ export class OAuthAuthorizationServer {
         
         return {
             access_token : accessToken,
-            refresh_token : refreshToken,
+            refresh_token : newRefreshToken,
             expires_in : this.accessTokenExpiry==null ? undefined : this.accessTokenExpiry,
             token_type: "Bearer",
         }
     }
 
-    async validateJwt(code : string, type? : string) : Promise<{[key:string]: any}> {
+    async validAuthenticationCode(token : string) : Promise<{[key:string]: any}|undefined> {
+        try {
+            const decoded = await this.validateJwt(token, "refresh");
+            if (this.persistRefreshToken) {
+                const hash = "refresh:" + Hasher.hash(decoded.jti);
+                await this.keyStorage.getKey(hash);
+            }
+            return decoded;
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return undefined;
+        }
+    }
+
+    async validRefreshToken(token : string) : Promise<{[key:string]: any}|undefined> {
+        try {
+            const decoded = await this.validateJwt(token, "refresh");
+            if (this.persistRefreshToken) {
+                const hash = "refresh:" + Hasher.hash(decoded.payload.jti);
+                await this.keyStorage.getKey(hash);
+            }
+            return decoded;
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return undefined;
+        }
+    }
+
+    async validAccessToken(token : string) : Promise<{[key:string]: any}|undefined> {
+        try {
+            const decoded = await this.validateJwt(token, "access");
+            if (this.persistAccessToken) {
+                const hash = "access:" + Hasher.hash(decoded.payload.jti);
+                await this.keyStorage.getKey(hash);
+            }
+            return decoded;
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return undefined;
+        }
+    }
+
+    private async validateJwt(code : string, type? : string) : Promise<{[key:string]: any}> {
         return  new Promise((resolve, reject) => {
             jwt.verify(code, this.secretOrPublicKey, {clockTolerance: this.clockTolerance, complete: true}, 
                 (error: Error | null,

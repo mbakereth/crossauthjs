@@ -25,8 +25,21 @@ export async function createClient(secretRequired = true) : Promise<{clientStora
 
 }
 
-export async function getAuthServer({aud, persistAccessToken, emptyScopeIsValid, secretRequired} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean, emptyScopeIsValid? : boolean, secretRequired? : boolean} = {}) {
-    const {clientStorage, client} = await createClient(secretRequired == true);
+export async function getAuthServer({
+    aud, 
+    persistAccessToken, 
+    emptyScopeIsValid, 
+    secretRequired,
+    rollingRefreshToken,
+    } : {
+    challenge?: boolean, 
+    aud?: string, 
+    persistAccessToken? : boolean, 
+    emptyScopeIsValid? : boolean, 
+    secretRequired? : boolean,
+    rollingRefreshToken? : boolean,
+} = {}) {
+    const {clientStorage, client} = await createClient(secretRequired == undefined || secretRequired == true);
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
     let options : OAuthAuthorizationServerOptions = {
         jwtPrivateKey : privateKey,
@@ -41,14 +54,24 @@ export async function getAuthServer({aud, persistAccessToken, emptyScopeIsValid,
     if (persistAccessToken) {
         options.persistAccessToken = true;
     }
+    if (rollingRefreshToken != undefined) options.rollingRefreshToken = rollingRefreshToken;
     const keyStorage = new InMemoryKeyStorage();
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, options);
     return {client, clientStorage, authServer, keyStorage};
 }
 
-export async function getAuthorizationCode({challenge, aud, persistAccessToken} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean} = {}) {
+export async function getAuthorizationCode({
+    challenge, 
+    aud, 
+    persistAccessToken,
+    rollingRefreshToken,
+} : {challenge?: boolean,
+     aud?: string, 
+     persistAccessToken? : boolean,
+     rollingRefreshToken? : boolean,
+    } = {}) {
     const secretRequired = challenge == undefined;
-    const {client, clientStorage, authServer, keyStorage} = await getAuthServer({aud, persistAccessToken, secretRequired});
+    const {client, clientStorage, authServer, keyStorage} = await getAuthServer({aud, persistAccessToken, secretRequired, rollingRefreshToken});
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
     const codeVerifier = "ABC123";

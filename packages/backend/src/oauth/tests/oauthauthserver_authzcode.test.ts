@@ -324,7 +324,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
         validScopes: "read, write",
     });
     const inputState = "ABCXYZ";
-    const {code, state, error, error_description} 
+    const {code, state, error} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
             clientId: client.clientId, 
@@ -332,10 +332,20 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
-    expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    await expect(async () => {await authServer.validateJwt(code||"")}).rejects.toThrowError(CrossauthError);
-    });
+
+    const {access_token,  error: error2}
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: "DEF"});
+    expect(error2).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token||"");
+    expect(decodedAccessToken).toBeUndefined();
+});
 
 test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
 
@@ -345,23 +355,39 @@ test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
     const decodedAccessToken
-        = await authServer.validateJwt(access_token||"");
-    expect(decodedAccessToken.payload.scope.length).toBe(2);
-    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[0]);
-    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[1]);
+        = await authServer.validAccessToken(access_token||"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
 
     const decodedRefreshToken
-        = await authServer.validateJwt(refresh_token||"");
-    expect(decodedRefreshToken.payload.scope.length).toBe(2);
-    expect(["read", "write"]).toContain(decodedRefreshToken.payload.scope[0]);
-    expect(["read", "write"]).toContain(decodedRefreshToken.payload.scope[1]);
+        = await authServer.validRefreshToken(refresh_token||"");
+    expect(decodedRefreshToken).toBeDefined();
+    expect(decodedRefreshToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedRefreshToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedRefreshToken?.payload.scope[1]);
 
     expect(expires_in).toBe(60*60);
+});
+
+test('AuthorizationServer.AuthzCodeFlow.invalidfAccessToken', async () => {
+    const {authServer} = await getAuthorizationCode();
+    const decodedAccessToken
+        = await authServer.validAccessToken("ABC");
+    expect(decodedAccessToken).toBeUndefined();
+});
+
+test('AuthorizationServer.AuthzCodeFlow.invalidfRefreshToken', async () => {
+    const {authServer} = await getAuthorizationCode();
+    const decodedRefreshToken
+        = await authServer.validRefreshToken("ABC");
+    expect(decodedRefreshToken).toBeUndefined();
 });
 
 test('AuthorizationServer.AuthzCodeFlow.oidcConfiguration', async () => {
@@ -382,4 +408,51 @@ test('AuthorizationServer.AuthzCodeFlow.jwks', async () => {
     const jwks = authServer.jwks();
     expect(jwks.keys.length).toBe(1);
     expect(jwks.keys[0].kty).toBe("RSA");
+});
+
+test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowNoRolling', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode({rollingRefreshToken: false});
+    const {refresh_token, error}
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(refresh_token).toBeDefined();
+
+    const {refresh_token: refresh_token2, error: error2}
+        = await authServer.tokenPostEndpoint({
+            grantType: "refresh_token", 
+            clientId: client.clientId, 
+            refreshToken: refresh_token, 
+            clientSecret: "DEF"});
+    expect(error2).toBeUndefined();
+    expect(refresh_token2).toBeUndefined();
+
+});
+
+test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode({rollingRefreshToken: true});
+    const {refresh_token, error}
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(refresh_token).toBeDefined();
+
+    const {refresh_token: refresh_token2, error: error2}
+        = await authServer.tokenPostEndpoint({
+            grantType: "refresh_token", 
+            clientId: client.clientId, 
+            refreshToken: refresh_token, 
+            clientSecret: "DEF"});
+    expect(error2).toBeUndefined();
+    expect(refresh_token2).toBeDefined();
+    expect(refresh_token2).not.toBe(refresh_token);
+
 });

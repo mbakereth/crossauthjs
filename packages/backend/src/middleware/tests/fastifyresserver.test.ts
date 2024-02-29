@@ -37,15 +37,16 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
     const decodedAccessToken
-        = await authServer.validateJwt(access_token||"");
-    expect(decodedAccessToken.payload.scope.length).toBe(2);
-    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[0]);
-    expect(["read", "write"]).toContain(decodedAccessToken.payload.scope[1]);
+        = await authServer.validAccessToken(access_token||"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const resserver = new FastifyOAuthResourceServer({authServerBaseUri: "http://server.com"})
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await resserver.loadConfig();
