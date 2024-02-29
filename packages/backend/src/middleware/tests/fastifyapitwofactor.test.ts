@@ -23,8 +23,8 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
     let lpAuthenticator = new LocalPasswordAuthenticator(userStorage, {pbkdf2Iterations: 1_000});
     let totpAuthenticator = new TotpAuthenticator("FastifyTest");
     let emailAuthenticator = new EmailAuthenticator();
-    emailAuthenticator["sendToken"] = async function (to: string, token : string) {
-        emailTokenData = {token, to}
+    emailAuthenticator["sendToken"] = async function (to: string, otp : string) {
+        emailTokenData = {otp, to}
         return "1";
     };
 
@@ -137,10 +137,10 @@ async function createEmailAccount(server : FastifyServer) {
     expect(body.ok).toBe(true);
 
     const sessionCookie = getSession(res);
-    const token = emailTokenData.token;
+    const otp = emailTokenData.otp;
     res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
-        token: token
+        otp: otp
     } })
     body = JSON.parse(res.body)
     
@@ -165,10 +165,10 @@ async function loginEmail(server : FastifyServer) : Promise<{sessionCookie : str
     expect(body.ok).toBe(true);
 
     const sessionCookie = getSession(res);
-    const token = emailTokenData.token;
+    const otp = emailTokenData.otp;
     res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
-        token: token
+        otp: otp
     } })
     expect(body.ok).toBe(true);
 
@@ -479,10 +479,10 @@ test('FastifyServer.api.signupEmailWithoutEmailVerificationWrongCode', async () 
     expect(body.ok).toBe(true);
 
     const sessionCookie = getSession(res);
-    const token = "XXXXXX";
+    const otp = "XXXXXX";
     res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
-        token: token
+        otp: otp
     } })
     body = JSON.parse(res.body)
     
@@ -519,10 +519,10 @@ test('FastifyServer.api.loginEmail', async () => {
     expect(body.ok).toBe(true);
 
     const sessionCookie = getSession(res);
-    const token = emailTokenData.token;
+    const otp = emailTokenData.otp;
     res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
-        token: token
+        otp: otp
     } })
     expect(body.ok).toBe(true);
 });
@@ -555,10 +555,10 @@ test('FastifyServer.api.turnOnEmail', async () => {
     body = JSON.parse(res.body)
     expect(body.ok).toBe(true);
 
-    const token = emailTokenData.token;
+    const otp = emailTokenData.otp;
     res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
-        token: token
+        otp: otp
     } });
     body = JSON.parse(res.body)
     expect(body.ok).toBe(true);
@@ -586,10 +586,10 @@ test('FastifyServer.api.turnOffEmail', async () => {
     expect(body.ok).toBe(true);
 
     const sessionCookie = getSession(res);
-    const token = emailTokenData.token;
+    const otp = emailTokenData.otp;
     res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
-        token: token
+        otp: otp
     } })
     expect(body.ok).toBe(true);
     expect(body.user.username).toBe("mary");
@@ -627,7 +627,7 @@ test('FastifyServer.api.loginEmailTokenExpired', async () => {
     expect(body.ok).toBe(true);
 
     const sessionCookie = getSession(res);
-    const token = emailTokenData.token;
+    const otp = emailTokenData.otp;
     // @ts-ignore we will ignore the possibilty of being undefined
     const sessionManager = server["sessionServer"]["sessionManager"];
     expect(sessionManager).toBeDefined();
@@ -647,7 +647,7 @@ test('FastifyServer.api.loginEmailTokenExpired', async () => {
 
     res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
-        token: token
+        otp: otp
     } })
     body = JSON.parse(res.body)
     expect(body.ok).toBe(false);
@@ -671,7 +671,7 @@ test('FastifyServer.api.signupEmailWithoutEmailVerificationExpiredCode', async (
     expect(body.ok).toBe(true);
 
     const sessionCookie = getSession(res);
-    const token = emailTokenData.token;
+    const otp = emailTokenData.otp;
 
     // @ts-ignore
     const sessionManager = server["sessionServer"]["sessionManager"];
@@ -693,7 +693,7 @@ test('FastifyServer.api.signupEmailWithoutEmailVerificationExpiredCode', async (
 
     res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
-        token: token
+        otp: otp
     } })
     body = JSON.parse(res.body)
     
@@ -710,7 +710,7 @@ test('FastifyServer.api.factor2ProtectedPage', async () => {
     let res;
     let body;
 
-    emailTokenData.token = "";
+    emailTokenData.otp = "";
 
     // request change password - expect to be asked for 2FA
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
@@ -723,12 +723,12 @@ test('FastifyServer.api.factor2ProtectedPage', async () => {
     expect(body.ok).toBe(true);
     expect(body.factor2Required).toBe(true);
 
-    const token = emailTokenData.token;
-    expect(token).not.toBe("");
+    const otp = emailTokenData.otp;
+    expect(otp).not.toBe("");
 
-    // enter token
+    // enter otp
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
-        token: token, 
+        otp: otp, 
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);
@@ -744,7 +744,7 @@ test('FastifyServer.api.factor2ProtectedPageInvalidToken', async () => {
     let res;
     let body;
 
-    emailTokenData.token = "";
+    emailTokenData.otp = "";
 
     // request change password - expect to be asked for 2FA
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
@@ -757,11 +757,11 @@ test('FastifyServer.api.factor2ProtectedPageInvalidToken', async () => {
     expect(body.ok).toBe(true);
     expect(body.factor2Required).toBe(true);
 
-    const token = "XXXXX";
+    const otp = "XXXXX";
 
-    // enter token
+    // enter otp
     res = await server.app.inject({ method: "POST", url: "/api/changepassword", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
-        token: token, 
+        otp: otp, 
         csrfToken: csrfToken,
     } });
     body = JSON.parse(res.body);

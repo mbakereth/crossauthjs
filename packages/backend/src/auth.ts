@@ -6,7 +6,6 @@ import type { User, UserInputFields, UserSecretsInputFields, Key } from '@crossa
 */
 export interface AuthenticationParameters extends UserSecretsInputFields {
     otp? : string,
-    token? : string,
 }
 
 /**
