@@ -7,11 +7,12 @@ export class OAuthFlows {
     static readonly AuthorizationCode = "AuthorizationCode";
     static readonly AuthorizationCodeWithPKCE = "AuthorizationCodeWithPKCE";
     static readonly ClientCredentials = "ClientCredentials";
+    static readonly RefreshToken = "RefreshToken";
+    static readonly DeviceCode = "DeviceCode";
+    static readonly Password = "Password";
 
     static isValidFlow(flow : string) : boolean {
-        return [OAuthFlows.AuthorizationCode,
-                OAuthFlows.AuthorizationCodeWithPKCE,
-                OAuthFlows.ClientCredentials].includes(flow);
+        return OAuthFlows.allFlows().includes(flow);
     }
 
     static areAllValidFlows(flows : string[]) : boolean {
@@ -25,7 +26,11 @@ export class OAuthFlows {
     static allFlows() : string[] {
         return [OAuthFlows.AuthorizationCode,
             OAuthFlows.AuthorizationCodeWithPKCE,
-            OAuthFlows.ClientCredentials]
+            OAuthFlows.ClientCredentials,
+            OAuthFlows.RefreshToken,
+            OAuthFlows.DeviceCode,
+            OAuthFlows.Password,
+        ];
     }
 } 
 

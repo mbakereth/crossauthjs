@@ -6,7 +6,7 @@ import { Hasher } from '../../hasher';
 import { OAuthClient, OAuthFlows } from '@crossauth/common';
 import fs from 'node:fs';
 
-export async function createClient() : Promise<{clientStorage : OAuthClientStorage, client : OAuthClient}> {
+export async function createClient(secretRequired = true) : Promise<{clientStorage : OAuthClientStorage, client : OAuthClient}> {
     const clientStorage = new InMemoryOAuthClientStorage();
     const clientSecret = await Hasher.passwordHash("DEF", {
         encode: true,
@@ -15,7 +15,7 @@ export async function createClient() : Promise<{clientStorage : OAuthClientStora
     });
     const inputClient = {
         clientId : "ABC",
-        clientSecret: clientSecret,
+        clientSecret: secretRequired ? clientSecret : undefined,
         clientName: "Test",
         redirectUri: ["http://localhost:3000/authzcode"],
         validFlow: OAuthFlows.allFlows(),
@@ -25,8 +25,8 @@ export async function createClient() : Promise<{clientStorage : OAuthClientStora
 
 }
 
-export async function getAuthServer({aud, persistAccessToken, emptyScopeIsValid} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean, emptyScopeIsValid? : boolean} = {}) {
-    const {clientStorage, client} = await createClient();
+export async function getAuthServer({aud, persistAccessToken, emptyScopeIsValid, secretRequired} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean, emptyScopeIsValid? : boolean, secretRequired? : boolean} = {}) {
+    const {clientStorage, client} = await createClient(secretRequired == true);
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
     let options : OAuthAuthorizationServerOptions = {
         jwtPrivateKey : privateKey,
@@ -47,7 +47,8 @@ export async function getAuthServer({aud, persistAccessToken, emptyScopeIsValid}
 }
 
 export async function getAuthorizationCode({challenge, aud, persistAccessToken} : {challenge?: boolean, aud?: string, persistAccessToken? : boolean} = {}) {
-    const {client, clientStorage, authServer, keyStorage} = await getAuthServer({aud, persistAccessToken});
+    const secretRequired = challenge == undefined;
+    const {client, clientStorage, authServer, keyStorage} = await getAuthServer({aud, persistAccessToken, secretRequired});
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
     const codeVerifier = "ABC123";
@@ -73,6 +74,6 @@ export async function getAccessToken() {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     return {authServer, client, code, clientStorage, access_token, error, error_description};
 };

@@ -3,7 +3,7 @@ import { KeyStorage, OAuthClientStorage, OAuthAuthorizationStorage } from '../st
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import { OpenIdConfiguration, GrantType, Jwks } from '@crossauth/common';
-import { CrossauthError, ErrorCode, OAuthClient, OAuthErrorCode, OAuthTokenResponse } from '@crossauth/common';
+import { CrossauthError, ErrorCode, OAuthClient, OAuthTokenResponse } from '@crossauth/common';
 import { CrossauthLogger, j, type Key, type User } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, JsonWebKey } from 'crypto'
@@ -56,6 +56,9 @@ export interface OAuthAuthorizationServerOptions {
     /** If true, only redirect Uri's registered for the client will be accepted */
     requireRedirectUriRegistration?: boolean,
 
+    /** If true, the authorization code flow will require either a client secret or PKCE challenger/verifier.  Default true */
+    requireClientSecretOrChallenge?: boolean,
+
     /** Authorization code length, before base64url-encoding.  Default 32 */
     authorizationCodeLength? : number,
 
@@ -105,8 +108,11 @@ export interface OAuthAuthorizationServerOptions {
     /** Expiry for access tokens in seconds.  If null, they don't expire.  Defult 1 hour */
     accessTokenExpiry? : number | null,
 
-    /** Expiry for refresh tokens in seconds.  If null, they don't expire.  Defult 1 day */
+    /** Expiry for refresh tokens in seconds.  If null, they don't expire.  Defult 1 hour */
     refreshTokenExpiry? : number | null,
+
+    /** If true, a new refresh token, with new expiry, will be issued every time the access token is refreshed.  Default true */
+    rollingRefreshToken? : boolean,
 
     /** Expiry for authorization codes in seconds.  If null, they don't expire.  Defult 5 minutes */
     authorizationCodeExpiry? : number | null,
@@ -142,6 +148,7 @@ export class OAuthAuthorizationServer {
         private oauthPbkdf2Iterations = 40000;
         private oauthPbkdf2KeyLength = 32;
         private requireRedirectUriRegistration = true;
+        private requireClientSecretOrChallenge = true;
         private jwtAlgorithm = "RS256";
         private jwtAlgorithmChecked : Algorithm = "RS256";
         private authorizationCodeLength = 32;
@@ -161,7 +168,8 @@ export class OAuthAuthorizationServer {
         private opaqueRefreshToken = false;
         private opaquetUserToken = false;
         private accessTokenExpiry : number|null = 60*60;
-        private refreshTokenExpiry : number|null = 60*60*24;
+        private refreshTokenExpiry : number|null = 60*60;
+        private rollingRefreshToken : boolean = true;
         private authorizationCodeExpiry : number|null = 60*5;
         private clockTolerance : number = 10;
         private emptyScopeIsValid : boolean = true;
@@ -179,7 +187,8 @@ export class OAuthAuthorizationServer {
         setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
         setParameter("oauthPbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
         setParameter("oauthPbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
-        setParameter("requireRedirectUriRegistration", ParamType.String, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
+        setParameter("requireRedirectUriRegistration", ParamType.Boolean, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
+        setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
         setParameter("authorizationCodeLength", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_LENGTH");
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
@@ -197,6 +206,7 @@ export class OAuthAuthorizationServer {
         setParameter("opaquetUserToken", ParamType.String, this, options, "OAUTH_OPAQUE_USER_TOKEN");
         setParameter("accessTokenExpiry", ParamType.Number, this, options, "OAUTH_ACCESS_TOKEN_EXPIRY");
         setParameter("refreshTokenExpiry", ParamType.Number, this, options, "OAUTH_REFRESH_TOKEN_EXPIRY");
+        setParameter("rollingRefreshToken", ParamType.Boolean, this, options, "OAUTH_ROLLING_REFRESH_TOKEN");
         setParameter("authorizationCodeExpiry", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_EXPIRY");
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
         setParameter("validateScopes", ParamType.Boolean, this, options, "OAUTH_VALIDATE_SCOPES");
@@ -205,11 +215,7 @@ export class OAuthAuthorizationServer {
         setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
         
         if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
-            this.validFlows = [
-                OAuthFlows.AuthorizationCode,
-                OAuthFlows.AuthorizationCodeWithPKCE,
-                OAuthFlows.ClientCredentials,
-            ];
+            this.validFlows = OAuthFlows.allFlows();
         }
 
         this.jwtAlgorithmChecked = algorithm(this.jwtAlgorithm);
@@ -248,8 +254,8 @@ export class OAuthAuthorizationServer {
         }
 
         if (this.opaqueAccessToken) this.persistAccessToken = true;
-        if (this.opaqueRefreshToken) this.persistRefreshToken = true
-        if (this.opaquetUserToken) this.persistUserToken = true
+        if (this.opaqueRefreshToken) this.persistRefreshToken = true;
+        if (this.opaquetUserToken) this.persistUserToken = true;
 
         if ((this.persistAccessToken || this.persistRefreshToken || this.persistUserToken) && !this.keyStorage) {
             throw new CrossauthError(ErrorCode.Configuration, "Key storage required for persisting tokens");
@@ -350,7 +356,6 @@ export class OAuthAuthorizationServer {
         if (!this.authStorage) return false;
         const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
         const existingRequestedScopes = requestedScopes.filter((scope) => existingScopes.includes(scope));
-        console.log(requestedScopes, existingRequestedScopes, existingScopes);
         return existingRequestedScopes.length == requestedScopes.length;
     }
 
@@ -396,13 +401,15 @@ export class OAuthAuthorizationServer {
         code,
         clientSecret,
         codeVerifier,
+        refreshToken,
     } : {
         grantType : string, 
         clientId : string, 
         scope? : string, 
         code? : string,
         clientSecret? : string,
-        codeVerifier? : string}) 
+        codeVerifier? : string,
+        refreshToken? : string}) 
     : Promise<OAuthTokenResponse> {
 
         // get client
@@ -415,7 +422,7 @@ export class OAuthAuthorizationServer {
                 error_description: "client id does not exist",
             }
         }
-        if (client.secret && !clientSecret) {
+        if (client.clientSecret && !clientSecret) {
             return {
                 error: "access_denied",
                 error_description: "Client secret is required for this client",
@@ -444,9 +451,27 @@ export class OAuthAuthorizationServer {
             if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};        
         }*/
 
+        // determine whether we are also creating a refresh token
+        let createRefreshToken = false;
+        if (this.issueRefreshToken && flow != OAuthFlows.RefreshToken) {
+            createRefreshToken = true;
+        }
+        if (this.issueRefreshToken && flow == OAuthFlows.RefreshToken && this.rollingRefreshToken) {
+            createRefreshToken = true;
+        }
+
         if (grantType == "authorization_code") {
 
-            if (!clientSecret && !codeVerifier) {
+            // validate secret/challenge
+            if (this.requireClientSecretOrChallenge && (client.clientSecret && !clientSecret) && !codeVerifier) {
+                return {
+                    error : "access_denied",
+                    error_description: "Must provide either a client secret or use PKCE",
+                };
+                
+            }
+
+            if (client.clientSecret && !clientSecret) {
                 return {
                     error : "access_denied",
                     error_description: "No client secret or code verifier provided for authorization coode flow",
@@ -458,21 +483,19 @@ export class OAuthAuthorizationServer {
                     error_description: "No authorization code provided for authorization code flow",
                 };
             }
-            return await this.getAccessToken(client, code, clientSecret, codeVerifier);
+            return await this.getAccessToken(client, code, clientSecret, codeVerifier, undefined, undefined, createRefreshToken);
+
+        } else if (grantType == "refresh_token") {
+    
+            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, undefined, refreshToken, createRefreshToken);
 
         } else if (grantType == "client_credentials") {
 
-            if (!clientSecret) {
-                return {
-                    error : OAuthErrorCode[OAuthErrorCode.access_denied],
-                    error_description: "No client secret provided to client credentials flow",
-                };
-            }
             // validate scopes
             const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
             if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
     
-            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes);
+            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes, undefined, createRefreshToken);
 
         } else {
 
@@ -505,6 +528,12 @@ export class OAuthAuthorizationServer {
             return OAuthFlows.AuthorizationCode;
         } else if (grantType == "client_credentials") {
             return OAuthFlows.ClientCredentials;
+        } else if (grantType == "refresh_token") {
+            return OAuthFlows.RefreshToken;
+        } else if (grantType == "device_code") {
+            return OAuthFlows.DeviceCode;
+        } else if (grantType == "password") {
+            return OAuthFlows.Password;
         }
         return undefined;
 
@@ -566,20 +595,21 @@ export class OAuthAuthorizationServer {
         return {code: authzCode, state: state};
     }
 
-    private async getAccessToken(client: OAuthClient, code? : string, clientSecret? : string, codeVerifier? : string,  scopes? : string[]) 
+    private async getAccessToken(client: OAuthClient, code? : string, clientSecret? : string, codeVerifier? : string,  scopes? : string[], refreshToken? : string, issueRefreshToken = false) 
         : Promise<OAuthTokenResponse> {
 
         // validate client secret
         try {
             if (client.clientSecret) {
-                    Hasher.passwordsEqual(clientSecret||"", client.clientSecret||"");
-                } else {
-                    throw new CrossauthError(ErrorCode.Unauthorized, "Client secret is required for this client");
+                if (!await Hasher.passwordsEqual(clientSecret||"", client.clientSecret||"")) {
+                        throw new CrossauthError(ErrorCode.Unauthorized, "Invalid client secret");
+                    }
                 }
         }
         catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            return {error: "access_denied", error_description: "The client is not authorized"};
+            const message = e instanceof CrossauthError ? e.message : "Couldn't validate client";
+            return {error: "server_error", error_description: message};
         }
 
         // validate authorization code
@@ -670,29 +700,29 @@ export class OAuthAuthorizationServer {
             );
         }
 
-        // create refresh token payload
-        const refreshTokenJti = Hasher.uuid();
-        let dateRefreshTokenExpires : Date|undefined;
-        const refreshTokenPayload : {[key:string]: any} = {
-            jti: refreshTokenJti,
-            iat: timeCreated,
-            iss: this.oauthIssuer,
-            sub: authzData.username,
-            type: "refresh",
-        };
-        if (scopes) {
-            refreshTokenPayload.scope = scopes;
-        }
-        if (this.refreshTokenExpiry != null) {
-            refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry;
-            dateRefreshTokenExpires = new Date(now.getTime()+this.refreshTokenExpiry*1000 + this.clockTolerance*1000);
-        }
-        if (this.resourceServers) {
-            refreshTokenPayload.aud = this.resourceServers;
-        }
+        if (issueRefreshToken) {
 
-        let refreshToken : string|undefined;
-        if (this.issueRefreshToken) {
+            // create refresh token payload
+            const refreshTokenJti = Hasher.uuid();
+            let dateRefreshTokenExpires : Date|undefined;
+            const refreshTokenPayload : {[key:string]: any} = {
+                jti: refreshTokenJti,
+                iat: timeCreated,
+                iss: this.oauthIssuer,
+                sub: authzData.username,
+                type: "refresh",
+            };
+            if (scopes) {
+                refreshTokenPayload.scope = scopes;
+            }
+            if (this.refreshTokenExpiry != null) {
+                refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry;
+                dateRefreshTokenExpires = new Date(now.getTime()+this.refreshTokenExpiry*1000 + this.clockTolerance*1000);
+            }
+            if (this.resourceServers) {
+                refreshTokenPayload.aud = this.resourceServers;
+            }
+
             // create refresh token jwt
             refreshToken = await new Promise((resolve, reject) => {
                 jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked}, 

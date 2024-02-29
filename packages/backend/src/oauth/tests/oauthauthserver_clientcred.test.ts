@@ -1,12 +1,5 @@
 import { test, expect } from 'vitest';
-import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '../authserver';
-import { CrossauthError } from '@crossauth/common';
-import fs from 'node:fs';
-import { createClient, getAuthorizationCode, getAuthServer } from './common';
-import { InMemoryKeyStorage, InMemoryOAuthAuthorizationStorage } from '../../storage/inmemorystorage';
-import { Hasher } from '../../hasher';
-import { KeyStorage } from '../../storage';
-
+import { getAuthServer } from './common';
 test('AuthorizationServer.ClientCredFlow.accessToken', async () => {
 
     const {authServer, client} = await getAuthServer();
@@ -15,8 +8,7 @@ test('AuthorizationServer.ClientCredFlow.accessToken', async () => {
             grantType: "client_credentials", 
             clientId: client.clientId, 
             clientSecret: client.clientSecret,
-            scope: "read write",
-            state: "ABCDEF"});
+            scope: "read write"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 

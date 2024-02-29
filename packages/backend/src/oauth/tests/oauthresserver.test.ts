@@ -12,7 +12,7 @@ test('ResourceServer.validAccessToken', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -35,7 +35,7 @@ test('ResourceServer.invalidPublicKey', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -58,7 +58,7 @@ test('ResourceServer.invalidAccessToken', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -115,7 +115,7 @@ test('ResourceServer.validAud', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -138,7 +138,7 @@ test('ResourceServer.invalidAud', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -161,7 +161,7 @@ test('ResourceServer.invalidIsser', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -184,7 +184,7 @@ test('ResourceServer.persistAccessToken', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -211,7 +211,7 @@ test('ResourceServer.validateWithJwks', async () => {
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
-            clientSecret: client.clientSecret});
+            clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
