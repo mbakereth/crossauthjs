@@ -29,6 +29,11 @@ interface ClientCredentialsBodyType {
     csrfToken? : string,
 }
 
+interface RefreshTokenBodyType {
+    refreshToken: string,
+    csrfToken? : string,
+}
+
 interface PasswordBodyType {
     username : string,
     password: string,
@@ -108,7 +113,8 @@ async function saveInSessionAndLoad(client: FastifyOAuthClient, request : Fastif
         if (!sessionCookieValue) {
             sessionCookieValue = await client.server.createAnonymousSession(request, reply, {[client.sessionDataName] : oauthResponse});
         } else {
-            await client.server.updateSessionData(request, client.sessionDataName, oauthResponse);
+            const expires_at = Date.now() + (oauthResponse.expires_in||0)*1000;
+            await client.server.updateSessionData(request, client.sessionDataName, {...oauthResponse, expires_at});
         }
         if (!client.authorizedPage) {
             return reply.status(500).view(client.errorPage, {status: 500, errorMessage: "Authorized url not configured", errorCodeName: ErrorCode[ErrorCode.Configuration], errorCode: ErrorCode.Configuration});
@@ -138,7 +144,8 @@ async function saveInSessionAndRedirect(client: FastifyOAuthClient, request : Fa
         if (!sessionCookieValue) {
             sessionCookieValue = await client.server.createAnonymousSession(request, reply, {[client.sessionDataName] : oauthResponse});
         } else {
-            await client.server.updateSessionData(request, client.sessionDataName, oauthResponse);
+            const expires_at = (new Date().getTime() + (oauthResponse.expires_in||0)*1000);
+            await client.server.updateSessionData(request, client.sessionDataName, {...oauthResponse, expires_at});
         }
         if (!client.authorizedUrl) {
             return reply.status(500).view(client.errorPage, {status: 500, errorMessage: "Authorized url not configured", errorCodeName: ErrorCode[ErrorCode.Configuration], errorCode: ErrorCode.Configuration});
@@ -162,7 +169,7 @@ export class FastifyOAuthClient extends OAuthClient {
     sessionDataName : string = "oauth";
     private receiveTokenFn : (client : FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply> = sendJson;
     private errorFn : FastifyErrorFn = jsonError;
-    private loginUrl : string = "";
+    private loginUrl : string = "/login";
     private loginProtectedFlows : string[] = [];
     private tokenResponseType :  "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom" = "sendJson";
     private errorResponseType :  "sendJson" | "pageError" | "custom" = "sendJson";
@@ -285,8 +292,7 @@ export class FastifyOAuthClient extends OAuthClient {
                     if (error) return error;
                 }
                 if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
-                    return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
-                }               
+                    return reply.status(401).header(...JSONHDR).send({ok: false, msg: "Access denied"});                }               
                 try {
                     const resp = await this.clientCredentialsFlow(request.body?.scope);
                     if (resp.error) {
@@ -305,12 +311,39 @@ export class FastifyOAuthClient extends OAuthClient {
             });
         }
 
+        if (this.validFlows.includes(OAuthFlows.RefreshToken)) {
+            this.server.app.post(this.prefix+'refreshtokenflow', async (request : FastifyRequest<{ Body: RefreshTokenBodyType }>, reply : FastifyReply) =>  {
+                if (this.server.sessionServer) {
+                    // if sessions are enabled, require a csrf token
+                    const error = await server.errorIfCsrfInvalid(request, reply, this.errorFn);
+                    if (error) return error;
+                }
+                if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
+                    return reply.status(401).header(...JSONHDR).send({ok: false, msg: "Access denied"});                }               
+                try {
+                    const resp = await this.refreshTokenFlow(request.body.refreshToken);
+                    if (resp.error) {
+                        const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description);
+                        return await this.errorFn(this.server, request, reply, ce);
+                    }
+                    return await this.receiveTokenFn(this, request, reply, resp);
+                } catch (e) {
+                    let code = ErrorCode.UnknownError
+                    let message = e instanceof Error ? e.message : "Unknown error";
+                    const ce = (e instanceof CrossauthError) ? e as CrossauthError : new CrossauthError(code, message);
+                    CrossauthLogger.logger.error(j({msg: "Error receiving token", cerr: ce, user: request.user?.user}));
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    return await this.errorFn(this.server, request, reply, ce);
+                }
+            });
+        }
+
         if (this.validFlows.includes(OAuthFlows.Password)) {
             this.server.app.get(this.prefix+this.passwordFlowUrl, async (request : FastifyRequest<{ Querystring: PasswordQueryType, Body: PasswordBodyType }>, reply : FastifyReply) =>  {
-                if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
+                if (!request.user && this.loginProtectedFlows.includes(OAuthFlows.Password)) {
                     return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
-                }               
-                return reply.view(this.passwordFlowPage, {user: request.user, csrfToken: request.csrfToken, scope: request.query.scope});
+                }
+                return reply.view(this.passwordFlowPage, {user: request.user, scope: request.query.scope, csrfToken: request.csrfToken});            
             });
 
             this.server.app.post(this.prefix+this.passwordFlowUrl, async (request : FastifyRequest<{ Body: PasswordBodyType }>, reply : FastifyReply) =>  {
@@ -352,5 +385,28 @@ export class FastifyOAuthClient extends OAuthClient {
             return reply.view(this.passwordFlowPage, {user: request.user, username: request.body.username, password: request.body.password, scope: request.body.scope, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName, csrfToken: request.csrfToken});
         }
 
+    }
+
+    async refreshIfExpired(request : FastifyRequest, reply : FastifyReply, refreshToken? : string, expiresAt? : number) 
+        : Promise<{refresh_token?: string, access_token? : string, expires_at?: number, error? : string, error_description? : string}|undefined> {
+            if (!expiresAt || !refreshToken) return undefined;
+            if (expiresAt <= Date.now()) {
+            try {
+                const resp = await this.refreshTokenFlow(refreshToken);
+                if (!resp.error && !resp.access_token) {
+                    resp.error = "server_error";
+                    resp.error_description = "Unexpectedly did not receive error or access token";
+                }
+                if (!resp.error) {
+                    await this.receiveTokenFn(this, request, reply, resp);
+                } 
+                return {access_token: resp.access_token, refresh_token: resp.refresh_token, expires_at: resp.expires_at, error: resp.error, error_description: resp.error_description};
+            } catch(e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                CrossauthLogger.logger.error(j({cerr: e, msg: "Failed refreshing access token"}));
+                return {error: "server_error", error_description: "Failed refreshing access token"};
+            }
+        }
+        return undefined;
     }
 }

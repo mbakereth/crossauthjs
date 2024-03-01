@@ -5,7 +5,7 @@ import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
-import { CrossauthError, CrossauthLogger, OAuthFlows, type OAuthTokenResponse } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, OAuthFlows, type OAuthTokenResponse } from '@crossauth/common';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
@@ -90,15 +90,22 @@ app.get('/passwordex', async (request : FastifyRequest, reply : FastifyReply) =>
 
 // in this example, the API is called from the backend
 app.get('/resource', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    const oauthData = await server.getSessionData(request, "oauth");
-    if (oauthData?.access_token) {
-        const resp = await fetch(process.env["RESOURCE_SERVER"]+"/resource", {
-            headers: {
-                "Authorization": "Bearer " + oauthData.access_token,
-        }});
-        return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
-    } else {
-        return reply.header(...JSONHDR).status(401).send({ok: false});
+    try {
+        const oauthData = await server.getSessionData(request, "oauth");
+        let access_token = oauthData.access_token;
+        const resp = await server.oAuthClient?.refreshIfExpired(request, reply, oauthData.refresh_token, oauthData.expires_at);
+        if (resp?.new_access_token) access_token = resp.new_ccess_token;
+        if (access_token) {
+            const resp = await fetch(process.env["RESOURCE_SERVER"]+"/resource", {
+                headers: {
+                    "Authorization": "Bearer " + access_token,
+            }});
+            return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
+        } else {
+            return reply.header(...JSONHDR).status(401).send({ok: false});
+        }
+    } catch (e) {
+        CrossauthLogger.logger.error(j({err: e}));
     }
 });
 

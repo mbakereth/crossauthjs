@@ -101,11 +101,11 @@ export async function getAuthorizationCode({
 export async function getAccessToken() {
 
     const {authServer, client, code, clientStorage} = await getAuthorizationCode();
-    const {access_token, error, error_description}
+    const {access_token, error, error_description, refresh_token, expires_in}
         = await authServer.tokenPostEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
             clientSecret: "DEF"});
-    return {authServer, client, code, clientStorage, access_token, error, error_description};
+    return {authServer, client, code, clientStorage, access_token, error, error_description, refresh_token, expires_in};
 };

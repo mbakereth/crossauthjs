@@ -267,3 +267,30 @@ test('FastifyAuthServfer.getAccessTokenWClientCredentialsNoAuth', async () => {
     // @ts-ignore
 
 });
+
+
+test('FastifyAuthServfer.getAccessTokenWithPasswordFlow', async () => {
+
+    let {server} = await makeAppWithOptions();
+
+    let res;
+    let body;
+
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        payload: {
+            grant_type: "password",
+            scope: "read write",
+            state: "ABCDEF",
+            client_id: "ABC",
+            client_secret: "DEF",
+            username: "bob",
+            password: "bobPass123",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeDefined();
+    // @ts-ignore
+    await server.authServer.authServer.validateJwt(body.access_token, "access");
+
+});

@@ -1,12 +1,14 @@
 import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, beforeAll, afterAll, vi } from 'vitest';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
-import fastify from 'fastify';
-import { OpenIdConfiguration } from '@crossauth/common';
+import fastify, { FastifyRequest, FastifyReply } from 'fastify';
+import { OpenIdConfiguration, type OAuthTokenResponse } from '@crossauth/common';
 import { getAccessToken, getAuthServer } from '../../oauth/tests/common';
 import { getTestUserStorage } from '../../storage/tests/inmemorytestdata';
 import { InMemoryKeyStorage } from '../..';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
+import { FastifyOAuthClient, } from '../..';
+
 import path from 'path';
 
 const fetchMocker = createFetchMock(vi);
@@ -20,7 +22,7 @@ const oidcConfiguration : OpenIdConfiguration = {
     jwks_uri: "http://server.com/jwks",
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
-    grant_types_supported: ["authorization_code", "client_credentials", "password"],
+    grant_types_supported: ["authorization_code", "client_credentials", "password", "refresh_token"],
     token_endpoint_auth_signing_alg_values_supported: ["RS256"],
     subject_types_supported: ["public"],
     id_token_signing_alg_values_supported: ["RS256"],
@@ -190,7 +192,7 @@ test('FastifyOAuthClient.passwordFlow', async () => {
 
     // get csrf token and check password flow get 
     res = await server.app.inject({ method: "GET", url: "/passwordflow" })
-    body = JSON.parse(res.body)
+    body = JSON.parse(res.body);
     expect(body.template).toBe("passwordflow.njk");
     const {csrfCookie, csrfToken} = getCsrf(res);
 
@@ -226,3 +228,54 @@ test('FastifyOAuthClient.passwordFlow', async () => {
 afterAll(async () => {
     fetchMocker.dontMock();
 });
+
+test('FastifyOAuthClient.refreshToken', async () => {
+    const {authServer, access_token, refresh_token} = await getAccessToken();
+    expect(access_token).toBeDefined();
+
+    const resp = await authServer.tokenPostEndpoint({
+        grantType: "refresh_token", 
+        clientId : "ABC", 
+        clientSecret : "DEF",
+        refreshToken: refresh_token,
+    });
+    expect(resp.error).toBeUndefined();
+    expect(resp.access_token).toBeDefined();
+});
+
+async function receiveFn(_client: FastifyOAuthClient, _request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
+    return reply;
+}
+
+test('FastifyOAuthClient.refreshIfExpiredIsExpired', async () => {
+    const {authServer, access_token, refresh_token, expires_in} = await getAccessToken();
+    expect(access_token).toBeDefined();
+
+    const server = await makeClient();
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+
+    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()||"{}")}));
+    if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
+    // @ts-ignore
+    let res = await server.oAuthClient?.refreshIfExpired(null, null, refresh_token, Date.now()-10000);
+    expect(res?.access_token).toBeDefined();
+});
+
+test('FastifyOAuthClient.refreshIfExpiredIsNotExpired', async () => {
+    const {authServer, access_token, refresh_token, expires_in} = await getAccessToken();
+    expect(access_token).toBeDefined();
+
+    const server = await makeClient();
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+
+    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()||"{}")}));
+    if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
+    // @ts-ignore
+    let res = await server.oAuthClient?.refreshIfExpired(null, null, refresh_token, Date.now()+expires_in);
+    expect(res?.access_token).toBeUndefined();
+});
+

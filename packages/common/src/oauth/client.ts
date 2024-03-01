@@ -266,7 +266,7 @@ export abstract class OAuthClientBase {
     }
 
     protected async refreshTokenFlow(refreshToken : string) : Promise<{[key:string]:any}> {
-        CrossauthLogger.logger.debug(j({msg: "Starting password flow"}));
+        CrossauthLogger.logger.debug(j({msg: "Starting refresh token flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("refresh_token")) {
             return {error: "invalid_request", error_description: "Server does not support refresh_token grant"};
