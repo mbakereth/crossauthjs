@@ -46,7 +46,7 @@ export class FastifyApiKeyServer {
                         try {
                             const {user} = await this.userStorage.getUserById(key.userId);
                             request.user = user;
-                            CrossauthLogger.logger.debug(j({msg: "API key is for user", userId: user.id, hahedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
+                            CrossauthLogger.logger.debug(j({msg: "API key is for user", userId: user.id, user: user.username, hahedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                         } catch (e2) {
                             CrossauthLogger.logger.error(j({msg: "API key has invalid user", userId: key.userId,  hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                             CrossauthLogger.logger.debug(j({err: e2}));

@@ -21,7 +21,7 @@ const oidcConfiguration : OpenIdConfiguration = {
     jwks_uri: "http://server.com/jwks",
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
-    grant_types_supported: ["authorization_code"],
+    grant_types_supported: ["authorization_code", "client_credentials", "password"],
     token_endpoint_auth_signing_alg_values_supported: ["RS256"],
     subject_types_supported: ["public"],
     id_token_signing_alg_values_supported: ["RS256"],
@@ -37,7 +37,7 @@ beforeAll(async () => {
 });
 
 
-test('ResourceServer.validAccessToken', async () => {
+test('OAuthClient.startAuthorizationCodeFlow', async () => {
     const {code, access_token} = await getAccessToken();
     
     const oauthClient = new OAuthClient("http://authserver.com", { 
@@ -65,6 +65,64 @@ test('ResourceServer.validAccessToken', async () => {
             expires_in: new Date(new Date().getTime()+1000*60*5),
     })});
     const resp = await oauthClient["redirectEndpoint"](code, state);
+    expect(resp.access_token).toBeDefined();
+
+});
+
+test('OAuthClient.clientCredentialsFlow', async () => {
+    
+    const oauthClient = new OAuthClient("http://authserver.com", { 
+        clientId: "ABC",
+        clientSecret: "DEF",
+        redirectUri: "http://client.com/authzcode"
+    });
+    
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await oauthClient.loadConfig();
+    const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
+    expect(url).toBeDefined();
+    const state = get("state",url||"");
+    expect(state).toBeDefined();
+    expect(state?.length).toBeGreaterThan(0);
+
+    fetchMocker.mockResponseOnce((_req) => {
+        return JSON.stringify({
+            access_token: "dummy",
+            token_type: "Bearer",
+            expires_in: new Date(new Date().getTime()+1000*60*5),
+    })});
+    const resp = await oauthClient["clientCredentialsFlow"]("read write");
+    expect(resp.access_token).toBeDefined();
+
+});
+
+test('OAuthClient.passwordFlow', async () => {
+    
+    const oauthClient = new OAuthClient("http://authserver.com", { 
+        clientId: "ABC",
+        clientSecret: "DEF",
+        redirectUri: "http://client.com/authzcode"
+    });
+    
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await oauthClient.loadConfig();
+    const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
+    expect(url).toBeDefined();
+    const state = get("state",url||"");
+    expect(state).toBeDefined();
+    expect(state?.length).toBeGreaterThan(0);
+
+    fetchMocker.mockResponseOnce((req) => {
+        const params = JSON.parse((req.body||"{}").toString());
+        if (params.username != "bob" || params.password != "bobPass123") return {};
+        return JSON.stringify({
+            access_token: "dummy",
+            token_type: "Bearer",
+            expires_in: new Date(new Date().getTime()+1000*60*5),
+    })});
+    const resp = await oauthClient["passwordFlow"]("bob", "bobPass123", "read write");
     expect(resp.access_token).toBeDefined();
 
 });

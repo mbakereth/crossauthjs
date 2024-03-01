@@ -31,6 +31,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         clientId : "ABC",
         clientSecret: clientSecret,
         clientName: "Test",
+        confidential: true,
         redirectUri: ["http://example.com/redirect"],
         validFlow: OAuthFlows.allFlows(),
     };
@@ -216,5 +217,53 @@ test('FastifyAuthServfer.getAccessTokenWClientCredentials', async () => {
     expect(body.access_token).toBeDefined();
     // @ts-ignore
     await server.authServer.authServer.validateJwt(body.access_token, "access");
+
+});
+
+test('FastifyAuthServfer.getAccessTokenWClientCredentialsBasicAuth', async () => {
+
+    let {server} = await makeAppWithOptions();
+
+    let res;
+    let body;
+
+    const authorization = Hasher.base64Encode("ABC:DEF");
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        headers: {
+            authorization: "Basic " + authorization,
+        },
+        payload: {
+            grant_type: "client_credentials",
+            scope: "read write",
+            state: "ABCDEF",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeDefined();
+    // @ts-ignore
+    await server.authServer.authServer.validateJwt(body.access_token, "access");
+
+});
+
+test('FastifyAuthServfer.getAccessTokenWClientCredentialsNoAuth', async () => {
+
+    let {server} = await makeAppWithOptions();
+
+    let res;
+    let body;
+
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        payload: {
+            grant_type: "client_credentials",
+            scope: "read write",
+            state: "ABCDEF",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeUndefined();
+    expect(body.error).toBe("access_denied");
+    // @ts-ignore
 
 });

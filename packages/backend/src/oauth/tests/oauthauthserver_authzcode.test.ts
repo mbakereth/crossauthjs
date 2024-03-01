@@ -415,6 +415,7 @@ test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
     expect(decodedAccessToken?.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    expect(decodedAccessToken?.payload.sub).toBe("bob");
 
     const decodedRefreshToken
         = await authServer.validRefreshToken(refresh_token||"");

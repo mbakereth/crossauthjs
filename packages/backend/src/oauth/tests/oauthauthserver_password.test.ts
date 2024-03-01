@@ -4,6 +4,7 @@ import { createClient } from './common';
 import { InMemoryKeyStorage } from '../../storage/inmemorystorage';
 import { LocalPasswordAuthenticator } from '../..';
 import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
+import { jwtDecode } from "jwt-decode";
 
 test('AuthorizationServer.passwordFlow.correctPassword', async () => {
     const {clientStorage, client} = await createClient();
@@ -27,7 +28,8 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
             clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(access_token).toBeDefined();
-
+    const sub = jwtDecode(access_token||"")?.sub;
+    expect(sub).toBe("bob");
 });
 
 test('AuthorizationServer.passwordFlow.incorrectPassword', async () => {

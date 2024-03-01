@@ -1,6 +1,6 @@
 import { CrossauthLogger, j } from '..';
 import { CrossauthError, ErrorCode } from '..';
-import { OpenIdConfiguration, DEFAULT_OIDCCONFIG } from '..';
+import { OpenIdConfiguration, DEFAULT_OIDCCONFIG, type GrantType } from '..';
 
 export class OAuthFlows {
     static readonly All = "all";
@@ -32,6 +32,23 @@ export class OAuthFlows {
             OAuthFlows.Password,
         ];
     }
+
+    static grantType(oauthFlow : string) : GrantType|undefined {
+        switch (oauthFlow) {
+            case OAuthFlows.AuthorizationCode:
+            case OAuthFlows.AuthorizationCodeWithPKCE:
+                return "authorization_code";
+            case OAuthFlows.ClientCredentials:
+                return "client_credentials";
+            case OAuthFlows.RefreshToken:
+                return "refresh_token";
+            case OAuthFlows.Password:
+                return "password";
+            case OAuthFlows.DeviceCode:
+                return "device_code";
+        }
+        return undefined;
+    }
 } 
 
 export interface OAuthTokenResponse {
@@ -56,7 +73,6 @@ export abstract class OAuthClientBase {
     protected stateLength = 32;
     protected authzCode : string = "";
     protected oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
-    protected activeFlow : string = "";
 
     constructor({authServerBaseUri,
         clientId,
@@ -146,9 +162,6 @@ export abstract class OAuthClientBase {
             this.codeVerifier = this.randomValue(this.verifierLength);
             this.codeChallenge = this.codeChallengeMethod == "plain" ? this.codeVerifier : this.sha256(this.codeVerifier);
             url += "&code_challenge=" + this.codeChallenge;
-            this.activeFlow = OAuthFlows.AuthorizationCodeWithPKCE;
-        } else {
-            this.activeFlow = OAuthFlows.AuthorizationCode;
         }
 
         return {url: url};
@@ -177,19 +190,15 @@ export abstract class OAuthClientBase {
 
         let grant_type : string;
         let clientSecret : string|undefined;
-        if (this.activeFlow == OAuthFlows.AuthorizationCode || this.activeFlow == OAuthFlows.AuthorizationCodeWithPKCE) {
-            grant_type = "authorization_code";
-            clientSecret = this.clientSecret;
-        } else {
-            return {error: "invalid_request", error_description: "Unsupported flow " + OAuthFlows.AuthorizationCode};
-        }
+        grant_type = "authorization_code";
+        clientSecret = this.clientSecret;
         let params : {[key:string]:any} = {
             grant_type: grant_type,
             client_id: this.clientId,
             code: this.authzCode,
         }
         if (clientSecret) params.client_secret = clientSecret;
-        if (this.activeFlow == OAuthFlows.AuthorizationCodeWithPKCE) params.code_verifier = this.codeVerifier;
+        params.code_verifier = this.codeVerifier;
         try {
             return this.post(url, params);
         } catch (e) {
@@ -218,7 +227,60 @@ export abstract class OAuthClientBase {
             client_secret: this.clientSecret,
         }
         if (scope) params.scope = scope;
-        this.activeFlow = OAuthFlows.ClientCredentials;
+        try {
+            return await this.post(url, params);
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return {error: "server_error", error_description: "Error connecting to authorization server"};
+        }
+        //return {url: url, params: params};
+    }
+
+    protected async passwordFlow(username : string, password : string, scope? : string) : Promise<{[key:string]:any}> {
+        CrossauthLogger.logger.debug(j({msg: "Starting password flow"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("password")) {
+            return {error: "invalid_request", error_description: "Server does not support password grant"};
+        }
+        if (!this.oidcConfig?.token_endpoint) {
+            return {error: "server_error", error_description: "Cannot get token endpoint"};
+        }
+
+        const url = this.oidcConfig.token_endpoint;
+
+        let params : {[key:string]:any} = {
+            grant_type: "password",
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            username : username,
+            password : password,
+        }
+        if (scope) params.scope = scope;
+        try {
+            return await this.post(url, params);
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return {error: "server_error", error_description: "Error connecting to authorization server"};
+        }
+        //return {url: url, params: params};
+    }
+
+    protected async refreshTokenFlow(refreshToken : string) : Promise<{[key:string]:any}> {
+        CrossauthLogger.logger.debug(j({msg: "Starting password flow"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("refresh_token")) {
+            return {error: "invalid_request", error_description: "Server does not support refresh_token grant"};
+        }
+        if (!this.oidcConfig?.token_endpoint) {
+            return {error: "server_error", error_description: "Cannot get token endpoint"};
+        }
+
+        const url = this.oidcConfig.token_endpoint;
+
+        let params : {[key:string]:any} = {
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+        }
         try {
             return await this.post(url, params);
         } catch (e) {
@@ -229,6 +291,7 @@ export abstract class OAuthClientBase {
     }
 
     protected async post(url : string, params : {[key:string]:any}) : Promise<{[key:string]:any}>{
+        CrossauthLogger.logger.debug(j({msg: "Fetch", url: url, params: Object.keys(params)}));
         const resp = await fetch(url, {
             method: 'POST',
             headers: {

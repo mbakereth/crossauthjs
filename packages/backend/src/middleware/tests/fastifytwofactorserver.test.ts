@@ -16,7 +16,7 @@ import { CrossauthError } from '@crossauth/common';
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
 export var passwordResetData :  {token : string, extraData: {[key:string]: any}};
-export var emailTokenData :  {to: string, token : string};
+export var emailTokenData :  {to: string, otp : string};
 
 beforeAll(async () => {
 });

@@ -5,7 +5,7 @@ import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
-import { CrossauthError, CrossauthLogger, type OAuthTokenResponse } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, OAuthFlows, type OAuthTokenResponse } from '@crossauth/common';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
@@ -61,7 +61,9 @@ const server = new FastifyServer(userStorage, {
     allowedFactor2: "none",
     enableEmailVerification: false,
     siteUrl: `http://localhost:${port}`,
+    loginUrl: "login",
     validFlows: "all", // activate all OAuth flows
+    loginProtectedFlows: OAuthFlows.AuthorizationCode + ", " + OAuthFlows.AuthorizationCodeWithPKCE,
     tokenResponseType: "saveInSessionAndLoad",
 });
 
@@ -78,6 +80,11 @@ app.get('/authzcodeex', async (request : FastifyRequest, reply : FastifyReply) =
 
 app.get('/clientcredentialsex', async (request : FastifyRequest, reply : FastifyReply) =>  {
     return reply.view('clientcredentials.njk', {user: request.user, csrfToken: request.csrfToken});
+}
+);
+
+app.get('/passwordex', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    return reply.view('passwordex.njk', {user: request.user, csrfToken: request.csrfToken});
 }
 );
 

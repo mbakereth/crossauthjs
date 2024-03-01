@@ -52,6 +52,7 @@ model Key {
 
 model OAuthClient {
     clientId       String                    @id @unique
+    confidential   Boolean                   @default(true)
     clientName     String
     clientSecret   String?
 

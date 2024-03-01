@@ -39,7 +39,8 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
             }    
         } catch (e) {
             const ce = e as CrossauthError;
-            CrossauthLogger.logger.error(j({err: e}));
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {authorized: false, error: "server_error", error_description: ce.message};
         }
         return undefined;

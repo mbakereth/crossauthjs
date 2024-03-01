@@ -217,7 +217,7 @@ export class PrismaUserStorage extends UserStorage {
                 });
             }
         } catch (e) {
-            CrossauthLogger.logger.error(j({err: e}));
+            CrossauthLogger.logger.debug(j({err: e}));
             throw new CrossauthError(ErrorCode.Connection, "Error updating user");
         }
     }
@@ -267,7 +267,7 @@ export class PrismaUserStorage extends UserStorage {
             });
             }
         } catch (e) {
-            CrossauthLogger.logger.error(j({err: e}));
+            CrossauthLogger.logger.debug(j({err: e}));
             error = new CrossauthError(ErrorCode.Connection, "Error creating user");
             if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                 if (e.code === 'P2002') {
@@ -291,7 +291,7 @@ export class PrismaUserStorage extends UserStorage {
         }
     });
     } catch (e) {
-        CrossauthLogger.logger.error(j({err: e}));
+        CrossauthLogger.logger.debug(j({err: e}));
         error = new CrossauthError(ErrorCode.Connection, "Error deleting key");
     } 
     if (error) throw error;
@@ -416,7 +416,7 @@ export class PrismaKeyStorage extends KeyStorage {
         } catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                 if (e.code == 'P2002') {
-                    CrossauthLogger.logger.debug(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+                    CrossauthLogger.logger.warn(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
                     CrossauthLogger.logger.debug(j({err: e}));
                     error = new CrossauthError(ErrorCode.KeyExists);
                 } else {
@@ -695,7 +695,8 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 validFlow: validFlowObjects.map((x:{[key:string]:any}) => x.flow)
             };
         } catch (e) {
-            CrossauthLogger.logger.error(j({msg: "Invalid OAuth client id", err: e}))
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({msg: "Invalid OAuth client id", clientId: clientId, cerr: e}))
             throw new CrossauthError(ErrorCode.InvalidClientId);
         }
     }
@@ -1017,7 +1018,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             return rows.map((row : {[key:string]:any}) => row.scope);
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({msg: "Couldn't get authorizations"}))
+            //CrossauthLogger.logger.error(j({msg: "Couldn't get authorizations", clientId: clientId, userId: userId, cerr: e}))
             throw new CrossauthError(ErrorCode.Connection);
         }
     }

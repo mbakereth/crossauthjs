@@ -48,6 +48,8 @@ interface TokenBodyType {
     state?: string,
     code? : string,
     code_verifier? : string,
+    username? : string,
+    password? : string,
 }
 
 export class FastifyAuthorizationServer {
@@ -106,9 +108,9 @@ export class FastifyAuthorizationServer {
                 let ce : CrossauthError|undefined = undefined;
                 if (error_description) {
                     ce = new CrossauthError(ErrorCode.BadRequest, error_description);
-                    CrossauthLogger.logger.debug(j({msg: "authorize parameter invalid " + error_description}));
+                    CrossauthLogger.logger.error(j({msg: "authorize parameter invalid", cerr: ce, user: request.user?.username}));
                 }  else {
-                    CrossauthLogger.logger.debug(j({msg: "authorize parameter valid"}));
+                    CrossauthLogger.logger.error(j({msg: "authorize parameter valid", user: request.user?.username}));
 
                 }
 
@@ -125,7 +127,7 @@ export class FastifyAuthorizationServer {
                     }
                 }
                 let hasAllScopes = false;
-                CrossauthLogger.logger.debug(j({msg: `Checking scopes ${request.query.scope} have been authorized`}))
+                CrossauthLogger.logger.debug(j({msg: `Checking scopes have been authorized`, scope: request.query.scope }))
                 if (request.query.scope) {
                     hasAllScopes = await this.authServer.hasAllScopes(request.query.client_id, request.user, request.query.scope.split(" "));
 
@@ -134,7 +136,7 @@ export class FastifyAuthorizationServer {
 
                 }
                 if (hasAllScopes) {
-                    CrossauthLogger.logger.debug(j({msg: `All scopes authorized`}))
+                    CrossauthLogger.logger.debug(j({msg: `All scopes authorized`, scope: request.query.scope}))
                     // all scopes have been previously authorized - create an authorization code
                     return this.authorize(request, reply, true, {
                         responseType: request.query.response_type,
@@ -148,11 +150,9 @@ export class FastifyAuthorizationServer {
                    
                 } else {
                     // requesting new scopes - redirect to page to ask user for it
-                    CrossauthLogger.logger.debug(j({msg: `Not all scopes authorized`}))
+                    CrossauthLogger.logger.debug(j({msg: `Not all scopes authorized`, scope: request.query.scope}))
                     try {
-                        CrossauthLogger.logger.debug(j({msg: "Looking up client " + request.query.client_id}));
                         const client = await this.clientStorage.getClient(request.query.client_id);
-                        CrossauthLogger.logger.debug(j({msg: "Client " + JSON.stringify(client)}));
                         
                         return reply.view(this.oauthAuthorizePage, {
                             user: request.user,
@@ -169,8 +169,9 @@ export class FastifyAuthorizationServer {
                         });
                     } catch (e) {
                         const ce = e as CrossauthError;
+                        CrossauthLogger.logger.debug(j({err: ce}));
                         if (this.errorPage) {
-                            return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: "Invalid client given", errorCode: ErrorCode.UnauthorizedClient, errorCodeName: ErrorCode[ErrorCode.UnauthorizedClient]});
+                            return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: "Invalid client given", clientId: request.query.client_id, user: request.user?.username, httpStatus: ce.httpStatus, errorCode: ErrorCode.UnauthorizedClient, errorCodeName: ErrorCode[ErrorCode.UnauthorizedClient]});
                         } else {
                             return reply.status(ce.httpStatus).send(DEFAULT_ERROR[401]);
                         }
@@ -196,7 +197,7 @@ export class FastifyAuthorizationServer {
                         ce = new CrossauthError(ErrorCode.UnknownError,  "Invalid csrf cookie received")
                     }
 
-                    CrossauthLogger.logger.error(j({msg: ce.message, hashedCsrfCookie: csrfCookie?Hasher.hash(csrfCookie) : undefined}));
+                    CrossauthLogger.logger.error(j({msg: ce.message, hashedCsrfCookie: csrfCookie?Hasher.hash(csrfCookie) : undefined, user: request.user?.username, cerr: ce}));
                 }
 
                 if (ce) {
@@ -233,22 +234,47 @@ export class FastifyAuthorizationServer {
             this.app.post(this.prefix+'token', async (request : FastifyRequest<{ Body: TokenBodyType }>, reply : FastifyReply) => {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'token', ip: request.ip, user: request.user?.username}));
 
+                // OAuth spec says we may take client credentials from authorization jeader
+                let clientId = request.body.client_id;
+                let clientSecret = request.body.client_secret;
+                if (request.headers.authorization) {
+                    let clientId1 : string|undefined;
+                    let clientSecret1 : string|undefined;
+                    const parts = request.headers.authorization.split(" ");
+                    if (parts.length == 2 && parts[0].toLocaleLowerCase() == "basic") {
+                        const decoded = Hasher.base64Decode(parts[1]);
+                        const parts2 = decoded.split(":", 2);
+                        if (parts2.length == 2) {
+                            clientId1 = parts2[0];
+                            clientSecret1 = parts2[1];
+                        }
+                    }
+                    if (clientId1 == undefined || clientSecret1 == undefined) {
+                        CrossauthLogger.logger.warn(j({msg: "Ignoring malform authenization header " + request.headers.authorization}));
+                    } else {
+                        clientId = clientId1;
+                        clientSecret = clientSecret1;
+                    }
+                }
+
                 const resp = await this.authServer.tokenPostEndpoint({
                     grantType: request.body.grant_type,
-                    clientId : request.body.client_id,
-                    clientSecret : request.body.client_secret,
+                    clientId : clientId,
+                    clientSecret : clientSecret,
                     scope: request.body.scope,
                     codeVerifier: request.body.code_verifier,
                     code: request.body.code,
+                    username: request.body.username,
+                    password: request.body.password,
                 });
 
                 if (resp.error || !resp.access_token) {
                     let error = "server_error";
-                    let errorDescription = "Neither code nor error received";
+                    let errorDescription = "Neither code nor error received when requestoing authorization";
                     if (resp.error) error = resp.error;
                     if (resp.error_description) errorDescription = resp.error_description;
                     const ce = CrossauthError.fromOAuthError(error, errorDescription);
-                    CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: ce.code, errorCodeName: ce.codeName}));
+                    CrossauthLogger.logger.error(j({cerr: ce}));
                     return reply.header(...JSONHDR).status(ce.httpStatus).send(resp);
                 }
                 return reply.header(...JSONHDR).send(resp);
@@ -296,7 +322,7 @@ export class FastifyAuthorizationServer {
             // couldn't create an authorization code
             if (error || !code) {
                 const ce = CrossauthError.fromOAuthError(error||"server_error", errorDescription||"Neither code nor error received")
-                CrossauthLogger.logger.error(j({msg: ce.message, errorCode: ce.code, errorCodeName: ce.codeName}));
+                CrossauthLogger.logger.error(j({cerr: ce}));
                 if (this.errorPage) {
                     return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
                 } else {

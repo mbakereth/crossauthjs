@@ -20,6 +20,7 @@ export async function createClient(secretRequired = true) : Promise<{clientStora
         clientSecret: secretRequired ? clientSecret : undefined,
         clientName: "Test",
         redirectUri: ["http://localhost:3000/authzcode"],
+        confidential: true,
         validFlow: OAuthFlows.allFlows(),
     };
     const client = await clientStorage.createClient(inputClient);
@@ -63,7 +64,7 @@ export async function getAuthServer({
     if (rollingRefreshToken != undefined) options.rollingRefreshToken = rollingRefreshToken;
     const keyStorage = new InMemoryKeyStorage();
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, options);
-    return {client, clientStorage, authServer, keyStorage};
+    return {client, clientStorage, authServer, keyStorage, userStorage};
 }
 
 export async function getAuthorizationCode({
@@ -77,7 +78,8 @@ export async function getAuthorizationCode({
      rollingRefreshToken? : boolean,
     } = {}) {
     const secretRequired = challenge == undefined;
-    const {client, clientStorage, authServer, keyStorage} = await getAuthServer({aud, persistAccessToken, secretRequired, rollingRefreshToken});
+    const {client, clientStorage, authServer, keyStorage, userStorage} = await getAuthServer({aud, persistAccessToken, secretRequired, rollingRefreshToken});
+    const {user} = await userStorage.getUserByUsername("bob");
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
     const codeVerifier = "ABC123";
@@ -89,7 +91,8 @@ export async function getAuthorizationCode({
             redirectUri: client.redirectUri[0], 
             scope: "read write", 
             state: inputState,
-            codeChallenge: codeChallenge});
+            codeChallenge: codeChallenge,
+            user});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     return {code, client, clientStorage, authServer, keyStorage};

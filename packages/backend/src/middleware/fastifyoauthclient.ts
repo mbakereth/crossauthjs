@@ -5,6 +5,7 @@ import { FastifyServer, FastifyErrorFn } from './fastifyserver';
 import { CrossauthLogger, OAuthFlows, type OAuthTokenResponse, j } from '@crossauth/common';
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
 import { jwtDecode } from "jwt-decode";
+import { Hasher } from '../hasher';
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
@@ -19,7 +20,18 @@ interface RedirectUriQueryType {
     error_description? : string,
 }
 
+interface PasswordQueryType {
+    scope? : string,
+}
+
 interface ClientCredentialsBodyType {
+    scope? : string,
+    csrfToken? : string,
+}
+
+interface PasswordBodyType {
+    username : string,
+    password: string,
     scope? : string,
     csrfToken? : string,
 }
@@ -29,10 +41,12 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     prefix? : string,
     sessionDataName? : string,
     errorPage? : string,
+    passwordFlowPage? : string,
     authorizedPage? : string,
     authorizedUrl? : string,
     loginUrl? : string,
     loginProtectedFlows? : string,
+    passwordFlowUrl? : string,
     receiveTokenFn? : (client: FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply>;
     errorFn? :FastifyErrorFn ;
     tokenResponseType? : "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom";
@@ -40,12 +54,12 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
 }
 
 async function jsonError(_server : FastifyServer, _request : FastifyRequest, reply : FastifyReply, ce : CrossauthError) : Promise<FastifyReply> {
-    CrossauthLogger.logger.error(j({err: ce}));
+    CrossauthLogger.logger.debug(j({err: ce}));
     return reply.header(...JSONHDR).status(ce.httpStatus).send({ok: false, status: ce.httpStatus, errorMessage: ce.message, errorMessages: ce.messages, errorCode: ce.code, errorCodeName: ce.codeName});
 }
 
 async function pageError(server: FastifyServer, _request : FastifyRequest, reply : FastifyReply,  ce : CrossauthError) : Promise<FastifyReply> {
-    CrossauthLogger.logger.error(j({err: ce}));
+    CrossauthLogger.logger.debug(j({err: ce}));
     return reply.status(ce.httpStatus).view(server.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorMessages: ce.messages, errorCodeName: ce.codeName});
 }
 
@@ -58,7 +72,15 @@ async function sendInPage(client: FastifyOAuthClient, _request : FastifyRequest,
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, oauthResponse.error_description);
         return reply.status(ce.httpStatus).view(client.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCodeName: ce.codeName, errorCode: ce.code});
     } else if (oauthResponse.access_token) {
-        CrossauthLogger.logger.debug("Got access token " + JSON.stringify(jwtDecode(oauthResponse.access_token)));
+        try {
+            if (oauthResponse.access_token) {
+                const jti = jwtDecode(oauthResponse.access_token)?.jti;
+                const hash = jti ? Hasher.hash(jti) : undefined;
+                CrossauthLogger.logger.debug(j({msg: "Got access token", accessTokenHash: hash}));
+            }
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
     }
     try {
         return reply.status(200).view(client.authorizedPage, {});
@@ -73,7 +95,13 @@ async function saveInSessionAndLoad(client: FastifyOAuthClient, request : Fastif
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, oauthResponse.error_description);
         return reply.status(ce.httpStatus).view(client.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCodeName: ce.codeName, errorCode: ce.code});
     } else if (oauthResponse.access_token) {
-        CrossauthLogger.logger.debug("Got access token " + JSON.stringify(jwtDecode(oauthResponse.access_token)));
+        try {
+            const jti = jwtDecode(oauthResponse.access_token)?.jti;
+            const hash = jti ? Hasher.hash(jti) : undefined;
+            CrossauthLogger.logger.debug(j({msg: "Got access token", accessTokenHash: hash}));
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
     }
     try {
         let sessionCookieValue = client.server.getSessionCookieValue(request);
@@ -97,7 +125,13 @@ async function saveInSessionAndRedirect(client: FastifyOAuthClient, request : Fa
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, oauthResponse.error_description);
         return reply.status(ce.httpStatus).view(client.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCodeName: ce.codeName, errorCode: ce.code});
     } else if (oauthResponse.access_token) {
-        CrossauthLogger.logger.debug("Got access token " + JSON.stringify(jwtDecode(oauthResponse.access_token)));
+        try {
+            const jti = jwtDecode(oauthResponse.access_token)?.jti;
+            const hash = jti ? Hasher.hash(jti) : undefined;
+            CrossauthLogger.logger.debug(j({msg: "Got access token", accessTokenHash: hash}));
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
     }
     try {
         let sessionCookieValue = client.server.getSessionCookieValue(request);
@@ -122,6 +156,7 @@ export class FastifyOAuthClient extends OAuthClient {
     private siteUrl : string = "/";
     private prefix : string = "/";
     errorPage : string = "error.njk";
+    passwordFlowPage : string = "passwordflow.njk"
     authorizedPage : string = "authorized.njk";
     authorizedUrl : string = "authorized.njk";
     sessionDataName : string = "oauth";
@@ -131,6 +166,7 @@ export class FastifyOAuthClient extends OAuthClient {
     private loginProtectedFlows : string[] = [];
     private tokenResponseType :  "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom" = "sendJson";
     private errorResponseType :  "sendJson" | "pageError" | "custom" = "sendJson";
+    private passwordFlowUrl : string = "passwordflow";
 
     constructor(server : FastifyServer, authServerBaseUri : string, options : FastifyOAuthClientOptions) {
         super(authServerBaseUri, options);
@@ -145,6 +181,8 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("authorizedPage", ParamType.String, this, options, "AUTHORIZED_PAGE");
         setParameter("authorizedUrl", ParamType.String, this, options, "AUTHORIZED_URL");
         setParameter("loginProtectedFlows", ParamType.StringArray, this, options, "OAUTH_LOGIN_PROTECTED_FLOWS");
+        setParameter("passwordFlowUrl", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_URL");
+        setParameter("passwordFlowPage", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_PAGE");
         if (this.loginProtectedFlows.length == 1 && this.loginProtectedFlows[0] == OAuthFlows.All) {
             this.loginProtectedFlows = this.validFlows;
         } else {
@@ -197,7 +235,7 @@ export class FastifyOAuthClient extends OAuthClient {
                     const ce = CrossauthError.fromOAuthError(error||"server_error", error_description);
                     return await this.errorFn(this.server, request, reply, ce)
                 }
-                CrossauthLogger.logger.debug(j({msg: `Authorization code flow: redirecting to ${url}`}));
+                CrossauthLogger.logger.debug(j({msg: `Authorization code flow: redirecting`, url: url}));
                 return reply.redirect(url);
             });
         }
@@ -223,15 +261,20 @@ export class FastifyOAuthClient extends OAuthClient {
                 }               
                 const resp = await this.redirectEndpoint(request.query.code, request.query.state, request.query.error, request.query.error_description);
                 try {
+                    if (resp.error) {
+                        const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description);
+                        return await this.errorFn(this.server, request, reply, ce);
+                    }
                     return await this.receiveTokenFn(this, request, reply, resp);
                 } catch (e) {
                     let code = ErrorCode.UnknownError
                     let message = e instanceof Error ? e.message : "Unknown error";
                     const ce = (e instanceof CrossauthError) ? e as CrossauthError : new CrossauthError(code, message);
-                    CrossauthLogger.logger.error(j({err: e}));
-                    return await this.errorFn(this.server, request, reply, ce)
+                    CrossauthLogger.logger.error(j({msg: "Error receiving token", cerr: ce, user: request.user?.user}));
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    return await this.errorFn(this.server, request, reply, ce);
                 }
-});
+            });
         }
 
         if (this.validFlows.includes(OAuthFlows.ClientCredentials)) {
@@ -246,15 +289,68 @@ export class FastifyOAuthClient extends OAuthClient {
                 }               
                 try {
                     const resp = await this.clientCredentialsFlow(request.body?.scope);
+                    if (resp.error) {
+                        const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description);
+                        return await this.errorFn(this.server, request, reply, ce);
+                    }
                     return await this.receiveTokenFn(this, request, reply, resp);
                 } catch (e) {
                     let code = ErrorCode.UnknownError
                     let message = e instanceof Error ? e.message : "Unknown error";
                     const ce = (e instanceof CrossauthError) ? e as CrossauthError : new CrossauthError(code, message);
-                    CrossauthLogger.logger.error(j({err: e}));
-                    return await this.errorFn(this.server, request, reply, ce)
+                    CrossauthLogger.logger.error(j({msg: "Error receiving token", cerr: ce, user: request.user?.user}));
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    return await this.errorFn(this.server, request, reply, ce);
                 }
             });
         }
+
+        if (this.validFlows.includes(OAuthFlows.Password)) {
+            this.server.app.get(this.prefix+this.passwordFlowUrl, async (request : FastifyRequest<{ Querystring: PasswordQueryType, Body: PasswordBodyType }>, reply : FastifyReply) =>  {
+                if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
+                    return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
+                }               
+                return reply.view(this.passwordFlowPage, {user: request.user, csrfToken: request.csrfToken, scope: request.query.scope});
+            });
+
+            this.server.app.post(this.prefix+this.passwordFlowUrl, async (request : FastifyRequest<{ Body: PasswordBodyType }>, reply : FastifyReply) =>  {
+                return await this.passwordPost(false, request, reply);
+            });
+
+            this.server.app.post(this.prefix+"api/"+this.passwordFlowUrl, async (request : FastifyRequest<{ Body: PasswordBodyType }>, reply : FastifyReply) =>  {
+                return await this.passwordPost(true, request, reply);
+            });
+
+        }
+    }
+
+    private async passwordPost(isApi : boolean, request : FastifyRequest<{ Body: PasswordBodyType }>, reply : FastifyReply) {
+        if (this.server.sessionServer) {
+            // if sessions are enabled, require a csrf token
+            const error = await this.server.errorIfCsrfInvalid(request, reply, this.errorFn);
+            if (error) return error;
+        }
+        if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
+            if (isApi) return reply.status(401).header(...JSONHDR).send({ok: false, msg: "Access denied"});
+            return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
+        }               
+        try {
+            const resp = await this.passwordFlow(request.body.username, request.body.password, request.body.scope);
+            if (resp.error) {
+                const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description);
+                if (isApi) return await this.errorFn(this.server, request, reply, ce);
+                return reply.view(this.passwordFlowPage, {user: request.user, username: request.body.username, password: request.body.password, scope: request.body.scope, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName, csrfToken: request.csrfToken});            
+            }
+            return await this.receiveTokenFn(this, request, reply, resp);
+        } catch (e) {
+            let code = ErrorCode.UnknownError
+            let message = e instanceof Error ? e.message : "Unknown error";
+            const ce = (e instanceof CrossauthError) ? e as CrossauthError : new CrossauthError(code, message);
+            CrossauthLogger.logger.error(j({msg: "Error receiving token", cerr: ce, user: request.user?.user}));
+            CrossauthLogger.logger.debug(j({err: e}));
+            if (isApi) return await this.errorFn(this.server, request, reply, ce);
+            return reply.view(this.passwordFlowPage, {user: request.user, username: request.body.username, password: request.body.password, scope: request.body.scope, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName, csrfToken: request.csrfToken});
+        }
+
     }
 }

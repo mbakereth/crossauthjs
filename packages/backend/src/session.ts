@@ -9,6 +9,7 @@ import { CrossauthLogger, j } from '@crossauth/common';
 import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth.ts';
 import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth.ts';
 import { setParameter, ParamType } from './utils.ts';
+import { Hasher } from './hasher.ts';
 
 export interface SessionManagerOptions extends TokenEmailerOptions {
 
@@ -268,9 +269,6 @@ export class SessionManager {
                         error = ce;
                 }
             }
-            else {
-                CrossauthLogger.logger.error(j({err: e}));
-            }
             error = new CrossauthError(ErrorCode.UnknownError);
         }
         if (error) {
@@ -377,7 +375,7 @@ export class SessionManager {
     async updateSessionData(sessionCookieValue : string, name : string, value : {[key:string]:any}) : Promise<void> {
         const sessionId = this.session.unsignCookie(sessionCookieValue);
         const hashedSessionKey = SessionCookie.hashSessionKey(sessionId);
-        CrossauthLogger.logger.debug(j({msg: `Updating session ${hashedSessionKey} ${name}`}));
+        CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Hasher.hash(sessionCookieValue)}));
         await this.keyStorage.updateData(hashedSessionKey, name, value);
     }
     

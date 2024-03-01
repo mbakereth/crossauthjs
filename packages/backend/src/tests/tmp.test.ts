@@ -47,7 +47,6 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
 
     app.setErrorHandler(function (error, _request, reply) {
         // Log error
-        console.log(error)
         // Send error response
         return reply.status(409).send({ ok: false })
     })

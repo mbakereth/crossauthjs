@@ -1,3 +1,5 @@
+import { CrossauthError } from ".";
+
 export interface CrossauthLoggerInterface {
     error(output: any) : void;
     warn(output: any) : void;
@@ -11,6 +13,49 @@ export interface CrossauthLoggerInterface {
  * A very simple logging class with no dependencies.
  * 
  * Logs to console. 
+ * 
+ * The logging API is designed so that you can replace this with other common loggers, eg Pino.
+ * To change it, use the global {@link setLogger} function.  This has a parameter to tell 
+ * Crossauth whether your logger accepts JSON input or not.
+ * 
+ * When writing logs, we use the helper function {@link j} to send JSON to the logger if it is
+ * supprted, and a stringified JSON otherwise.
+ * 
+ * <b>Crossauth logs<b>
+ * 
+ * All Crossauth log messages are JSON (or stringified JSON, depending on whether the logger supports
+ * JSON input - this one does).  The following fields may be present depending on context
+ * (`msg` is always present):
+ * 
+ * - `msg` : main contents of the log
+ * - `err` : an error object.  If a subclass of Error, it wil contain at least `message` and
+ *           a stack trace in `stack`.  If the error is of type{@link CrossauthError} 
+ *           it also will also contain `code` and `httpStatus`.
+ * - `hashedSessionCookie` : for security reasons, session cookies are not included in logs.
+ *                           However, so that errors can be correlated with each other, a hash
+ *                           of it is included in errors originating from a session.
+ * - `hashedCsrfCookie`    : for security reasons, csrf cookies are not included in logs.
+ *                           However, so that errors can be correlated with each other, a hash
+ *                           of it is included in errors originating from a session.
+ * - `user` : username
+ * - `emailMessageId` : internal id of any email that is sent
+ * - `email` : email address
+ * - `userId` : sometimes provided in addition to username, or when username not available
+ * - `hahedApiKey` : a hash of an API key.  The unhashed version is not logged for security,
+ *                   but a hash of it is logged for correlation purposes.
+ * - `header`      : an HTTP header that relates to an error (eg `Authorization`), only if
+ *                   it is non-secret or invalid
+ * - `accessTokenHash` : hash of the JTI of an access token.  For security reasons, the 
+ *                       unhashed version is not logged.
+ * - `url` : relevant URL
+ * - `ip`  : relevant IP address           
+ * - `scope` : OAuth scope
+ * - `errorCode` : Crossauth error code
+ * - `errorCodeName` : String version of Crossauth error code
+ * - `httpStatus` : HTTP status that will be returned
+ * - `port` port service is running on (only for starting a service)
+ * - `prefix` prefix for endpoints (only when starting a service)
+ * 
  */
 export class CrossauthLogger {
 
@@ -122,6 +167,8 @@ export function j(arg : {[key: string]: any}|string) : string|{[key: string]: an
     }
     try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object") && arg.err && ("message" in arg.err) && !("msg" in arg)) arg["msg"] = arg.err.message;} catch {}
     try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object")) arg.err = {...arg.err, stack: stack}; } catch {}
+    try {if (typeof arg == "object" && ("err" in arg) && !("msg" in arg)) arg["msg"] = arg.msg = "An unknown error occurred";} catch {}
+    try {if (typeof arg == "object" && ("cerr" in arg) && (arg.cerr instanceof CrossauthError) && arg.cerr ) {arg["errorCode"] = arg.cerr.code; arg["errorCodeName"] = arg.cerr.codeName; arg["httpStatus"] = arg.cerr.httpStatus; if (!("msg" in arg)) arg["msg"] = arg.cerr.message; delete arg.cerr;}} catch {}
     return (typeof arg == "string" || globalThis.crossauthLoggerAcceptsJson) ? arg : JSON.stringify(arg);
 }
 

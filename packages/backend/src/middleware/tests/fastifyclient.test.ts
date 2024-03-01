@@ -20,7 +20,7 @@ const oidcConfiguration : OpenIdConfiguration = {
     jwks_uri: "http://server.com/jwks",
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
-    grant_types_supported: ["authorization_code", "client_credentials"],
+    grant_types_supported: ["authorization_code", "client_credentials", "password"],
     token_endpoint_auth_signing_alg_values_supported: ["RS256"],
     subject_types_supported: ["public"],
     id_token_signing_alg_values_supported: ["RS256"],
@@ -172,6 +172,52 @@ test('FastifyOAuthClient.clientCredentialsFlow', async () => {
         clientId : body.body.client_id, 
         scope : body.body.scope, 
         clientSecret : body.body.client_secret,
+    });
+    expect(resp.error).toBeUndefined();
+    expect(resp.access_token).toBeDefined();
+});
+
+test('FastifyOAuthClient.passwordFlow', async () => {
+    const {authServer} = await getAuthServer();
+
+    const server = await makeClient();
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+
+    let res;
+    let body;
+
+    // get csrf token and check password flow get 
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("passwordflow.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())}));
+    res = await server.app.inject({ method: "POST", url: "/passwordflow", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        csrfToken: csrfToken,
+        scope: "read write",
+        username: "bob",
+        password: "bobPass123",
+     }});
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    expect(body.body.grant_type).toBe("password");
+    expect(body.body.client_id).toBe("ABC");
+    expect(body.body.client_secret).toBe("DEF");
+    expect(body.body.scope).toBe("read write");
+    expect(body.body.username).toBe("bob");
+    expect(body.body.password).toBe("bobPass123");
+
+    const resp = await authServer.tokenPostEndpoint({
+        grantType: body.body.grant_type, 
+        clientId : body.body.client_id, 
+        scope : body.body.scope, 
+        clientSecret : body.body.client_secret,
+        username: body.body.username,
+        password: body.body.password,
     });
     expect(resp.error).toBeUndefined();
     expect(resp.access_token).toBeDefined();

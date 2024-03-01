@@ -1,5 +1,12 @@
 import { PrismaClient } from './generated/client/index.js';
-import { FastifyServer, PrismaKeyStorage, PrismaUserStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage, LocalPasswordAuthenticator, FastifyOAuthResourceServer } from '@crossauth/backend';
+import { FastifyServer, 
+         PrismaKeyStorage, 
+         PrismaUserStorage, 
+         PrismaOAuthClientStorage, 
+         PrismaOAuthAuthorizationStorage, 
+         LocalPasswordAuthenticator, 
+         FastifyOAuthResourceServer 
+        } from '@crossauth/backend';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
@@ -66,6 +73,8 @@ let server = new FastifyServer(userStorage, {
         validScopes: "read, write",
         siteUrl: `http://localhost:${port}`,
         authStorage: authStorage,
+        userStorage: userStorage,
+        authenticator: lpAuthenticator,
 });
 
 // SImple page to check login status and logout

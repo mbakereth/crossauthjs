@@ -194,14 +194,15 @@ export class OAuthResourceServer {
                     return undefined;
                 }
             } catch (e) {
-                CrossauthLogger.logger.error(j({err: e}));
+                CrossauthLogger.logger.warn(j({msg: "Couldn't get token from database - is it valid?", hashedAccessToken: Hasher.hash(decoded.payload.jti)}))
+                CrossauthLogger.logger.debug(j({err: e}));
                 return undefined;
             }
         }
         if (this.oauthIssuers) {
             if ((Array.isArray(this.oauthIssuers) && !this.oauthIssuers.includes(decoded.payload.iss)) ||
                 (!Array.isArray(this.oauthIssuers) && this.oauthIssuers != decoded.payload.iss)) {
-                CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.payload.iss} in access token`}));
+                CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.payload.iss} in access token`, hashedAccessToken: Hasher.hash(decoded.payload.jti)}));
                 return undefined;
 
             }
@@ -209,7 +210,7 @@ export class OAuthResourceServer {
         if (decoded.payload.aud) {
             if ((Array.isArray(decoded.payload.aud) && !decoded.payload.aud.includes(this.resourceServerName)) ||
                 (!Array.isArray(decoded.payload.aud) && decoded.payload.aud != this.resourceServerName)) {
-                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.payload.aud} in access token`}));
+                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.payload.aud} in access token`, hashedAccessToken: Hasher.hash(decoded.payload.jti)}));
                     return undefined;    
                 }
         }

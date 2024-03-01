@@ -58,7 +58,7 @@ export interface User extends UserInputFields {
 export interface UserSecretsInputFields {
     password? : string,
     totpSecret? : string,
-    token?: string,
+    otp?: string,
     expiry?: number,
 }
 
@@ -68,6 +68,7 @@ export interface UserSecrets extends UserSecretsInputFields {
 
 export interface OAuthClient {
     clientId : string,
+    confidential : boolean,
     clientName : string,
     clientSecret? : string,
     redirectUri : string[],

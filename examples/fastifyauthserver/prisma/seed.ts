@@ -39,6 +39,7 @@ async function main() {
   });
   const inputClient = {
       clientId : "ABC",
+      confidential: true,
       clientSecret: clientSecret,
       clientName: "Example Client",
       redirectUri: ["http://localhost:3001/authzcode"],

@@ -1,7 +1,6 @@
 import {  pbkdf2, createHmac, createHash, timingSafeEqual, randomBytes, randomUUID, createCipheriv, createDecipheriv }  from 'node:crypto';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { promisify } from 'node:util';
-import { CrossauthLogger, j } from '@crossauth/common';
 
 // the following comply with NIST and OWASP recommendations
 const PBKDF2_DIGEST = process.env["PBKDF2_DIGEST"] || "sha256";
@@ -67,10 +66,16 @@ export class Hasher {
             digest : hash.digest
         });
         if (newHash.length != hash.hashedPassword.length) {
-            CrossauthLogger.logger.debug(j({msg: "Passwords different length " + newHash + " " + hash.hashedPassword}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
         return timingSafeEqual(Buffer.from(newHash), Buffer.from(hash.hashedPassword));
+    }
+
+    static base64Decode(encoded : string) : string {
+        return Buffer.from(encoded, 'base64').toString('utf-8');
+    }
+    static base64Encode(text : string) : string {
+        return Buffer.from(text, 'utf-8').toString('base64');
     }
 
     /**
@@ -231,7 +236,6 @@ export class Hasher {
         if (newSig.length != sig.length)
             throw new CrossauthError(ErrorCode.InvalidKey, "Signature does not match payload");
         if  (!timingSafeEqual(Buffer.from(newSig), Buffer.from(sig))) {
-            CrossauthLogger.logger.debug(j({msg: "Signature signature does not match payload"}));
             throw new CrossauthError(ErrorCode.InvalidKey, "Signature does not match payload");
         }
         return payload;        

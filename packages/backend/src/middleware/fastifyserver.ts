@@ -323,7 +323,8 @@ export class FastifyServer {
             await this.validateCsrfToken(request)
             return undefined;
         } catch (e) {
-            CrossauthLogger.logger.warn(j({err: e, msg: `Attempt to access url without csrf token`, url: request.url}));
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.warn(j({msg: `Attempt to access url without csrf token`, url: request.url}));
             try {
                 if (errorFn) {
                     const errorCode = ErrorCode.UnknownError;
@@ -354,7 +355,8 @@ export class FastifyServer {
                         {errorMessage: "User is not logged in", status: 401, code: ErrorCode.Unauthorized, codeName: ErrorCode[ErrorCode.Unauthorized]});
                 }
             } catch (e2) {
-                CrossauthLogger.logger.error(j({err: e2}));
+                CrossauthLogger.logger.debug(j({err: e2}));
+                CrossauthLogger.logger.error(j({cerr: e2, hashedSessionCookie: this.sessionServer?.getHashOfSessionCookie(request)}))
                 return reply.status(401).send(ERROR_401);                
             }
             return reply.status(401).send(ERROR_401);
@@ -412,7 +414,7 @@ export class FastifyServer {
 
     async createAnonymousSession(request : FastifyRequest, reply : FastifyReply, data? : {[key:string]:any}) : Promise<string>  {
         if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Sessions not enabled");
-        console.log("Create anonymous session");
+        CrossauthLogger.logger.debug(j({msg: "Creating anonymous session"}));
         return await this.sessionServer.createAnonymousSession(request, reply, data);
     }
 

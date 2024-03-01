@@ -167,7 +167,7 @@ export class LdapUserStorage extends UserStorage {
             return await this.searchUser(ldapClient, userDn);
               
         } catch (e) {
-            CrossauthLogger.logger.error(j({err: e}));
+            CrossauthLogger.logger.debug(j({err: e}));
             if (e instanceof CrossauthError) throw e;
             else if (e instanceof ldap.InvalidCredentialsError) {
                 throw new CrossauthError(ErrorCode.UsernameOrPasswordInvalid);
