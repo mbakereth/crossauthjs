@@ -71,7 +71,7 @@ async function jsonError(_server : FastifyServer, _request : FastifyRequest, rep
 
 async function pageError(server: FastifyServer, _request : FastifyRequest, reply : FastifyReply,  ce : CrossauthError) : Promise<FastifyReply> {
     CrossauthLogger.logger.debug(j({err: ce}));
-    return reply.status(ce.httpStatus).view(server.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorMessages: ce.messages, errorCodeName: ce.codeName});
+    return reply.status(ce.httpStatus).view(server.oAuthClient?.errorPage||"error.njk", {status: ce.httpStatus, errorMessage: ce.message, errorMessages: ce.messages, errorCodeName: ce.codeName});
 }
 
 async function sendJson(_client: FastifyOAuthClient, _request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
@@ -191,6 +191,7 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("tokenResponseType", ParamType.String, this, options, "OAUTH_TOKEN_RESPONSE_TYPE");
         setParameter("errorResponseType", ParamType.String, this, options, "OAUTH_ERROR_RESPONSE_TYPE");
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
+        if (!(this.prefix.endsWith("/"))) this.prefix += "/";
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("authorizedPage", ParamType.String, this, options, "AUTHORIZED_PAGE");
@@ -396,7 +397,10 @@ export class FastifyOAuthClient extends OAuthClient {
                     const resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
                         headers:headers 
                     });
-                    return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
+                    for (const pair of resp.headers.entries()) {
+                        reply.header(pair[0], pair[1]);
+                    }
+                    return reply.status(resp.status).send(await resp.json());
                 } catch (e) {
                     CrossauthLogger.logger.error(j({err: e}));
                     return reply.header(...JSONHDR).status(500).send({});
@@ -428,7 +432,10 @@ export class FastifyOAuthClient extends OAuthClient {
                         headers:headers,
                         body: JSON.stringify(request.body), 
                     });
-                    return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
+                    for (const pair of resp.headers.entries()) {
+                        reply.header(pair[0], pair[1]);
+                    }
+                    return reply.status(resp.status).send(await resp.json());
                 } catch (e) {
                     CrossauthLogger.logger.error(j({err: e}));
                     return reply.header(...JSONHDR).status(500).send({});

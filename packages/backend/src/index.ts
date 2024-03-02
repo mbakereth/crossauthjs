@@ -50,7 +50,7 @@ declare module 'fastify' {
       user: User|undefined,
       csrfToken: string|undefined,
       apiKey: ApiKey,
-      authTokenPayload: {[key:string]:any}|undefined,
+      accessTokenPayload: {[key:string]:any}|undefined,
       authError: string|undefined,
       authErrorDescription: string|undefined,
     }

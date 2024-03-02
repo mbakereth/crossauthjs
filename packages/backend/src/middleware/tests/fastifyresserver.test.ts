@@ -3,7 +3,8 @@ import { test, expect , vi, beforeAll, afterAll } from 'vitest';
 import { FastifyOAuthResourceServer } from '../fastifyresserver';
 import { OpenIdConfiguration } from '@crossauth/common';
 import { getAuthorizationCode } from '../../oauth/tests/common';
-import { FastifyRequest } from 'fastify';
+import { FastifyRequest, FastifyReply } from 'fastify';
+import fastify from 'fastify';
 
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -47,7 +48,10 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
     expect(decodedAccessToken?.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
-    const resserver = new FastifyOAuthResourceServer({authServerBaseUri: "http://server.com"})
+    const app = fastify({logger: false});
+    const resserver = new FastifyOAuthResourceServer(
+        app, undefined, {}, {authServerBaseUri: "http://server.com"}
+    );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await resserver.loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
@@ -56,14 +60,61 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
     const reply : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token}
     }
-    const resp1 = await resserver.authorized(reply);
+    const resp1 = await resserver["authorized"](reply);
     expect(resp1?.authorized).toBe(true);
 
     // @ts-ignore
     const reply2 : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token+"x"}
     }
-    const resp2 = await resserver.authorized(reply2);
+    const resp2 = await resserver["authorized"](reply2);
+    expect(resp2?.authorized).toBe(false);
+});
+
+const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
+
+test('FastifyOAuthResourceServer.preHandlerHook', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode();
+    const {access_token, error, error_description}
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(error_description).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token||"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    const app = fastify({logger: false});
+    const resserver = new FastifyOAuthResourceServer(
+        app, undefined, {}, {authServerBaseUri: "http://server.com"}
+    );
+    app.get('/post',  async (request : FastifyRequest, reply : FastifyReply) =>  {
+        reply.header(...JSONHDR).send({token: request.accessTokenPayload});
+    });
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await resserver.loadConfig();
+    fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
+    await resserver.loadJwks();
+    // @ts-ignore
+    const reply : FastifyRequest = {
+        headers: {authorization: "Bearer " + access_token}
+    }
+    const resp1 = await resserver["authorized"](reply);
+    expect(resp1?.authorized).toBe(true);
+
+    // @ts-ignore
+    const reply2 : FastifyRequest = {
+        headers: {authorization: "Bearer " + access_token+"x"}
+    }
+    const resp2 = await resserver["authorized"](reply2);
     expect(resp2?.authorized).toBe(false);
 });
 

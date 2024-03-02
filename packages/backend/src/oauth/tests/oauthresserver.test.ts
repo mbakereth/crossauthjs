@@ -97,6 +97,7 @@ test('ResourceServer.validCodeChallenge', async () => {
             clientId: client.clientId, 
             code: code, 
             codeVerifier: "ABC123"});
+        console.log(error_description)
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 

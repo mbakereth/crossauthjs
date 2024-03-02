@@ -70,116 +70,11 @@ export interface FastifyServerOptions extends FastifySessionServerOptions, Fasti
     /** You can pass your own fastify instance or omit this, in which case Crossauth will create one */
     app? : FastifyInstance<Server, IncomingMessage, ServerResponse>,
 
-    /** List of endpoints to add to the server ("login", "api/login", etc, prefixed by the `prefix` parameter.  Empty for all.  Default all. */
-    endpoints? : string,
+    /** If this is passed, it is registered as a Nunjucks view folder with autoscape on */
+    views? : string,
 };
 
 export type FastifyErrorFn = (server: FastifyServer, request : FastifyRequest, reply : FastifyReply, ce : CrossauthError) => Promise<FastifyReply>;
-
-/**
- * Endpoints that depend on sessions being enabled and display HTML
- */
-export const SessionPageEndpoints = [
-    "login",
-    "logout",
-    "changepassword",
-    "updateuser",
-];
-
-/**
- * API (JSON) endpoints that depend on sessions being enabled 
- */
-export const SessionApiEndpoints = [
-    "api/login",
-    "api/logout",
-    "api/changepassword",
-    "api/userforsessionkey",
-    "api/getcsrftoken",
-    "api/updateuser",
-];
-
-/**
- * API (JSON) endpoints that depend on 2FA being enabled 
- */
-export const Factor2ApiEndpoints = [
-    "api/configurefactor2",
-    "api/loginfactor2",
-    "api/changefactor2",
-    "api/factor2",
-    "api/cancelfactor2",
-];
-
-/**
- * Endpoints that depend on email verification being enabled and display HTML
- */
-export const EmailVerificationPageEndpoints = [
-    "verifyemail",
-    "emailverified",
-];
-
-/**
- * API (JSON) endpoints that depend on email verification being enabled 
- */
-export const EmailVerificationApiEndpoints = [
-    "api/verifyemail",
-];
-
-/**
- * Endpoints that depend on password reset being enabled and display HTML
- */
-export const PasswordResetPageEndpoints = [
-    "requestpasswordreset",
-    "resetpassword",
-];
-
-/**
- * API (JSON) endpoints that depend on password reset being enabled 
- */
-export const PasswordResetApiEndpoints = [
-    "api/requestpasswordreset",
-    "api/resetpassword",
-];
-
-/**
- * Endpoints for signing a user up that display HTML
- */
-export const SignupPageEndpoints = [
-    "signup",
-]
-
-/**
- * API (JSON) endpoints for signing a user up that display HTML
- */
-export const SignupApiEndpoints = [
-    "api/signup",
-]
-
-/**
- * Endpoints for signing a user up that display HTML
- */
-export const Factor2PageEndpoints = [
-    "configurefactor2",
-    "loginfactor2",
-    "changefactor2",
-    "factor2",
-]
-
-/**
- * These are all the endpoints created by default by this server-
- */
-export const AllEndpoints = [
-    ...SignupPageEndpoints,
-    ...SignupApiEndpoints,
-    ...SessionPageEndpoints,
-    ...SessionApiEndpoints,
-    ...EmailVerificationPageEndpoints,
-    ...EmailVerificationApiEndpoints,
-    ...PasswordResetPageEndpoints,
-    ...PasswordResetApiEndpoints,
-    ...Factor2PageEndpoints,
-    ...Factor2ApiEndpoints,
-];
-
 
 /**
  * This class provides a complete (but without HTML files) auth backend server for
@@ -205,38 +100,33 @@ export const AllEndpoints = [
 export class FastifyServer {
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
     private views : string = "views";
-    private sessionPrefix : string = "/";
-    private oauthPrefix : string = "/";
-    private endpoints : string[] = [];
     readonly sessionServer? : FastifySessionServer; 
     readonly oAuthAuthServer? : FastifyAuthorizationServer;
     readonly oAuthClient? : FastifyOAuthClient;
     readonly oAuthResServer? : FastifyOAuthResourceServer;
 
-    private enableEmailVerification : boolean = false;
-    private enablePasswordReset : boolean = true;
-    private allowedFactor2 : string[] = [];
-    errorPage : string = "error.njk";
-
-
     /**
-     * Creates the Fastify endpoints, optionally also the Fastify app.
-     * @param optoions see {@link FastifyServerOptions}
+     * Integrates fastify session, API key and OAuth servers
+     * @param options see {@link FastifyServerOptions}
      */
     constructor(userStorage: UserStorage, {session, apiKey, oAuthAuthServer, oAuthClient, oAuthResServer} : {
                 session?: {
                     keyStorage: KeyStorage, 
                     authenticators: {[key:string]: Authenticator}, 
+                    options?: FastifySessionServerOptions,
                 },
                 apiKey?: {
-                    keyStorage: KeyStorage
+                    keyStorage: KeyStorage,
+                    options? : FastifyApiKeyServerOptions
                 },
                 oAuthAuthServer? : {
                     clientStorage: OAuthClientStorage,
-                    keyStorage: KeyStorage
+                    keyStorage: KeyStorage,
+                    options? : FastifyAuthorizationServerOptions,
                 },
                 oAuthClient? : {
                     authServerBaseUri: string,
+                    options? : FastifyOAuthClientOptions,
                 },
                 oAuthResServer? : {
                     protectedEndpoints?: {[key:string]: {scope? : string}},
@@ -245,14 +135,6 @@ export class FastifyServer {
 
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
-        setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
-        setParameter("sessionPrefix", ParamType.String, this, options, "SESSION_PREFIX");
-        setParameter("oauthPrefix", ParamType.String, this, options, "OAUTH_PREFIX");
-        setParameter("enableSessions", ParamType.Boolean, this, options, "ENABLE_SESSIONS");
-        setParameter("enableapiKeys", ParamType.Boolean, this, options, "ENABLE_APIKEYS");
-        setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
-        setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
-        setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
 
         if (options.app) {
             this.app = options.app;
@@ -286,33 +168,24 @@ export class FastifyServer {
         this.app.decorateRequest('user', undefined);
         this.app.decorateRequest('csrfToken', undefined);
 
-        if (session) 
-        {
-            this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
-            this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
-            if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
-            if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
-            if (this.allowedFactor2.length > 0) this.endpoints = [...this.endpoints, ...Factor2PageEndpoints, ...Factor2ApiEndpoints];
-        }
-        setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
-
         if (session) { 
-            const sessionServer = new FastifySessionServer(this.app, this.sessionPrefix, userStorage, session.keyStorage, session.authenticators, options);
+            const sessionServer = new FastifySessionServer(this.app, userStorage, session.keyStorage, session.authenticators, {...options, ...session.options});
             this.sessionServer = sessionServer; // for testing only
-            sessionServer.addEndpoints(this.endpoints);
         }
 
         if (apiKey) {
-            new FastifyApiKeyServer(this.app, userStorage, apiKey.keyStorage, options);
+            new FastifyApiKeyServer(this.app, userStorage, apiKey.keyStorage, {...options, ...apiKey.options});
         }
 
         if (oAuthAuthServer) 
         {
-            this.oAuthAuthServer = new FastifyAuthorizationServer(this.app, this, this.oauthPrefix, this.sessionPrefix+"login", oAuthAuthServer.clientStorage, oAuthAuthServer.keyStorage, options);
+            let extraOptions : FastifyAuthorizationServerOptions = {};
+            if (this.sessionServer) extraOptions.loginUrl = this.sessionServer.prefix + "login";
+            this.oAuthAuthServer = new FastifyAuthorizationServer(this.app, this, oAuthAuthServer.clientStorage, oAuthAuthServer.keyStorage, {...extraOptions, ...options, ...oAuthAuthServer.options});
         }
 
         if (oAuthClient) {
-            this.oAuthClient = new FastifyOAuthClient(this, oAuthClient.authServerBaseUri, options);
+            this.oAuthClient = new FastifyOAuthClient(this, oAuthClient.authServerBaseUri, {...options, ...oAuthClient.options});
         }
 
         if (oAuthResServer) {
@@ -436,7 +309,7 @@ export class FastifyServer {
      */
     start(port : number = 3000) {
         this.app.listen({ port: port}, () =>
-            CrossauthLogger.logger.info(j({msg: "Starting fastify server", port: port, prefix: this.sessionPrefix})),
+            CrossauthLogger.logger.info(j({msg: "Starting fastify server", port: port})),
         );
 
     }

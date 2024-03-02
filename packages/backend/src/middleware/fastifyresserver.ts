@@ -38,15 +38,15 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
         // validate access token and put in request, along with any errors
         app.addHook('preHandler', async (request : FastifyRequest, _reply : FastifyReply) => {
             const authResponse = await this.authorized(request);
-            request.authTokenPayload = authResponse?.tokenPayload;
+            request.accessTokenPayload = authResponse?.tokenPayload;
             request.authError = authResponse?.error
             request.authErrorDescription = authResponse?.error_description;
-            CrossauthLogger.logger.debug(j({msg: "Resource server url", url: request.url, authorized: request.authTokenPayload!= undefined}));
+            CrossauthLogger.logger.debug(j({msg: "Resource server url", url: request.url, authorized: request.accessTokenPayload!= undefined}));
         });
 
         app.addHook('onSend', async (request : FastifyRequest, reply : FastifyReply) => {
             const urlWithoutQuery = request.url.split("?", 2)[0];
-            if (!request.authTokenPayload && urlWithoutQuery in this.protectedEndpoints) {
+            if (!request.accessTokenPayload && urlWithoutQuery in this.protectedEndpoints) {
                 let header = "Bearer";
                 if ("scope" in this.protectedEndpoints[urlWithoutQuery]) {
                     header += ' scope="' + this.protectedEndpoints[urlWithoutQuery]["scope"];

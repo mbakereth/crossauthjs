@@ -21,6 +21,12 @@ const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=ut
  */
 export interface FastifySessionServerOptions extends SessionManagerOptions {
 
+    /** All endpoint URLs will be prefixed with this.  Default `/` */
+    prefix? : string,
+
+    /** List of endpoints to add to the server ("login", "api/login", etc, prefixed by the `prefix` parameter.  Empty for all.  Default all. */
+    endpoints? : string,
+
     /** Page to redirect to after successful login, default "/" */
     loginRedirect? : string;
 
@@ -123,6 +129,115 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
     factor2ProtectedApiEndpoints?: string,
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// ENDPOINTS
+
+/**
+ * Endpoints that depend on sessions being enabled and display HTML
+ */
+export const SessionPageEndpoints = [
+    "login",
+    "logout",
+    "changepassword",
+    "updateuser",
+];
+
+/**
+ * API (JSON) endpoints that depend on sessions being enabled 
+ */
+export const SessionApiEndpoints = [
+    "api/login",
+    "api/logout",
+    "api/changepassword",
+    "api/userforsessionkey",
+    "api/getcsrftoken",
+    "api/updateuser",
+];
+
+/**
+ * API (JSON) endpoints that depend on 2FA being enabled 
+ */
+export const Factor2ApiEndpoints = [
+    "api/configurefactor2",
+    "api/loginfactor2",
+    "api/changefactor2",
+    "api/factor2",
+    "api/cancelfactor2",
+];
+
+/**
+ * Endpoints that depend on email verification being enabled and display HTML
+ */
+export const EmailVerificationPageEndpoints = [
+    "verifyemail",
+    "emailverified",
+];
+
+/**
+ * API (JSON) endpoints that depend on email verification being enabled 
+ */
+export const EmailVerificationApiEndpoints = [
+    "api/verifyemail",
+];
+
+/**
+ * Endpoints that depend on password reset being enabled and display HTML
+ */
+export const PasswordResetPageEndpoints = [
+    "requestpasswordreset",
+    "resetpassword",
+];
+
+/**
+ * API (JSON) endpoints that depend on password reset being enabled 
+ */
+export const PasswordResetApiEndpoints = [
+    "api/requestpasswordreset",
+    "api/resetpassword",
+];
+
+/**
+ * Endpoints for signing a user up that display HTML
+ */
+export const SignupPageEndpoints = [
+    "signup",
+]
+
+/**
+ * API (JSON) endpoints for signing a user up that display HTML
+ */
+export const SignupApiEndpoints = [
+    "api/signup",
+]
+
+/**
+ * Endpoints for signing a user up that display HTML
+ */
+export const Factor2PageEndpoints = [
+    "configurefactor2",
+    "loginfactor2",
+    "changefactor2",
+    "factor2",
+]
+
+/**
+ * These are all the endpoints created by default by this server-
+ */
+export const AllEndpoints = [
+    ...SignupPageEndpoints,
+    ...SignupApiEndpoints,
+    ...SessionPageEndpoints,
+    ...SessionApiEndpoints,
+    ...EmailVerificationPageEndpoints,
+    ...EmailVerificationApiEndpoints,
+    ...PasswordResetPageEndpoints,
+    ...PasswordResetApiEndpoints,
+    ...Factor2PageEndpoints,
+    ...Factor2ApiEndpoints,
+];
+
+
+
 export interface CsrfBodyType {
     csrfToken?: string;
 }
@@ -130,6 +245,9 @@ export interface CsrfBodyType {
 export interface ArbitraryBodyType {
     [key:string]: string;
 }
+
+//////////////////////////////////////////////////////////////////////////////////
+// REQUEST INTERFACES
 
 interface LoginBodyType extends CsrfBodyType {
     username: string,
@@ -295,7 +413,8 @@ function defaultUpdateUser(user : User, request : FastifyRequest<{ Body: UpdateU
 export class FastifySessionServer {
 
     private app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
-    private prefix : string = "/";
+    readonly prefix : string = "/";
+    private endpoints : string[] = [];
     private loginRedirect = "/";
     private logoutRedirect : string = "/";
     private signupPage : string = "signup.njk";
@@ -339,7 +458,6 @@ export class FastifySessionServer {
 
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
-        prefix : string,
         userStorage: UserStorage, 
         keyStorage: KeyStorage, 
         authenticators: {[key:string]: Authenticator}, 
@@ -347,6 +465,8 @@ export class FastifySessionServer {
 
         this.app = app;
 
+        setParameter("prefix", ParamType.String, this, options, "PREFIX");
+        if (!(this.prefix.endsWith("/"))) this.prefix += "/";
         setParameter("signupPage", ParamType.String, this, options, "SIGNUP_PAGE");
         setParameter("configureFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
         setParameter("loginPage", ParamType.String, this, options, "LOGIN_PAGE");
@@ -373,7 +493,15 @@ export class FastifySessionServer {
         if (options.addToSession) this.addToSession = options.addToSession;
         if (options.validateSession) this.validateSession = options.validateSession;
 
-        this.prefix = prefix;
+        this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
+        this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
+        if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
+        if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
+        if (this.allowedFactor2.length > 0) this.endpoints = [...this.endpoints, ...Factor2PageEndpoints, ...Factor2ApiEndpoints];
+        this.addEndpoints();
+
+        setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
+
         this.userStorage = userStorage;
         this.authenticators = authenticators;
         this.sessionManager = new SessionManager(userStorage, keyStorage, authenticators, options);
@@ -546,113 +674,113 @@ export class FastifySessionServer {
     //////////////////
     // page endpoints
 
-    addEndpoints(endpoints : string[]) {
-        if (endpoints.includes("login")) {
+    addEndpoints() {
+        if (this.endpoints.includes("login")) {
             this.addLoginEndpoints();
         }
 
-        if (endpoints.includes("loginfactor2")) {
+        if (this.endpoints.includes("loginfactor2")) {
             this.addLoginFactor2Endpoints();
         }
 
-        if (endpoints.includes("factor2")) {
+        if (this.endpoints.includes("factor2")) {
             this.addFactor2Endpoints();
         }
 
-        if (endpoints.includes("signup")) {
+        if (this.endpoints.includes("signup")) {
             this.addSignupEndpoints();
         }
 
-        if (endpoints.includes("configurefactor2")) {
+        if (this.endpoints.includes("configurefactor2")) {
             this.addConfigureFactor2Endpoints();
         }
 
-        if (endpoints.includes("changefactor2")) {
+        if (this.endpoints.includes("changefactor2")) {
             this.addChangeFactor2Endpoints();
         }
 
-        if (endpoints.includes("changepassword")) {
+        if (this.endpoints.includes("changepassword")) {
             this.addChangePasswordEndpoints();
         }
 
-        if (endpoints.includes("updateuser")) {
+        if (this.endpoints.includes("updateuser")) {
             this.addUpdateUserEndpoints();
         }
 
-        if (endpoints.includes("requestpasswordreset")) {
+        if (this.endpoints.includes("requestpasswordreset")) {
             this.addRequestPasswordResetENdpoints();
         }
 
-        if (endpoints.includes("resetpassword")) {
+        if (this.endpoints.includes("resetpassword")) {
             if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /resetpassword");
             this.addResetPasswordEndpoints();
         }
 
-        if (endpoints.includes("verifyemail")) {
+        if (this.endpoints.includes("verifyemail")) {
             if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification  must be enabled for /verifyemail");
             this.addVerifyEmailEndpoints();
         }
 
-        if (endpoints.includes("logout")) {
+        if (this.endpoints.includes("logout")) {
             this.addLogoutEndpoints();
 
         }
-        if (endpoints.includes("api/login")) {
+        if (this.endpoints.includes("api/login")) {
             this.addApiLoginEndpoints();
         }
 
-        if (endpoints.includes("api/loginfactor2")) {
+        if (this.endpoints.includes("api/loginfactor2")) {
             this.addApiLoginFactor2Endpoints();
         }
 
-        if (endpoints.includes("api/cancelfactor2")) {
+        if (this.endpoints.includes("api/cancelfactor2")) {
             this.addApiCancelFactor2Endpoints();
         }
 
-        if (endpoints.includes("api/logout")) {
+        if (this.endpoints.includes("api/logout")) {
             this.addApiLogoutEndpoints();
         }
 
-        if (endpoints.includes("api/signup")) {
+        if (this.endpoints.includes("api/signup")) {
             this.addApiSignupEndpoints();
         }
 
-        if (endpoints.includes("api/configurefactor2")) {
+        if (this.endpoints.includes("api/configurefactor2")) {
             this.addApiConfigureFactor2Endpoints();
         }
 
-        if (endpoints.includes("api/changepassword")) {
+        if (this.endpoints.includes("api/changepassword")) {
             this.addApiChangePasswordEndpoints();
         }
 
-        if (endpoints.includes("api/changefactor2")) {
+        if (this.endpoints.includes("api/changefactor2")) {
             this.addApiChangeFactor2Endpoints();
         }
 
-        if (endpoints.includes("api/updateuser")) {
+        if (this.endpoints.includes("api/updateuser")) {
             this.addApiUpdateUserEndpoints();
         }
 
-        if (endpoints.includes("api/resetpassword")) {
+        if (this.endpoints.includes("api/resetpassword")) {
             if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /api/resetpassword");
             this.addApiResetPasswordEndpoints();
         }
 
-        if (endpoints.includes("api/requestpasswordreset")) {
+        if (this.endpoints.includes("api/requestpasswordreset")) {
             if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /api/requestpasswordreset");
             this.addApiRequestPasswordResetEndpoints();
         }
 
-        if (endpoints.includes("api/verifyemail")) {
+        if (this.endpoints.includes("api/verifyemail")) {
             if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification must be enabled for /api/verifyemail");
             this.addApiVerifyEmailEndpoints();
         }
 
-        if (endpoints.includes("api/userforsessionkey")) {
+        if (this.endpoints.includes("api/userforsessionkey")) {
             this.addApiUserForSessionKeyEndpoints();
         }
 
-        if (endpoints.includes("api/getcsrftoken")) {
+        if (this.endpoints.includes("api/getcsrftoken")) {
             this.addApiGetCsrfTokenEndpoints();
     
         }

@@ -15,6 +15,8 @@ const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=ut
 export interface FastifyAuthorizationServerOptions extends OAuthAuthorizationServerOptions {
     errorPage? : string,
     oauthAuthorizePage? : string,
+    prefix? : string,
+    loginUrl? : string,
 }
 
 interface AuthorizeQueryType {
@@ -55,8 +57,8 @@ interface TokenBodyType {
 export class FastifyAuthorizationServer {
     private fastifyServer : FastifyServer;
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
-    private prefix : string;
-    private loginUrl : string;
+    private prefix : string = "/";
+    private loginUrl : string = "/login";
     readonly authServer : OAuthAuthorizationServer;
     private oauthAuthorizePage : string = "authorize.njk";
     private errorPage : string = "error.njk";
@@ -65,29 +67,28 @@ export class FastifyAuthorizationServer {
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
         fastifyServer : FastifyServer,
-        prefix : string,
-        loginUrl : string,
         clientStorage : OAuthClientStorage, 
         keyStorage : KeyStorage,
         options : FastifyAuthorizationServerOptions) {
 
-        this.prefix = prefix;
-        this.loginUrl = loginUrl;
         this.app = app;
         this.fastifyServer = fastifyServer;
         this.clientStorage = clientStorage;
 
         this.authServer = new OAuthAuthorizationServer(this.clientStorage, keyStorage, options);
 
+        setParameter("prefix", ParamType.String, this, options, "PREFIX");
+        if (!(this.prefix.endsWith("/"))) this.prefix += "/";
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
+        setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
         setParameter("oauthAuthorizePage", ParamType.String, this, options, "OAUTH_AUTHORIZE_PAGE");
 
         app.get(this.prefix+'.well-known/openid-configuration', async (_request : FastifyRequest, reply : FastifyReply) =>  {
             return reply.header(...JSONHDR).status(200).send(
                 this.authServer.oidcConfiguration({
-                    authorizeEndpoint: prefix+"authorize", 
-                    tokenEndpoint: prefix+"token", 
-                    jwksUri: prefix+"jwks", 
+                    authorizeEndpoint: this.prefix+"authorize", 
+                    tokenEndpoint: this.prefix+"token", 
+                    jwksUri: this.prefix+"jwks", 
                     additionalClaims: []}));
         });
 
