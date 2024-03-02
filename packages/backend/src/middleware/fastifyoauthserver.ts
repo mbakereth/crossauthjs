@@ -54,7 +54,7 @@ interface TokenBodyType {
 
 export class FastifyAuthorizationServer {
     private fastifyServer : FastifyServer;
-    private app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
+    readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
     private prefix : string;
     private loginUrl : string;
     readonly authServer : OAuthAuthorizationServer;

@@ -243,12 +243,12 @@ test('FastifyOAuthClient.refreshToken', async () => {
     expect(resp.access_token).toBeDefined();
 });
 
-async function receiveFn(_client: FastifyOAuthClient, _request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
+async function receiveFn(_client: FastifyOAuthClient, _request : FastifyRequest, reply : FastifyReply, _oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
     return reply;
 }
 
 test('FastifyOAuthClient.refreshIfExpiredIsExpired', async () => {
-    const {authServer, access_token, refresh_token, expires_in} = await getAccessToken();
+    const {access_token, refresh_token} = await getAccessToken();
     expect(access_token).toBeDefined();
 
     const server = await makeClient();
@@ -264,7 +264,7 @@ test('FastifyOAuthClient.refreshIfExpiredIsExpired', async () => {
 });
 
 test('FastifyOAuthClient.refreshIfExpiredIsNotExpired', async () => {
-    const {authServer, access_token, refresh_token, expires_in} = await getAccessToken();
+    const {access_token, refresh_token, expires_in} = await getAccessToken();
     expect(access_token).toBeDefined();
 
     const server = await makeClient();

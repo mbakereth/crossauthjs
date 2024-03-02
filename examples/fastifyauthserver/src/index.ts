@@ -64,6 +64,9 @@ let server = new FastifyServer(userStorage, {
     oAuthAuthServer : {
         clientStorage : clientStorage,
         keyStorage: keyStorage,
+    },
+    oAuthResServer: {
+        protectedEndpoints: {"/resource": {scope: "read write"}}, 
     }}, {
         app: app,
         views: path.join(__dirname, '../views'),
@@ -75,6 +78,7 @@ let server = new FastifyServer(userStorage, {
         authStorage: authStorage,
         userStorage: userStorage,
         authenticator: lpAuthenticator,
+        resourceServerName: "https://resserver.com",
 });
 
 // SImple page to check login status and logout
@@ -88,16 +92,18 @@ app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
 // This is a resource server endpoint.  It doesn't have to be on the same
 // server as the authorization server, in which initialize it with
 // {authServerBaseUri: AUTH_SERVER_URI} instead
-const resserver = new FastifyOAuthResourceServer({
-    authServer: server.authServer,
+/*const resserver = new FastifyOAuthResourceServer(
+    app, 
+    server.authServer,
+    {"/resource": {scope: "read write"}}, {
     resourceServerName: "https://resserver.com",
-});
+});*/
 app.get('/resource', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    const {authorized, error_description, tokenPayload} = await resserver.authorized(request);
-    if (authorized) {
-        return reply.header(...JSONHDR).status(200).send({ok: true, timeCalled: new Date(), username: tokenPayload.sub});
-    } else if (error_description) {
-        return reply.header(...JSONHDR).status(500).send({ok: false, error: error_description});
+    //const {authorized, error_description, tokenPayload} = await resserver.authorized(request);
+    if (request.authTokenPayload) {
+        return reply.header(...JSONHDR).status(200).send({ok: true, timeCalled: new Date(), username: request.authTokenPayload.sub});
+    } else if (request.authErrorDescription) {
+        return reply.header(...JSONHDR).status(500).send({ok: false, error: request.authErrorDescription});
     } else {
         return reply.header(...JSONHDR).status(401).send({ok: false});
     }

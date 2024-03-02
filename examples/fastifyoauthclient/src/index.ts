@@ -65,6 +65,7 @@ const server = new FastifyServer(userStorage, {
     validFlows: "all", // activate all OAuth flows
     loginProtectedFlows: OAuthFlows.AuthorizationCode + ", " + OAuthFlows.AuthorizationCodeWithPKCE,
     tokenResponseType: "saveInSessionAndLoad",
+    bffGetEndpoints: "/resource"
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
@@ -87,26 +88,5 @@ app.get('/passwordex', async (request : FastifyRequest, reply : FastifyReply) =>
     return reply.view('passwordex.njk', {user: request.user, csrfToken: request.csrfToken});
 }
 );
-
-// in this example, the API is called from the backend
-app.get('/resource', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    try {
-        const oauthData = await server.getSessionData(request, "oauth");
-        let access_token = oauthData.access_token;
-        const resp = await server.oAuthClient?.refreshIfExpired(request, reply, oauthData.refresh_token, oauthData.expires_at);
-        if (resp?.new_access_token) access_token = resp.new_ccess_token;
-        if (access_token) {
-            const resp = await fetch(process.env["RESOURCE_SERVER"]+"/resource", {
-                headers: {
-                    "Authorization": "Bearer " + access_token,
-            }});
-            return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
-        } else {
-            return reply.header(...JSONHDR).status(401).send({ok: false});
-        }
-    } catch (e) {
-        CrossauthLogger.logger.error(j({err: e}));
-    }
-});
 
 server.start(port);

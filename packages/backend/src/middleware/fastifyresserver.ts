@@ -1,22 +1,67 @@
-import { CrossauthError, CrossauthLogger, j } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, ErrorCode } from '@crossauth/common';
 import {  OAuthResourceServer, type OAuthResourceServerOptions } from '../oauth/resserver';
 import {  FastifyAuthorizationServer } from './fastifyoauthserver';
-import { FastifyRequest } from 'fastify';
+import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import { UserStorage } from '../storage';
+import { Server, IncomingMessage, ServerResponse } from 'http'
 
 export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOptions {
-    authServer? : FastifyAuthorizationServer,
     userStorage? : UserStorage;
 }
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
     private authServer?: FastifyAuthorizationServer;
+    private protectedEndpoints : {[key:string]: {scope? : string}} = {};
 
-    constructor(options : FastifyOAuthResourceServerOptions = {}) {
+    constructor(
+        app: FastifyInstance<Server, IncomingMessage, ServerResponse>, 
+        authServer? : FastifyAuthorizationServer,
+        protectedEndpoints? : {[key:string]: {scope? : string}},
+        options : FastifyOAuthResourceServerOptions = {}) {
         super(options);
-        this.authServer = options.authServer;
+        this.authServer = authServer;
+
+        if (protectedEndpoints) {
+            const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;
+            for (const [key, value] of Object.entries(protectedEndpoints)) {
+                if (!key.startsWith("/")) {
+                    throw new CrossauthError(ErrorCode.Configuration, "protected endpoints must be absolute paths without the protocol and hostname");
+                }
+                if (value.scope) {
+                    value.scope.split(" ").forEach((s : string) => {
+                        if (!(regex.test(s))) throw new CrossauthError(ErrorCode.Configuration, "Illegal charactwers in scope " + s);
+                    });
+                }
+            }
+            this.protectedEndpoints = protectedEndpoints;
+        }
+
+        // validate access token and put in request, along with any errors
+        app.addHook('preHandler', async (request : FastifyRequest, _reply : FastifyReply) => {
+            const authResponse = await this.authorized(request);
+            request.authTokenPayload = authResponse?.tokenPayload;
+            request.authError = authResponse?.error
+            request.authErrorDescription = authResponse?.error_description;
+            CrossauthLogger.logger.debug(j({msg: "Resource server url", url: request.url, authorized: request.authTokenPayload!= undefined}));
+        });
+
+        app.addHook('onSend', async (request : FastifyRequest, reply : FastifyReply) => {
+            const urlWithoutQuery = request.url.split("?", 2)[0];
+            if (!request.authTokenPayload && urlWithoutQuery in this.protectedEndpoints) {
+                let header = "Bearer";
+                if ("scope" in this.protectedEndpoints[urlWithoutQuery]) {
+                    header += ' scope="' + this.protectedEndpoints[urlWithoutQuery]["scope"];
+                }
+                reply.header("WWW-Authenticate:", header);
+                CrossauthLogger.logger.debug(j({msg: "Adding www-authenticate header to reply"}));
+            }
+        });
     }
 
-    async authorized(request : FastifyRequest) : Promise<{authorized: boolean, tokenPayload?: {[key:string]: any}, error? : string, error_description?: string}|undefined> {
+   protected async authorized(request : FastifyRequest) : Promise<{
+        authorized: boolean, 
+        tokenPayload?: {[key:string]: any}, 
+        error? : string, 
+        error_description?: string}|undefined> {
         try {
             if ((!this.keys || this.keys.length == 0) && this.authServer) {
                 // we will get the keys from the auth server directly rather than let the

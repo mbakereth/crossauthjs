@@ -44,7 +44,7 @@ export interface OAuthResourceServerOptions {
 
 export class OAuthResourceServer {
     
-    private resourceServerName : string = "";
+    protected resourceServerName : string = "";
     private persistAccessToken = false;
     private keyStorage? : KeyStorage;
     private jwtSecretKey = "";

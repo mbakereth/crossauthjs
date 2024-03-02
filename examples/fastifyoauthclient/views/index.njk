@@ -2,6 +2,22 @@
     <head>
         <title>Client</title>
         <link rel="stylesheet" href="/public/style.css"/>
+
+        <script>
+            function authorize() {
+                window.location.href = '/authzcodeflow?scope=read+write';
+            }
+            function callResource() {
+                fetch("/get/resource")
+                .then(function(response) {return response.json()}).then(function(response) {
+                    document.getElementById("result").innerHTML = "<pre>"+JSON.stringify(response)+"</pre>"
+                })
+                .catch(function(error) {
+                    document.getElementById("result").text = error;
+                })
+            }
+        </script>
+
         </head>
     <body>
         <h1>Client</h1>
@@ -11,7 +27,10 @@
         <p><a href="clientcredentialsex">Client credentials flow</a></p>
         <p><a href="passwordex">Password flow</a></p>
 
-	{% if user %}
+        <p><button onClick="callResource()">Call Resource</button></p>
+        <p id="result">Result will be here</p>
+
+	    {% if user %}
        	    <form method="POST" action="logout">
                 <button type="submit">Logout</button>
             </form>

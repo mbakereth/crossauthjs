@@ -41,6 +41,10 @@ interface PasswordBodyType {
     csrfToken? : string,
 }
 
+interface BffParamType {
+    url : string,
+}
+
 export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     siteUrl ?: string,
     prefix? : string,
@@ -55,7 +59,9 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     receiveTokenFn? : (client: FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply>;
     errorFn? :FastifyErrorFn ;
     tokenResponseType? : "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom";
-    errorResponseType? : "sendJson" | "errorPage" | "custom";
+    errorResponseType? : "sendJson" | "errorPage" | "custom",
+    bffGetEndpoints? : string,
+    bffPostEndpoints? : string,
 }
 
 async function jsonError(_server : FastifyServer, _request : FastifyRequest, reply : FastifyReply, ce : CrossauthError) : Promise<FastifyReply> {
@@ -174,6 +180,8 @@ export class FastifyOAuthClient extends OAuthClient {
     private tokenResponseType :  "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom" = "sendJson";
     private errorResponseType :  "sendJson" | "pageError" | "custom" = "sendJson";
     private passwordFlowUrl : string = "passwordflow";
+    private bffGetEndpoints : string[] = [];
+    private bffPostEndpoints : string[] = [];
 
     constructor(server : FastifyServer, authServerBaseUri : string, options : FastifyOAuthClientOptions) {
         super(authServerBaseUri, options);
@@ -190,6 +198,9 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("loginProtectedFlows", ParamType.StringArray, this, options, "OAUTH_LOGIN_PROTECTED_FLOWS");
         setParameter("passwordFlowUrl", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_URL");
         setParameter("passwordFlowPage", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_PAGE");
+        setParameter("bffGetEndpoints", ParamType.StringArray, this, options, "OAUTH_BFF_GET_ENDPOINTS");
+        setParameter("bffPostEndpoints", ParamType.StringArray, this, options, "OAUTH_BFF_PUT_ENDPOINTS");
+
         if (this.loginProtectedFlows.length == 1 && this.loginProtectedFlows[0] == OAuthFlows.All) {
             this.loginProtectedFlows = this.validFlows;
         } else {
@@ -234,6 +245,7 @@ export class FastifyOAuthClient extends OAuthClient {
 
         if (this.validFlows.includes(OAuthFlows.AuthorizationCode)) {
             this.server.app.get(this.prefix+'authzcodeflow', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authzcodeflow', ip: request.ip, user: request.user?.username}));
                 if (!request.user && this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
                     return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }          
@@ -249,6 +261,7 @@ export class FastifyOAuthClient extends OAuthClient {
 
         if (this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
             this.server.app.get(this.prefix+'authzcodeflowpkce', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authzcodeflowpkce', ip: request.ip, user: request.user?.username}));
                 if (!request.user && this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
                     return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }               
@@ -263,6 +276,7 @@ export class FastifyOAuthClient extends OAuthClient {
 
         if (this.validFlows.includes(OAuthFlows.AuthorizationCode) || this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
             this.server.app.get(this.prefix+'authzcode', async (request : FastifyRequest<{ Querystring: RedirectUriQueryType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authzcode', ip: request.ip, user: request.user?.username}));
                 if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode))) {
                     return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }               
@@ -286,6 +300,7 @@ export class FastifyOAuthClient extends OAuthClient {
 
         if (this.validFlows.includes(OAuthFlows.ClientCredentials)) {
             this.server.app.post(this.prefix+'clientcredflow', async (request : FastifyRequest<{ Body: ClientCredentialsBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'clientcredflow', ip: request.ip, user: request.user?.username}));
                 if (this.server.sessionServer) {
                     // if sessions are enabled, require a csrf token
                     const error = await server.errorIfCsrfInvalid(request, reply, this.errorFn);
@@ -313,6 +328,7 @@ export class FastifyOAuthClient extends OAuthClient {
 
         if (this.validFlows.includes(OAuthFlows.RefreshToken)) {
             this.server.app.post(this.prefix+'refreshtokenflow', async (request : FastifyRequest<{ Body: RefreshTokenBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'refreshtokenflow', ip: request.ip, user: request.user?.username}));
                 if (this.server.sessionServer) {
                     // if sessions are enabled, require a csrf token
                     const error = await server.errorIfCsrfInvalid(request, reply, this.errorFn);
@@ -340,6 +356,7 @@ export class FastifyOAuthClient extends OAuthClient {
 
         if (this.validFlows.includes(OAuthFlows.Password)) {
             this.server.app.get(this.prefix+this.passwordFlowUrl, async (request : FastifyRequest<{ Querystring: PasswordQueryType, Body: PasswordBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'passwordFlowUrl', ip: request.ip, user: request.user?.username}));
                 if (!request.user && this.loginProtectedFlows.includes(OAuthFlows.Password)) {
                     return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }
@@ -347,13 +364,77 @@ export class FastifyOAuthClient extends OAuthClient {
             });
 
             this.server.app.post(this.prefix+this.passwordFlowUrl, async (request : FastifyRequest<{ Body: PasswordBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+this.passwordFlowUrl, ip: request.ip, user: request.user?.username}));
                 return await this.passwordPost(false, request, reply);
             });
 
             this.server.app.post(this.prefix+"api/"+this.passwordFlowUrl, async (request : FastifyRequest<{ Body: PasswordBodyType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+"api/"+this.passwordFlowUrl, ip: request.ip, user: request.user?.username}));
                 return await this.passwordPost(true, request, reply);
             });
 
+        }
+
+        for (let i=0; i<this.bffGetEndpoints.length; ++i) {
+            this.server.app.get(this.prefix+'get' + this.bffGetEndpoints[i],  async (request : FastifyRequest<{Params: BffParamType}>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'get' + this.bffGetEndpoints[i], ip: request.ip, user: request.user?.username}));
+                const url = request.url.substring(this.prefix.length+"get".length);
+                CrossauthLogger.logger.debug(j({msg: "Resource server URL " + url}))
+                try {
+                    const oauthData = await this.server.getSessionData(request, "oauth");
+                    let access_token = oauthData?.access_token;
+                    if (oauthData && oauthData.access_token) {
+                        const resp = await server.oAuthClient?.refreshIfExpired(request, reply, oauthData.refresh_token, oauthData.expires_at);
+                        if (resp?.access_token) access_token = resp.access_token;
+                    }
+                    let headers : {[key:string]: string} = {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            "Authorization": "Bearer " + access_token,
+                    }
+                    if (access_token) headers["Authorization"] = "Bearer " + access_token;
+                    const resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
+                        headers:headers 
+                    });
+                    return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
+                } catch (e) {
+                    CrossauthLogger.logger.error(j({err: e}));
+                    return reply.header(...JSONHDR).status(500).send({});
+
+                }
+            });
+        }
+
+        for (let i=0; i<this.bffPostEndpoints.length; ++i) {
+            this.server.app.post(this.prefix+'post' + this.bffPostEndpoints[i],  async (request : FastifyRequest<{Params: BffParamType}>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'get' + this.bffPostEndpoints[i], ip: request.ip, user: request.user?.username}));
+                const url = request.url.substring(this.prefix.length+"get".length);
+                CrossauthLogger.logger.debug(j({msg: "Resource server URL " + url}))
+                try {
+                    const oauthData = await this.server.getSessionData(request, "oauth");
+                    let access_token = oauthData?.access_token;
+                    if (oauthData && oauthData.access_token) {
+                        const resp = await server.oAuthClient?.refreshIfExpired(request, reply, oauthData.refresh_token, oauthData.expires_at);
+                        if (resp?.access_token) access_token = resp.access_token;
+                    }
+                    let headers : {[key:string]: string} = {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            "Authorization": "Bearer " + access_token,
+                    }
+                    if (access_token) headers["Authorization"] = "Bearer " + access_token;
+                    const resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
+                        method: "POST",
+                        headers:headers,
+                        body: JSON.stringify(request.body), 
+                    });
+                    return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
+                } catch (e) {
+                    CrossauthLogger.logger.error(j({err: e}));
+                    return reply.header(...JSONHDR).status(500).send({});
+
+                }
+            });
         }
     }
 

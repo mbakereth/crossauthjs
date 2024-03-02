@@ -47,6 +47,7 @@ export interface CrossauthLoggerInterface {
  *                   it is non-secret or invalid
  * - `accessTokenHash` : hash of the JTI of an access token.  For security reasons, the 
  *                       unhashed version is not logged.
+ * - `method`: request method (GET, PUT etc)
  * - `url` : relevant URL
  * - `ip`  : relevant IP address           
  * - `scope` : OAuth scope
@@ -55,6 +56,7 @@ export interface CrossauthLoggerInterface {
  * - `httpStatus` : HTTP status that will be returned
  * - `port` port service is running on (only for starting a service)
  * - `prefix` prefix for endpoints (only when starting a service)
+ * - `authorized` whether or not a valid OAuth access token was provided
  * 
  */
 export class CrossauthLogger {

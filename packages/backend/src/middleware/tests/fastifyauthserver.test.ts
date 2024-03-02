@@ -192,7 +192,7 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
     body = JSON.parse(res.body);
     expect(body.access_token).toBeDefined();
     // @ts-ignore
-    await server.authServer.authServer.validateJwt(body.access_token, "access");
+    await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
 
 });
 
@@ -216,7 +216,7 @@ test('FastifyAuthServfer.getAccessTokenWClientCredentials', async () => {
     body = JSON.parse(res.body);
     expect(body.access_token).toBeDefined();
     // @ts-ignore
-    await server.authServer.authServer.validateJwt(body.access_token, "access");
+    await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
 
 });
 
@@ -242,7 +242,7 @@ test('FastifyAuthServfer.getAccessTokenWClientCredentialsBasicAuth', async () =>
     body = JSON.parse(res.body);
     expect(body.access_token).toBeDefined();
     // @ts-ignore
-    await server.authServer.authServer.validateJwt(body.access_token, "access");
+    await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
 
 });
 
@@ -291,6 +291,6 @@ test('FastifyAuthServfer.getAccessTokenWithPasswordFlow', async () => {
     body = JSON.parse(res.body);
     expect(body.access_token).toBeDefined();
     // @ts-ignore
-    await server.authServer.authServer.validateJwt(body.access_token, "access");
+    await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
 
 });

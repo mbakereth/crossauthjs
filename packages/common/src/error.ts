@@ -1,18 +1,4 @@
 /**
- * Errors that can be returned from OAuth2 endpoints
- */
-export enum OAuthErrorCode {
-    /** Thrown when a given username does not exist, eg during login */
-    invalid_request = 101,
-    unauthorized_client = 102,
-    access_denied = 103,
-    unsupported_response_type = 104,
-    invalid_scope = 105,
-    server_error = 106,
-    temporarily_unavailable = 107,
-  };
-
-/**
  * Indicates the type of error reported by {@link @crossauth/common!CrossauthError}
  */
 export enum ErrorCode {
@@ -62,6 +48,9 @@ export enum ErrorCode {
 
     /** Thrown for the OAuth invalid_scope error  */
     InvalidScope,
+
+    /** Thrown for the OAuth insufficient_scope error  */
+    InsufficientScope,
 
     /** Returned with an HTTP 403 response */
     Forbidden,
@@ -213,7 +202,10 @@ export class CrossauthError extends Error {
             _httpStatus = 401;
         } else if (code == ErrorCode.InvalidScope) {
             _message = "Invalid scope"
-            _httpStatus = 402;
+            _httpStatus = 403;
+        } else if (code == ErrorCode.InsufficientScope) {
+            _message = "Insufficient scope"
+            _httpStatus = 403;
         } else if (code == ErrorCode.Connection) {
             _message = "Connection failure";
         } else if (code == ErrorCode.Expired) {
@@ -287,6 +279,8 @@ export class CrossauthError extends Error {
             case "invalid_scope": code = ErrorCode.InvalidScope; break;
             case "server_error": code = ErrorCode.UnknownError; break;
             case "temporarily_unavailable": code = ErrorCode.Connection; break;
+            case "invalid_token": code = ErrorCode.InvalidToken; break;
+            case "insufficient_scope": code = ErrorCode.InvalidToken; break;
             default: code = ErrorCode.UnknownError;
         }
         return new CrossauthError(code, error_description);
