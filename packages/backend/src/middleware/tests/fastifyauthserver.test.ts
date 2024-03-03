@@ -173,12 +173,12 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
         }});
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toContain("/redirect?");
-    const params = getQueryParams(res.headers.location||"");
+    const params = getQueryParams(res.headers.location??"");
     const code = params.code;
     const state = params.state;
     expect(state).toBe("ABC123");
     expect(code).toBeDefined();
-    await keyStorage.getKey("authz:"+Hasher.hash(code||""));
+    await keyStorage.getKey("authz:"+Hasher.hash(code??""));
 
     res = await server.app.inject({ 
         method: "POST", 

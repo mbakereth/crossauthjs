@@ -179,7 +179,7 @@ export class PrismaUserStorage extends UserStorage {
         if (secrets && !secrets.userId) secrets.userId = user[this.idColumn];
         try {
             let {id: dummyUserId, ...userData} = user;
-            let {userId: dummySecretsId, ...secretsData} = secrets||{};
+            let {userId: dummySecretsId, ...secretsData} = secrets??{};
             if ("email" in userData && userData.email) {
                 userData = {emailNormalized: PrismaUserStorage.normalize(userData.email), ...userData};
             }
@@ -404,7 +404,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 user_id : userId,
                 value : value,
                 created : created,
-                expires : expires||null,
+                expires : expires??null,
                 data : data,
                 ...extraFields,
             };
@@ -467,7 +467,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                     where: {
                         AND: [
-                            { user_id: userId||null },
+                            { user_id: userId??null },
                             { value: {startsWith: prefix} },
                             { value: { not: except } },
                         ]
@@ -479,7 +479,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                     where: {
                         AND: [
-                            { user_id: userId||null },
+                            { user_id: userId??null },
                             { value: {startsWith: prefix} } ,
                         ]
                     }
@@ -527,7 +527,7 @@ export class PrismaKeyStorage extends KeyStorage {
             return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                 where: {
                     AND: [
-                        { user_id: userId||null },
+                        { user_id: userId??null },
                         { value: {startsWith: prefix} },
                     ]
                 }
@@ -547,7 +547,7 @@ export class PrismaKeyStorage extends KeyStorage {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             let prismaKeys =  await this.prismaClient[this.keyTable].findMany({
                 where: {
-                    user_id: userId||null
+                    user_id: userId??null
                 }
             });
             returnKeys = prismaKeys.map((v : Partial<Key>) => { return {...v, userId: v.user_id} });
@@ -690,7 +690,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             const validFlowObjects = client.validFlow;
             return {
                 ...client, 
-                clientSecret: client.clientSecret||undefined, 
+                clientSecret: client.clientSecret??undefined, 
                 redirectUri: redirectUriObjects.map((x:{[key:string]:any}) => x.uri), 
                 validFlow: validFlowObjects.map((x:{[key:string]:any}) => x.flow)
             };
@@ -1009,7 +1009,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             let rows = await this.prismaClient[this.authorizationTable].findMany({
                 where: {
                     client_id : clientId,
-                    user_id: userId||null,
+                    user_id: userId??null,
                 },
                 select: {
                     scope: true,
@@ -1044,7 +1044,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             await tx[this.authorizationTable].deleteMany({
                 where: {
                     client_id: clientId,
-                    user_id : userId||null
+                    user_id : userId??null
                 }
             });
 
@@ -1054,7 +1054,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
                 promises.push(tx[this.authorizationTable].create({
                     data: {
                         client_id : clientId,
-                        user_id : userId||null,
+                        user_id : userId??null,
                         scope : scope,
                     },
                 }));

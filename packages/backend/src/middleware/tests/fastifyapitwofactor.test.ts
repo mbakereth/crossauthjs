@@ -12,7 +12,7 @@ import { authenticator as gAuthenticator } from 'otplib';
 import { SessionCookie } from '../../cookieauth';
 
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
-export var emailTokenData :  {to: string, token : string};
+export var emailTokenData :  {to: string, otp : string};
 
 beforeAll(async () => {
 });
@@ -290,7 +290,7 @@ test('FastifyServer.api.loginTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret||"");
+        const code = gAuthenticator.generate(secrets.totpSecret??"");
         res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code
@@ -369,7 +369,7 @@ test('FastifyServer.api.turnOffTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret||"");
+        const code = gAuthenticator.generate(secrets.totpSecret??"");
         res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code
@@ -416,7 +416,7 @@ test('FastifyServer.api.reconfigureTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret||"");
+        const code = gAuthenticator.generate(secrets.totpSecret??"");
         res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code,

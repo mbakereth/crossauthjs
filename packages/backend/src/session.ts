@@ -78,8 +78,8 @@ export class SessionManager {
         }
 
 
-        this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options||{}});
-        this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options||{}});
+        this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options??{}});
+        this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options??{}});
 
 
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
@@ -484,7 +484,7 @@ export class SessionManager {
         } 
 
         // this part is for turning off 2FA
-        await this.userStorage.updateUser({id: user.id, factor2: newFactor2||""});
+        await this.userStorage.updateUser({id: user.id, factor2: newFactor2??""});
         await this.keyStorage.updateData(
             SessionCookie.hashSessionKey(sessionId), 
             "2fa",

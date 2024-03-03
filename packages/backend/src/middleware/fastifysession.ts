@@ -591,7 +591,7 @@ export class FastifySessionServer {
         // 2FA for endpoints that are protected by it (other than login)
         app.addHook('preHandler', async (request : FastifyRequest<{Body: ArbitraryBodyType}>, reply : FastifyReply) => {
             const sessionCookieValue = this.getSessionCookieValue(request);
-            if (sessionCookieValue && request.user?.factor2 && (this.factor2ProtectedPageEndpoints.includes(request.url) || this.factor2ProtectedApiEndpoints.includes(request.url))) {
+            if (sessionCookieValue && request.user?.factor2 && (this.factor2ProtectedPageEndpoints.includes(request.url) || this.factor2ProtectedApiEndpoints.includes(request.url))) {
                 if (!(["GET", "OPTIONS", "HEAD"].includes(request.method))) {
                     const sessionData = await this.sessionManager.dataForSessionKey(sessionCookieValue);
                     if (("pre2fa") in sessionData) {
@@ -800,7 +800,7 @@ export class FastifySessionServer {
 
         this.app.get(this.prefix+'login', async (request : FastifyRequest<{Querystring : LoginQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'login', ip: request.ip}));
-            if (request.user) return reply.redirect(request.query.next||this.loginRedirect); // already logged in
+            if (request.user) return reply.redirect(request.query.next??this.loginRedirect); // already logged in
 
             let data : {urlprefix: string, next? : any, csrfToken: string|undefined} = {urlprefix: this.prefix, csrfToken: request.csrfToken};
             if (request.query.next) {
@@ -821,7 +821,7 @@ export class FastifySessionServer {
                     } else {
                         let data = {
                             csrfToken: request.csrfToken,
-                            next: request.body.next||this.loginRedirect,
+                            next: request.body.next??this.loginRedirect,
                             persist: request.body.persist ? "on" : "",
                             urlprefix: this.prefix, 
                             factor2: user.factor2,
@@ -994,7 +994,7 @@ export class FastifySessionServer {
             try {
                 return await this.reconfigureFactor2(request, reply, 
                 (reply, data, _user) => {
-                    return reply.view(this.configureFactor2Page, {...data, next: request.query.next||this.loginRedirect});
+                    return reply.view(this.configureFactor2Page, {...data, next: request.query.next??this.loginRedirect});
                 });
             } catch (e) {
                 CrossauthLogger.logger.error(j({msg: "Configure factor2 failure", user: request.user?.username, errorCodeName: e instanceof CrossauthError ? e.codeName : "UnknownError"}));
@@ -1005,7 +1005,7 @@ export class FastifySessionServer {
                         errorMessages: error.messages, 
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
-                        next: request.query.next||this.loginRedirect, 
+                        next: request.query.next??this.loginRedirect, 
                         csrfToken: request.csrfToken,
                         urlprefix: this.prefix, 
                     });
@@ -1037,7 +1037,7 @@ export class FastifySessionServer {
                     } else {
                         if (!request.user) {
                             // we came here as part of login in - take user to orignally requested page
-                            return reply.redirect(request.body.next||this.loginRedirect);
+                            return reply.redirect(request.body.next??this.loginRedirect);
                         } else {
                             // we came here because the user asked to change 2FA - tell them it was successful
                             return reply.view(this.configureFactor2Page, {
@@ -1139,9 +1139,9 @@ export class FastifySessionServer {
                 let data = {
                     urlprefix: this.prefix, 
                     csrfToken: request.csrfToken,
-                    next: request.query.next||this.loginRedirect,
+                    next: request.query.next??this.loginRedirect,
                     allowedFactor2: this.allowedFactor2Details(),
-                    factor2 : request.user.factor2||"none",
+                    factor2 : request.user.factor2??"none",
                 };
                 return reply.view(this.changeFactor2Page, data);
             }
@@ -1154,9 +1154,9 @@ export class FastifySessionServer {
                 return await this.changeFactor2(request, reply, 
                     (reply, data, _user) => {
                         if (data.factor2) {
-                            return reply.view(this.configureFactor2Page, {csrfToken: data.csrfToken, next: request.body.next||this.loginRedirect, ...data.userData});
+                            return reply.view(this.configureFactor2Page, {csrfToken: data.csrfToken, next: request.body.next??this.loginRedirect, ...data.userData});
                         } else {
-                            return reply.view(this.configureFactor2Page, {message: "Two factor authentication has been updated", next: request.body.next||this.loginRedirect, csrfToken: data.csrfToken});
+                            return reply.view(this.configureFactor2Page, {message: "Two factor authentication has been updated", next: request.body.next??this.loginRedirect, csrfToken: data.csrfToken});
                         }
                     });
             } catch (e) {
@@ -1171,8 +1171,8 @@ export class FastifySessionServer {
                         csrfToken: request.csrfToken,
                         urlprefix: this.prefix, 
                         allowedFactor2: this.allowedFactor2Details(),
-                        factor2: request.user?.factor2||"none",
-                        next: request.body.next||this.loginRedirect,
+                        factor2: request.user?.factor2??"none",
+                        next: request.body.next??this.loginRedirect,
                     });
                 });
             }
@@ -1464,7 +1464,7 @@ export class FastifySessionServer {
                     return reply.header(...JSONHDR).send({
                     ok: true,
                     user : user,
-                    emailVerificationNeeded: this.enableEmailVerification||false,
+                    emailVerificationNeeded: this.enableEmailVerification??false,
                     ...data.userData,
                 })});
             } catch (e) {
@@ -1903,7 +1903,7 @@ export class FastifySessionServer {
                 {
                     userData: userData,
                     username: username,
-                    next: next||this.loginRedirect,
+                    next: next??this.loginRedirect,
                     csrfToken: request.csrfToken,
                 };
                 return successFn(reply, data)
@@ -1989,7 +1989,7 @@ export class FastifySessionServer {
             factor2: newFactor2,
             userData: userData,
             username: userData.username,
-            next: request.body.next||this.loginRedirect,
+            next: request.body.next??this.loginRedirect,
             csrfToken: request.csrfToken,
         };
         return successFn(reply, data)
@@ -2303,7 +2303,7 @@ export class FastifySessionServer {
     }
 
     errorStatus(e : any) {
-        if (typeof e == "object" && "httpStatus" in e) return e.httpStatus||500;
+        if (typeof e == "object" && "httpStatus" in e) return e.httpStatus??500;
         return 500;
     }
 

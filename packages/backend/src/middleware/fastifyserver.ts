@@ -217,7 +217,7 @@ export class FastifyServer {
                     const ce = (e instanceof CrossauthError) ? e as CrossauthError : new CrossauthError(errorCode, errorMessage);
                     return errorFn(this, request, reply, ce);
                 } else if (this.sessionServer?.errorPage) {
-                    return reply.status(401).view(this.sessionServer?.errorPage||"",
+                    return reply.status(401).view(this.sessionServer?.errorPage??"",
                         {errorMessage: "CSRF Token not provided", status: 401, code: ErrorCode.InvalidCsrf, codeName: ErrorCode[ErrorCode.InvalidCsrf]});
                 }
             } catch (e2) {
@@ -236,7 +236,7 @@ export class FastifyServer {
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
                     return errorFn(this, request, reply, ce);
                 } else if (this.sessionServer?.errorPage) {
-                    return reply.status(401).view(this.sessionServer?.errorPage||"",
+                    return reply.status(401).view(this.sessionServer?.errorPage??"",
                         {errorMessage: "User is not logged in", status: 401, code: ErrorCode.Unauthorized, codeName: ErrorCode[ErrorCode.Unauthorized]});
                 }
             } catch (e2) {

@@ -28,7 +28,7 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
             clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(access_token).toBeDefined();
-    const sub = jwtDecode(access_token||"")?.sub;
+    const sub = jwtDecode(access_token??"")?.sub;
     expect(sub).toBe("bob");
 });
 

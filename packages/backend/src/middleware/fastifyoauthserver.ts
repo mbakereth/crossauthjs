@@ -133,7 +133,7 @@ export class FastifyAuthorizationServer {
                             case 401: status = "401" ; break;
                             case 400: status = "400" ; break;
                         }
-                        return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]||ERROR_500);
+                        return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]??ERROR_500);
                     }
                 }
                 let hasAllScopes = false;
@@ -219,7 +219,7 @@ export class FastifyAuthorizationServer {
                             case 401: status = "401" ; break;
                             case 400: status = "400" ; break;
                         }
-                        return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]||ERROR_500);
+                        return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]??ERROR_500);
                     }
                 }
    
@@ -331,7 +331,7 @@ export class FastifyAuthorizationServer {
 
             // couldn't create an authorization code
             if (error || !code) {
-                const ce = CrossauthError.fromOAuthError(error||"server_error", errorDescription||"Neither code nor error received")
+                const ce = CrossauthError.fromOAuthError(error??"server_error", errorDescription??"Neither code nor error received")
                 CrossauthLogger.logger.error(j({cerr: ce}));
                 if (this.errorPage) {
                     return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
@@ -341,7 +341,7 @@ export class FastifyAuthorizationServer {
                         case 401: status = "401" ; break;
                         case 400: status = "400" ; break;
                     }
-                    return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]||ERROR_500);
+                    return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]??ERROR_500);
                 }
             }
 

@@ -43,7 +43,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
     expect(error_description).toBeUndefined();
 
     const decodedAccessToken
-        = await authServer.validAccessToken(access_token||"");
+        = await authServer.validAccessToken(access_token??"");
     expect(decodedAccessToken).toBeDefined();
     expect(decodedAccessToken?.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
@@ -86,7 +86,7 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
     expect(error_description).toBeUndefined();
 
     const decodedAccessToken
-        = await authServer.validAccessToken(access_token||"");
+        = await authServer.validAccessToken(access_token??"");
     expect(decodedAccessToken).toBeDefined();
     expect(decodedAccessToken?.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);

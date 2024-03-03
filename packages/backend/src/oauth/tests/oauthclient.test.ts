@@ -51,13 +51,13 @@ test('OAuthClient.startAuthorizationCodeFlow', async () => {
     await oauthClient.loadConfig();
     const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
     expect(url).toBeDefined();
-    const state = get("state",url||"");
+    const state = get("state",url??"");
     expect(state).toBeDefined();
     expect(state?.length).toBeGreaterThan(0);
 
-    //fetchMocker.mockResponseOnce((req) => (req.body||"{}").toString());
+    //fetchMocker.mockResponseOnce((req) => (req.body??"{}").toString());
     fetchMocker.mockResponseOnce((req) => {
-        const params = JSON.parse((req.body||"{}").toString());
+        const params = JSON.parse((req.body??"{}").toString());
         if (params.code != code) return "{}";
         return JSON.stringify({
             access_token: access_token,
@@ -82,7 +82,7 @@ test('OAuthClient.clientCredentialsFlow', async () => {
     await oauthClient.loadConfig();
     const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
     expect(url).toBeDefined();
-    const state = get("state",url||"");
+    const state = get("state",url??"");
     expect(state).toBeDefined();
     expect(state?.length).toBeGreaterThan(0);
 
@@ -110,12 +110,12 @@ test('OAuthClient.passwordFlow', async () => {
     await oauthClient.loadConfig();
     const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
     expect(url).toBeDefined();
-    const state = get("state",url||"");
+    const state = get("state",url??"");
     expect(state).toBeDefined();
     expect(state?.length).toBeGreaterThan(0);
 
     fetchMocker.mockResponseOnce((req) => {
-        const params = JSON.parse((req.body||"{}").toString());
+        const params = JSON.parse((req.body??"{}").toString());
         if (params.username != "bob" || params.password != "bobPass123") return {};
         return JSON.stringify({
             access_token: "dummy",

@@ -53,9 +53,9 @@ export class InMemoryUserStorage extends UserStorage {
 
             const userToStore = {id: user.username, ...user}
             this.usersByUsername[user.usernameNormalized] = userToStore;
-            this.secretsByUsername[user.usernameNormalized] = secrets||{};
+            this.secretsByUsername[user.usernameNormalized] = secrets??{};
             if ("email" in user && user.email) this.usersByEmail[user.emailNormalized] = userToStore;
-            if ("email" in user && user.email) this.secretsByEmail[user.emailNormalized] = secrets||{};
+            if ("email" in user && user.email) this.secretsByEmail[user.emailNormalized] = secrets??{};
 
         return {id: user.username, ...user};
     }
@@ -353,7 +353,7 @@ export class InMemoryKeyStorage extends KeyStorage {
      */
     async updateKey(key : Partial<Key>) : Promise<void> {
         if (key.value && key.value in this.keys) {
-            let value : string = key.value||"";
+            let value : string = key.value??"";
             for (let field in key) {
                 this.keys[value][field] = key[field];
             }
@@ -441,10 +441,10 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
             const oldClient = this.clients[client.clientId];
             this.clients[client.clientId] = {
                 ...client, 
-                clientName: client.clientName||oldClient.clientName, 
+                clientName: client.clientName??oldClient.clientName, 
                 clientId: oldClient.clientId, 
-                redirectUri: client.redirectUri||oldClient.redirectUri,
-                validFlow: client.validFlow||oldClient.validFlow,
+                redirectUri: client.redirectUri??oldClient.redirectUri,
+                validFlow: client.validFlow??oldClient.validFlow,
             }
         }
     }

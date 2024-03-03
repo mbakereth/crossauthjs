@@ -78,7 +78,7 @@ async function jsonError(_server : FastifyServer, _request : FastifyRequest, rep
 
 async function pageError(server: FastifyServer, _request : FastifyRequest, reply : FastifyReply,  ce : CrossauthError) : Promise<FastifyReply> {
     CrossauthLogger.logger.debug(j({err: ce}));
-    return reply.status(ce.httpStatus).view(server.oAuthClient?.errorPage||"error.njk", {status: ce.httpStatus, errorMessage: ce.message, errorMessages: ce.messages, errorCodeName: ce.codeName});
+    return reply.status(ce.httpStatus).view(server.oAuthClient?.errorPage??"error.njk", {status: ce.httpStatus, errorMessage: ce.message, errorMessages: ce.messages, errorCodeName: ce.codeName});
 }
 
 async function sendJson(_client: FastifyOAuthClient, _request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
@@ -126,7 +126,7 @@ async function saveInSessionAndLoad(client: FastifyOAuthClient, request : Fastif
         if (!sessionCookieValue) {
             sessionCookieValue = await client.server.createAnonymousSession(request, reply, {[client.sessionDataName] : oauthResponse});
         } else {
-            const expires_at = Date.now() + (oauthResponse.expires_in||0)*1000;
+            const expires_at = Date.now() + (oauthResponse.expires_in??0)*1000;
             await client.server.updateSessionData(request, client.sessionDataName, {...oauthResponse, expires_at});
         }
         if (!client.authorizedPage) {
@@ -157,7 +157,7 @@ async function saveInSessionAndRedirect(client: FastifyOAuthClient, request : Fa
         if (!sessionCookieValue) {
             sessionCookieValue = await client.server.createAnonymousSession(request, reply, {[client.sessionDataName] : oauthResponse});
         } else {
-            const expires_at = (new Date().getTime() + (oauthResponse.expires_in||0)*1000);
+            const expires_at = (new Date().getTime() + (oauthResponse.expires_in??0)*1000);
             await client.server.updateSessionData(request, client.sessionDataName, {...oauthResponse, expires_at});
         }
         if (!client.authorizedUrl) {
@@ -265,7 +265,7 @@ export class FastifyOAuthClient extends OAuthClient {
                 }          
                 const {url, error, error_description} = await this.startAuthorizationCodeFlow(request.query.scope);
                 if (error || !url) {
-                    const ce = CrossauthError.fromOAuthError(error||"server_error", error_description);
+                    const ce = CrossauthError.fromOAuthError(error??"server_error", error_description);
                     return await this.errorFn(this.server, request, reply, ce)
                 }
                 CrossauthLogger.logger.debug(j({msg: `Authorization code flow: redirecting`, url: url}));
@@ -281,7 +281,7 @@ export class FastifyOAuthClient extends OAuthClient {
                 }               
                 const {url, error, error_description} = await this.startAuthorizationCodeFlow(request.query.scope, true);
                 if (error || !url) {
-                    const ce = CrossauthError.fromOAuthError(error||"server_error", error_description);
+                    const ce = CrossauthError.fromOAuthError(error??"server_error", error_description);
                     return await this.errorFn(this.server, request, reply, ce)
                 }
                 return reply.redirect(url);
@@ -405,7 +405,7 @@ export class FastifyOAuthClient extends OAuthClient {
 
             }
             const methods = this.bffEndpoints[i].methods;
-            const matchSubUrls = this.bffEndpoints[i].matchSubUrls||false;
+            const matchSubUrls = this.bffEndpoints[i].matchSubUrls??false;
             let route = url;
             if (matchSubUrls) {
                 if (!(route.endsWith("/"))) route += "/";
@@ -437,7 +437,7 @@ export class FastifyOAuthClient extends OAuthClient {
                                 resp = await fetch(this.bffBaseUrl + url, {
                                     headers:headers,
                                     method: request.method,
-                                    body: JSON.stringify(request.body||"{}"),
+                                    body: JSON.stringify(request.body??"{}"),
                                 });    
                             } else {
                                 resp = await fetch(this.bffBaseUrl + url, {

@@ -230,7 +230,7 @@ test('FastifyServer.wrongCsrf', async () => {
     res = await server.app.inject({ method: "GET", url: "/login" })
     const {csrfToken: csrfToken2} = getCsrf(res);
     const csrfCookie2 = csrfTokens?.makeCsrfCookie(Hasher.randomValue(16));
-    res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie2?.value||""}, payload: {username: "bob", password: "abc", csrfToken: csrfToken2} })
+    res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie2?.value??""}, payload: {username: "bob", password: "abc", csrfToken: csrfToken2} })
     body = JSON.parse(res.body);
     expect(body.args.errorCodeName).toBe("InvalidCsrf");
 

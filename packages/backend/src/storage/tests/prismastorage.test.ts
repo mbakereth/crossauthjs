@@ -119,17 +119,17 @@ test("PeismaStorage.addData", async() => {
     await keyStorage.saveKey(bob.id, keyName, now, expiry);
     await keyStorage.updateData(keyName, "name1", "abc");
     const key1 = await keyStorage.getKey(keyName);
-    const jsonData1 = JSON.parse(key1.data||"{}");
+    const jsonData1 = JSON.parse(key1.data??"{}");
     expect(jsonData1.name1).toBe("abc");
 
     await keyStorage.updateData(keyName, "name2", {"name3": "xyz"});
     const key2 = await keyStorage.getKey(keyName);
-    const jsonData2 = JSON.parse(key2.data||"{}");
+    const jsonData2 = JSON.parse(key2.data??"{}");
     expect(jsonData2.name2.name3).toBe("xyz");
 
     await keyStorage.updateData(keyName, "name1", undefined);
     const key3 = await keyStorage.getKey(keyName);
-    const jsonData3 = JSON.parse(key3.data||"{}");
+    const jsonData3 = JSON.parse(key3.data??"{}");
     expect(jsonData3.name1).toBeUndefined();
 
 });

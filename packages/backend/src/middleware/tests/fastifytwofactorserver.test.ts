@@ -283,7 +283,7 @@ test('FastifyServer.signupTotpWithoutEmailVerification', async () => {
     const sessionCookie = getSession(res);
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secret||"");
+        const code = gAuthenticator.generate(secret??"");
         res = await server.app.inject({ method: "POST", url: "/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code,
@@ -330,7 +330,7 @@ test('FastifyServer.signupTotpWithEmailVerification', async () => {
     const sessionCookie = getSession(res);
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secret||"");
+        const code = gAuthenticator.generate(secret??"");
         res = await server.app.inject({ method: "POST", url: "/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code,
@@ -374,7 +374,7 @@ test('FastifyServer.loginTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret||"");
+        const code = gAuthenticator.generate(secrets.totpSecret??"");
         res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code,
@@ -469,7 +469,7 @@ test('FastifyServer.turnOffTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret||"");
+        const code = gAuthenticator.generate(secrets.totpSecret??"");
         res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code
@@ -525,7 +525,7 @@ test('FastifyServer.reconfigureTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret||"");
+        const code = gAuthenticator.generate(secrets.totpSecret??"");
         res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code,
@@ -757,7 +757,7 @@ test('FastifyServer.totpToEmail', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret||"");
+        const code = gAuthenticator.generate(secrets.totpSecret??"");
         res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code
@@ -839,7 +839,7 @@ test('FastifyServer.factor2ProtectedPage', async () => {
     } });
     expect(res.statusCode).toBe(200);
     const {secrets} = await userStorage.getUserByUsername("mary");
-    const passwordsEqual = await Hasher.passwordsEqual("newPass123", secrets.password||"");
+    const passwordsEqual = await Hasher.passwordsEqual("newPass123", secrets.password??"");
     expect(passwordsEqual).toBe(true);
 });
 
@@ -885,7 +885,7 @@ test('FastifyServer.factor2ProtectedPageWrongPassword', async () => {
     body = JSON.parse(res.body)
     expect(body.args.errorCodeName).toBe("UsernameOrPasswordInvalid")
     const {secrets} = await userStorage.getUserByUsername("mary");
-    const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password||"");
+    const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password??"");
     expect(passwordsEqual).toBe(true);
 });
 
@@ -930,6 +930,6 @@ test('FastifyServer.factor2ProtectedPageWrongToken', async () => {
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe("/factor2?error=InvalidToken");
     const {secrets} = await userStorage.getUserByUsername("mary");
-    const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password||"");
+    const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password??"");
     expect(passwordsEqual).toBe(true);
 });

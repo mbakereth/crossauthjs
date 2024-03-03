@@ -38,7 +38,7 @@ function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvF
     const key = param.replace(".", "_");
     switch (type) {
         case ParamType.StringArray:
-            instance[key] = (process.env[nameInEnvFile]||"")?.split(/ *, */);
+            instance[key] = (process.env[nameInEnvFile]??"")?.split(/ *, */);
             break;
         case ParamType.String:
             instance[key] = process.env[nameInEnvFile]=="null" ? null : process.env[nameInEnvFile];
@@ -47,7 +47,7 @@ function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvF
             instance[key] = process.env[nameInEnvFile]=="null" ? null : Number(process.env[nameInEnvFile]);
             break;
         case ParamType.Boolean:
-            instance[key] = ["1", "true"].includes(process.env[nameInEnvFile]?.toLowerCase()||"");
+            instance[key] = ["1", "true"].includes(process.env[nameInEnvFile]?.toLowerCase()??"");
             break;
     }
 }

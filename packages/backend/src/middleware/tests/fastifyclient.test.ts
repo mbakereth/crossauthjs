@@ -151,22 +151,22 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
     res = await server.app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
     const authUrl = res.headers?.location;
     expect(authUrl).toBeDefined();
-    const state = get("state", authUrl||"");
-    const response_type = get("response_type", authUrl||"");
-    const client_id = get("client_id", authUrl||"");
-    const redirect_uri = get("redirect_uri", authUrl||"");
-    const scope = get("scope", authUrl||"");
+    const state = get("state", authUrl??"");
+    const response_type = get("response_type", authUrl??"");
+    const client_id = get("client_id", authUrl??"");
+    const redirect_uri = get("redirect_uri", authUrl??"");
+    const scope = get("scope", authUrl??"");
     expect(state).toBeDefined();
     expect(state?.length).toBeGreaterThan(0);
     expect(response_type).toBe("code");
     expect(client_id).toBe("ABC");
 
     const {code, state: returnedState, error} = await authServer.authorizeGetEndpoint({
-        responseType: response_type||"", 
-        clientId: client_id||"", 
-        redirectUri: redirect_uri||"",
+        responseType: response_type??"", 
+        clientId: client_id??"", 
+        redirectUri: redirect_uri??"",
         scope: scope,
-        state: state||""
+        state: state??""
     });
     expect(error).toBeUndefined();
     expect(returnedState).toBe(state);
@@ -303,7 +303,7 @@ test('FastifyOAuthClient.refreshIfExpiredIsExpired', async () => {
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
-    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()||"{}")}));
+    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()??"{}")}));
     if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
     // @ts-ignore
     let res = await server.oAuthClient?.refreshIfExpired(null, null, refresh_token, Date.now()-10000);
@@ -318,7 +318,7 @@ test('FastifyOAuthClient.refreshIfExpiredIsNotExpired', async () => {
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
-    //fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()||"{}")}));
+    //fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()??"{}")}));
     if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
     // @ts-ignore
     let res = await server.oAuthClient?.refreshIfExpired(null, null, refresh_token, Date.now()+expires_in);
@@ -361,7 +361,7 @@ test('FastifyOAuthClient.bffPost', async () => {
     let res;
     let body;
 
-    fetchMocker.mockResponseOnce((req) => {return JSON.stringify({ok: true, url: req.url, authHeader: req.headers.get("Authorization"), body: req.body?.toString()||"{}" })});
+    fetchMocker.mockResponseOnce((req) => {return JSON.stringify({ok: true, url: req.url, authHeader: req.headers.get("Authorization"), body: req.body?.toString()??"{}" })});
     res = await server.app.inject({ method: "POST", url: "/bff/test", cookies: {SESSIONID: sessionCookie}, payload: {param: "value"} });
     body = JSON.parse(res.body);
     expect(body.ok).toBe(true);

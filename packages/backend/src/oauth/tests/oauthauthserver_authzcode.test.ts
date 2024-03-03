@@ -35,7 +35,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
+    const key = await keyStorage.getKey("authz:"+Hasher.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -72,7 +72,7 @@ test('AuthorizationServer.AuthzCodeFlow.scopePersistence', async () => {
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
+    const key = await keyStorage.getKey("authz:"+Hasher.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -168,7 +168,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
+    const key = await keyStorage.getKey("authz:"+Hasher.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -201,7 +201,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyPr
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
+    const key = await keyStorage.getKey("authz:"+Hasher.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -234,7 +234,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKeyFi
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
+    const key = await keyStorage.getKey("authz:"+Hasher.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -267,7 +267,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKey',
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey("authz:"+Hasher.hash(code||""));
+    const key = await keyStorage.getKey("authz:"+Hasher.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -393,7 +393,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
     expect(error2).toBeUndefined();
 
     const decodedAccessToken
-        = await authServer.validAccessToken(access_token||"");
+        = await authServer.validAccessToken(access_token??"");
     expect(decodedAccessToken).toBeUndefined();
 });
 
@@ -410,7 +410,7 @@ test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
     expect(error_description).toBeUndefined();
 
     const decodedAccessToken
-        = await authServer.validAccessToken(access_token||"");
+        = await authServer.validAccessToken(access_token??"");
     expect(decodedAccessToken).toBeDefined();
     expect(decodedAccessToken?.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
@@ -418,7 +418,7 @@ test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
     expect(decodedAccessToken?.payload.sub).toBe("bob");
 
     const decodedRefreshToken
-        = await authServer.validRefreshToken(refresh_token||"");
+        = await authServer.validRefreshToken(refresh_token??"");
     expect(decodedRefreshToken).toBeDefined();
     expect(decodedRefreshToken?.payload.scope.length).toBe(2);
     expect(["read", "write"]).toContain(decodedRefreshToken?.payload.scope[0]);

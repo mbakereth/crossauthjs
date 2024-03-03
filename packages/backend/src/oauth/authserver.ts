@@ -385,13 +385,13 @@ export class OAuthAuthorizationServer {
             const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
             scopes = requestedScopes;
             scopesIncludingNull = requestedScopes;
-            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption||"Unknown error"};      
+            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption??"Unknown error"};      
         } else {
             scopesIncludingNull = [null];
         }
         if (this.authStorage) {
             try {
-                const newScopes = scopesIncludingNull||[];
+                const newScopes = scopesIncludingNull??[];
                 const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
                 const updatedScopes = [...new Set([...existingScopes, ...newScopes])];
                 CrossauthLogger.logger.debug(j({msg: "Updating authorizations for " + clientId + " to " + updatedScopes}));
@@ -526,7 +526,7 @@ export class OAuthAuthorizationServer {
 
         } else if (grantType == "refresh_token") {
     
-            if (!this.validRefreshToken(refreshToken||"")) {
+            if (!this.validRefreshToken(refreshToken??"")) {
                 return {
                     error: "access_denied",
                     error_description: "Refresh token is invalid",
@@ -678,7 +678,7 @@ export class OAuthAuthorizationServer {
         let passwordCorrect = true;
         try {
             if (client.clientSecret!=undefined) { // we validated this before so if authentication is required, it will not be undefined
-                passwordCorrect = await Hasher.passwordsEqual(clientSecret||"", client.clientSecret||"");
+                passwordCorrect = await Hasher.passwordsEqual(clientSecret??"", client.clientSecret??"");
             }
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
@@ -726,7 +726,7 @@ export class OAuthAuthorizationServer {
             }
         }
         if (authzData.challenge) {
-            const hashedVerifier = authzData.challengeMethod == "plain" ? codeVerifier||"" : Hasher.sha256(codeVerifier||"");
+            const hashedVerifier = authzData.challengeMethod == "plain" ? codeVerifier??"" : Hasher.sha256(codeVerifier??"");
             // we store the challenge in hashed form for security, so if S256 is used this will be a second hash
             if (Hasher.hash(hashedVerifier) != authzData.challenge) {
                 return {error: "access_denied", error_description:   "Code verifier is incorrect"};
@@ -1018,10 +1018,10 @@ export class OAuthAuthorizationServer {
         if (!additionalClaims) additionalClaims = [];
         return {
             issuer: this.oauthIssuer,
-            authorization_endpoint: new URL(authorizeEndpoint||"authorize", this.oauthIssuer).toString(),
-            token_endpoint: new URL(tokenEndpoint||"token", this.oauthIssuer).toString(),
+            authorization_endpoint: new URL(authorizeEndpoint??"authorize", this.oauthIssuer).toString(),
+            token_endpoint: new URL(tokenEndpoint??"token", this.oauthIssuer).toString(),
             token_endpoint_auth_methods_supported: ["client_secret_post"],
-            jwks_uri: new URL(jwksUri||"jwks", this.oauthIssuer).toString(),
+            jwks_uri: new URL(jwksUri??"jwks", this.oauthIssuer).toString(),
             response_types_supported: ["code"],
             response_modes_supported: ["query"],
             grant_types_supported: grantTypes,

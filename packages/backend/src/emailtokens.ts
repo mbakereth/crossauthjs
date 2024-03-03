@@ -290,7 +290,7 @@ export class TokenEmailer {
             const now = new Date().getTime();
             if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
             await this.keyStorage.deleteKey(hash);
-            return {userId: storedToken.userId, newEmail: storedToken.data||''};
+            return {userId: storedToken.userId, newEmail: storedToken.data??''};
         } finally {
             try {
                 await this.keyStorage.deleteKey(hash);

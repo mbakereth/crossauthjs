@@ -196,13 +196,13 @@ export class Hasher {
         const hashBytes = await pbkdf2Async(
             plaintext, 
             saltAndSecret, 
-            options.iterations||PBKDF2_ITERATIONS, 
-            options.keyLen||PBKDF2_KEYLENGTH,
-            options.digest||PBKDF2_DIGEST 
+            options.iterations??PBKDF2_ITERATIONS, 
+            options.keyLen??PBKDF2_KEYLENGTH,
+            options.digest??PBKDF2_DIGEST 
         );
         let passwordHash = hashBytes.toString('base64url');
         if (encode) passwordHash = this.encodePasswordHash(
-            passwordHash, salt, useSecret, options.iterations||PBKDF2_ITERATIONS, options.keyLen||PBKDF2_KEYLENGTH, options.digest||PBKDF2_DIGEST);
+            passwordHash, salt, useSecret, options.iterations??PBKDF2_ITERATIONS, options.keyLen??PBKDF2_KEYLENGTH, options.digest??PBKDF2_DIGEST);
         return passwordHash;
     }
 
