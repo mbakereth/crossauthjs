@@ -14,6 +14,9 @@ const CSRFHEADER = "X-CROSSAUTH-CSRF";
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
+////////////////////////////////////////////////////////////////////////////////
+// OPTIONS
+
 /**
  * Options for {@link FastifyServer }.
  * 
@@ -321,6 +324,9 @@ interface AuthenticatorDetails {
     hasSecrets: boolean,
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+// DEFAULT FUNCTIONS
+
 /**
  * Default User validator.  Doesn't validate password
  * 
@@ -365,6 +371,9 @@ function defaultUpdateUser(user : User, request : FastifyRequest<{ Body: UpdateU
     return user;
 
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// CLASSES
 
 /**
  * This class the session management for the fastify server

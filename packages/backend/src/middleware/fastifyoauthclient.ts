@@ -9,6 +9,32 @@ import { Hasher } from '../hasher';
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
+////////////////////////////////////////////////////////////////////////////////////
+// OPTIONS
+
+export interface FastifyOAuthClientOptions extends OAuthClientOptions {
+    siteUrl ?: string,
+    prefix? : string,
+    sessionDataName? : string,
+    errorPage? : string,
+    passwordFlowPage? : string,
+    authorizedPage? : string,
+    authorizedUrl? : string,
+    loginUrl? : string,
+    loginProtectedFlows? : string,
+    passwordFlowUrl? : string,
+    receiveTokenFn? : (client: FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply>;
+    errorFn? :FastifyErrorFn ;
+    tokenResponseType? : "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom";
+    errorResponseType? : "sendJson" | "errorPage" | "custom",
+    bffEndpoints? : {url: string, methods: ("GET"|"POST"|"PUT"|"DELETE"|"PATCH")[], matchSubUrls?: boolean}[],
+    bffEndpointName? : string,
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// FASTIFY INTERFACES
+
 interface AuthorizeQueryType {
     scope? : string,
 }
@@ -41,28 +67,8 @@ interface PasswordBodyType {
     csrfToken? : string,
 }
 
-interface BffParamType {
-    url : string,
-}
-
-export interface FastifyOAuthClientOptions extends OAuthClientOptions {
-    siteUrl ?: string,
-    prefix? : string,
-    sessionDataName? : string,
-    errorPage? : string,
-    passwordFlowPage? : string,
-    authorizedPage? : string,
-    authorizedUrl? : string,
-    loginUrl? : string,
-    loginProtectedFlows? : string,
-    passwordFlowUrl? : string,
-    receiveTokenFn? : (client: FastifyOAuthClient, request : FastifyRequest, reply : FastifyReply, oauthResponse : OAuthTokenResponse) => Promise<FastifyReply>;
-    errorFn? :FastifyErrorFn ;
-    tokenResponseType? : "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom";
-    errorResponseType? : "sendJson" | "errorPage" | "custom",
-    bffGetEndpoints? : string,
-    bffPostEndpoints? : string,
-}
+////////////////////////////////////////////////////////////////////////////
+// DEFAULT FUNCTIONS
 
 async function jsonError(_server : FastifyServer, _request : FastifyRequest, reply : FastifyReply, ce : CrossauthError) : Promise<FastifyReply> {
     CrossauthLogger.logger.debug(j({err: ce}));
@@ -164,6 +170,9 @@ async function saveInSessionAndRedirect(client: FastifyOAuthClient, request : Fa
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// CLASSES
+
 export class FastifyOAuthClient extends OAuthClient {
     server : FastifyServer;
     private siteUrl : string = "/";
@@ -180,8 +189,8 @@ export class FastifyOAuthClient extends OAuthClient {
     private tokenResponseType :  "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom" = "sendJson";
     private errorResponseType :  "sendJson" | "pageError" | "custom" = "sendJson";
     private passwordFlowUrl : string = "passwordflow";
-    private bffGetEndpoints : string[] = [];
-    private bffPostEndpoints : string[] = [];
+    private bffEndpoints : {url: string, methods: ("GET"|"POST"|"PUT"|"DELETE"|"PATCH"|"OPTIONS")[], matchSubUrls?: boolean}[] = [];
+    private bffEndpointName = "bff";
 
     constructor(server : FastifyServer, authServerBaseUri : string, options : FastifyOAuthClientOptions) {
         super(authServerBaseUri, options);
@@ -199,8 +208,9 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("loginProtectedFlows", ParamType.StringArray, this, options, "OAUTH_LOGIN_PROTECTED_FLOWS");
         setParameter("passwordFlowUrl", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_URL");
         setParameter("passwordFlowPage", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_PAGE");
-        setParameter("bffGetEndpoints", ParamType.StringArray, this, options, "OAUTH_BFF_GET_ENDPOINTS");
-        setParameter("bffPostEndpoints", ParamType.StringArray, this, options, "OAUTH_BFF_PUT_ENDPOINTS");
+        setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
+        if (this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
+        if (options.bffEndpoints) this.bffEndpoints = options.bffEndpoints;
 
         if (this.loginProtectedFlows.length == 1 && this.loginProtectedFlows[0] == OAuthFlows.All) {
             this.loginProtectedFlows = this.validFlows;
@@ -376,72 +386,69 @@ export class FastifyOAuthClient extends OAuthClient {
 
         }
 
-        for (let i=0; i<this.bffGetEndpoints.length; ++i) {
-            this.server.app.get(this.prefix+'get' + this.bffGetEndpoints[i],  async (request : FastifyRequest<{Params: BffParamType}>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'get' + this.bffGetEndpoints[i], ip: request.ip, user: request.user?.username}));
-                const url = request.url.substring(this.prefix.length+"get".length);
-                CrossauthLogger.logger.debug(j({msg: "Resource server URL " + url}))
-                try {
-                    const oauthData = await this.server.getSessionData(request, "oauth");
-                    let access_token = oauthData?.access_token;
-                    if (oauthData && oauthData.access_token) {
-                        const resp = await server.oAuthClient?.refreshIfExpired(request, reply, oauthData.refresh_token, oauthData.expires_at);
-                        if (resp?.access_token) access_token = resp.access_token;
-                    }
-                    let headers : {[key:string]: string} = {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            "Authorization": "Bearer " + access_token,
-                    }
-                    if (access_token) headers["Authorization"] = "Bearer " + access_token;
-                    const resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
-                        headers:headers 
-                    });
-                    for (const pair of resp.headers.entries()) {
-                        reply.header(pair[0], pair[1]);
-                    }
-                    return reply.status(resp.status).send(await resp.json());
-                } catch (e) {
-                    CrossauthLogger.logger.error(j({err: e}));
-                    return reply.header(...JSONHDR).status(500).send({});
+        for (let i=0; i<this.bffEndpoints.length; ++i) {
+            const url = this.bffEndpoints[i].url;
+            if (url.includes("?") || url.includes("#")) {
+                throw new CrossauthError(ErrorCode.Configuration, "BFF urls may not contain query parameters or page fragments");
+            }
+            if (!(url.startsWith("/"))) {
+                throw new CrossauthError(ErrorCode.Configuration, "BFF urls must be absolute and without the HTTP method, hostname or port");
 
-                }
-            });
-        }
-
-        for (let i=0; i<this.bffPostEndpoints.length; ++i) {
-            this.server.app.post(this.prefix+'post' + this.bffPostEndpoints[i],  async (request : FastifyRequest<{Params: BffParamType}>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'get' + this.bffPostEndpoints[i], ip: request.ip, user: request.user?.username}));
-                const url = request.url.substring(this.prefix.length+"get".length);
-                CrossauthLogger.logger.debug(j({msg: "Resource server URL " + url}))
-                try {
-                    const oauthData = await this.server.getSessionData(request, "oauth");
-                    let access_token = oauthData?.access_token;
-                    if (oauthData && oauthData.access_token) {
-                        const resp = await server.oAuthClient?.refreshIfExpired(request, reply, oauthData.refresh_token, oauthData.expires_at);
-                        if (resp?.access_token) access_token = resp.access_token;
+            }
+            const methods = this.bffEndpoints[i].methods;
+            const matchSubUrls = this.bffEndpoints[i].matchSubUrls||false;
+            let route = url;
+            if (matchSubUrls) {
+                if (!(route.endsWith("/"))) route += "/";
+                route += "*";
+            }
+            for (let i in methods) {
+                this.server.app.route({
+                    method: methods[i],
+                    url: this.prefix + this.bffEndpointName + url,
+                    handler: async (request : FastifyRequest, reply : FastifyReply) =>  {
+                        CrossauthLogger.logger.info(j({msg: "Page visit", method: request.method, url: request.url, ip: request.ip, user: request.user?.username}));
+                        const url = request.url.substring(this.prefix.length+this.bffEndpointName.length);
+                        CrossauthLogger.logger.debug(j({msg: "Resource server URL " + url}))
+                        try {
+                            const oauthData = await this.server.getSessionData(request, "oauth");
+                            let access_token = oauthData?.access_token;
+                            if (oauthData && oauthData.access_token) {
+                                const resp = await server.oAuthClient?.refreshIfExpired(request, reply, oauthData.refresh_token, oauthData.expires_at);
+                                if (resp?.access_token) access_token = resp.access_token;
+                            }
+                            let headers : {[key:string]: string} = {
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json',
+                                    "Authorization": "Bearer " + access_token,
+                            }
+                            if (access_token) headers["Authorization"] = "Bearer " + access_token;
+                            let resp : Response;
+                            if (request.body) {
+                                resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
+                                    headers:headers,
+                                    method: request.method,
+                                    body: request.body.toString(),
+                                });    
+                            } else {
+                                resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
+                                    headers:headers,
+                                    method: request.method,
+                                });    
+                            }
+                            for (const pair of resp.headers.entries()) {
+                                reply = reply.header(pair[0], pair[1]);
+                            }
+                            return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
+                        } catch (e) {
+                            CrossauthLogger.logger.error(j({err: e}));
+                            return reply.header(...JSONHDR).status(500).send({});
+        
+                        }
                     }
-                    let headers : {[key:string]: string} = {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            "Authorization": "Bearer " + access_token,
-                    }
-                    if (access_token) headers["Authorization"] = "Bearer " + access_token;
-                    const resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
-                        method: "POST",
-                        headers:headers,
-                        body: JSON.stringify(request.body), 
-                    });
-                    for (const pair of resp.headers.entries()) {
-                        reply.header(pair[0], pair[1]);
-                    }
-                    return reply.status(resp.status).send(await resp.json());
-                } catch (e) {
-                    CrossauthLogger.logger.error(j({err: e}));
-                    return reply.header(...JSONHDR).status(500).send({});
-
-                }
-            });
+    
+                });
+            }
         }
     }
 

@@ -8,8 +8,10 @@ import { getTestUserStorage } from '../../storage/tests/inmemorytestdata';
 import { InMemoryKeyStorage } from '../..';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 import { FastifyOAuthClient, } from '../..';
+import { KeyStorage } from '../../storage';
 
 import path from 'path';
+import { OAuthClient } from '../../oauth/client';
 
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -36,7 +38,13 @@ function get(name : string, url : string){
     let names : RegExpExecArray|null;
     if(names=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(url))
        return decodeURIComponent(names[1]);
- }
+}
+
+function getSession(res: any) : string {
+    const sessionCookies = res.cookies.filter((cookie: any) => {return cookie.name == "SESSIONID"});
+    expect(sessionCookies.length).toBe(1);
+    return sessionCookies[0].value;
+}
 
 beforeAll(async () => {
     fetchMocker.doMock();
@@ -52,7 +60,8 @@ function getCsrf(res: any) : {csrfCookie: string, csrfToken: string} {
     return {csrfCookie, csrfToken};
 }
 
-async function makeClient(options : FastifyServerOptions = {}) : Promise<FastifyServer> {
+async function makeClient(options : FastifyServerOptions = {}) : Promise<{server: FastifyServer, keyStorage: KeyStorage}> {
+    //const app = fastify({logger: {level: 'debug'}});
     const app = fastify({logger: false});
 
     // @ts-ignore
@@ -63,7 +72,7 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<Fastify
     const userStorage = await getTestUserStorage();
     const keyStorage = new InMemoryKeyStorage();
     let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
-    return new FastifyServer(userStorage, {
+    return {server: new FastifyServer(userStorage, {
         session: {
             keyStorage: keyStorage,
             authenticators: {
@@ -84,16 +93,15 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<Fastify
         errorResponseType: "sendJson",
         secret: "ABC",
         ...options,
-    });
+    }), keyStorage: keyStorage};
 }
 
 test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
     const {authServer} = await getAccessToken();
 
-    const server = await makeClient();
+    const {server} = await makeClient();
 
-    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
     let res;
 
@@ -125,13 +133,12 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
 test('FastifyOAuthClient.authzcodeflowWithLoginRedirects', async () => {
     await getAccessToken();
 
-    const server = await makeClient({
+    const {server} = await makeClient({
         loginProtectedFlows: "all",
         loginUrl: "/login",
     });
 
-    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
     let res;
 
@@ -142,10 +149,9 @@ test('FastifyOAuthClient.authzcodeflowWithLoginRedirects', async () => {
 test('FastifyOAuthClient.clientCredentialsFlow', async () => {
     const {authServer} = await getAuthServer();
 
-    const server = await makeClient();
+    const {server} = await makeClient();
 
-    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
     let res;
     let body;
@@ -182,10 +188,9 @@ test('FastifyOAuthClient.clientCredentialsFlow', async () => {
 test('FastifyOAuthClient.passwordFlow', async () => {
     const {authServer} = await getAuthServer();
 
-    const server = await makeClient();
+    const {server} = await makeClient();
 
-    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
     let res;
     let body;
@@ -251,10 +256,9 @@ test('FastifyOAuthClient.refreshIfExpiredIsExpired', async () => {
     const {access_token, refresh_token} = await getAccessToken();
     expect(access_token).toBeDefined();
 
-    const server = await makeClient();
+    const {server} = await makeClient();
 
-    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
     fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()||"{}")}));
     if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
@@ -267,15 +271,68 @@ test('FastifyOAuthClient.refreshIfExpiredIsNotExpired', async () => {
     const {access_token, refresh_token, expires_in} = await getAccessToken();
     expect(access_token).toBeDefined();
 
-    const server = await makeClient();
+    const {server} = await makeClient();
 
-    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    if (server.oAuthClient) await server.oAuthClient.loadConfig();
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
-    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()||"{}")}));
+    //fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()||"{}")}));
     if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
     // @ts-ignore
     let res = await server.oAuthClient?.refreshIfExpired(null, null, refresh_token, Date.now()+expires_in);
     expect(res?.access_token).toBeUndefined();
 });
 
+test('FastifyOAuthClient.bffGet', async () => {
+
+    const {server, access_token, sessionCookie} = await getAccessTokenCC({tokenResponseType: "saveInSessionAndLoad", bffEndpoints: [{url: "/test", methods: ["GET"]}]});
+
+    let res;
+    let body;
+
+    fetchMocker.mockResponseOnce((req) => {return JSON.stringify({ok: true, authHeader: req.headers.get("Authorization") })});
+    res = await server.app.inject({ method: "GET", url: "/bff/test", cookies: {SESSIONID: sessionCookie} });
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    expect(body.authHeader).toBe("Bearer " + access_token);
+});
+
+async function getAccessTokenCC(clientParams : {[key:string]:any}) {
+    const {authServer} = await getAuthServer();
+
+    const {server, keyStorage} = await makeClient(clientParams);
+
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    let res;
+    let body;
+
+    // get csrf token and check password flow get 
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("passwordflow.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    const resp = await authServer.tokenPostEndpoint({
+        grantType: "password", 
+        clientId : "ABC", 
+        scope : "read write", 
+        clientSecret : "DEF",
+        username: "bob",
+        password: "bobPass123",
+    });
+    const access_token = resp.access_token;
+
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token})});
+    res = await server.app.inject({ method: "POST", url: "/passwordflow", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        csrfToken: csrfToken,
+        scope: "read write",
+        username: "bob",
+        password: "bobPass123",
+     }});
+    const sessionCookie = getSession(res);
+
+
+    return {server, keyStorage: keyStorage, access_token, sessionCookie}
+}

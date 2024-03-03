@@ -8,6 +8,7 @@ import { Server, IncomingMessage, ServerResponse } from 'http'
 export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOptions {
     userStorage? : UserStorage;
 }
+
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
     private authServer?: FastifyAuthorizationServer;
     private protectedEndpoints : {[key:string]: {scope? : string}} = {};

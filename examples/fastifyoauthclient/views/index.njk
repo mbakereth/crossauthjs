@@ -8,7 +8,7 @@
                 window.location.href = '/authzcodeflow?scope=read+write';
             }
             function callResource() {
-                fetch("/get/resource")
+                fetch("/bff/resource")
                 .then(function(response) {return response.json()}).then(function(response) {
                     document.getElementById("result").innerHTML = "<pre>"+JSON.stringify(response)+"</pre>"
                 })

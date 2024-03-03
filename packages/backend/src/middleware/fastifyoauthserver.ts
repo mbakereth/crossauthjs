@@ -12,12 +12,18 @@ import { FastifyServer, ERROR_500, DEFAULT_ERROR } from './fastifyserver';
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
+////////////////////////////////////////////////////////////////////////////////
+// OPTIONS
+
 export interface FastifyAuthorizationServerOptions extends OAuthAuthorizationServerOptions {
     errorPage? : string,
     oauthAuthorizePage? : string,
     prefix? : string,
     loginUrl? : string,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// FASTIFY INTERFACES
 
 interface AuthorizeQueryType {
     response_type : string,
@@ -53,6 +59,9 @@ interface TokenBodyType {
     username? : string,
     password? : string,
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// CLASS
 
 export class FastifyAuthorizationServer {
     private fastifyServer : FastifyServer;
