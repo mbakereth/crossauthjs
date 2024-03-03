@@ -11,7 +11,6 @@ import { FastifyOAuthClient, } from '../..';
 import { KeyStorage } from '../../storage';
 
 import path from 'path';
-import { OAuthClient } from '../../oauth/client';
 
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -95,6 +94,50 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
         ...options,
     }), keyStorage: keyStorage};
 }
+
+async function getAccessTokenThroughClient(clientParams : {[key:string]:any}) {
+    const {authServer} = await getAuthServer();
+
+    const {server, keyStorage} = await makeClient(clientParams);
+
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    let res;
+    let body;
+
+    // get csrf token and check password flow get 
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("passwordflow.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    const resp = await authServer.tokenPostEndpoint({
+        grantType: "password", 
+        clientId : "ABC", 
+        scope : "read write", 
+        clientSecret : "DEF",
+        username: "bob",
+        password: "bobPass123",
+    });
+    const access_token = resp.access_token;
+
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token})});
+    res = await server.app.inject({ method: "POST", url: "/passwordflow", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        csrfToken: csrfToken,
+        scope: "read write",
+        username: "bob",
+        password: "bobPass123",
+     }});
+    const sessionCookie = getSession(res);
+
+
+    return {server, keyStorage: keyStorage, access_token, sessionCookie}
+}
+
+////////////////////////////////////////////////////////////////////////
+// Tests
 
 test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
     const {authServer} = await getAccessToken();
@@ -284,7 +327,7 @@ test('FastifyOAuthClient.refreshIfExpiredIsNotExpired', async () => {
 
 test('FastifyOAuthClient.bffGet', async () => {
 
-    const {server, access_token, sessionCookie} = await getAccessTokenCC({tokenResponseType: "saveInSessionAndLoad", bffEndpoints: [{url: "/test", methods: ["GET"]}]});
+    const {server, access_token, sessionCookie} = await getAccessTokenThroughClient({tokenResponseType: "saveInSessionAndLoad", bffBaseUrl: "http://res.com", bffEndpoints: [{url: "/test", methods: ["GET"]}]});
 
     let res;
     let body;
@@ -296,43 +339,34 @@ test('FastifyOAuthClient.bffGet', async () => {
     expect(body.authHeader).toBe("Bearer " + access_token);
 });
 
-async function getAccessTokenCC(clientParams : {[key:string]:any}) {
-    const {authServer} = await getAuthServer();
+test('FastifyOAuthClient.bffGetWithQueryParams', async () => {
 
-    const {server, keyStorage} = await makeClient(clientParams);
-
-    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+    const {server, access_token, sessionCookie} = await getAccessTokenThroughClient({tokenResponseType: "saveInSessionAndLoad", bffBaseUrl: "http://res.com", bffEndpoints: [{url: "/test", methods: ["GET"]}]});
 
     let res;
     let body;
 
-    // get csrf token and check password flow get 
-    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    fetchMocker.mockResponseOnce((req) => {return JSON.stringify({ok: true, url: req.url, authHeader: req.headers.get("Authorization") })});
+    res = await server.app.inject({ method: "GET", url: "/bff/test?a=1&b=2", cookies: {SESSIONID: sessionCookie} });
     body = JSON.parse(res.body);
-    expect(body.template).toBe("passwordflow.njk");
-    const {csrfCookie, csrfToken} = getCsrf(res);
-    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+    expect(body.ok).toBe(true);
+    expect(body.authHeader).toBe("Bearer " + access_token);
+    expect(body.url).toBe("http://res.com/test?a=1&b=2")
+});
 
-    const resp = await authServer.tokenPostEndpoint({
-        grantType: "password", 
-        clientId : "ABC", 
-        scope : "read write", 
-        clientSecret : "DEF",
-        username: "bob",
-        password: "bobPass123",
-    });
-    const access_token = resp.access_token;
+test('FastifyOAuthClient.bffPost', async () => {
 
-    // @ts-ignore
-    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token})});
-    res = await server.app.inject({ method: "POST", url: "/passwordflow", cookies: {CSRFTOKEN: csrfCookie}, payload: {
-        csrfToken: csrfToken,
-        scope: "read write",
-        username: "bob",
-        password: "bobPass123",
-     }});
-    const sessionCookie = getSession(res);
+    const {server, access_token, sessionCookie} = await getAccessTokenThroughClient({tokenResponseType: "saveInSessionAndLoad", bffBaseUrl: "http://res.com", bffEndpoints: [{url: "/test", methods: ["POST"]}]});
 
+    let res;
+    let body;
 
-    return {server, keyStorage: keyStorage, access_token, sessionCookie}
-}
+    fetchMocker.mockResponseOnce((req) => {return JSON.stringify({ok: true, url: req.url, authHeader: req.headers.get("Authorization"), body: req.body?.toString()||"{}" })});
+    res = await server.app.inject({ method: "POST", url: "/bff/test", cookies: {SESSIONID: sessionCookie}, payload: {param: "value"} });
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    expect(body.authHeader).toBe("Bearer " + access_token);
+    const requestBody = JSON.parse(body.body);
+    expect(requestBody.param).toBe("value");
+});
+

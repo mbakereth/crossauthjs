@@ -29,6 +29,7 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     errorResponseType? : "sendJson" | "errorPage" | "custom",
     bffEndpoints? : {url: string, methods: ("GET"|"POST"|"PUT"|"DELETE"|"PATCH")[], matchSubUrls?: boolean}[],
     bffEndpointName? : string,
+    bffBaseUrl? : string,
 }
 
 
@@ -191,6 +192,7 @@ export class FastifyOAuthClient extends OAuthClient {
     private passwordFlowUrl : string = "passwordflow";
     private bffEndpoints : {url: string, methods: ("GET"|"POST"|"PUT"|"DELETE"|"PATCH"|"OPTIONS")[], matchSubUrls?: boolean}[] = [];
     private bffEndpointName = "bff";
+    private bffBaseUrl? : string;
 
     constructor(server : FastifyServer, authServerBaseUri : string, options : FastifyOAuthClientOptions) {
         super(authServerBaseUri, options);
@@ -209,6 +211,7 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("passwordFlowUrl", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_URL");
         setParameter("passwordFlowPage", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_PAGE");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
+        setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
         if (this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
         if (options.bffEndpoints) this.bffEndpoints = options.bffEndpoints;
 
@@ -386,6 +389,12 @@ export class FastifyOAuthClient extends OAuthClient {
 
         }
 
+        // Add BFF endpoints
+        if (this.bffEndpoints.length > 0 && !this.bffBaseUrl) {
+            throw new CrossauthError(ErrorCode.Configuration, "If enabling BFF endpoints, must also define bffBaseUrl");
+        }
+        if (this.bffBaseUrl == undefined) this.bffBaseUrl = ""; // to stop vs code errors
+        if (this.bffBaseUrl.endsWith("/")) this.bffBaseUrl = this.bffBaseUrl.substring(0, this.bffBaseUrl.length-1);
         for (let i=0; i<this.bffEndpoints.length; ++i) {
             const url = this.bffEndpoints[i].url;
             if (url.includes("?") || url.includes("#")) {
@@ -425,13 +434,13 @@ export class FastifyOAuthClient extends OAuthClient {
                             if (access_token) headers["Authorization"] = "Bearer " + access_token;
                             let resp : Response;
                             if (request.body) {
-                                resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
+                                resp = await fetch(this.bffBaseUrl + url, {
                                     headers:headers,
                                     method: request.method,
-                                    body: request.body.toString(),
+                                    body: JSON.stringify(request.body||"{}"),
                                 });    
                             } else {
-                                resp = await fetch(process.env["RESOURCE_SERVER"] + url, {
+                                resp = await fetch(this.bffBaseUrl + url, {
                                     headers:headers,
                                     method: request.method,
                                 });    
