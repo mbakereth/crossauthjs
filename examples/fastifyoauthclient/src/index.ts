@@ -66,6 +66,7 @@ const server = new FastifyServer(userStorage, {
     loginProtectedFlows: OAuthFlows.AuthorizationCode + ", " + OAuthFlows.AuthorizationCodeWithPKCE,
     tokenResponseType: "saveInSessionAndLoad",
     bffEndpoints: [{url: "/resource", methods: ["GET"]}],
+    bffBaseUrl: process.env["RESOURCE_SERVER"],
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
