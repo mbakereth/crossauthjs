@@ -8,7 +8,7 @@
     "build": "pnpx tsc",
     "start": "node dist/index.js",
     "dev": "dotenv -e .env.dev tsx src/index.ts",
-    "postinstall": "dotenv .e .env.dev pnpm exec prisma generate",
+    "postinstall": "dotenv -e .env.dev pnpm exec prisma generate",
     "prisma": "dotenv -e .env.dev pnpm exec prisma"
   },
   "prisma": {

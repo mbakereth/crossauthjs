@@ -100,8 +100,8 @@ app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
 });*/
 app.get('/resource', async (request : FastifyRequest, reply : FastifyReply) =>  {
     //const {authorized, error_description, tokenPayload} = await resserver.authorized(request);
-    if (request.authTokenPayload) {
-        return reply.header(...JSONHDR).status(200).send({ok: true, timeCalled: new Date(), username: request.authTokenPayload.sub});
+    if (request.accessTokenPayload) {
+        return reply.header(...JSONHDR).status(200).send({ok: true, timeCalled: new Date(), username: request.accessTokenPayload.sub});
     } else if (request.authErrorDescription) {
         return reply.header(...JSONHDR).status(500).send({ok: false, error: request.authErrorDescription});
     } else {
