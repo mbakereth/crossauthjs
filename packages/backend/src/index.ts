@@ -59,3 +59,5 @@ declare module 'fastify' {
     }*/
   }
 
+// Sveltekit
+export { SvelteKitSession, svelteSessionHook } from './middleware/sveltekitsession';

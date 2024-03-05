@@ -1,34 +1,33 @@
 <script>
-    import { browser } from '$app/environment';
-    import "carbon-components-svelte/css/g90.css";
-    import { 
-        Content,
-    } from 'carbon-components-svelte'
+    import "tailwindcss/tailwind.css";
+  </script>
+  
+<div class="m-8">
+    <slot />
+</div>
+  
+<style lang="postcss">
+:global(h1, h2, h3, h4, h5, h6) {
+  @apply leading-tight mt-3 mb-6;
+}
 
-</script>  
-<Content>
-    <slot/>
+:global(h1) {
+  @apply text-4xl;
+}
 
-</Content>
+:global(h2) {
+  @apply text-3xl;
+}
 
-<style>
-    :global(body) {
-        margin-top: 2ex;
-        margin-left: 4ex;
-        margin-right: 4ex;
-        font-size: 12pt;
-    }
-    /*:global(.darkmode label) {
-        color: #bbb;
-    }*/
-    /*:global(.bx--checkbox-label::before, .bx--checkbox-label::after) {
-        outline: 2px solid transparent !important; 
-        outline-offset: 2px !important;
-    }*/
-    :global(:focus:not(:focus-visible)) {
-        outline: 2px solid transparent !important; 
-        outline-offset: 2px !important;
-    }
+:global(h3) {
+  @apply text-2xl;
+}
 
+:global(h4) {
+  @apply text-xl;
+}
 
+:global(p) {
+  @apply mt-2 mb-2;
+}
 </style>

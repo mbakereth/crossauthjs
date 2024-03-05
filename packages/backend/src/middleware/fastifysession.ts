@@ -1,10 +1,10 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { type FastifyInstance, type FastifyRequest, type FastifyReply } from 'fastify';
 import { UserStorage, KeyStorage } from '../storage';
-import { AuthenticationParameters, Authenticator } from '../auth';
+import {type  AuthenticationParameters, Authenticator } from '../auth';
 import { Hasher } from '../hasher';
 import { SessionManager, type SessionManagerOptions } from '../session';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
-import { User, Key, UserInputFields } from '@crossauth/common';
+import { type User, type Key, type UserInputFields } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
 import { Server, IncomingMessage, ServerResponse } from 'http'

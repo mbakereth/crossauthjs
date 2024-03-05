@@ -1,8 +1,10 @@
 /// <reference types="vitest" />
 // Configure Vitest (https://vitest.dev/config/)
 import { resolve } from 'path';
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { join, dirname } from 'path'
 
 // https://vitejs.dev/guide/build.html#library-mode
@@ -20,14 +22,17 @@ export default defineConfig({
     rollupOptions: {
       // make sure to externalize deps that shouldn't be bundled
       // into your library
-      external: ['.env', 'prisma', '@prisma/client', 'express', '@types/express', 'nunjucks', '@types/nunjucks', 'node:crypto', 'crypto', 'fastify', '@fastify/cookie', '@fastify/view', '@fastify/formbody', 'otplib',  'qrcode', '@types/qrcode'],
+      external: ['.env', 'prisma', '@prisma/client', 'express', '@types/express', 'nunjucks', '@types/nunjucks', 'node:crypto', 'crypto', 'fastify', '@fastify/cookie', '@fastify/view', '@fastify/formbody', 'otplib',  'qrcode', '@types/qrcode', '@sveltejs/kit', '@sveltejs/vite-plugin-svelte', '@sveltejs/adapter-auto'],
     },
   },
   plugins: [
     dts(),
+    svelte({ hot: !process.env.VITEST }),
     //pinoplugin({ transports: ['pino-pretty'] })
   ],
   test: {
+    globals: true,
+		environment: 'happy-dom',
     // ...
   },
   });
