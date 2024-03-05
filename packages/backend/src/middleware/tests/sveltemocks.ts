@@ -206,7 +206,7 @@ export class MockFormData implements FormData {
     }
     static fromBody(body : string) {
         let data : {[key:string] : string} = {};
-        const components = body.split("&");
+        const components = body.trim().split("&");
         for (let i=0; i<components.length; ++i) {
             const parts = components[i].split("=", 2);
             data[parts[0]] = decodeURIComponent(parts[1].replace("+", "%20"));
