@@ -194,7 +194,7 @@ export class DoubleSubmitCsrfToken {
      * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
      * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `InvalidKey`
      */
-    validateDoubleSubmitCsrfToken(cookieValue : string, formOrHeaderValue: string)  {
+    validateDoubleSubmitCsrfToken(cookieValue : string, formOrHeaderValue: string) :void  {
         // token in form or header contains mask and masked token.  Unmask to get token back
         const formOrHeaderToken = this.unmaskCsrfToken(formOrHeaderValue);
 

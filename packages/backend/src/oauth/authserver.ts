@@ -1,13 +1,13 @@
-import jwt, { Algorithm } from 'jsonwebtoken';
+import jwt, { type Algorithm } from 'jsonwebtoken';
 import { KeyStorage, UserStorage, OAuthClientStorage, OAuthAuthorizationStorage } from '../storage';
 import { Authenticator } from '../auth';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
-import { OpenIdConfiguration, GrantType, Jwks } from '@crossauth/common';
-import { CrossauthError, ErrorCode, OAuthClient, OAuthTokenResponse } from '@crossauth/common';
+import { type OpenIdConfiguration, type GrantType, type Jwks } from '@crossauth/common';
+import { CrossauthError, ErrorCode, type OAuthClient, type OAuthTokenResponse } from '@crossauth/common';
 import { CrossauthLogger, j, type Key, type User } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
-import { createPublicKey, JsonWebKey } from 'crypto'
+import { createPublicKey, type JsonWebKey } from 'crypto'
 import fs from 'node:fs';
 
 const CLIENT_ID_LENGTH = 16;

@@ -6,6 +6,7 @@ import { CrossauthLogger, OAuthFlows, type OAuthTokenResponse, j } from '@crossa
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
 import { jwtDecode } from "jwt-decode";
 import { Hasher } from '../hasher';
+import type { CsrfBodyType } from './fastifysession.ts';
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
@@ -190,7 +191,7 @@ export class FastifyOAuthClient extends OAuthClient {
     private tokenResponseType :  "sendJson" | "saveInSessionAndLoad" | "saveInSessionAndRedirect" | "sendInPage" | "custom" = "sendJson";
     private errorResponseType :  "sendJson" | "pageError" | "custom" = "sendJson";
     private passwordFlowUrl : string = "passwordflow";
-    private bffEndpoints : {url: string, methods: ("GET"|"POST"|"PUT"|"DELETE"|"PATCH"|"OPTIONS")[], matchSubUrls?: boolean}[] = [];
+    private bffEndpoints : {url: string, methods: ("GET"|"POST"|"PUT"|"DELETE"|"PATCH"|"OPTIONS"|"HEAD")[], matchSubUrls?: boolean}[] = [];
     private bffEndpointName = "bff";
     private bffBaseUrl? : string;
 
@@ -317,8 +318,8 @@ export class FastifyOAuthClient extends OAuthClient {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'clientcredflow', ip: request.ip, user: request.user?.username}));
                 if (this.server.sessionServer) {
                     // if sessions are enabled, require a csrf token
-                    const error = await server.errorIfCsrfInvalid(request, reply, this.errorFn);
-                    if (error) return error;
+                    const {error, reply: reply1} = await server.errorIfCsrfInvalid(request, reply, this.errorFn);
+                    if (error) return reply1;
                 }
                 if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
                     return reply.status(401).header(...JSONHDR).send({ok: false, msg: "Access denied"});                }               
@@ -345,8 +346,8 @@ export class FastifyOAuthClient extends OAuthClient {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'refreshtokenflow', ip: request.ip, user: request.user?.username}));
                 if (this.server.sessionServer) {
                     // if sessions are enabled, require a csrf token
-                    const error = await server.errorIfCsrfInvalid(request, reply, this.errorFn);
-                    if (error) return error;
+                    const {error, reply: reply1} = await server.errorIfCsrfInvalid(request, reply, this.errorFn);
+                    if (error) return reply1;
                 }
                 if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
                     return reply.status(401).header(...JSONHDR).send({ok: false, msg: "Access denied"});                }               
@@ -415,10 +416,17 @@ export class FastifyOAuthClient extends OAuthClient {
                 this.server.app.route({
                     method: methods[i],
                     url: this.prefix + this.bffEndpointName + url,
-                    handler: async (request : FastifyRequest, reply : FastifyReply) =>  {
+                    handler: async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) =>  {
                         CrossauthLogger.logger.info(j({msg: "Page visit", method: request.method, url: request.url, ip: request.ip, user: request.user?.username}));
                         const url = request.url.substring(this.prefix.length+this.bffEndpointName.length);
                         CrossauthLogger.logger.debug(j({msg: "Resource server URL " + url}))
+                        const csrfRequired = (methods[i] != "GET" && methods[i] != "HEAD" && methods[i] != "OPTIONS");
+                        if (this.server.sessionServer && csrfRequired) {
+                            // if sessions are enabled, require a csrf token
+                            const {error, reply: reply1} = await server.errorIfCsrfInvalid(request, reply, this.errorFn);
+                            if (error) return reply1;
+                        }
+                
                         try {
                             const oauthData = await this.server.getSessionData(request, "oauth");
                             let access_token = oauthData?.access_token;
@@ -429,7 +437,6 @@ export class FastifyOAuthClient extends OAuthClient {
                             let headers : {[key:string]: string} = {
                                     'Accept': 'application/json',
                                     'Content-Type': 'application/json',
-                                    "Authorization": "Bearer " + access_token,
                             }
                             if (access_token) headers["Authorization"] = "Bearer " + access_token;
                             let resp : Response;
@@ -445,10 +452,11 @@ export class FastifyOAuthClient extends OAuthClient {
                                     method: request.method,
                                 });    
                             }
+                            const body = await resp.json();
                             for (const pair of resp.headers.entries()) {
                                 reply = reply.header(pair[0], pair[1]);
                             }
-                            return reply.header(...JSONHDR).status(resp.status).send(await resp.json());
+                            return reply.header(...JSONHDR).status(resp.status).send(body);
                         } catch (e) {
                             CrossauthLogger.logger.error(j({err: e}));
                             return reply.header(...JSONHDR).status(500).send({});
@@ -464,8 +472,8 @@ export class FastifyOAuthClient extends OAuthClient {
     private async passwordPost(isApi : boolean, request : FastifyRequest<{ Body: PasswordBodyType }>, reply : FastifyReply) {
         if (this.server.sessionServer) {
             // if sessions are enabled, require a csrf token
-            const error = await this.server.errorIfCsrfInvalid(request, reply, this.errorFn);
-            if (error) return error;
+            const {error, reply: reply1} = await this.server.errorIfCsrfInvalid(request, reply, this.errorFn);
+            if (error) return reply1;
         }
         if (!request.user && (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
             if (isApi) return reply.status(401).header(...JSONHDR).send({ok: false, msg: "Access denied"});

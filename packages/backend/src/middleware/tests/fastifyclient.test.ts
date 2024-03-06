@@ -1,8 +1,9 @@
 import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, beforeAll, afterAll, vi } from 'vitest';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
-import fastify, { FastifyRequest, FastifyReply } from 'fastify';
-import { OpenIdConfiguration, type OAuthTokenResponse } from '@crossauth/common';
+import { CSRFHEADER } from '../fastifysession';
+import fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
+import { type OpenIdConfiguration, type OAuthTokenResponse } from '@crossauth/common';
 import { getAccessToken, getAuthServer } from '../../oauth/tests/common';
 import { getTestUserStorage } from '../../storage/tests/inmemorytestdata';
 import { InMemoryKeyStorage } from '../..';
@@ -206,7 +207,7 @@ test('FastifyOAuthClient.clientCredentialsFlow', async () => {
     const {csrfCookie, csrfToken} = await getCsrf(res);
 
     // @ts-ignore
-    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())}));
+    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())})});
     res = await server.app.inject({ method: "POST", url: "/clientcredflow", cookies: {CSRFTOKEN: csrfCookie}, payload: {
         csrfToken: csrfToken,
         scope: "read write",
@@ -361,8 +362,20 @@ test('FastifyOAuthClient.bffPost', async () => {
     let res;
     let body;
 
+    // get the csrf token
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("passwordflow.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
     fetchMocker.mockResponseOnce((req) => {return JSON.stringify({ok: true, url: req.url, authHeader: req.headers.get("Authorization"), body: req.body?.toString()??"{}" })});
-    res = await server.app.inject({ method: "POST", url: "/bff/test", cookies: {SESSIONID: sessionCookie}, payload: {param: "value"} });
+    let headers : {[key:string]:string}= {};
+    headers[CSRFHEADER] = csrfToken;
+    res = await server.app.inject({ 
+        method: "POST", url: "/bff/test", 
+        cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}, 
+        headers: headers,
+        payload: {param: "value"} });
     body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
     expect(body.authHeader).toBe("Bearer " + access_token);

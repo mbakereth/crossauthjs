@@ -35,7 +35,7 @@ interface AuthorizeQueryType {
     code_challenge_method : string,
 }
 
-interface AuthorizeBodyType {
+interface UserAuthorizeBodyType {
     csrfToken : string,
     response_type : string,
     client_id : string,
@@ -110,87 +110,16 @@ export class FastifyAuthorizationServer {
 
             app.get(this.prefix+'authorize', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
-                if (!request.user) return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
-
-                // this just checks they are valid strings and not empty if required, to avoid XSR vulnerabilities
-                CrossauthLogger.logger.debug(j({msg: "validating authorize parameters"}))
-                let {error_description} = this.authServer.validateAuthorizeParameters(request.query);
-                let ce : CrossauthError|undefined = undefined;
-                if (error_description) {
-                    ce = new CrossauthError(ErrorCode.BadRequest, error_description);
-                    CrossauthLogger.logger.error(j({msg: "authorize parameter invalid", cerr: ce, user: request.user?.username}));
-                }  else {
-                    CrossauthLogger.logger.error(j({msg: "authorize parameter valid", user: request.user?.username}));
-
-                }
-
-                if (ce) {
-                    if (this.errorPage) {
-                        return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
-                    } else {
-                        let status : "401" | "400" | "500" = "500"
-                        switch (ce.httpStatus) {
-                            case 401: status = "401" ; break;
-                            case 400: status = "400" ; break;
-                        }
-                        return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]??ERROR_500);
-                    }
-                }
-                let hasAllScopes = false;
-                CrossauthLogger.logger.debug(j({msg: `Checking scopes have been authorized`, scope: request.query.scope }))
-                if (request.query.scope) {
-                    hasAllScopes = await this.authServer.hasAllScopes(request.query.client_id, request.user, request.query.scope.split(" "));
-
-                } else {
-                    hasAllScopes = await this.authServer.hasAllScopes(request.query.client_id, request.user, [null]);
-
-                }
-                if (hasAllScopes) {
-                    CrossauthLogger.logger.debug(j({msg: `All scopes authorized`, scope: request.query.scope}))
-                    // all scopes have been previously authorized - create an authorization code
-                    return this.authorize(request, reply, true, {
-                        responseType: request.query.response_type,
-                        clientId : request.query.client_id,
-                        redirectUri: request.query.redirect_uri,
-                        scope: request.query.scope,
-                        state: request.query.state,
-                        codeChallenge: request.query.code_challenge,
-                        codeChallengeMethod: request.query.code_challenge_method,
-                    });
-                   
-                } else {
-                    // requesting new scopes - redirect to page to ask user for it
-                    CrossauthLogger.logger.debug(j({msg: `Not all scopes authorized`, scope: request.query.scope}))
-                    try {
-                        const client = await this.clientStorage.getClient(request.query.client_id);
-                        
-                        return reply.view(this.oauthAuthorizePage, {
-                            user: request.user,
-                            response_type: request.query.response_type,
-                            client_id : request.query.client_id,
-                            client_name : client.clientName,
-                            redirect_uri: request.query.redirect_uri,
-                            scope: request.query.scope,
-                            scopes: request.query.scope ? request.query.scope.split(" ") : undefined,
-                            state: request.query.state,
-                            code_challenge: request.query.code_challenge,
-                            code_challenge_method: request.query.code_challenge_method,
-                            csrfToken: request.csrfToken,
-                        });
-                    } catch (e) {
-                        const ce = e as CrossauthError;
-                        CrossauthLogger.logger.debug(j({err: ce}));
-                        if (this.errorPage) {
-                            return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: "Invalid client given", clientId: request.query.client_id, user: request.user?.username, httpStatus: ce.httpStatus, errorCode: ErrorCode.UnauthorizedClient, errorCodeName: ErrorCode[ErrorCode.UnauthorizedClient]});
-                        } else {
-                            return reply.status(ce.httpStatus).send(DEFAULT_ERROR[401]);
-                        }
-    
-                    }
-                }
+                return await this.authorizeEndpoint(request, reply, request.query);
             });
 
-            this.app.post(this.prefix+'userauthorize', async (request : FastifyRequest<{ Body: AuthorizeBodyType }>, reply : FastifyReply) => {
+            app.post(this.prefix+'authorize', async (request : FastifyRequest<{ Body: AuthorizeQueryType }>, reply : FastifyReply) =>  {
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
+                return await this.authorizeEndpoint(request, reply, request.body);
+            });
+
+
+            this.app.post(this.prefix+'userauthorize', async (request : FastifyRequest<{ Body: UserAuthorizeBodyType }>, reply : FastifyReply) => {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
 
                 // this should not be called if a user is not logged in
@@ -290,6 +219,95 @@ export class FastifyAuthorizationServer {
                 return reply.header(...JSONHDR).send(resp);
             });
         }
+    }
+
+    private async authorizeEndpoint(request : FastifyRequest, reply : FastifyReply, query : AuthorizeQueryType) {
+        if (!request.user) return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
+
+        // this just checks they are valid strings and not empty if required, to avoid XSR vulnerabilities
+        CrossauthLogger.logger.debug(j({msg: "validating authorize parameters"}))
+        let {error_description} = this.authServer.validateAuthorizeParameters(query);
+        let ce : CrossauthError|undefined = undefined;
+        if (error_description) {
+            ce = new CrossauthError(ErrorCode.BadRequest, error_description);
+            CrossauthLogger.logger.error(j({msg: "authorize parameter invalid", cerr: ce, user: request.user?.username}));
+        }  else {
+            CrossauthLogger.logger.error(j({msg: "authorize parameter valid", user: request.user?.username}));
+
+        }
+
+        if (ce) {
+            if (this.errorPage) {
+                return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+            } else {
+                let status : "401" | "400" | "500" = "500"
+                switch (ce.httpStatus) {
+                    case 401: status = "401" ; break;
+                    case 400: status = "400" ; break;
+                }
+                return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]??ERROR_500);
+            }
+        }
+        let hasAllScopes = false;
+        CrossauthLogger.logger.debug(j({msg: `Checking scopes have been authorized`, scope: query.scope }))
+        if (query.scope) {
+            hasAllScopes = await this.authServer.hasAllScopes(query.client_id, request.user, query.scope.split(" "));
+
+        } else {
+            hasAllScopes = await this.authServer.hasAllScopes(query.client_id, request.user, [null]);
+
+        }
+        if (hasAllScopes) {
+            CrossauthLogger.logger.debug(j({msg: `All scopes authorized`, scope: query.scope}))
+            // all scopes have been previously authorized - create an authorization code
+            return this.authorize(request, reply, true, {
+                responseType: query.response_type,
+                clientId : query.client_id,
+                redirectUri: query.redirect_uri,
+                scope: query.scope,
+                state: query.state,
+                codeChallenge: query.code_challenge,
+                codeChallengeMethod: query.code_challenge_method,
+            });
+           
+        } else {
+            // requesting new scopes - redirect to page to ask user for it
+            CrossauthLogger.logger.debug(j({msg: `Not all scopes authorized`, scope: query.scope}))
+            try {
+                const client = await this.clientStorage.getClient(query.client_id);
+                
+                return reply.view(this.oauthAuthorizePage, {
+                    user: request.user,
+                    response_type: query.response_type,
+                    client_id : query.client_id,
+                    client_name : client.clientName,
+                    redirect_uri: query.redirect_uri,
+                    scope: query.scope,
+                    scopes: query.scope ? query.scope.split(" ") : undefined,
+                    state: query.state,
+                    code_challenge: query.code_challenge,
+                    code_challenge_method: query.code_challenge_method,
+                    csrfToken: request.csrfToken,
+                });
+            } catch (e) {
+                const ce = e as CrossauthError;
+                CrossauthLogger.logger.debug(j({err: ce}));
+                if (this.errorPage) {
+                    return reply.status(ce.httpStatus).view(this.errorPage, {
+                        status: ce.httpStatus, 
+                        errorMessage: "Invalid client given", 
+                        clientId: query.client_id, 
+                        user: request.user?.username, 
+                        httpStatus: ce.httpStatus, 
+                        errorCode: ErrorCode.UnauthorizedClient, 
+                        errorCodeName: ErrorCode[ErrorCode.UnauthorizedClient]});
+                } else {
+                    return reply.status(ce.httpStatus).send(DEFAULT_ERROR[401]);
+                }
+
+            }
+        }
+
     }
 
     private async authorize(request : FastifyRequest, reply : FastifyReply, authorized : boolean, {

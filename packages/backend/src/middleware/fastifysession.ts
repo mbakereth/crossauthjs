@@ -10,7 +10,7 @@ import { setParameter, ParamType } from '../utils';
 import { Server, IncomingMessage, ServerResponse } from 'http'
 import { FastifyServer } from './fastifyserver';
 
-const CSRFHEADER = "X-CROSSAUTH-CSRF";
+export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
@@ -2258,7 +2258,7 @@ export class FastifySessionServer {
         return "";
     }
 
-    async validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) : Promise<string|undefined> {
+    validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) : string|undefined {
 
         this.sessionManager.validateDoubleSubmitCsrfToken(this.getCsrfCookieValue(request), request.csrfToken);
         return this.getCsrfCookieValue(request);
@@ -2267,8 +2267,8 @@ export class FastifySessionServer {
     csrfToken(request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) {
         let token = request.body.csrfToken;
         if (!token) {
-            if (request.headers && CSRFHEADER in request.headers) {
-                const header = request.headers[CSRFHEADER];
+            if (request.headers && CSRFHEADER.toLowerCase() in request.headers) { 
+                const header = request.headers[CSRFHEADER.toLowerCase()];
                 if (Array.isArray(header)) token = header[0];
                 else token = header;
             }

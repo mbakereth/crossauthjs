@@ -2,11 +2,11 @@
 import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '@crossauth/common';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { UserStorage, KeyStorage } from './storage.ts';
-import { AuthenticationParameters, Authenticator } from './auth.ts';
+import { type AuthenticationParameters, Authenticator } from './auth.ts';
 import type { LocalPasswordAuthenticatorOptions }  from "./authenticators/passwordauth.ts";
-import { TokenEmailer, TokenEmailerOptions } from './emailtokens.ts';
+import { TokenEmailer, type TokenEmailerOptions } from './emailtokens.ts';
 import { CrossauthLogger, j } from '@crossauth/common';
-import { Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth.ts';
+import { type Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth.ts';
 import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth.ts';
 import { setParameter, ParamType } from './utils.ts';
 import { Hasher } from './hasher.ts';
