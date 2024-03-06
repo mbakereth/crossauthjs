@@ -127,7 +127,7 @@ function getQueryParams(redirectUri : string) : {[key:string]:string} {
     return params;
 
 }
-test('FastifyAuthServfer.authorizeRedirectsToLogin', async () => {
+test('FastifyAuthServer.authorizeRedirectsToLogin', async () => {
 
     let {server} = await makeAppWithOptions();
     let res;
@@ -139,7 +139,7 @@ test('FastifyAuthServfer.authorizeRedirectsToLogin', async () => {
     expect(res.statusCode).toBe(302);
 });
 
-test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
+test('FastifyAuthServer.getAccessTokenWhileLoggedIn', async () => {
 
     let {server, keyStorage} = await makeAppWithOptions();
 
@@ -152,7 +152,7 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
         url: `/authorize?response_type=code&client_id=ABC&redirect_uri=http://example.com/redirect&scope=read+write&state=ABC123`,  
         cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
     body = JSON.parse(res.body)
-    expect(body.template).toBe("authorize.njk");
+    expect(body.template).toBe("userauthorize.njk");
     expect(body.args.response_type).toBe("code");
     expect(body.args.client_id).toBe("ABC");
     expect(body.args.redirect_uri).toBe("http://example.com/redirect");
@@ -161,7 +161,7 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
 
     res = await server.app.inject({ 
         method: "POST", 
-        url: `/authorize`,  
+        url: `/userauthorize`,  
         cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}, payload: {
             authorized: "true",
             response_type: "code",
@@ -196,7 +196,7 @@ test('FastifyAuthServfer.getAccessTokenWhileLoggedIn', async () => {
 
 });
 
-test('FastifyAuthServfer.getAccessTokenWClientCredentials', async () => {
+test('FastifyAuthServer.getAccessTokenWClientCredentials', async () => {
 
     let {server} = await makeAppWithOptions();
 
@@ -220,7 +220,7 @@ test('FastifyAuthServfer.getAccessTokenWClientCredentials', async () => {
 
 });
 
-test('FastifyAuthServfer.getAccessTokenWClientCredentialsBasicAuth', async () => {
+test('FastifyAuthServer.getAccessTokenWClientCredentialsBasicAuth', async () => {
 
     let {server} = await makeAppWithOptions();
 
@@ -246,7 +246,7 @@ test('FastifyAuthServfer.getAccessTokenWClientCredentialsBasicAuth', async () =>
 
 });
 
-test('FastifyAuthServfer.getAccessTokenWClientCredentialsNoAuth', async () => {
+test('FastifyAuthServer.getAccessTokenWClientCredentialsNoAuth', async () => {
 
     let {server} = await makeAppWithOptions();
 
@@ -269,7 +269,7 @@ test('FastifyAuthServfer.getAccessTokenWClientCredentialsNoAuth', async () => {
 });
 
 
-test('FastifyAuthServfer.getAccessTokenWithPasswordFlow', async () => {
+test('FastifyAuthServer.getAccessTokenWithPasswordFlow', async () => {
 
     let {server} = await makeAppWithOptions();
 

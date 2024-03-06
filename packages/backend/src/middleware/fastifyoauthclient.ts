@@ -1,7 +1,7 @@
 import { OAuthClient, type OAuthClientOptions } from '../oauth/client.ts';
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { type FastifyRequest, type FastifyReply } from 'fastify';
 import { setParameter, ParamType } from '../utils';
-import { FastifyServer, FastifyErrorFn } from './fastifyserver';
+import { FastifyServer, type FastifyErrorFn } from './fastifyserver';
 import { CrossauthLogger, OAuthFlows, type OAuthTokenResponse, j } from '@crossauth/common';
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
 import { jwtDecode } from "jwt-decode";

@@ -1,39 +1,56 @@
-import { MockRequest, MockRequestEvent, MockHeaders } from './sveltemocks';
+import { MockRequestEvent, MockResolver, MockCookies } from './sveltemocks';
+import { SvelteKitSession } from '../sveltekitsession';;
 
-test('SvelteMocks.MockHeaders', async () => {
+test('SvelteMocks.Request', async () => {
 
-    const headers = new MockHeaders({
-        "Authorization": ["Bearer XYZ"],
-    });
-    expect(headers.get("authorization")).toBe("Bearer XYZ");
-    let values = [...headers.values()];
-    expect(values.length).toBe(1);
-    expect(values[0]).toBe("Bearer XYZ");
-    let keys = [...headers.keys()];
-    expect(keys.length).toBe(1);
-    expect(keys[0]).toBe("authorization");
-    let entries = [...headers.entries()];
-    expect(entries.length).toBe(1);
-    expect(entries[0].length).toBe(2);
-    expect(entries[0][0]).toBe("authorization");
-    expect(entries[0][1]).toBe("Bearer XYZ");
-
-    headers.append("Set-Cookie", "name1=value1");
-    values = [...headers.values()];
-    expect(values.length).toBe(2);
-
-    headers.append("Set-Cookie", "name2=value2");
-    values = [...headers.values()];
-    expect(values.length).toBe(3);
-
-    let cookies = headers.getSetCookie();
-    expect(cookies.length).toBe(2);
+    const request = new Request("http://ex.com/test", {method: "POST", body: "This is the body"});
+    expect(request.body).not.toBe(null)
+    if (request.body) expect(await (new Response(request.body).text())).toBe("This is the body");
 });
 
-test('SvelteMocks.RequestEvent', async () => {
+test('SvelteMocks.MockRequestEvent', async () => {
 
-    const request = new MockRequest("/test");
+    const request = new Request("http://ex.com/test", {method: "POST", body: "This is the body"});
     const requestEvent = new MockRequestEvent("1", request, {"param1": "value1"});
     expect(requestEvent.route.id).toBe("1");
     expect(requestEvent.params["param1"]).toBe("value1");
+
+});
+
+test('SvelteMocks.MockCookies', async () => {
+    const cookies = new MockCookies({
+        "cookie1": {value: "value1", opts: {maxAge: 120, domain: "http://example1.com"}},
+        "cookie2": {value: "value&2", opts: {maxAge: 140, domain: "http://example2.com"}},
+    });
+
+    // get cookie
+    let value1 = await cookies.get("cookie1")
+    expect(value1).toBe("value1");
+    let value2 = await cookies.get("cookie2")
+    expect(value2).toBe("value&2");
+
+    // get all
+    let values = await cookies.getAll();
+    expect(values.length).toBe(2);
+
+    // set cookie
+    await cookies.set("cookie1", "value3", {maxAge: 120, domain: "http://example3.com", path: "/"});
+    value1 = await cookies.get("cookie1");
+    expect(value1).toBe("value3");
+    await cookies.delete("cookie1", {path: "/"});
+    value1 = await cookies.get("cookie1");
+    expect(value1).toBe(undefined);
+});
+
+test('SvelteMocks.hook', async () => {
+    const request = new Request("http://ex.com/test", {method: "POST", body: "This is the body"});
+    const requestEvent = new MockRequestEvent("1", request, {"param1": "value1"});
+
+    const session = new SvelteKitSession();
+    const handle = session.sessionHook;
+    const resolver = new MockResolver("Response");
+    const resp = await handle({event: requestEvent, resolve: resolver.mockResolve});
+    const cookies = resp.headers.getSetCookie();
+    expect(cookies.length).toBe(1);
+    expect(cookies[0]).toContain("TESTCOOKIE=");
 });

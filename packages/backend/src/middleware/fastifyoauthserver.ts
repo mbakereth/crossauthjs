@@ -1,10 +1,10 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { type FastifyInstance, type FastifyRequest, type FastifyReply } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http'
 import { OAuthClientStorage, KeyStorage } from '../storage';
 import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '../oauth/authserver';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
-import { CrossauthError, CrossauthLogger, OpenIdConfiguration, j } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, type OpenIdConfiguration, j } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
 import { ErrorCode } from '@crossauth/common';
 import { FastifyServer, ERROR_500, DEFAULT_ERROR } from './fastifyserver';
@@ -69,7 +69,7 @@ export class FastifyAuthorizationServer {
     private prefix : string = "/";
     private loginUrl : string = "/login";
     readonly authServer : OAuthAuthorizationServer;
-    private oauthAuthorizePage : string = "authorize.njk";
+    private oauthAuthorizePage : string = "userauthorize.njk";
     private errorPage : string = "error.njk";
     private clientStorage : OAuthClientStorage;
 
@@ -190,7 +190,7 @@ export class FastifyAuthorizationServer {
                 }
             });
 
-            this.app.post(this.prefix+'authorize', async (request : FastifyRequest<{ Body: AuthorizeBodyType }>, reply : FastifyReply) => {
+            this.app.post(this.prefix+'userauthorize', async (request : FastifyRequest<{ Body: AuthorizeBodyType }>, reply : FastifyReply) => {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
 
                 // this should not be called if a user is not logged in
