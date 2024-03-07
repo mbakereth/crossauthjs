@@ -259,21 +259,15 @@ export class SessionManager {
             let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
             return key.data;
         } catch (e) {
-            if (e instanceof CrossauthError) {
-                let ce = e as CrossauthError;
-                switch (ce.code) {
-                    case ErrorCode.Expired:
-                        return undefined;
-                        break;
-                    default:
-                        error = ce;
-                }
+            let ce = CrossauthError.asCrossauthError(e);
+            switch (ce.code) {
+                case ErrorCode.Expired:
+                    return undefined;
+                    break;
+                default:
+                    error = ce;
             }
-            error = new CrossauthError(ErrorCode.UnknownError);
-        }
-        if (error) {
-            CrossauthLogger.logger.debug(j({err: error}));
-            throw error;
+            throw ce;
         }
     }
 
@@ -820,7 +814,7 @@ export class SessionManager {
      * @returns true if email verification is now needed, false otherwise
      */
     async updateUser(currentUser: User, newUser : User) : Promise<boolean> {
-        let newEmail = undefined;
+        let newEmail : string|undefined = undefined;
         if (!("id" in currentUser) || currentUser.id == undefined) {
             throw new CrossauthError(ErrorCode.UserNotExist, "Please specify a user id");
         }

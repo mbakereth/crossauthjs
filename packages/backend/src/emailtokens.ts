@@ -5,7 +5,7 @@ import { Hasher } from './hasher';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from './utils';
-import { User } from '@crossauth/common';
+import { type User } from '@crossauth/common';
 
 const TOKEN_LENGTH = 16; // in bytes, before base64url
 

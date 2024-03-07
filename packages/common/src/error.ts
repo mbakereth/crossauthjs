@@ -128,6 +128,8 @@ export enum ErrorCode {
  */
 export class CrossauthError extends Error {
 
+    isCrossauthError = true;
+
     /** The best HTTP status to report */
     readonly httpStatus: number;
 
@@ -267,6 +269,7 @@ export class CrossauthError extends Error {
         this.name = 'CrossauthError';
         if (Array.isArray(message)) this.messages = message;
         else this.messages = [_message];
+	Object.setPrototypeOf(this, CrossauthError.prototype);
     }
 
     static fromOAuthError(error : string, error_description?: string) : CrossauthError {
@@ -285,5 +288,15 @@ export class CrossauthError extends Error {
         }
         return new CrossauthError(code, error_description);
             
+    }
+
+    static asCrossauthError(e: any) : CrossauthError { 
+        if (e instanceof Error) {
+            if ("isCrossauthError" in e) {
+                return e as CrossauthError;
+            } 
+            return new CrossauthError(ErrorCode.UnknownError, e.message);
+        }
+        return new CrossauthError(ErrorCode.UnknownError);
     }
 }

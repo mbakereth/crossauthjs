@@ -5,9 +5,9 @@ import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
-import { createPublicKey, JsonWebKey, KeyObject } from 'crypto'
+import { createPublicKey, type JsonWebKey, KeyObject } from 'crypto'
 import fs from 'node:fs';
-import { OpenIdConfiguration, DEFAULT_OIDCCONFIG } from '@crossauth/common';
+import { type OpenIdConfiguration, DEFAULT_OIDCCONFIG } from '@crossauth/common';
 
 export interface OAuthResourceServerOptions {
 

@@ -1,4 +1,4 @@
-import { PrismaClient } from '../src/generated/client/index.js';
+import { PrismaClient } from '@prisma/client'
 import { LocalPasswordAuthenticator } from '@crossauth/backend';
 import { PrismaUserStorage, PrismaKeyStorage } from '@crossauth/backend';
 import { ApiKeyManager } from '@crossauth/backend';

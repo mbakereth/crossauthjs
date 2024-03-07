@@ -1,5 +1,5 @@
 import { UserStorage, KeyStorage, type UserStorageGetOptions, type UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage, type OAuthAuthorizationStorageOptions } from '../storage';
-import { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields, OAuthClient } from '@crossauth/common';
+import { type User, type UserSecrets, type Key, type UserInputFields, type UserSecretsInputFields, type OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 
@@ -445,6 +445,7 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
                 clientId: oldClient.clientId, 
                 redirectUri: client.redirectUri??oldClient.redirectUri,
                 validFlow: client.validFlow??oldClient.validFlow,
+                confidential: client.confidential??oldClient.confidential,
             }
         }
     }

@@ -1,3 +1,3 @@
-import { SvelteKitSession } from '@crossauth/backend';
+import { SvelteKitSessionServer } from '@crossauth/backend';
 
-export const crossauthSession = new SvelteKitSession();
+export const crossauthSession = new SvelteKitSessionServer();

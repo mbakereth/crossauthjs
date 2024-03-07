@@ -364,18 +364,13 @@ export class SessionCookie {
                 await this.keyStorage.saveKey(userId, hashedSessionId, dateCreated, expires, undefined, extraFields);
                 succeeded = true;
             } catch (e) {
-                if (e instanceof CrossauthError) {
-                    let ce = e as CrossauthError;
-                    if (ce.code == ErrorCode.KeyExists || ce.code == ErrorCode.InvalidKey) {
-                        numTries++;
-                        sessionId = Hasher.randomValue(SESSIONID_LENGTH);
-                        if (numTries > maxTries) {
-                            CrossauthLogger.logger.error(j({msg: "Max attempts exceeded trying to create session ID"}))
-                            throw new CrossauthError(ErrorCode.KeyExists)
-                        }
-                    } else {
-                        CrossauthLogger.logger.debug(j({err: e}));
-                        throw e;
+                let ce = CrossauthError.asCrossauthError(e);
+                if (ce.code == ErrorCode.KeyExists || ce.code == ErrorCode.InvalidKey) {
+                    numTries++;
+                    sessionId = Hasher.randomValue(SESSIONID_LENGTH);
+                    if (numTries > maxTries) {
+                        CrossauthLogger.logger.error(j({msg: "Max attempts exceeded trying to create session ID"}))
+                        throw new CrossauthError(ErrorCode.KeyExists)
                     }
                 } else {
                     CrossauthLogger.logger.debug(j({err: e}));

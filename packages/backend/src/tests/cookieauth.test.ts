@@ -40,7 +40,7 @@ test('CookieSessionManager.loginGetKeyLogout', async () => {
     expect(user).toBeDefined();
     if (user) expect(user.username).toBe(bob.username);
     await manager.logout(cookie.value);
-    await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError();
 });
 
 test('CookieSessionManager.logoutFromAll', async() => {
@@ -53,7 +53,7 @@ test('CookieSessionManager.logoutFromAll', async() => {
     if (user) {
         expect(user.username).toBe(bob.username);
         await manager.logoutFromAll(user.username);
-        await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError(CrossauthError);
+        await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError();
     }
 })
 

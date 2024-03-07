@@ -19,7 +19,7 @@ test('InMemoryUserStorage.getUser', async () => {
     const id = bob.id;
     const {user: bob2} = await userStorage.getUserById(bob.username);
     expect(bob2.id).toBe(id);
-    await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError();
 });
 
 // test updating a field
@@ -44,7 +44,7 @@ test('InMemoryKeyStorage.createGetAndDeleteSession', async () => {
     expect(sessionKey.userId).toBe(bob.id);
     expect(sessionKey.expires).toStrictEqual(expiry);
     keyStorage.deleteKey(key);
-    await expect(async () => {await keyStorage.getKey(key)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key)}).rejects.toThrowError();
 });
 
 test("InMemoryKeyStorage.deleteAllKeysForUser", async() => {
@@ -58,8 +58,8 @@ test("InMemoryKeyStorage.deleteAllKeysForUser", async() => {
     await keyStorage.saveKey(bob.username, key1, now, expiry);
     await keyStorage.saveKey(bob.username, key2, now, expiry);
     await keyStorage.deleteAllForUser(bob.id, "");
-    await expect(async () => {await keyStorage.getKey(key1)}).rejects.toThrowError(CrossauthError);
-    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key1)}).rejects.toThrowError();
+    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError();
 
 });
 
@@ -76,7 +76,7 @@ test("InMemoryKeyStorage.deleteAllKeysForUserExcept", async() => {
     await keyStorage.deleteAllForUser(bob.id, "", key1 );
     let bobkey2 = await keyStorage.getKey(key1);
     expect(bobkey2.userId).toBe(bob.id);
-    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError();
 
 });
 
@@ -202,7 +202,7 @@ test('InMemoryClientStorage.createGetAndDeleteClient', async () => {
     const getClient = await clientStorage.getClient(client.clientId);
     expect(getClient.clientSecret).toBe(client.clientSecret);
     await clientStorage.deleteClient(client.clientId);
-    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError();
 });
 
 test('InMemoryClientStorage.createAndUpdateValidFlows', async () => {

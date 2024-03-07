@@ -1,4 +1,4 @@
-import { PrismaClient } from './generated/client/index.js';
+import { PrismaClient } from '@prisma/client'
 import { KeyStorage, FastifyServer, FastifyOAuthClient, PrismaKeyStorage, PrismaUserStorage, PrismaOAuthAuthorizationStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';

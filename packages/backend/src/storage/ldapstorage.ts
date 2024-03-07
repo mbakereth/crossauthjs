@@ -1,5 +1,5 @@
-import { UserStorage, UserStorageGetOptions, UserStorageOptions } from '../storage';
-import { User, UserSecrets, UserInputFields, UserSecretsInputFields } from '@crossauth/common';
+import { UserStorage, type UserStorageGetOptions, type UserStorageOptions } from '../storage';
+import { type User, type UserSecrets, type UserInputFields, type UserSecretsInputFields } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
@@ -168,9 +168,11 @@ export class LdapUserStorage extends UserStorage {
               
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
-            if (e instanceof CrossauthError) throw e;
-            else if (e instanceof ldap.InvalidCredentialsError) {
+            const ce = CrossauthError.asCrossauthError(e);
+            if (e instanceof ldap.InvalidCredentialsError) {
                 throw new CrossauthError(ErrorCode.UsernameOrPasswordInvalid);
+            } else if (ce.code != ErrorCode.UnknownError) {
+                throw ce;
             } else {
                 throw new CrossauthError(ErrorCode.Connection, "LDAP error getting user");            
             }

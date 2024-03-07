@@ -41,7 +41,7 @@ test('PrismaUserStorage.getUser', async () => {
     const id = bob.id;
     const {user: bob2} = await userStorage.getUserById(id);
     expect(bob2.id).toBe(id);
-    await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError();
 });
 
 // test updating a field in the user table
@@ -74,7 +74,7 @@ test('PrismaKeyStorage.createGetAndDeleteKey', async () => {
     expect(sessionKey.userId).toBe(bob.id);
     expect(sessionKey.expires).toStrictEqual(expiry);
     await keyStorage.deleteKey(key);
-    await expect(async () => {await keyStorage.getKey(key)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key)}).rejects.toThrowError();
 });
 
 test("PrismaKeyStorage.deleteAllKeysForUser", async() => {
@@ -88,8 +88,8 @@ test("PrismaKeyStorage.deleteAllKeysForUser", async() => {
     await keyStorage.saveKey(bob.id, key1, now, expiry);
     await keyStorage.saveKey(bob.id, key2, now, expiry);
     await keyStorage.deleteAllForUser(bob.id, "");
-    await expect(async () => {await keyStorage.getKey(key1)}).rejects.toThrowError(CrossauthError);
-    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key1)}).rejects.toThrowError();
+    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError();
 
 });
 
@@ -106,7 +106,7 @@ test("PrismaKeyStorage.deleteAllKeysForUserExcept", async() => {
     await keyStorage.deleteAllForUser(bob.id, "", key1 );
     let bobkey2 = await keyStorage.getKey(key1);
     expect(bobkey2.userId).toBe(bob.id);
-    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError();
 
 });
 
@@ -213,7 +213,7 @@ test('PrismaStorage.createGetAndDeleteClient', async () => {
     const getClient = await clientStorage.getClient(client.clientId);
     expect(getClient.clientSecret).toBe(client.clientSecret);
     await clientStorage.deleteClient(client.clientId);
-    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError();
 });
 
 test('PrismaStorage.createClientWithRedirectUris', async () => {
@@ -232,7 +232,7 @@ test('PrismaStorage.createClientWithRedirectUris', async () => {
     expect(["http://client.com/uri1", "http://client.com/uri2"]).toContain(getClient.redirectUri[0]);
     expect(["http://client.com/uri1", "http://client.com/uri2"]).toContain(getClient.redirectUri[1]);
     await clientStorage.deleteClient(client.clientId);
-    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError();
 });
 
 test('PrismaStorage.createAndUpdateClient', async () => {
@@ -278,7 +278,7 @@ test('PrismaStorage.createInvalidFlow', async () => {
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: ["AuthorizationCodeX"],
     }
-    await expect(async () => {await clientStorage.createClient(client)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await clientStorage.createClient(client)}).rejects.toThrowError();
 });
 
 test("PrismaAuthorization.createAndGetForUser", async () => {

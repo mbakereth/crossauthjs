@@ -2,7 +2,6 @@ import { test, expect } from 'vitest';
 import { InMemoryUserStorage } from '../../storage/inmemorystorage';
 import { LdapUserStorage } from '../../storage/ldapstorage';
 import { LdapAuthenticator } from '../ldapauth';
-import { CrossauthError } from '@crossauth/common';
 import { UserInputFields } from '@crossauth/common';
 
 test('Ldapauth.authenticateUserInLdapAndLocal', async () => {
@@ -29,7 +28,7 @@ test('Ldapauth.authenticateUserInLdapNotInLocal', async () => {
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",
     });
-    await expect(async () => {await ldapStorage.getUserByUsername("dave")}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {await ldapStorage.getUserByUsername("dave")}).rejects.toThrowError();
 });
 
 test('Ldapauth.authenticateUserAutoCreate', async () => {

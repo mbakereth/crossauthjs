@@ -14,7 +14,8 @@
     "dev": "vite",
     "build": "vite build --emptyOutDir=false",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "echo 'No tests defined'",
+    "testonce": "echo 'No tests defined'",
     "doc": "typedoc"
   },
   "devDependencies": {

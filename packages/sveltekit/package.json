@@ -1,0 +1,37 @@
+{
+	"name": "@crossauth/sveltekit",
+	"version": "0.0.1",
+	"private": true,
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test": "dotenv -e .env.unittest vitest",
+		"testonce": "dotenv -e .env.unittest vitest run"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^3.0.0",
+		"@sveltejs/kit": "^2.0.0",
+		"@sveltejs/vite-plugin-svelte": "^3.0.0",
+		"autoprefixer": "^10.4.18",
+		"daisyui": "^4.7.2",
+		"dotenv": "^16.3.1",
+		"dotenv-cli": "^7.3.0",
+		"svelte": "^4.2.7",
+		"svelte-check": "^3.6.0",
+		"tslib": "^2.4.1",
+		"tsx": "^4.7.0",
+		"typescript": "^5.0.0",
+		"vite": "^5.0.3",
+		"vitest": "^1.2.0"
+	},
+	"type": "module",
+	"dependencies": {
+		"@crossauth/backend": "workspace:^",
+		"@crossauth/common": "workspace:^",
+		"cookie": "^0.6.0",
+		"vite-plugin-dts": "^3.6.4"
+	}
+}

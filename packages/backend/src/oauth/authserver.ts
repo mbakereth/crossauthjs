@@ -682,7 +682,7 @@ export class OAuthAuthorizationServer {
             }
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            const message = e instanceof CrossauthError ? e.message : "Couldn't validate client";
+            const message = "Couldn't validate client";
             return {error: "server_error", error_description: message};
         }
         if (!passwordCorrect) return {error: "access_denied", error_description: "Invalid client secret"};

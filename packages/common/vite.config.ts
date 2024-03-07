@@ -8,6 +8,10 @@ import { join, dirname } from 'path'
 
 // https://vitejs.dev/guide/build.html#library-mode
 export default defineConfig({
+  /*esbuild: {
+	minifyIdentifiers: false,
+	keepNames: true,
+  },*/
   build: {
       ssr: false,
       lib: {

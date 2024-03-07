@@ -170,7 +170,7 @@ export function j(arg : {[key: string]: any}|string) : string|{[key: string]: an
     try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object") && arg.err && ("message" in arg.err) && !("msg" in arg)) arg["msg"] = arg.err.message;} catch {}
     try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object")) arg.err = {...arg.err, stack: stack}; } catch {}
     try {if (typeof arg == "object" && ("err" in arg) && !("msg" in arg)) arg["msg"] = arg.msg = "An unknown error occurred";} catch {}
-    try {if (typeof arg == "object" && ("cerr" in arg) && (arg.cerr instanceof CrossauthError) && arg.cerr ) {arg["errorCode"] = arg.cerr.code; arg["errorCodeName"] = arg.cerr.codeName; arg["httpStatus"] = arg.cerr.httpStatus; if (!("msg" in arg)) arg["msg"] = arg.cerr.message; delete arg.cerr;}} catch {}
+    try {if (typeof arg == "object" && ("cerr" in arg) && ("isCrossauthError" in arg.cerr) && arg.cerr ) {arg["errorCode"] = arg.cerr.code; arg["errorCodeName"] = arg.cerr.codeName; arg["httpStatus"] = arg.cerr.httpStatus; if (!("msg" in arg)) arg["msg"] = arg.cerr.message; delete arg.cerr;}} catch {}
     return (typeof arg == "string" || globalThis.crossauthLoggerAcceptsJson) ? arg : JSON.stringify(arg);
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "@crossauth/fastifysessionserver-example",
+  "name": "@crossauth/fastifysessionserver",
   "version": "0.0.0",
   "description": "",
   "type": "module",
@@ -8,8 +8,11 @@
     "build": "pnpx tsc",
     "start": "node dist/index.js",
     "dev": "dotenv -e .env.dev tsx src/index.ts",
-    "postinstall": "dotenv -e .env.dev pnpm exec prisma generate",
-    "prisma": "dotenv -e .env.dev pnpm exec prisma"
+    "preinstall": "bash ../../removeprismaclient.sh",
+    "postinstall": "bash ../../copyprismaclient.sh && bash ../../ifdotenv.sh -e .env.dev prisma generate",
+    "prisma": "dotenv -e .env.dev pnpm exec prisma",
+    "test": "echo 'no tests defined'",
+    "testonce": "echo 'no tests defined'"
   },
   "prisma": {
     "seed": "dotenv -e .env.dev tsx prisma/seed.ts"

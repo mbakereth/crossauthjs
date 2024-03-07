@@ -1,0 +1,2 @@
+    "postinstall": "dotenv -e .env.dev pnpm exec prisma generate",
+

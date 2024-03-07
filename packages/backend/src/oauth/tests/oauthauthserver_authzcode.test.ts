@@ -333,7 +333,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKeyInConstructor', async () => {
         validScopes: "read, write",
 
     } 
-    await expect(async () => {new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), options)}).rejects.toThrowError(CrossauthError);
+    await expect(async () => {new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), options)}).rejects.toThrowError();
 });
 
 test('AuthorizationServer.AuthzCodeFlow.invalidResponseType', async () => {

@@ -2,7 +2,7 @@ import type { User, Key, UserSecretsInputFields, UserInputFields } from '@crossa
 //import { getJsonData } from '../../interfaces.ts';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
-import { Authenticator, type AuthenticationParameters, AuthenticationOptions } from '../auth.ts';
+import { Authenticator, type AuthenticationParameters, type AuthenticationOptions } from '../auth.ts';
 import { setParameter, ParamType } from '../utils.ts';
 import { randomInt }  from 'node:crypto';
 import nunjucks from "nunjucks";
