@@ -118,6 +118,9 @@ export interface OAuthAuthorizationServerOptions {
     /** Expiry for authorization codes in seconds.  If null, they don't expire.  Defult 5 minutes */
     authorizationCodeExpiry? : number | null,
 
+    /** Expiry for authorization codes in seconds.  If null, they don't expire.  Defult 5 minutes */
+    mfaTokenExpiry? : number | null,
+
     /** Number of seconds tolerance when checking expiration.  Default 10 */
     clockTolerance? : number,
 
@@ -140,7 +143,9 @@ export interface OAuthAuthorizationServerOptions {
     userStorage? : UserStorage;
 
     /** Required if activating the password flow */
-    authenticator? : Authenticator;
+    authenticators? : {[key:string] : Authenticator};
+
+    idTokenClaims? : string;
 }
 
 export class OAuthAuthorizationServer {
@@ -148,7 +153,7 @@ export class OAuthAuthorizationServer {
         private clientStorage : OAuthClientStorage;
         private keyStorage : KeyStorage;
         private userStorage? : UserStorage;
-        private authenticator? : Authenticator;
+        private authenticators : {[key:string] : Authenticator} = {};
         private authStorage? : OAuthAuthorizationStorage;
 
         private oauthIssuer : string = "";
@@ -180,10 +185,13 @@ export class OAuthAuthorizationServer {
         private refreshTokenExpiry : number|null = 60*60;
         private rollingRefreshToken : boolean = true;
         private authorizationCodeExpiry : number|null = 60*5;
+        private mfaTokenExpiry : number|null = 60*5;
         private clockTolerance : number = 10;
         private emptyScopeIsValid : boolean = true;
         private validateScopes : boolean = false;
         private validScopes : string[] = [];
+        private idTokenClaims : string[] = [];
+        private idTokenClaimsMap : {[key:string]: string} = {};
         validFlows : string[] = ["all"];
     
     constructor(clientStorage: OAuthClientStorage, keyStorage : KeyStorage, options: OAuthAuthorizationServerOptions) {
@@ -191,7 +199,7 @@ export class OAuthAuthorizationServer {
         this.keyStorage = keyStorage;
         this.userStorage = options.userStorage;
         this.authStorage = options.authStorage;
-        this.authenticator = options.authenticator;
+        if (options.authenticators) this.authenticators = options.authenticators;
 
         setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
         setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
@@ -219,11 +227,18 @@ export class OAuthAuthorizationServer {
         setParameter("refreshTokenExpiry", ParamType.Number, this, options, "OAUTH_REFRESH_TOKEN_EXPIRY");
         setParameter("rollingRefreshToken", ParamType.Boolean, this, options, "OAUTH_ROLLING_REFRESH_TOKEN");
         setParameter("authorizationCodeExpiry", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_EXPIRY");
+        setParameter("mfaTokenExpiry", ParamType.Number, this, options, "OAUTH_MFA_TOKEN_EXPIRY");
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
         setParameter("validateScopes", ParamType.Boolean, this, options, "OAUTH_VALIDATE_SCOPES");
         setParameter("emptyScopeIsValid", ParamType.Boolean, this, options, "OAUTH_EMPTY_SCOPE_VALID");
         setParameter("validScopes", ParamType.StringArray, this, options, "OAUTH_VALID_SCOPES");
         setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("idTokenClaims", ParamType.StringArray, this, options, "OAUTH_ID_TOKEN_CLAIMS");
+        for (let claim of this.idTokenClaims) {
+            const pair = claim.split(":");
+            if (pair.length != 2) throw new CrossauthError(ErrorCode.Configuration, "Id token claims must be a string of claim:fieldName separated by spaces");
+            this.idTokenClaimsMap[pair[0]] = pair[1];
+        }
         
         if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();
@@ -272,8 +287,9 @@ export class OAuthAuthorizationServer {
             throw new CrossauthError(ErrorCode.Configuration, "Key storage required for persisting tokens");
         }
 
-        if (this.validFlows.includes(OAuthFlows.Password) && (!this.userStorage || !this.authenticator)) {
-            throw new CrossauthError(ErrorCode.Configuration, "If password flow is enabled, userStorage and authenticator must be provided");
+        if ((this.validFlows.includes(OAuthFlows.Password) || this.validFlows.includes(OAuthFlows.PasswordMfa) ) 
+             && (!this.userStorage || Object.keys(this.authenticators).length == 0)) {
+            throw new CrossauthError(ErrorCode.Configuration, "If password flow or password MFA flow is enabled, userStorage and authenticators must be provided");
         }
     }
 
@@ -308,7 +324,8 @@ export class OAuthAuthorizationServer {
         error_description? : string,
     }> {
         // validate responseType (because OAuth requires a different error for this)
-        if (responseType != "code") {
+        const responseTypesSupported = this.responseTypesSupported();
+        if (!responseTypesSupported.includes(responseType)) {
             return {
                 error: "unsupported_response_type",
                 error_description: "Unsupported response type " + responseType,
@@ -325,9 +342,13 @@ export class OAuthAuthorizationServer {
             return {error: "unauthorized_client", error_description: "Client is not authorized"};
         }
 
+        // validate scopes
+        const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, user);
+        if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
+
 
         // validate flow type
-        const flow = this.inferFlowFromGet(responseType, codeChallenge);
+        const flow = this.inferFlowFromGet(responseType, scopes||[], codeChallenge);
         if (!flow || !(this.validFlows.includes(flow))) {
             return {
                 error: "access_denied",
@@ -340,10 +361,6 @@ export class OAuthAuthorizationServer {
                 error_description: "Client does not support " + flow,
             };
         }
-
-        // validate scopes
-        const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, user);
-        if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
 
         // validate state
         try {
@@ -472,6 +489,15 @@ export class OAuthAuthorizationServer {
         }
 
         // validate flow type
+        if (flow == OAuthFlows.Password) {
+            // special case - this flow is indistiguishable from PasswordMfa by looking at the request
+            if (!(this.validFlows.includes(flow)) && !(this.validFlows.includes(OAuthFlows.PasswordMfa))) {
+                return {
+                    error: "access_denied",
+                    error_description: "Unsupported flow type " + flow,
+                };    
+            }
+        }
         if (!flow || !(this.validFlows.includes(flow))) {
             return {
                 error: "access_denied",
@@ -522,7 +548,7 @@ export class OAuthAuthorizationServer {
                     error_description: "No authorization code provided for authorization code flow",
                 };
             }
-            return await this.getAccessToken(client, code, clientSecret, codeVerifier, undefined, createRefreshToken);
+            return await this.getAccessToken({client, code, clientSecret, codeVerifier, issueRefreshToken : createRefreshToken});
 
         } else if (grantType == "refresh_token") {
     
@@ -532,7 +558,7 @@ export class OAuthAuthorizationServer {
                     error_description: "Refresh token is invalid",
                 }
             }
-            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, undefined, createRefreshToken);
+            return await this.getAccessToken({client, clientSecret, codeVerifier, issueRefreshToken : createRefreshToken});
 
         } else if (grantType == "client_credentials") {
 
@@ -540,7 +566,7 @@ export class OAuthAuthorizationServer {
             const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
             if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
     
-            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes, createRefreshToken);
+            return await this.getAccessToken({client, clientSecret, codeVerifier, scopes, issueRefreshToken: createRefreshToken});
 
         } else if (grantType == "password") {
 
@@ -557,12 +583,19 @@ export class OAuthAuthorizationServer {
             }
             let user : User|undefined = undefined;
             try {
-                if (!this.userStorage || !this.authenticator) {
+                if (!this.userStorage) {
                     // already checked in constructor but VS code doesn't know
                     return {error: "server_error", error_description: "Password authentication not configured"};
                 }
                 const {user: user1, secrets} = await this.userStorage.getUserByUsername(username);
-                await this.authenticator.authenticateUser(user1, secrets, {password: password});
+                const factor1Authenticator = this.authenticators[user1.factor1];
+                if (!factor1Authenticator || !(factor1Authenticator.secretNames().includes("password"))) {
+                    return {
+                        error: "access_denied",
+                        error_description: "Password flow used but factor 1 authenticator does not accept passwords",
+                    }
+                }
+                await factor1Authenticator.authenticateUser(user1, secrets, {password: password});
                 user = user1;
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -571,7 +604,17 @@ export class OAuthAuthorizationServer {
                     error_description: "Username and/or password do not match",
                 }
             }
-            return await this.getAccessToken(client, undefined, clientSecret, codeVerifier, scopes, createRefreshToken, user);
+            if (user.factor2) {
+                return await this.createMfaRequest(user);
+            }
+            return await this.getAccessToken({
+                client, 
+                clientSecret, 
+                codeVerifier, 
+                scopes, 
+                issueRefreshToken:
+                 createRefreshToken, 
+                 user});
 
         } else {
 
@@ -583,14 +626,56 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    async createMfaRequest(user : User) : Promise<{mfa_token: string, error: string, error_description : string}> {
+        const mfaToken = Hasher.randomValue(16);
+        const mfaKey = "omfa:" + Hasher.hash(mfaToken);
+        const now = new Date();
+        try {
+            await this.keyStorage.saveKey(
+                user.id, 
+                mfaKey, 
+                now, 
+                this.mfaTokenExpiry ? (new Date(now.getTime() + this.mfaTokenExpiry*1000)) : undefined
+            );
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce, msg: "Couldn't save MFA token"}));
+        }
+        return {
+            mfa_token: mfaToken,
+            error: "mfa_required",
+            error_description: "Multifactor authentication required",
+        };
+    }
+
     inferFlowFromGet(
         responseType : string, 
+        scope : string[],
         codeChallenge? : string,
     ) : string|undefined {
 
-        if (responseType == "code") {
+        if (responseType == "code" && !scope.includes("openid")) {
             if (codeChallenge) return OAuthFlows.AuthorizationCodeWithPKCE;
             return OAuthFlows.AuthorizationCode;
+        } else if (scope.includes("openid")) {
+            if (responseType == "code") {
+                if (codeChallenge) return OAuthFlows.AuthorizationCodeWithPKCE;
+                return OAuthFlows.AuthorizationCode;
+                /*
+                // not supported yet
+            } else if (responseType == "id_token") {
+                return OAuthFlows.OidcAuthorizationCode;
+            } else if (responseType == "id_token token" || responseType == "token id_token") {
+                return OAuthFlows.OidcAuthorizationCode;
+            } else if (responseType == "id_token code" || responseType == "code id_token") {
+                return OAuthFlows.OidcAuthorizationCode;
+            } else if (responseType == "token code" || responseType == "code token") {
+                return OAuthFlows.OidcAuthorizationCode;
+            } else if (responseType == "code id_token token" || responseType == "id_token code token" || responseType == "id_token token code" || responseType == "token id_token code" || responseType == "token code id_token"  || responseType == "code token id_token") {
+                return OAuthFlows.OidcAuthorizationCode;
+                */
+            }
         }
         return undefined;
     }
@@ -671,7 +756,21 @@ export class OAuthAuthorizationServer {
         return {code: authzCode, state: state};
     }
 
-    private async getAccessToken(client: OAuthClient, code? : string, clientSecret? : string, codeVerifier? : string,  scopes? : string[], issueRefreshToken = false, user? : User) 
+    private async getAccessToken({
+        client, 
+        code, 
+        clientSecret, 
+        codeVerifier,  
+        scopes, 
+        issueRefreshToken = false, 
+        user} : {
+            client: OAuthClient, 
+            code? : string, 
+            clientSecret? : string, 
+            codeVerifier? : string,  
+            scopes? : string[], 
+            issueRefreshToken? : boolean, 
+            user? : User}) 
         : Promise<OAuthTokenResponse> {
 
         // validate client secret
@@ -759,7 +858,7 @@ export class OAuthAuthorizationServer {
 
         // create access token jwt
         const accessToken : string = await new Promise((resolve, reject) => {
-            jwt.sign(accessTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked}, 
+            jwt.sign(accessTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked, keyid: "1"}, 
                 (error: Error | null,
                 encoded: string | undefined) => {
                     if (encoded) resolve(encoded);
@@ -779,6 +878,49 @@ export class OAuthAuthorizationServer {
         }
 
         let newRefreshToken : string|undefined = undefined;
+        let idToken : string|undefined = undefined;
+
+        if (scopes && scopes.includes("openid")) {
+
+            // create access token payload
+            const idokenJti = Hasher.uuid();
+            const idTokenPayload : {[key:string]: any} = {
+                jti: idokenJti,
+                iat: timeCreated,
+                iss: this.oauthIssuer,
+                sub: authzData.username,
+                type: "id",
+            };
+            if ("email" in scopes && user && "email" in user) idTokenPayload.email = user.email;
+            if ("address" in scopes && user && "address" in user) idTokenPayload.address = user.address;
+            if ("phone" in scopes && user && "phone" in user) idTokenPayload.phone = user.phone;
+            if ("profile" in scopes && user) {
+                for (let field of ["name", "family_name", "given_name", "middle_name", "nickname", "preferred_username", "profile", "picture", "website", "gender", "birthdate", "zoneinfo", "locale", "updated_at"]) {
+                    idTokenPayload[field] = user[field];
+                }
+            }
+            if (user) {
+                for (let field in this.idTokenClaims) {
+                    idTokenPayload[field] = user[this.idTokenClaims[field]];
+                }
+            }
+            idTokenPayload.scope = scopes;
+            if (this.accessTokenExpiry != null) {
+                idTokenPayload.exp = timeCreated + this.accessTokenExpiry
+            }
+    
+            // create access token jwt
+            idToken = await new Promise((resolve, reject) => {
+                jwt.sign(idTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked, keyid: "1"}, 
+                    (error: Error | null,
+                    encoded: string | undefined) => {
+                        if (encoded) resolve(encoded);
+                        else if (error) reject(error);
+                        else reject(new CrossauthError(ErrorCode.Unauthorized, "Couldn't create jwt"));
+                    });
+            });
+    
+        }
 
         if (issueRefreshToken) {
             // create refresh token payload
@@ -805,7 +947,7 @@ export class OAuthAuthorizationServer {
 
             // create refresh token jwt
             newRefreshToken = await new Promise((resolve, reject) => {
-                jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked}, 
+                jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked, keyid: "1"}, 
                     (error: Error | null,
                     encoded: string | undefined) => {
                         if (encoded) resolve(encoded);
@@ -827,6 +969,7 @@ export class OAuthAuthorizationServer {
         
         return {
             access_token : accessToken,
+            id_token: idToken,
             refresh_token : newRefreshToken,
             expires_in : this.accessTokenExpiry==null ? undefined : this.accessTokenExpiry,
             token_type: "Bearer",
@@ -854,6 +997,16 @@ export class OAuthAuthorizationServer {
                 const hash = "refresh:" + Hasher.hash(decoded.payload.jti);
                 await this.keyStorage.getKey(hash);
             }
+            return decoded;
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+            return undefined;
+        }
+    }
+
+    async validIdToken(token : string) : Promise<{[key:string]: any}|undefined> {
+        try {
+            const decoded = await this.validateJwt(token, "id");
             return decoded;
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -984,6 +1137,14 @@ export class OAuthAuthorizationServer {
         return `${redirectUri}${sep}code=${code}&state=${state}`;
     }
 
+    responseTypesSupported() : string[] {
+        let response_types_supported = [];
+        if (this.validFlows.includes(OAuthFlows.AuthorizationCode) || this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || this.validFlows.includes(OAuthFlows.OidcAuthorizationCode)) {
+            response_types_supported.push("code");
+        }
+        // Not supporting other OIDC flows yet
+        return response_types_supported;
+    }
     oidcConfiguration({
         authorizeEndpoint, 
         tokenEndpoint,
@@ -1016,13 +1177,14 @@ export class OAuthAuthorizationServer {
             "PS512",
         ];
         if (!additionalClaims) additionalClaims = [];
+
         return {
             issuer: this.oauthIssuer,
             authorization_endpoint: new URL(authorizeEndpoint??"authorize", this.oauthIssuer).toString(),
             token_endpoint: new URL(tokenEndpoint??"token", this.oauthIssuer).toString(),
             token_endpoint_auth_methods_supported: ["client_secret_post"],
             jwks_uri: new URL(jwksUri??"jwks", this.oauthIssuer).toString(),
-            response_types_supported: ["code"],
+            response_types_supported: this.responseTypesSupported(),
             response_modes_supported: ["query"],
             grant_types_supported: grantTypes,
             token_endpoint_auth_signing_alg_values_supported: jwtAlgorithms,
@@ -1038,6 +1200,7 @@ export class OAuthAuthorizationServer {
         let keys : JsonWebKey[] = [];
         if (this.jwtPublicKey) {
             const publicKey = createPublicKey(this.jwtPublicKey).export({format: "jwk"});
+            publicKey.kid = "1";
             keys.push(publicKey)
         }
         return { keys };

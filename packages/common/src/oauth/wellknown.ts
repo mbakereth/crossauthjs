@@ -2,7 +2,7 @@ import { JsonWebKey } from 'crypto';
 
 export type TokenEndpointAuthMethod = "client_secret_post" | "client_secret_basic" | "client_secret_jwt" | "private_key_jwt";
 export type ResponseMode = "query" | "fragment";
-export type GrantType = "authorization_code" | "implicit" | "client_credentials" | "device_code" | "password" | "refresh_token";
+export type GrantType = "authorization_code" | "implicit" | "client_credentials" | "device_code" | "password" | "refresh_token" | "http://auth0.com/oauth/grant-type/mfa-otp" | "http://auth0.com/oauth/grant-type/mfa-oob";
 export type SubjectType = "pairwise" | "public";
 export type ClaimType = "normal" | "aggregated" | "distributed";
 

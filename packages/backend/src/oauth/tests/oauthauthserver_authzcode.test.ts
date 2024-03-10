@@ -1,6 +1,5 @@
 import { test, expect } from 'vitest';
 import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '../authserver';
-import { CrossauthError } from '@crossauth/common';
 import fs from 'node:fs';
 import { createClient, getAuthorizationCode } from './common';
 import { InMemoryKeyStorage, InMemoryOAuthAuthorizationStorage } from '../../storage/inmemorystorage';
@@ -22,7 +21,9 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
         validateScopes : true,
         validScopes: "read, write",
         userStorage, 
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -56,7 +57,9 @@ test('AuthorizationServer.AuthzCodeFlow.scopePersistence', async () => {
         validScopes: "read, write",
         authStorage : authStorage,
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -94,7 +97,9 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeDisallowed', async () => {
         emptyScopeIsValid: false,
         authStorage : authStorage,
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {error, error_description} 
@@ -125,7 +130,9 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeAllowed', async () => {
         authStorage : authStorage,
         emptyScopeIsValid: true,
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
    });
     const inputState = "ABCXYZ";
     const {error, error_description} 
@@ -155,7 +162,9 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -188,7 +197,9 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyPr
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -221,7 +232,9 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKeyFi
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -254,7 +267,9 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKey',
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -285,7 +300,9 @@ test('AuthorizationServer.AuthzCodeFlow.invalidScope', async () => {
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {error} 
@@ -309,7 +326,9 @@ test('AuthorizationServer.AuthzCodeFlow.invalidRedirectUri', async () => {
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {error} 
@@ -346,7 +365,9 @@ test('AuthorizationServer.AuthzCodeFlow.invalidResponseType', async () => {
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {error} 
@@ -371,7 +392,9 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error} 
@@ -506,4 +529,45 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
     expect(refresh_token2).toBeDefined();
     expect(refresh_token2).not.toBe(refresh_token);
 
+});
+
+test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdToken', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode({oidc: true});
+    const {access_token, refresh_token, expires_in, error, error_description, id_token}
+        = await authServer.tokenPostEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(error_description).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(3);
+    expect(["read", "write", "openid"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write", "openid"]).toContain(decodedAccessToken?.payload.scope[1]);
+    expect(["read", "write", "openid"]).toContain(decodedAccessToken?.payload.scope[2]);
+    expect(decodedAccessToken?.payload.sub).toBe("bob");
+
+    const decodedRefreshToken
+        = await authServer.validRefreshToken(refresh_token??"");
+    expect(decodedRefreshToken).toBeDefined();
+    expect(decodedRefreshToken?.payload.scope.length).toBe(3);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[0]);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
+
+    const decodedIdToken
+        = await authServer.validIdToken(id_token??"");
+    expect(decodedIdToken).toBeDefined();
+    expect(decodedIdToken?.payload.scope.length).toBe(3);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[0]);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
+    expect(decodedIdToken?.payload.sub).toBe("bob");
+
+    expect(expires_in).toBe(60*60);
 });

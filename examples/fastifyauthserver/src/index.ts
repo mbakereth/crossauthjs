@@ -1,12 +1,11 @@
 import { PrismaClient } from '@prisma/client'
-import { FastifyServer, 
-         PrismaKeyStorage, 
+import { PrismaKeyStorage, 
          PrismaUserStorage, 
          PrismaOAuthClientStorage, 
          PrismaOAuthAuthorizationStorage, 
          LocalPasswordAuthenticator, 
-         FastifyOAuthResourceServer 
         } from '@crossauth/backend';
+import { FastifyServer, FastifyOAuthResourceServer } from '@crossauth/fastify';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
@@ -64,6 +63,9 @@ let server = new FastifyServer(userStorage, {
     oAuthAuthServer : {
         clientStorage : clientStorage,
         keyStorage: keyStorage,
+        options: {authenticators: {
+            "localpassword": lpAuthenticator
+        }},
     },
     oAuthResServer: {
         protectedEndpoints: {"/resource": {scope: "read write"}}, 
@@ -77,7 +79,6 @@ let server = new FastifyServer(userStorage, {
         siteUrl: `http://localhost:${port}`,
         authStorage: authStorage,
         userStorage: userStorage,
-        authenticator: lpAuthenticator,
         resourceServerName: "https://resserver.com",
 });
 

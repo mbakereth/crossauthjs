@@ -50,12 +50,14 @@ export async function getAuthServer({
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: "read, write, openid",
         issueRefreshToken: true,
         emptyScopeIsValid: emptyScopeIsValid,
         validFlows: "all",
         userStorage,
-        authenticator,
+        authenticators: {
+            "localpassword": authenticator,
+        },
     };
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {
@@ -72,10 +74,12 @@ export async function getAuthorizationCode({
     aud, 
     persistAccessToken,
     rollingRefreshToken,
+    oidc = false,
 } : {challenge?: boolean,
      aud?: string, 
      persistAccessToken? : boolean,
      rollingRefreshToken? : boolean,
+     oidc? : boolean,
     } = {}) {
     const secretRequired = challenge == undefined;
     const {client, clientStorage, authServer, keyStorage, userStorage} = await getAuthServer({challenge, aud, persistAccessToken, secretRequired, rollingRefreshToken});
@@ -89,7 +93,7 @@ export async function getAuthorizationCode({
             responseType: "code", 
             clientId: client.clientId, 
             redirectUri: client.redirectUri[0], 
-            scope: "read write", 
+            scope: "read write" + (oidc == true ? " openid" : ""), 
             state: inputState,
             codeChallenge: codeChallenge,
             user});

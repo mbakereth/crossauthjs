@@ -24,6 +24,11 @@ export class TotpAuthenticator extends Authenticator {
         this.appName = appName;
     }
 
+    /**
+     * Used by the OAuth password_mfa grant type.
+     */
+    mfaType() : "none" | "oob" | "otp" { return "otp"; }
+
     private async createSecret(username : string, secret? : string) : Promise<{qrUrl : string, secret: string}> {
         if (!secret) secret = gAuthenticator.generateSecret();
         let qrUrl = "";

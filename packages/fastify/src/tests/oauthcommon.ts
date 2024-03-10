@@ -52,7 +52,9 @@ export async function getAuthServer({
         emptyScopeIsValid: emptyScopeIsValid,
         validFlows: "all",
         userStorage,
-        authenticator,
+        authenticators : {
+            "localpassword": authenticator,
+        },
     };
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {

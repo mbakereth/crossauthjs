@@ -37,7 +37,6 @@ export abstract class Authenticator {
     abstract reprepareConfiguration(username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>, newSessionData: {[key:string]: any}|undefined}|undefined>;
     friendlyName : string;
     factorName : string = ""; // overridden when registered to backend
-
     /** 
      * Constructor.
      * @param options see {@link AuthenticationOptions}
@@ -47,6 +46,11 @@ export abstract class Authenticator {
          this.friendlyName = options?.friendlyName;
 
     }
+
+    /**
+     * Used by the OAuth password_mfa grant type.
+     */
+    abstract mfaType() : "none" | "oob" | "otp";
 
     /**
      * Should return the user if it exists in storage, otherwise throw {@link @crossauth/common!CrossauthError}:
@@ -123,4 +127,5 @@ export abstract class Authenticator {
 export abstract class PasswordAuthenticator extends Authenticator {
     secretNames() {return ["password"];}
     transientSecretNames() {return [];}
+    mfaType() : "none" | "oob" | "otp" { return "none"; }
 }

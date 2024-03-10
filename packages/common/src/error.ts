@@ -101,6 +101,9 @@ export enum ErrorCode {
     /** Thrown when a token (eg TOTP or OTP) is invalid */
     InvalidToken,
 
+    /** Thrown during OAuth password flow if an MFA step is needed */
+    MfaRequired,
+
     /** Thrown when a password does not match rules (length, uppercase/lowercase/digits) */
     PasswordFormat,
 
@@ -239,6 +242,9 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.InvalidToken) {
             _message = "Token is not valid";
             _httpStatus = 401;
+        } else if (code == ErrorCode.MfaRequired) {
+            _message = "MFA is required";
+            _httpStatus = 401;
         } else if (code == ErrorCode.PasswordFormat) {
             _message = "Password format was incorrect";
             _httpStatus = 401;
@@ -284,6 +290,7 @@ export class CrossauthError extends Error {
             case "temporarily_unavailable": code = ErrorCode.Connection; break;
             case "invalid_token": code = ErrorCode.InvalidToken; break;
             case "insufficient_scope": code = ErrorCode.InvalidToken; break;
+            case "mfa_required": code = ErrorCode.MfaRequired; break;
             default: code = ErrorCode.UnknownError;
         }
         return new CrossauthError(code, error_description);

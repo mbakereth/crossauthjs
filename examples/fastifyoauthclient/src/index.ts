@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client'
-import { KeyStorage, FastifyServer, FastifyOAuthClient, PrismaKeyStorage, PrismaUserStorage, PrismaOAuthAuthorizationStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
+import { KeyStorage, 
+    PrismaKeyStorage, 
+    PrismaUserStorage, 
+    PrismaOAuthAuthorizationStorage, 
+    LocalPasswordAuthenticator } from '@crossauth/backend';
+import { FastifyServer, FastifyOAuthClient } from '@crossauth/fastify';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import view from '@fastify/view';

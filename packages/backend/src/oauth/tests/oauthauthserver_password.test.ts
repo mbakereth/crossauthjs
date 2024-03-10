@@ -10,6 +10,7 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
     const {clientStorage, client} = await createClient();
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = await getTestUserStorage();
+
     const authenticator = new LocalPasswordAuthenticator(userStorage);
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
@@ -17,7 +18,9 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticator: authenticator,
+        authenticators: {
+            "localpassword" : authenticator
+        },
     });
     const {access_token, error}
         = await authServer.tokenPostEndpoint({
@@ -43,7 +46,9 @@ test('AuthorizationServer.passwordFlow.incorrectPassword', async () => {
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticator: authenticator,
+        authenticators: {
+            "password" : authenticator
+        },
     });
     const {access_token, error}
         = await authServer.tokenPostEndpoint({

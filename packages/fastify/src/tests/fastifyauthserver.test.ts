@@ -57,7 +57,9 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
             siteUrl: `http://localhost:3000`,
             userStorage,
-            authenticator,
+            authenticators: {
+                "localpassword": authenticator,
+            },
             ...options,
         });
     // @ts-ignore

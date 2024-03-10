@@ -10,6 +10,8 @@ export class OAuthFlows {
     static readonly RefreshToken = "RefreshToken";
     static readonly DeviceCode = "DeviceCode";
     static readonly Password = "Password";
+    static readonly PasswordMfa = "PasswordMfa";
+    static readonly OidcAuthorizationCode = "OidcAuthorizationCode";
 
     static isValidFlow(flow : string) : boolean {
         return OAuthFlows.allFlows().includes(flow);
@@ -30,6 +32,8 @@ export class OAuthFlows {
             OAuthFlows.RefreshToken,
             OAuthFlows.DeviceCode,
             OAuthFlows.Password,
+            OAuthFlows.PasswordMfa,
+            OAuthFlows.OidcAuthorizationCode,
         ];
     }
 
@@ -37,13 +41,16 @@ export class OAuthFlows {
         switch (oauthFlow) {
             case OAuthFlows.AuthorizationCode:
             case OAuthFlows.AuthorizationCodeWithPKCE:
-                return "authorization_code";
+                case OAuthFlows.OidcAuthorizationCode:
+                    return "authorization_code";
             case OAuthFlows.ClientCredentials:
                 return "client_credentials";
             case OAuthFlows.RefreshToken:
                 return "refresh_token";
             case OAuthFlows.Password:
                 return "password";
+            case OAuthFlows.PasswordMfa:
+                return "http://auth0.com/oauth/grant-type/mfa-otp";
             case OAuthFlows.DeviceCode:
                 return "device_code";
         }
@@ -54,10 +61,13 @@ export class OAuthFlows {
 export interface OAuthTokenResponse {
     access_token?: string,
     refresh_token? : string, 
+    id_token? : string, 
     token_type?: string, 
     expires_in?: number,
     error? : string,
     error_description? : string,
+    scope?: string,
+    mfa_token? : string,
 }
 
 export abstract class OAuthClientBase {
@@ -265,6 +275,166 @@ export abstract class OAuthClientBase {
         //return {url: url, params: params};
     }
 
+
+    protected async supportedAuthenticators(mfaToken : string) : Promise<{authenticators?: MfaAuthenticatorResponse[], error? : string, error_description? : string}> {
+        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            return {error: "invalid_request", error_description: "Server does not support password_mfa grant"};
+        }
+        if (!this.oidcConfig?.issuer) {
+            return {error: "server_error", error_description: "Cannot get issuer"};
+        }
+
+        const url = this.oidcConfig.issuer + (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
+        const resp = await this.get(url, {'authorization': 'Bearer ' + mfaToken});
+        if (Array.isArray(resp)) {
+            return {error: "server_error", error_description: "Expected array of authenticators in mfa/authenticators response"};
+        }
+        let authenticators : MfaAuthenticatorResponse[] = [];
+        for (let i=0; i<resp.length; ++i) {
+            const authenticator = resp[i];
+            if (!authenticator.id || !authenticator.authenticator_type || !authenticator.active) {
+                return {error: "server_error", error_description: "Invalid mfa/authenticators response"};
+            }
+            authenticators.push({
+                id: authenticator.id,
+                authenticator_type: authenticator.authenticator_type,
+                active: authenticator.active,
+                name: authenticator.name,
+                oob_channel: authenticator.oob_channel,
+            });
+        }
+        return {authenticators};
+
+    }
+
+    protected async mfaOtp(authenticatorId : string, mfaToken : string, otp: string) : Promise<{
+        access_token? : string, 
+        refresh_token? : string, 
+        id_token?: string, 
+        expires_in? : number, 
+        scope? : string, 
+        token_type?: string, 
+        error? : string, 
+        error_description? : string}> {
+        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            return {error: "invalid_request", error_description: "Server does not support password_mfa grant"};
+        }
+        if (!this.oidcConfig?.issuer) {
+            return {error: "server_error", error_description: "Cannot get issuer"};
+        }
+
+        const url = this.oidcConfig.issuer + (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
+        const resp = await this.post(url, {
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            challenge_type: "otp",
+            mfa_token: mfaToken,
+            authenticator_id: authenticatorId,
+        });
+        if (resp.challenge_type != "otp") {
+            return {error: resp.error??"server_error", error_description: resp.error_description??"Invalid OTP challenge response"};
+        }
+
+        if (!this.oidcConfig?.token_endpoint) {
+            return {error: "server_error", error_description: "Cannot get token endpoint"};
+        }
+
+        const otpUrl = this.oidcConfig.token_endpoint;
+        const otpResp = await this.post(otpUrl, {
+            grant_type: "http://auth0.com/oauth/grant-type/mfa-otp",
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            challenge_type: "otp",
+            mfa_token: mfaToken,
+            otp: otp,
+        });
+        return {
+            id_token: otpResp.id_token,
+            access_token: otpResp.access_token,
+            refresh_token: otpResp.refresh_token,
+            expires_in: Number(otpResp.expires_in),
+            scope: otpResp.scope,
+            token_type: otpResp.token_type,
+            error: otpResp.error,
+            error_description: otpResp.error_description,
+        }
+
+    }
+
+    protected async mfaOobRequest(authenticatorId : string, mfaToken : string) : Promise<{
+        challenge_type? : string, 
+        oob_code? : string, 
+        binding_method?: string, 
+        error? : string, 
+        error_description? : string}> {
+        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            return {error: "invalid_request", error_description: "Server does not support password_mfa grant"};
+        }
+        if (!this.oidcConfig?.issuer) {
+            return {error: "server_error", error_description: "Cannot get issuer"};
+        }
+
+        const url = this.oidcConfig.issuer + (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
+        const resp = await this.post(url, {
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            challenge_type: "oob",
+            mfa_token: mfaToken,
+            authenticator_id: authenticatorId,
+        });
+        if (resp.challenge_type != "oob" || !resp.otp || !resp.binding_method) {
+            return {error: resp.error??"server_error", error_description: resp.error_description??"Invalid OOB challenge response"};
+        }
+
+        return {
+            challenge_type: resp.challenge_type,
+            oob_code: resp.oob_code,
+            binding_method: resp.binding_method,
+            error: resp.error,
+            error_description: resp.error_description,
+        }
+
+    }
+
+    protected async mfaOobComplete(mfaToken : string, oobCode: string, bindingCode : string) : Promise<OAuthTokenResponse> {
+        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            return {error: "invalid_request", error_description: "Server does not support password_mfa grant"};
+        }
+        if (!this.oidcConfig?.issuer) {
+            return {error: "server_error", error_description: "Cannot get issuer"};
+        }
+
+        const url = this.oidcConfig.token_endpoint;
+        const resp = await this.post(url, {
+            grant_type: "http://auth0.com/oauth/grant-type/mfa-oob",
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            challenge_type: "otp",
+            mfa_token: mfaToken,
+            oob_code: oobCode,
+            binding_code: bindingCode,
+        });
+        return {
+            id_token: resp.id_token,
+            access_token: resp.access_token,
+            refresh_token: resp.refresh_token,
+            expires_in: Number(resp.expires_in),
+            scope: resp.scope,
+            token_type: resp.token_type,
+            error: resp.error,
+            error_description: resp.error_description,
+        }
+
+    }
+
     protected async refreshTokenFlow(refreshToken : string) : Promise<{[key:string]:any}> {
         CrossauthLogger.logger.debug(j({msg: "Starting refresh token flow"}));
         if (!this.oidcConfig) await this.loadConfig();
@@ -291,7 +461,7 @@ export abstract class OAuthClientBase {
     }
 
     protected async post(url : string, params : {[key:string]:any}) : Promise<{[key:string]:any}>{
-        CrossauthLogger.logger.debug(j({msg: "Fetch", url: url, params: Object.keys(params)}));
+        CrossauthLogger.logger.debug(j({msg: "Fetch POST", url: url, params: Object.keys(params)}));
         const resp = await fetch(url, {
             method: 'POST',
             headers: {
@@ -302,4 +472,25 @@ export abstract class OAuthClientBase {
         });
         return await resp.json();
     }
+
+    protected async get(url : string, headers : {[key:string]:any}) : Promise<{[key:string]:any}|{[key:string]:any}[]>{
+        CrossauthLogger.logger.debug(j({msg: "Fetch GET", url: url}));
+        const resp = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                ...headers,
+            },
+        });
+        return await resp.json();
+    }
+}
+
+export interface MfaAuthenticatorResponse {
+    authenticator_type: string,
+    id : string,
+    active: boolean,
+    oob_channel? : string,
+    name?: string,
 }

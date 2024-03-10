@@ -1,5 +1,5 @@
 {
-  "name": "@crossauth/fastifyoauthserver-example",
+  "name": "fastifyauthserver",
   "version": "0.0.0",
   "description": "",
   "type": "module",
@@ -31,6 +31,7 @@
   "dependencies": {
     "@crossauth/backend": "workspace:^",
     "@crossauth/common": "workspace:^",
+    "@crossauth/fastify": "workspace:^",
     "@fastify/cookie": "^9.2.0",
     "@fastify/formbody": "^7.4.0",
     "@fastify/static": "^7.0.1",

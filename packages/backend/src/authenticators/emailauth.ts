@@ -86,6 +86,11 @@ export class EmailAuthenticator extends Authenticator {
         nunjucks.configure(this.views, { autoescape: true });
     }
 
+    /**
+     * Used by the OAuth password_mfa grant type.
+     */
+    mfaType() : "none" | "oob" | "otp" { return "oob"; }
+
     private createEmailer() {
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
