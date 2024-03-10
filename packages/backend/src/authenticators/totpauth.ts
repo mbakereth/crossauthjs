@@ -145,6 +145,13 @@ export class TotpAuthenticator extends Authenticator {
     }
 
     /**
+     * @returns `totpSecret`
+     */
+    transientSecretNames() : string[] {
+        return ["otp"];
+    }
+    
+    /**
      * Does nothing for this class
      */
     validateSecrets(_params : AuthenticationParameters) : string[] {

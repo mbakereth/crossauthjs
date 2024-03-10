@@ -596,7 +596,7 @@ export class FastifySessionServer {
 
                         // get secrets from the request body 
                         const authenticator = this.authenticators[sessionData.pre2fa.factor2];
-                        const secretNames = authenticator.secretNames();
+                        const secretNames = [...authenticator.secretNames(), ...authenticator.transientSecretNames()];
                         let secrets : {[key:string]:string} = {};
                         for (let field in request.body) {
                             if (secretNames.includes(field)) secrets[field] = request.body[field];
@@ -606,7 +606,8 @@ export class FastifySessionServer {
                         if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie found");
                         let error : CrossauthError|undefined = undefined;
                         try {
-                            await this.sessionManager.completeTwoFactorPageVisit(request.body, sessionCookieValue);
+                            //await this.sessionManager.completeTwoFactorPageVisit(request.body, sessionCookieValue);
+                            await this.sessionManager.completeTwoFactorPageVisit(secrets, sessionCookieValue);
                         } catch (e) {
                             error = CrossauthError.asCrossauthError(e);
                             CrossauthLogger.logger.debug(j({err: e}));

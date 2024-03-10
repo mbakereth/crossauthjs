@@ -98,6 +98,13 @@ export abstract class Authenticator {
     abstract secretNames() : string[];
 
     /**
+     * All transient secrets created and managed by this authenticator, eg `otp`
+     * 
+     * When user data is passed, it is filtered by this list.
+     */
+    abstract transientSecretNames() : string[];
+
+    /**
      * Implementations should use this to validate secrets against local requirements,
      * eg minimum password length.
      * @param params user-provided secrets to validate
@@ -115,4 +122,5 @@ export abstract class Authenticator {
 
 export abstract class PasswordAuthenticator extends Authenticator {
     secretNames() {return ["password"];}
+    transientSecretNames() {return [];}
 }

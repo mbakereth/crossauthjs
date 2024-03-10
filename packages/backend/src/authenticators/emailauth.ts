@@ -234,6 +234,13 @@ export class EmailAuthenticator extends Authenticator {
     }
 
     /**
+     * @returns otp
+     */
+    transientSecretNames() : string[] {
+        return ["otp"];
+    }
+
+    /**
      * Does nothing for this class
      */
     validateSecrets(_params : AuthenticationParameters) : string[] {

@@ -254,7 +254,6 @@ export class SessionManager {
      *         `UserNotExist` or `Expired`.
      */
     async dataStringForSessionKey(sessionCookieValue : string) : Promise<string|undefined> {
-        let error : CrossauthError | undefined;
         try {
             let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
             return key.data;
@@ -265,7 +264,7 @@ export class SessionManager {
                     return undefined;
                     break;
                 default:
-                    error = ce;
+                    throw ce;
             }
             throw ce;
         }

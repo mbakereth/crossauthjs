@@ -152,7 +152,7 @@ export class SvelteKitSessionServer {
 
                         // get secrets from the request body 
                         const authenticator = this.authenticators[sessionData.pre2fa.factor2];
-                        const secretNames = authenticator.secretNames();
+                        const secretNames = [...authenticator.secretNames(), ...authenticator.transientSecretNames()];
                         let secrets : {[key:string]:string} = {};
                         const bodyData = new JsonOrFormData();
                         await bodyData.loadData(event);
@@ -164,7 +164,7 @@ export class SvelteKitSessionServer {
                         if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie found");
                         let error : CrossauthError|undefined = undefined;
                         try {
-                            await this.sessionManager.completeTwoFactorPageVisit(bodyData.toObject(), sessionCookieValue);
+                            await this.sessionManager.completeTwoFactorPageVisit(secrets, sessionCookieValue);
                         } catch (e) {
                             error = CrossauthError.asCrossauthError(e);
                             CrossauthLogger.logger.debug(j({err: e}));
