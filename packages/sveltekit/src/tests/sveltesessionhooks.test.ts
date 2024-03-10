@@ -1,6 +1,7 @@
 import { MockRequestEvent, MockResolver } from './sveltemocks';
 import { JsonOrFormData } from '../utils';
 import { SvelteKitServer } from '../sveltekitserver';
+import { SvelteKitSessionServer } from '../sveltekitsession';
 import { InMemoryKeyStorage, InMemoryUserStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
 import { test, expect } from 'vitest';
 
@@ -151,4 +152,34 @@ test('SvelteSessionHooks.jsonBody', async () => {
     expect(data.get("param1")).toBe("value1");
     expect(data.get("param&2")).toBe("value 2");
     expect(data.get("X")).toBeUndefined();
+});
+
+test('SvelteSessionHooks.cloneJsonResponse', async () => {
+    const response = new Response(
+        JSON.stringify({"param1": "value1", "param2" : "value2"}),
+        {status: 200, statusText: "OK", headers: {'content-type': 'application/json'}}
+    );
+    const newResponse = SvelteKitSessionServer.responseWithNewBody(
+        response,
+        {"param3": "value3"}
+    );
+    const newBody = await newResponse.json();
+    expect(newBody.param3).toBe("value3");
+    expect(newBody.param1).toBeUndefined();
+    expect(newResponse.headers.get('content-type')).toBe("application/json");
+});
+
+test('SvelteSessionHooks.cloneFormResponse', async () => {
+    const response = new Response(
+        "param1=value1&param2=value2",
+        {status: 200, statusText: "OK", headers: {'content-type': 'application/x-www-form-urlencoded'}}
+    );
+    const newResponse = SvelteKitSessionServer.responseWithNewBody(
+        response,
+        {"param3": "value3"}
+    );
+    const newBody = await newResponse.formData();
+    expect(newBody.get("param3")).toBe("value3");
+    expect(newBody.get("param1")).toBeNull();
+    expect(newResponse.headers.get('content-type')).toBe("application/x-www-form-urlencoded");
 });

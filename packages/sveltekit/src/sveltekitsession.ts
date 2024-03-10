@@ -172,7 +172,7 @@ export class SvelteKitSessionServer {
                             CrossauthLogger.logger.error(j({msg: error.message, cerr: e, user: bodyData.get("username"), errorCode: ce.code, errorCodeName: ce.codeName}));
                         }
                         // restore original request body
-                        response = SvelteKitSessionServer.responseWithNewBody(event, response, sessionData.pre2fa.body);
+                        response = SvelteKitSessionServer.responseWithNewBody(response, sessionData.pre2fa.body);
                         if (error) {
                             if (error.code == ErrorCode.Expired) {
                                 // user will not be able to complete this process - delete 
@@ -184,7 +184,7 @@ export class SvelteKitSessionServer {
                                     CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                                     CrossauthLogger.logger.debug(j({err:e}))
                                 }
-                                response = SvelteKitSessionServer.responseWithNewBody(event, response, {
+                                response = SvelteKitSessionServer.responseWithNewBody(response, {
                                     ...bodyData.toObject(),
                                     errorMessage: error.message,
                                     errorMessages: error.message,
@@ -355,8 +355,8 @@ export class SvelteKitSessionServer {
         return token;
     }
 
-    static responseWithNewBody(event : RequestEvent, origResp : Response, params : {[key:string]:string}) {
-        const contentType = event.request.headers.get('content-type');
+    static responseWithNewBody(origResp : Response, params : {[key:string]:string}) {
+        const contentType = origResp.headers.get('content-type');
         const newContentType = contentType == 'application/json' ? 'application/json' : 'application/x-www-form-urlencoded';
         let body : string;
         if (newContentType == 'application/json') {
