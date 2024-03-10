@@ -12,7 +12,7 @@ export default defineConfig({
     ssr: true,
     lib: {
       entry: resolve(__dirname, "./src/index.ts"),
-      fileName: "server",
+      fileName: "index",
       formats: ['es', 'cjs']
       },
     /*watch: {

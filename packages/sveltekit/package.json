@@ -2,6 +2,14 @@
 	"name": "@crossauth/sveltekit",
 	"version": "0.0.1",
 	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"typings": "./dist/index.d.ts",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist/*"
+	],
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -27,11 +35,12 @@
 		"vite": "^5.0.3",
 		"vitest": "^1.2.0"
 	},
-	"type": "module",
 	"dependencies": {
 		"@crossauth/backend": "workspace:^",
 		"@crossauth/common": "workspace:^",
+		"@types/cookie": "^0.6.0",
 		"cookie": "^0.6.0",
+		"formidable": "^3.5.1",
 		"vite-plugin-dts": "^3.6.4"
 	}
 }

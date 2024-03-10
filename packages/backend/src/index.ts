@@ -23,7 +23,7 @@ export { TotpAuthenticator } from './authenticators/totpauth';
 // session management
 export { SessionManager } from './session';
 export type { SessionManagerOptions } from './session';
-export { SessionCookie } from './cookieauth';
+export { SessionCookie, DoubleSubmitCsrfToken } from './cookieauth';
 export type { CookieOptions, Cookie } from './cookieauth';
 
 // API key management

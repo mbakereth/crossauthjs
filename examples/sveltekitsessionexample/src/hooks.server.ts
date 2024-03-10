@@ -1,4 +1,6 @@
 import { type Handle } from '@sveltejs/kit';
-import { crossauthSession } from '$lib/server//crossauthsession';
-export const handle: Handle = crossauthSession.sessionHook;
+import { crossauth } from '$lib/server/crossauthsession';
+import { CrossauthLogger } from '@crossauth/common';
+export const handle: Handle = crossauth.hooks;
 
+CrossauthLogger.logger.level = CrossauthLogger.Debug;

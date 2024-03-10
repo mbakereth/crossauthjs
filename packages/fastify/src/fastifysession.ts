@@ -488,8 +488,8 @@ export class FastifySessionServer {
         setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
-        setParameter("factor2ProtectedPageEndpoints", ParamType.StringArray, this, options, "ENABLE_FACTOR2_PROTECTED_PAGE_ENDPOINTS");
-        setParameter("factor2ProtectedApiEndpoints", ParamType.StringArray, this, options, "ENABLE_FACTOR2_PROTECTED_API_ENDPOINTS");
+        setParameter("factor2ProtectedPageEndpoints", ParamType.StringArray, this, options, "FACTOR2_PROTECTED_PAGE_ENDPOINTS");
+        setParameter("factor2ProtectedApiEndpoints", ParamType.StringArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
 
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
@@ -635,7 +635,7 @@ export class FastifySessionServer {
                                 }
                             } else {
                                 if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
-                                    return reply.redirect("/factor2?error="+ErrorCode[error.code]);
+                                    return reply.redirect(this.prefix+"factor2?error="+ErrorCode[error.code]);
 
                                 } else {
                                     return reply.status(error.httpStatus).send(JSON.stringify({ok: false, errorMessage: error.message, errorMessages: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}));
@@ -648,7 +648,7 @@ export class FastifySessionServer {
                         CrossauthLogger.logger.debug("Starting 2FA");
                         this.sessionManager.initiateTwoFactorPageVisit(request.user, sessionCookieValue, request.body, request.url.replace(/\?.*$/,""));
                         if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
-                            return reply.redirect("/factor2");
+                            return reply.redirect(this.prefix+"factor2");
                         } else {
                             return reply.send(JSON.stringify({ok: true, factor2Required: true}));
                         }
@@ -1649,8 +1649,9 @@ export class FastifySessionServer {
     private addApiUserForSessionKeyEndpoints() {
         this.app.post(this.prefix+'api/userforsessionkey', async (request : FastifyRequest<{ Body: LoginBodyType }>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({msg: "API visit", method: 'POST', url: this.prefix+'api/userforsessionkey', ip: request.ip, user: request.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(request)}));
-            if (!request.user) return this.sendJsonError(reply, 401);
-            await this.validateCsrfToken(request)
+            if (!request.user) return this.sendJsonError(reply, 401, "User not logged in");
+            if (!request.csrfToken) return this.sendJsonError(reply, 403, "No CSRF token present");
+            //await this.validateCsrfToken(request)
             try {
                 let user : User|undefined;
                 const sessionId = this.getSessionCookieValue(request);
@@ -1704,7 +1705,8 @@ export class FastifySessionServer {
         const persist = request.body.persist;
 
         // throw an exception if the CSRF token isn't valid
-        await this.validateCsrfToken(request);
+        //await this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // keep the old session ID.  If there was one, we will delete it after
         const oldSessionId = this.getSessionCookieValue(request);
@@ -1750,7 +1752,8 @@ export class FastifySessionServer {
         const persist = request.body.persist;
 
         // validate CSRF token - throw an exception if it is not valid
-        await this.validateCsrfToken(request);
+        //await this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         let extraFields = this.addToSession ? this.addToSession(request) : {}
         const {sessionCookie, csrfCookie, user} = await this.sessionManager.completeTwoFactorLogin(request.body, oldSessionCookieValue, extraFields, persist);
@@ -1765,7 +1768,8 @@ export class FastifySessionServer {
     private async cancelFactor2(request : FastifyRequest<{ Body: CsrfBodyType }>, reply : FastifyReply, 
         successFn : (res : FastifyReply) => void) {
 
-        this.validateCsrfToken(request);
+        //this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
         const sessionCookieValue = this.getSessionCookieValue(request);
         if (sessionCookieValue) {
             this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
@@ -1811,7 +1815,8 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, data: {[key:string]:any}, user? : User) => void) {
             
         // throw an error if the CSRF token is invalid
-        await this.validateCsrfToken(request);
+        //await this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // get data from the request body
         // make sure the requested second factor is valid
@@ -1950,7 +1955,8 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, user? : User) => void) {
 
         // validate the CSRF token
-        await this.validateCsrfToken(request);
+        //await this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // get the session - it may be a real user or anonymous
         const sessionCookieValue = this.getSessionCookieValue(request);
@@ -1973,7 +1979,8 @@ export class FastifySessionServer {
         if (!sessionValue || !request.user) throw new CrossauthError(ErrorCode.Unauthorized);
 
         // validate the CSRF token
-        await this.validateCsrfToken(request);
+        //await this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // validate the requested factor2
         let newFactor2 : string|undefined = request.body.factor2;
@@ -2002,7 +2009,8 @@ export class FastifySessionServer {
 
         // can only call this if logged in and CSRF token is valid
         if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized);
-        this.validateCsrfToken(request)
+        //this.validateCsrfToken(request)
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // get the authenticator for factor1 (passwords on factor2 are not supported)
         const authenticator = this.authenticators[request.user.factor1];
@@ -2046,7 +2054,8 @@ export class FastifySessionServer {
 
         // can only call this if logged in and CSRF token is valid
         if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized);
-        await this.validateCsrfToken(request);
+        //await this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // get new user fields from form, including from the implementor-provided hook
         let user : User = {
@@ -2077,7 +2086,8 @@ export class FastifySessionServer {
         }
 
         // validate the CSRDF token
-        await this.validateCsrfToken(request);
+        //await this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // get data from request body
         const email = request.body.email;
@@ -2116,7 +2126,8 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, user? : User) => void) {
 
         // check the CSRF token is valid
-        await this.validateCsrfToken(request);
+        //await this.validateCsrfToken(request);
+        if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // get the user based on ther token from the request body
         const token = request.body.token;
@@ -2262,13 +2273,18 @@ export class FastifySessionServer {
     }
 
     csrfToken(request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) {
-        let token = request.body.csrfToken;
+        let token : string|undefined = undefined;
+
+        // first try to get token from header
+        if (request.headers && CSRFHEADER.toLowerCase() in request.headers) { 
+            const header = request.headers[CSRFHEADER.toLowerCase()];
+            if (Array.isArray(header)) token = header[0];
+            else token = header;
+        }
+
+        // if not found, try to get token from body
         if (!token) {
-            if (request.headers && CSRFHEADER.toLowerCase() in request.headers) { 
-                const header = request.headers[CSRFHEADER.toLowerCase()];
-                if (Array.isArray(header)) token = header[0];
-                else token = header;
-            }
+            token = request.body.csrfToken;
         }
         if (token) {
             try {
@@ -2279,7 +2295,10 @@ export class FastifySessionServer {
             catch (e) {
                 CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token", hashedCsrfCookie: this.getHashOfCsrfCookie(request)}));
                 reply.clearCookie(this.sessionManager.csrfCookieName);
+                request.csrfToken = undefined;
             }
+        } else {
+            request.csrfToken = undefined;
         }
 
         return token;

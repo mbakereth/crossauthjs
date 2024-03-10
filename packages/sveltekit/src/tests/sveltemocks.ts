@@ -4,9 +4,24 @@ import cookie, { type CookieParseOptions, type CookieSerializeOptions } from 'co
 export class MockCookies implements Cookies {
     cookies : {[key : string] : {value : string, opts?: CookieSerializeOptions}};
 
-    constructor(cookies : {[key : string] : {value : string, opts?: CookieSerializeOptions}}) {
+    constructor(cookies : {[key : string] : {value : string, opts?: CookieSerializeOptions}}, req? : Request) {
         this.cookies = cookies;
+        if (req ) {
+            const reqCookiesString = req.headers.get("cookie");
+            if (reqCookiesString) {
+                const reqCookies = reqCookiesString.split(";");
+                for (let reqCookie of reqCookies) {
+                    const pair = reqCookie.trim().split("=", 2);
+                    if (pair.length == 2) {
+                        const name = decodeURIComponent(pair[0]);
+                        const value = decodeURIComponent(pair[1]);
+                        this.cookies[name] = {value: value};
+                    }
+                }
+            }
+        }
     }
+
     get(name: string, opts?: CookieParseOptions): string | undefined {
         // opts is ignored on the assumption 
         const decoder = opts?.decode??"decodeURIComponent";
@@ -55,7 +70,7 @@ RouteId extends string | null = string
         isSubRequest? : boolean,
         cookies? : {[key : string] : {value : string, opts?: CookieSerializeOptions}},
         baseUrl? : string} = {}) {
-        this.cookies = new MockCookies(cookies);
+        this.cookies = new MockCookies(cookies, request);
         this.fetch = fetch;
         this.locals = {};
         this.params = params;

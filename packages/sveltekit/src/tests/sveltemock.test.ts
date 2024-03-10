@@ -1,6 +1,5 @@
-import { MockRequestEvent, MockResolver, MockCookies } from './sveltemocks';
-import { SvelteKitSessionServer } from '../sveltekitsession';
-import { InMemoryKeyStorage } from '@crossauth/backend';
+import { MockRequestEvent, MockCookies } from './sveltemocks';
+import { test, expect } from 'vitest';
 
 test('SvelteMocks.Request', async () => {
 
@@ -41,19 +40,5 @@ test('SvelteMocks.MockCookies', async () => {
     await cookies.delete("cookie1", {path: "/"});
     value1 = await cookies.get("cookie1");
     expect(value1).toBe(undefined);
-});
-
-test('SvelteMocks.hook', async () => {
-    const request = new Request("http://ex.com/test", {method: "POST", body: "This is the body"});
-    const requestEvent = new MockRequestEvent("1", request, {"param1": "value1"});
-    const keyStorage = new InMemoryKeyStorage();
-
-    const session = new SvelteKitSessionServer(keyStorage);
-    const handle = session.sessionHook;
-    const resolver = new MockResolver("Response");
-    const resp = await handle({event: requestEvent, resolve: resolver.mockResolve});
-    const cookies = resp.headers.getSetCookie();
-    expect(cookies.length).toBe(1);
-    expect(cookies[0]).toContain("TESTCOOKIE=");
 });
 
