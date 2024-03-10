@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
-import { FastifyServer, PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from '@crossauth/backend';
+import { PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from '@crossauth/backend';
+import { FastifyServer } from '@crossauth/fastify';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
@@ -40,9 +41,9 @@ app.register(view, {
       })
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
-const prisma = new PrismaClient({datasourceUrl: "file:"+process.cwd()+"/prisma/"+process.env.DATABASE_FILE});
+const prisma = new PrismaClient();
 let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email"});
-let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma, keyTable: "apiKey"});
+let keyStorage = new PrismaKeyStorage({prismaClient : prisma, keyTable: "apiKey"});
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyServer(userStorage, {

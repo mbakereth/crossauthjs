@@ -374,7 +374,8 @@ export class PrismaKeyStorage extends KeyStorage {
                 ...prismaKey,
                 userId: prismaKey.user_id,
             }
-        } catch {
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
             error = new CrossauthError(ErrorCode.InvalidKey);
         }
         if (error) {

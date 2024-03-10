@@ -1,5 +1,5 @@
 {
-  "name": "@crossauth/fastifyapikeyserver",
+  "name": "fastifyapikeyserver",
   "version": "0.0.0",
   "description": "",
   "type": "module",
@@ -7,7 +7,7 @@
   "scripts": {
     "build": "pnpx tsc",
     "start": "node dist/index.js",
-    "dev": "dotenv -e .env.dev tsx src/index.ts",
+    "dev": "NODE_PATH=`pwd`/node_modules dotenv -e .env.dev tsx src/index.ts",
     "preinstall": "bash ../../removeprismaclient.sh",
     "postinstall": "bash ../../copyprismaclient.sh && bash ../../ifdotenv.sh -e .env.dev prisma generate",
     "prisma": "dotenv -e .env.dev pnpm exec prisma",
@@ -30,6 +30,7 @@
   "dependencies": {
     "@crossauth/backend": "workspace:^",
     "@crossauth/common": "workspace:^",
+    "@crossauth/fastify": "workspace:^",
     "@fastify/cookie": "^9.2.0",
     "@fastify/formbody": "^7.4.0",
     "@fastify/static": "^7.0.1",

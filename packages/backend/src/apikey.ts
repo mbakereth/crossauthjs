@@ -40,7 +40,7 @@ export class ApiKeyManager {
     private secret : string = "";
 
     /** The prefix to add to the hashed key in storage.  Defaults to "api:" */
-    prefix = "api";
+    prefix = "api:";
 
     /** The name of the speak in the Authorization header.  Defaults to "ApiKey" */
     authScheme? : string = "ApiKey";
