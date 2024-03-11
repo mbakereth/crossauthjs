@@ -7,7 +7,7 @@
   "scripts": {
     "build": "pnp exec tsc",
     "start": "node dist/index.js",
-    "dev": "dotenv -e .env.dev pnpm exec tsx src/index.ts",
+    "dev": "NODE_PATH=`pwd`/node_modules dotenv -e .env.dev pnpm exec tsx src/index.ts",
     "preinstall": "bash ../../removeprismaclient.sh",
     "postinstall": "bash ../../copyprismaclient.sh && bash ../../ifdotenv.sh -e .env.dev prisma generate",
     "prisma": "dotenv -e .env.dev pnpm exec prisma",
