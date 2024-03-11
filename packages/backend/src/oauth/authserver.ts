@@ -1,10 +1,15 @@
 import jwt, { type Algorithm } from 'jsonwebtoken';
-import { KeyStorage, UserStorage, OAuthClientStorage, OAuthAuthorizationStorage } from '../storage';
+import {
+    KeyStorage,
+    UserStorage,
+    OAuthClientStorage,
+    OAuthAuthorizationStorage } from '../storage';
 import { Authenticator } from '../auth';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
-import { type OpenIdConfiguration, type GrantType, type Jwks } from '@crossauth/common';
-import { CrossauthError, ErrorCode, type OAuthClient, type OAuthTokenResponse } from '@crossauth/common';
+import type { OpenIdConfiguration, GrantType, Jwks } from '@crossauth/common';
+import { CrossauthError, ErrorCode } from '@crossauth/common';
+import type  { OAuthClient, OAuthTokenResponse } from '@crossauth/common';
 import { CrossauthLogger, j, type Key, type User } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, type JsonWebKey } from 'crypto'
@@ -34,7 +39,8 @@ function algorithm(value : string) : Algorithm {
         case "none":
             return value;
     }
-    throw new CrossauthError(ErrorCode.Configuration, "Invalid JWT signing algorithm " + value)
+    throw new CrossauthError(ErrorCode.Configuration, 
+        "Invalid JWT signing algorithm " + value)
 }
 
 export interface OAuthAuthorizationServerOptions {
@@ -66,23 +72,34 @@ export interface OAuthAuthorizationServerOptions {
     /** The algorithm to sign JWTs with.  Default `RS256` */
     jwtAlgorithm? : string,
 
-    /** Secret key if using a symmetric cipher for signing the JWT.  Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
+    /** Secret key if using a symmetric cipher for signing the JWT.  
+     * Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
     jwtSecretKey? : string,
 
-    /** Filename with secret key if using a symmetric cipher for signing the JWT.  Either this or `jwtSecretKey` is required when using this kind of cipher*/
+    /** Filename with secret key if using a symmetric cipher for signing the 
+     * JWT.  Either this or `jwtSecretKey` is required when using this kind 
+     * of cipher*/
     jwtSecretKeyFile? : string,
 
-    /** Filename for the private key if using a public key cipher for signing the JWT.  Either this or `jwtPrivateKey` is required when using this kind of cipher.  publicKey or publicKeyFile is also required. */
+    /** Filename for the private key if using a public key cipher for 
+     * signing the JWT.  Either this or `jwtPrivateKey` is required when 
+     * using this kind of cipher.  publicKey or publicKeyFile is also 
+     * required. */
     jwtPrivateKeyFile? : string,
 
-    /** Tthe public key if using a public key cipher for signing the JWT.  Either this or `jwtPrivateKey` is required when using this kind of cipher.  publicKey or publicKeyFile is also required. */
+    /** Tthe public key if using a public key cipher for signing the JWT.  
+     * Either this or `jwtPrivateKey` is required when using this kind of 
+     * cipher.  publicKey or publicKeyFile is also required. */
     jwtPrivateKey? : string,
 
-    /** Filename for the public key if using a public key cipher for signing the JWT.  Either this or `jwtPublicKey` is required when using this kind of cipher.  privateKey or privateKeyFile is also required. */
+    /** Filename for the public key if using a public key cipher for signing 
+     * the JWT.  Either this or `jwtPublicKey` is required when using this 
+     * kind of cipher.  privateKey or privateKeyFile is also required. */
     jwtPublicKeyFile? : string,
 
-    /** The public key if using a public key cipher for signing the JWT.  Either this or `jwtP
-     * ublicKeyFile` is required when using this kind of cipher.  privateKey or privateKeyFile is also required. */
+    /** The public key if using a public key cipher for signing the JWT.  
+     * Either this or `jwtPublicKeyFile` is required when using this kind of 
+     * cipher.  privateKey or privateKeyFile is also required. */
     jwtPublicKey? : string,
 
     /** Whether to persist access tokens in key storage.  Default false */
@@ -97,43 +114,55 @@ export interface OAuthAuthorizationServerOptions {
     /** Whether to persist user tokens in key storage.  Default false */
     persistUserToken? : boolean,
 
-    /** If true, access token will contain no data, just a random string.  This will turn persistAccessToken on.  Default false. */
+    /** If true, access token will contain no data, just a random string.  
+     * This will turn persistAccessToken on.  Default false. */
     opaqueAccessToken? : boolean,
 
-    /** If true, refresh token will contain no data, just a random string.  This will turn persistRefreshToken on.  Default false. */
+    /** If true, refresh token will contain no data, just a random string.  
+     * This will turn persistRefreshToken on.  Default false. */
     opaqueRefreshToken? : boolean,
 
-    /** If true, user token will contain no data, just a random string.  This will turn persistUserToken on.  Default false. */
+    /** If true, user token will contain no data, just a random string.  
+     * This will turn persistUserToken on.  Default false. */
     opaqueUserToken? : boolean,
 
-    /** Expiry for access tokens in seconds.  If null, they don't expire.  Defult 1 hour */
+    /** Expiry for access tokens in seconds.  If null, they don't expire.  
+     * Defult 1 hour */
     accessTokenExpiry? : number | null,
 
-    /** Expiry for refresh tokens in seconds.  If null, they don't expire.  Defult 1 hour */
+    /** Expiry for refresh tokens in seconds.  If null, they don't expire.  
+     * Defult 1 hour */
     refreshTokenExpiry? : number | null,
 
-    /** If true, a new refresh token, with new expiry, will be issued every time the access token is refreshed.  Default true */
+    /** If true, a new refresh token, with new expiry, will be issued every 
+     * time the access token is refreshed.  Default true */
     rollingRefreshToken? : boolean,
 
-    /** Expiry for authorization codes in seconds.  If null, they don't expire.  Defult 5 minutes */
+    /** Expiry for authorization codes in seconds.  If null, they don't 
+     * expire.  Defult 5 minutes */
     authorizationCodeExpiry? : number | null,
 
-    /** Expiry for authorization codes in seconds.  If null, they don't expire.  Defult 5 minutes */
+    /** Expiry for authorization codes in seconds.  If null, they don't 
+     * expire.  Defult 5 minutes */
     mfaTokenExpiry? : number | null,
 
     /** Number of seconds tolerance when checking expiration.  Default 10 */
     clockTolerance? : number,
 
-    /** If false, authorization calls without a scope will be disallowed.  Default true */
+    /** If false, authorization calls without a scope will be disallowed.  
+     * Default true */
     emptyScopeIsValid? : boolean,
 
-    /** If true, a requested scope must match one in the `validScopes` list or an error will be returned.  Default false. */
+    /** If true, a requested scope must match one in the `validScopes` list 
+     * or an error will be returned.  Default false. */
     validateScopes? : boolean,
 
-    /** See `validateScopes`.  This should be a comma separated list, case sensitive, default empty */
+    /** See `validateScopes`.  This should be a comma separated list, case 
+     * sensitive, default empty */
     validScopes? : string,
 
-    /** Flows to support.  A comma-separated list from {@link OAuthFlows}.  If `all`, there must be none other in the list.  Default `all` */
+    /** Flows to support.  A comma-separated list from {@link OAuthFlows}.  
+     * If `all`, there must be none other in the list.  Default `all` */
     validFlows? : string,
 
     /** Required if emptyScopeIsValid is false */
@@ -201,79 +230,229 @@ export class OAuthAuthorizationServer {
         this.authStorage = options.authStorage;
         if (options.authenticators) this.authenticators = options.authenticators;
 
-        setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
-        setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
-        setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
-        setParameter("oauthPbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
-        setParameter("oauthPbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
-        setParameter("requireRedirectUriRegistration", ParamType.Boolean, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
-        setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
-        setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
-        setParameter("authorizationCodeLength", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_LENGTH");
-        setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
-        setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
-        setParameter("jwtPrivateKeyFile", ParamType.String, this, options, "JWT_PRIVATE_KEY_FILE");
-        setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
-        setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
-        setParameter("jwtPrivateKey", ParamType.String, this, options, "JWT_PRIVATE_KEY");
-        setParameter("persistAccessToken", ParamType.String, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
-        setParameter("issueRefreshToken", ParamType.String, this, options, "OAUTH_ISSUE_REFRESH_TOKEN");
-        setParameter("persistRefreshToken", ParamType.String, this, options, "OAUTH_PERSIST_REFRESH_TOKEN");
-        setParameter("persistUserToken", ParamType.String, this, options, "OAUTH_PERSIST_USER_TOKEN");
-        setParameter("opaqueAccessToken", ParamType.String, this, options, "OAUTH_OPAQUE_ACCESS_TOKEN");
-        setParameter("opaqueRefreshToken", ParamType.String, this, options, "OAUTH_OPAQUE_REFRESH_TOKEN");
-        setParameter("opaquetUserToken", ParamType.String, this, options, "OAUTH_OPAQUE_USER_TOKEN");
-        setParameter("accessTokenExpiry", ParamType.Number, this, options, "OAUTH_ACCESS_TOKEN_EXPIRY");
-        setParameter("refreshTokenExpiry", ParamType.Number, this, options, "OAUTH_REFRESH_TOKEN_EXPIRY");
-        setParameter("rollingRefreshToken", ParamType.Boolean, this, options, "OAUTH_ROLLING_REFRESH_TOKEN");
-        setParameter("authorizationCodeExpiry", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_EXPIRY");
-        setParameter("mfaTokenExpiry", ParamType.Number, this, options, "OAUTH_MFA_TOKEN_EXPIRY");
-        setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
-        setParameter("validateScopes", ParamType.Boolean, this, options, "OAUTH_VALIDATE_SCOPES");
-        setParameter("emptyScopeIsValid", ParamType.Boolean, this, options, "OAUTH_EMPTY_SCOPE_VALID");
-        setParameter("validScopes", ParamType.StringArray, this, options, "OAUTH_VALID_SCOPES");
-        setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
-        setParameter("idTokenClaims", ParamType.StringArray, this, options, "OAUTH_ID_TOKEN_CLAIMS");
+        setParameter("oauthIssuer",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_ISSUER",
+            true);
+        setParameter("resourceServers",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_RESOURCE_SERVER");
+        setParameter("oauthPbkdf2Iterations",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_PBKDF2_ITERATIONS");
+        setParameter("oauthPbkdf2Digest",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_PBKDF2_DIGEST");
+        setParameter("oauthPbkdf2KeyLength",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_PBKDF2_KEYLENGTH");
+        setParameter("requireRedirectUriRegistration",
+            ParamType.Boolean,
+            this,
+            options,
+            "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
+        setParameter("requireClientSecretOrChallenge",
+            ParamType.Boolean,
+            this,
+            options,
+            "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
+        setParameter("jwtAlgorithm",
+            ParamType.String,
+            this,
+            options,
+            "JWT_ALGORITHM");
+        setParameter("authorizationCodeLength",
+            ParamType.Number,
+            this,
+            options,
+            "OAUTH_AUTHORIZATION_CODE_LENGTH");
+        setParameter("jwtSecretKeyFile",
+            ParamType.String,
+            this,
+            options,
+            "JWT_SECRET_KEY_FILE");
+        setParameter("jwtPublicKeyFile",
+            ParamType.String,
+            this,
+            options,
+            "JWT_PUBLIC_KEY_FILE");
+        setParameter("jwtPrivateKeyFile",
+            ParamType.String,
+            this,
+            options,
+            "JWT_PRIVATE_KEY_FILE");
+        setParameter("jwtSecretKey",
+            ParamType.String,
+            this,
+            options,
+            "JWT_SECRET_KEY");
+        setParameter("jwtPublicKey",
+            ParamType.String,
+            this,
+            options,
+            "JWT_PUBLIC_KEY");
+        setParameter("jwtPrivateKey",
+            ParamType.String,
+            this,
+            options,
+            "JWT_PRIVATE_KEY");
+        setParameter("persistAccessToken",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_PERSIST_ACCESS_TOKEN");
+        setParameter("issueRefreshToken",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_ISSUE_REFRESH_TOKEN");
+        setParameter("persistRefreshToken",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_PERSIST_REFRESH_TOKEN");
+        setParameter("persistUserToken",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_PERSIST_USER_TOKEN");
+        setParameter("opaqueAccessToken",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_OPAQUE_ACCESS_TOKEN");
+        setParameter("opaqueRefreshToken",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_OPAQUE_REFRESH_TOKEN");
+        setParameter("opaquetUserToken",
+            ParamType.String,
+            this,
+            options,
+            "OAUTH_OPAQUE_USER_TOKEN");
+        setParameter("accessTokenExpiry",
+            ParamType.Number,
+            this,
+            options,
+            "OAUTH_ACCESS_TOKEN_EXPIRY");
+        setParameter("refreshTokenExpiry",
+            ParamType.Number,
+            this,
+            options,
+            "OAUTH_REFRESH_TOKEN_EXPIRY");
+        setParameter("rollingRefreshToken",
+            ParamType.Boolean,
+            this,
+            options,
+            "OAUTH_ROLLING_REFRESH_TOKEN");
+        setParameter("authorizationCodeExpiry",
+            ParamType.Number,
+            this,
+            options,
+            "OAUTH_AUTHORIZATION_CODE_EXPIRY");
+        setParameter("mfaTokenExpiry",
+            ParamType.Number,
+            this,
+            options,
+            "OAUTH_MFA_TOKEN_EXPIRY");
+        setParameter("clockTolerance",
+            ParamType.Number,
+            this,
+            options,
+            "OAUTH_CLOCK_TOLERANCE");
+        setParameter("validateScopes",
+            ParamType.Boolean,
+            this,
+            options,
+            "OAUTH_VALIDATE_SCOPES");
+        setParameter("emptyScopeIsValid",
+            ParamType.Boolean,
+            this,
+            options,
+            "OAUTH_EMPTY_SCOPE_VALID");
+        setParameter("validScopes",
+            ParamType.StringArray,
+            this,
+            options,
+            "OAUTH_VALID_SCOPES");
+        setParameter("validFlows",
+            ParamType.StringArray,
+            this,
+            options,
+            "OAUTH_VALID_FLOWS");
+        setParameter("idTokenClaims",
+            ParamType.StringArray,
+            this,
+            options,
+            "OAUTH_ID_TOKEN_CLAIMS");
         for (let claim of this.idTokenClaims) {
             const pair = claim.split(":");
-            if (pair.length != 2) throw new CrossauthError(ErrorCode.Configuration, "Id token claims must be a string of claim:fieldName separated by spaces");
+            if (pair.length != 2) {
+                throw new CrossauthError(ErrorCode.Configuration, 
+                    "Id token claims must be a string of claim:fieldName " +
+                    "separated by spaces");
+                }
             this.idTokenClaimsMap[pair[0]] = pair[1];
         }
         
-        if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
+        if (this.validFlows.length == 1 &&
+            this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();
         }
 
         this.jwtAlgorithmChecked = algorithm(this.jwtAlgorithm);
         
         if (this.jwtSecretKey || this.jwtSecretKeyFile) {
-            if (this.jwtPublicKey || this.jwtPublicKeyFile || this.jwtPrivateKey || this.jwtPrivateKeyFile) {
-                throw new CrossauthError(ErrorCode.Configuration, "Cannot specify symmetric and public/private JWT keys")
+            if (this.jwtPublicKey || this.jwtPublicKeyFile || 
+                this.jwtPrivateKey || this.jwtPrivateKeyFile) {
+                throw new CrossauthError(ErrorCode.Configuration,
+                     "Cannot specify symmetric and public/private JWT keys")
             }
             if (this.jwtSecretKey && this.jwtSecretKeyFile) {
-                throw new CrossauthError(ErrorCode.Configuration, "Cannot specify symmetric key and file")
+                throw new CrossauthError(ErrorCode.Configuration,
+                     "Cannot specify symmetric key and file")
             }
             if (this.jwtSecretKeyFile) {
-                this.jwtSecretKey = fs.readFileSync(this.jwtSecretKeyFile, 'utf8');
+                this.jwtSecretKey = 
+                    fs.readFileSync(this.jwtSecretKeyFile, 'utf8');
             }
-        } else if ((this.jwtPrivateKey || this.jwtPrivateKeyFile) && (this.jwtPublicKey || this.jwtPublicKeyFile)) {
+        } else if ((this.jwtPrivateKey || this.jwtPrivateKeyFile) && 
+                   (this.jwtPublicKey || this.jwtPublicKeyFile)) {
             if (this.jwtPrivateKeyFile && this.jwtPrivateKey) {
-                throw new CrossauthError(ErrorCode.Configuration, "Cannot specify both private key and private key file");
+                throw new CrossauthError(ErrorCode.Configuration, 
+                    "Cannot specify both private key and private key file");
             }
             if (this.jwtPrivateKeyFile) {
-                this.jwtPrivateKey = fs.readFileSync(this.jwtPrivateKeyFile, 'utf8');
+                this.jwtPrivateKey = fs.readFileSync(this.jwtPrivateKeyFile, 
+                    'utf8');
             }
             if (this.jwtPublicKeyFile && this.jwtPublicKey) {
-                throw new CrossauthError(ErrorCode.Configuration, "Cannot specify both public key and public key file");
+                throw new CrossauthError(ErrorCode.Configuration, 
+                    "Cannot specify both public key and public key file");
             }
             if (this.jwtPublicKeyFile) {
-                this.jwtPublicKey = fs.readFileSync(this.jwtPublicKeyFile, 'utf8');
+                this.jwtPublicKey = fs.readFileSync(this.jwtPublicKeyFile, 
+                    'utf8');
             }
         } else {
-            throw new CrossauthError(ErrorCode.Configuration, "Must specify either a JWT secret key or a public and private key pair");
+            throw new CrossauthError(ErrorCode.Configuration, 
+                "Must specify either a JWT secret key or a public and "+
+                "private key pair");
         }
         if (this.jwtSecretKey) {
-            this.secretOrPrivateKey = this.secretOrPublicKey = this.jwtSecretKey;
+            this.secretOrPrivateKey = this.secretOrPublicKey =
+                this.jwtSecretKey;
         } else {
             this.secretOrPrivateKey = this.jwtPrivateKey;
             this.secretOrPublicKey = this.jwtPublicKey;
@@ -283,13 +462,18 @@ export class OAuthAuthorizationServer {
         if (this.opaqueRefreshToken) this.persistRefreshToken = true;
         if (this.opaquetUserToken) this.persistUserToken = true;
 
-        if ((this.persistAccessToken || this.persistRefreshToken || this.persistUserToken) && !this.keyStorage) {
-            throw new CrossauthError(ErrorCode.Configuration, "Key storage required for persisting tokens");
+        if ((this.persistAccessToken || this.persistRefreshToken || 
+            this.persistUserToken) && !this.keyStorage) {
+            throw new CrossauthError(ErrorCode.Configuration, 
+                "Key storage required for persisting tokens");
         }
 
-        if ((this.validFlows.includes(OAuthFlows.Password) || this.validFlows.includes(OAuthFlows.PasswordMfa) ) 
+        if ((this.validFlows.includes(OAuthFlows.Password) || 
+             this.validFlows.includes(OAuthFlows.PasswordMfa) ) 
              && (!this.userStorage || Object.keys(this.authenticators).length == 0)) {
-            throw new CrossauthError(ErrorCode.Configuration, "If password flow or password MFA flow is enabled, userStorage and authenticators must be provided");
+            throw new CrossauthError(ErrorCode.Configuration, 
+                "If password flow or password MFA flow is enabled, "+
+                "userStorage and authenticators must be provided");
         }
     }
 
@@ -323,7 +507,8 @@ export class OAuthAuthorizationServer {
         error? : string,
         error_description? : string,
     }> {
-        // validate responseType (because OAuth requires a different error for this)
+        // validate responseType (because OAuth requires a different error 
+        // for this)
         const responseTypesSupported = this.responseTypesSupported();
         if (!responseTypesSupported.includes(responseType)) {
             return {
@@ -339,16 +524,24 @@ export class OAuthAuthorizationServer {
         }
         catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
-            return {error: "unauthorized_client", error_description: "Client is not authorized"};
+            return {error: "unauthorized_client", 
+                    error_description: "Client is not authorized"};
         }
 
         // validate scopes
-        const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, user);
-        if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
+        const { scopes,
+            error: scopeError,
+            error_description: scopeErrorDesciption } 
+            = await this.validateAndPersistScope(clientId, scope, user);
+        if (scopeError) return {
+            error: scopeError,
+            error_description: scopeErrorDesciption
+        };
 
 
         // validate flow type
-        const flow = this.inferFlowFromGet(responseType, scopes||[], codeChallenge);
+        const flow = 
+            this.inferFlowFromGet(responseType, scopes||[], codeChallenge);
         if (!flow || !(this.validFlows.includes(flow))) {
             return {
                 error: "access_denied",
@@ -373,7 +566,13 @@ export class OAuthAuthorizationServer {
         }
 
         if (responseType == "code") {
-            return await this.getAuthorizationCode(client, redirectUri, scopes, state, codeChallenge, codeChallengeMethod, user);
+            return await this.getAuthorizationCode(client,
+                redirectUri,
+                scopes,
+                state,
+                codeChallenge,
+                codeChallengeMethod,
+                user);
         } else {
 
             return {
@@ -384,14 +583,24 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    async hasAllScopes(clientId : string, user : User|undefined, requestedScopes: (string|null)[]) : Promise<boolean> {
+    async hasAllScopes(clientId: string,
+        user: User | undefined,
+        requestedScopes: (string | null)[]) : Promise<boolean> {
         if (!this.authStorage) return false;
-        const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
-        const existingRequestedScopes = requestedScopes.filter((scope) => existingScopes.includes(scope));
+        const existingScopes = 
+            await this.authStorage.getAuthorizations(clientId, user?.id);
+        const existingRequestedScopes = 
+            requestedScopes.filter((scope) => existingScopes.includes(scope));
         return existingRequestedScopes.length == requestedScopes.length;
     }
 
-    async validateAndPersistScope(clientId : string, scope? : string,user? : User) : Promise<{scopes?: string[]|undefined, error?: string, error_description?: string}> {
+    async validateAndPersistScope(clientId: string,
+        scope?: string,
+        user?: User): Promise<{
+            scopes?: string[] | undefined,
+            error?: string,
+            error_description?: string
+}> {
         // validate scopes
         let scopes : string[]|undefined;
         let scopesIncludingNull : (string|null)[]|undefined;
@@ -399,23 +608,40 @@ export class OAuthAuthorizationServer {
             return {error: "invalid_scope", error_description: "Must provide at least one scope"};
         }
         if (scope) {
-            const {error: scopeError, errorDescription: scopeErrorDesciption, scopes: requestedScopes} = this.validateScope(scope);
+            const { error: scopeError,
+                errorDescription: scopeErrorDesciption,
+                scopes: requestedScopes } = this.validateScope(scope);
             scopes = requestedScopes;
             scopesIncludingNull = requestedScopes;
-            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption??"Unknown error"};      
+            if (scopeError) {
+                return {
+                    error: scopeError,
+                    error_description: scopeErrorDesciption ?? "Unknown error"
+                };     
+            } 
         } else {
             scopesIncludingNull = [null];
         }
         if (this.authStorage) {
             try {
                 const newScopes = scopesIncludingNull??[];
-                const existingScopes = await this.authStorage.getAuthorizations(clientId, user?.id);
-                const updatedScopes = [...new Set([...existingScopes, ...newScopes])];
-                CrossauthLogger.logger.debug(j({msg: "Updating authorizations for " + clientId + " to " + updatedScopes}));
-                this.authStorage.updateAuthorizations(clientId, user?.id, updatedScopes);
+                const existingScopes 
+                    = await this.authStorage.getAuthorizations(clientId,
+                        user?.id);
+                const updatedScopes = 
+                    [...new Set([...existingScopes, ...newScopes])];
+                CrossauthLogger.logger.debug(j({
+                    msg: "Updating authorizations for " + clientId + " to " + 
+                        updatedScopes}));
+                this.authStorage.updateAuthorizations(clientId,
+                    user?.id,
+                    updatedScopes);
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
-                return { error: "server_error", error_description: "Couldn't save scope"};
+                return {
+                    error: "server_error",
+                    error_description: "Couldn't save scope"
+                };
             }
         }
         return {scopes: scopes};
@@ -466,22 +692,31 @@ export class OAuthAuthorizationServer {
         switch (flow) {
             case OAuthFlows.AuthorizationCode:
             case OAuthFlows.AuthorizationCodeWithPKCE:
-                authenticateClient = (client.confidential || client.clientSecret != undefined || clientSecret != undefined);
+                authenticateClient = (client.confidential || 
+                    client.clientSecret != undefined || 
+                    clientSecret != undefined);
                 break;
             case OAuthFlows.ClientCredentials:
                 authenticateClient = true;
                 break;
             case OAuthFlows.Password:
-                authenticateClient = (client.confidential || client.clientSecret != undefined || clientSecret != undefined);
+                authenticateClient = (client.confidential || 
+                    client.clientSecret != undefined || 
+                    clientSecret != undefined);
                 break;
             case OAuthFlows.RefreshToken:
-                authenticateClient = (client.confidential || client.clientSecret != undefined || clientSecret != undefined);
+                authenticateClient = (client.confidential || 
+                    client.clientSecret != undefined || 
+                    clientSecret != undefined);
                 break;
             case OAuthFlows.DeviceCode:
-                authenticateClient = (client.confidential || client.clientSecret != undefined || clientSecret != undefined);
+                authenticateClient = (client.confidential || 
+                    client.clientSecret != undefined || 
+                    clientSecret != undefined);
                 break;
         }
-        if (authenticateClient && (client.clientSecret==undefined || clientSecret==undefined)) {
+        if (authenticateClient && (client.clientSecret==undefined || 
+            clientSecret==undefined)) {
             return {
                 error: "access_denied",
                 error_description: "Client secret is required for this client",
@@ -490,8 +725,10 @@ export class OAuthAuthorizationServer {
 
         // validate flow type
         if (flow == OAuthFlows.Password) {
-            // special case - this flow is indistiguishable from PasswordMfa by looking at the request
-            if (!(this.validFlows.includes(flow)) && !(this.validFlows.includes(OAuthFlows.PasswordMfa))) {
+            // special case - this flow is indistiguishable from PasswordMfa 
+            // by looking at the request
+            if (!(this.validFlows.includes(flow)) && 
+                !(this.validFlows.includes(OAuthFlows.PasswordMfa))) {
                 return {
                     error: "access_denied",
                     error_description: "Unsupported flow type " + flow,
@@ -513,8 +750,10 @@ export class OAuthAuthorizationServer {
 
         // validate scopes (move to client credentials)
         /*if (scope) {
-            const {error: scopeError, errorDescription: scopeErrorDesciption} = this.validateScope(scope);
-            if (scopeError) return {error: scopeError, errorDescription: scopeErrorDesciption};        
+            const {error: scopeError, errorDescription: scopeErrorDesciption} = 
+                this.validateScope(scope);
+            if (scopeError) return {error: scopeError, 
+                errorDescription: scopeErrorDesciption};        
         }*/
 
         // determine whether we are also creating a refresh token
@@ -522,33 +761,45 @@ export class OAuthAuthorizationServer {
         if (this.issueRefreshToken && flow != OAuthFlows.RefreshToken) {
             createRefreshToken = true;
         }
-        if (this.issueRefreshToken && flow == OAuthFlows.RefreshToken && this.rollingRefreshToken) {
+        if (this.issueRefreshToken && flow == OAuthFlows.RefreshToken && 
+            this.rollingRefreshToken) {
             createRefreshToken = true;
         }
 
         if (grantType == "authorization_code") {
 
             // validate secret/challenge
-            if (this.requireClientSecretOrChallenge && (client && client.clientSecret && !clientSecret) && !codeVerifier) {
+            if (this.requireClientSecretOrChallenge && 
+                (client && client.clientSecret && !clientSecret) && 
+                !codeVerifier) {
                 return {
                     error : "access_denied",
-                    error_description: "Must provide either a client secret or use PKCE",
+                    error_description: "Must provide either a client secret " +
+                        "or use PKCE",
                 };
             }
 
             if (client && client.clientSecret && !clientSecret) {
                 return {
                     error : "access_denied",
-                    error_description: "No client secret or code verifier provided for authorization coode flow",
+                    error_description: "No client secret or code verifier " +
+                     "provided for authorization coode flow",
                 };
             }
             if (!code) {
                 return {
                     error : "access_denied",
-                    error_description: "No authorization code provided for authorization code flow",
+                    error_description: "No authorization code provided for " +
+                        "authorization code flow",
                 };
             }
-            return await this.getAccessToken({client, code, clientSecret, codeVerifier, issueRefreshToken : createRefreshToken});
+            return await this.getAccessToken({
+                client,
+                code,
+                clientSecret,
+                codeVerifier,
+                issueRefreshToken: createRefreshToken
+});
 
         } else if (grantType == "refresh_token") {
     
@@ -558,44 +809,82 @@ export class OAuthAuthorizationServer {
                     error_description: "Refresh token is invalid",
                 }
             }
-            return await this.getAccessToken({client, clientSecret, codeVerifier, issueRefreshToken : createRefreshToken});
+            return await this.getAccessToken({
+                client,
+                clientSecret,
+                codeVerifier,
+                issueRefreshToken: createRefreshToken
+});
 
         } else if (grantType == "client_credentials") {
 
             // validate scopes
-            const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
-            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
+            const { scopes,
+                error: scopeError,
+                error_description: scopeErrorDesciption } = 
+                await this.validateAndPersistScope(clientId, scope, undefined);
+            if (scopeError) {
+                return {
+                            error: scopeError,
+                            error_description: scopeErrorDesciption
+                };
+            }
     
-            return await this.getAccessToken({client, clientSecret, codeVerifier, scopes, issueRefreshToken: createRefreshToken});
+            return await this.getAccessToken({
+                client,
+                clientSecret,
+                codeVerifier,
+                scopes,
+                issueRefreshToken: createRefreshToken
+            });
 
         } else if (grantType == "password") {
 
             // validate scopes
-            const {scopes, error: scopeError, error_description: scopeErrorDesciption} = await this.validateAndPersistScope(clientId, scope, undefined);
-            if (scopeError) return {error: scopeError, error_description: scopeErrorDesciption};
+            const { scopes,
+                error: scopeError,
+                error_description: scopeErrorDesciption } = 
+                await this.validateAndPersistScope(clientId, scope, undefined);
+            if (scopeError) {
+                return {
+                    error: scopeError,
+                    error_description: scopeErrorDesciption
+                };
+            }
     
             // validate username and password
             if (!username || !password) {
                 return {
                     error: "access_denied",
-                    error_description: "Username and/or password not provided for password flow",
+                    error_description: "Username and/or password not " +
+                        "provided for password flow",
                 }
             }
             let user : User|undefined = undefined;
             try {
                 if (!this.userStorage) {
                     // already checked in constructor but VS code doesn't know
-                    return {error: "server_error", error_description: "Password authentication not configured"};
+                    return {
+                        error: "server_error",
+                        error_description: "Password authentication " +
+                            "not configured"
+};
                 }
-                const {user: user1, secrets} = await this.userStorage.getUserByUsername(username);
+                const {user: user1, secrets} = 
+                    await this.userStorage.getUserByUsername(username);
                 const factor1Authenticator = this.authenticators[user1.factor1];
-                if (!factor1Authenticator || !(factor1Authenticator.secretNames().includes("password"))) {
+                if (!factor1Authenticator || 
+                    !(factor1Authenticator.secretNames()
+                        .includes("password"))) {
                     return {
                         error: "access_denied",
-                        error_description: "Password flow used but factor 1 authenticator does not accept passwords",
+                        error_description: "Password flow used but factor 1 " +
+                            "authenticator does not accept passwords",
                     }
                 }
-                await factor1Authenticator.authenticateUser(user1, secrets, {password: password});
+                await factor1Authenticator.authenticateUser(user1,
+                    secrets,
+                    { password: password });
                 user = user1;
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -626,7 +915,11 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    async createMfaRequest(user : User) : Promise<{mfa_token: string, error: string, error_description : string}> {
+    async createMfaRequest(user: User): Promise<{
+        mfa_token: string,
+        error: string,
+        error_description: string
+    }> {
         const mfaToken = Hasher.randomValue(16);
         const mfaKey = "omfa:" + Hasher.hash(mfaToken);
         const now = new Date();
@@ -635,12 +928,17 @@ export class OAuthAuthorizationServer {
                 user.id, 
                 mfaKey, 
                 now, 
-                this.mfaTokenExpiry ? (new Date(now.getTime() + this.mfaTokenExpiry*1000)) : undefined
+                this.mfaTokenExpiry ?  
+                    (new Date(now.getTime() + this.mfaTokenExpiry*1000)) : 
+                    undefined
             );
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce, msg: "Couldn't save MFA token"}));
+            CrossauthLogger.logger.error(j({
+                cerr: ce,
+                msg: "Couldn't save MFA token"
+            }));
         }
         return {
             mfa_token: mfaToken,
@@ -666,13 +964,21 @@ export class OAuthAuthorizationServer {
                 // not supported yet
             } else if (responseType == "id_token") {
                 return OAuthFlows.OidcAuthorizationCode;
-            } else if (responseType == "id_token token" || responseType == "token id_token") {
+            } else if (responseType == "id_token token" || 
+                responseType == "token id_token") {
                 return OAuthFlows.OidcAuthorizationCode;
-            } else if (responseType == "id_token code" || responseType == "code id_token") {
+            } else if (responseType == "id_token code" || 
+                responseType == "code id_token") {
                 return OAuthFlows.OidcAuthorizationCode;
-            } else if (responseType == "token code" || responseType == "code token") {
+            } else if (responseType == "token code" || 
+                responseType == "code token") {
                 return OAuthFlows.OidcAuthorizationCode;
-            } else if (responseType == "code id_token token" || responseType == "id_token code token" || responseType == "id_token token code" || responseType == "token id_token code" || responseType == "token code id_token"  || responseType == "code token id_token") {
+            } else if (responseType == "code id_token token" || 
+                responseType == "id_token code token" || 
+                    responseType == "id_token token code" || 
+                    responseType == "token id_token code" || 
+                    responseType == "token code id_token"  || 
+                    responseType == "code token id_token") {
                 return OAuthFlows.OidcAuthorizationCode;
                 */
             }
@@ -700,27 +1006,51 @@ export class OAuthAuthorizationServer {
 
     }
 
-    private async getAuthorizationCode(client: OAuthClient, redirectUri : string, scopes: string[]|undefined, state: string, codeChallenge? : string, codeChallengeMethod? : string, user? : User) : Promise<{code? : string, state? : string, error? : string, error_description? : string}> {
+    private async getAuthorizationCode(client: OAuthClient,
+        redirectUri: string,
+        scopes: string[] | undefined,
+        state: string,
+        codeChallenge?: string,
+        codeChallengeMethod?: string,
+        user?: User): Promise<{
+            code?: string,
+            state?: string,
+            error?: string,
+            error_description?: string
+    }> {
 
         // if we have a challenge, check the method is valid
         if (codeChallenge) {
             if (!codeChallengeMethod) codeChallengeMethod = "S256";
-            if (codeChallengeMethod != "S256" && codeChallengeMethod != "plain") {
-                return {error: "invalid_request", error_description: "Code challenge method must be S256 or plain"};
+            if (codeChallengeMethod != "S256" && 
+                codeChallengeMethod != "plain") {
+                return {
+                    error: "invalid_request",
+                    error_description: "Code challenge method must be S256 " +
+                        "or plain"
+                };
             }
         }
 
         // validate redirect uri
-        const decodedUri = redirectUri; /*decodeURI(redirectUri.replace("+"," "));*/
+        const decodedUri = redirectUri; 
         OAuthAuthorizationServer.validateUri(decodedUri);
-        if (this.requireRedirectUriRegistration && !client.redirectUri.includes(decodedUri)) {
-            return {error: "invalid_request", error_description: `The redirect uri ${redirectUri} is invalid`};
+        if (this.requireRedirectUriRegistration && 
+            !client.redirectUri.includes(decodedUri)) {
+            return {
+                error: "invalid_request",
+                error_description: `The redirect uri ${redirectUri} is invalid`
+            };
         }
 
 
         // create authorization code and data to store with the key
         const created = new Date();
-        const expires = this.authorizationCodeExpiry ? new Date(created.getTime() + this.authorizationCodeExpiry*1000 + this.clockTolerance*1000) : undefined;
+        const expires = 
+        this.authorizationCodeExpiry ? 
+            new Date(created.getTime() + this.authorizationCodeExpiry*1000 + 
+                this.clockTolerance*1000) : 
+            undefined;
         const authzData : {[key:string]: any} = {
         }
         if (scopes) {
@@ -728,7 +1058,8 @@ export class OAuthAuthorizationServer {
         }
         if (codeChallenge) {
             authzData.challengeMethod = codeChallengeMethod;
-            // we store this as a hash for security.  If S256 is used, that will be a second hash
+            // we store this as a hash for security.  If S256 is used, 
+            // that will be a second hash
             authzData.challenge = Hasher.hash(codeChallenge);
         }
         if (user) {
@@ -743,14 +1074,20 @@ export class OAuthAuthorizationServer {
         for (let i=0; i<10 && !success; ++i) {
             try {
                 authzCode = Hasher.randomValue(this.authorizationCodeLength);
-                this.keyStorage.saveKey(undefined, AUTHZ_CODE_PREFIX+Hasher.hash(authzCode), created, expires, authzDataString);
+                this.keyStorage.saveKey(undefined,
+                    AUTHZ_CODE_PREFIX + Hasher.hash(authzCode),
+                    created,
+                    expires,
+                    authzDataString);
                 success = true;
             } catch (e) {
-                CrossauthLogger.logger.debug(`Attempt nmumber${i} at creating a unique authozation code failed`)
+                CrossauthLogger.logger.debug(j({msg: `Attempt nmumber${i} " +
+                    "at creating a unique authozation code failed`}));
             }
         }
         if (!success) {
-            throw new CrossauthError(ErrorCode.KeyExists, "Couldn't create a authorization code");
+            throw new CrossauthError(ErrorCode.KeyExists,
+                "Couldn't create a authorization code");
         }
 
         return {code: authzCode, state: state};
@@ -776,15 +1113,22 @@ export class OAuthAuthorizationServer {
         // validate client secret
         let passwordCorrect = true;
         try {
-            if (client.clientSecret!=undefined) { // we validated this before so if authentication is required, it will not be undefined
-                passwordCorrect = await Hasher.passwordsEqual(clientSecret??"", client.clientSecret??"");
+            // we validated this before so if authentication is required,
+            // it will not be undefined
+            if (client.clientSecret!=undefined) { 
+                passwordCorrect = 
+                    await Hasher.passwordsEqual(clientSecret??"", 
+                        client.clientSecret??"");
             }
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             const message = "Couldn't validate client";
             return {error: "server_error", error_description: message};
         }
-        if (!passwordCorrect) return {error: "access_denied", error_description: "Invalid client secret"};
+        if (!passwordCorrect) return {
+            error: "access_denied",
+            error_description: "Invalid client secret"
+        };
 
         // validate authorization code
         let authzData : {
@@ -793,24 +1137,32 @@ export class OAuthAuthorizationServer {
             challengeMethod? : string,
             userId? : number|string,
             username? : string,
-            [key:string] : any, // so having anything else stored doesn't raise an exception
+            [key:string] : any, 
         } = {};
 
         if (code) {
 
-            // recover scope, challenge and user from data persisted with authorization code
+            // recover scope, challenge and user from data persisted with 
+            // authorization code
             let key : Key|undefined;
             try {
                 key = await this.keyStorage.getKey(AUTHZ_CODE_PREFIX+Hasher.hash(code));
                 authzData = KeyStorage.decodeData(key.data);
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
-                return {error: "access_denied", error_description: "Invalid or expired authorization code"};
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid or expired authorization code"
+                };
             }
             try {
                 await this.keyStorage.deleteKey(key.value);
             } catch (e) {
-                CrossauthLogger.logger.warn(j({err: e, msg: "Couldn't delete authorization code from storatge", clientId: client?.clientId}));
+                CrossauthLogger.logger.warn(j({
+                    err: e,
+                    msg: "Couldn't delete authorization code from storatge",
+                    clientId: client?.clientId
+}));
             }
             scopes = authzData.scope;
         }
@@ -820,15 +1172,26 @@ export class OAuthAuthorizationServer {
         
         // validate code verifier, if there is one
         if (authzData.challengeMethod && !authzData.challenge) {
-            if (authzData.challengeMethod != "plain" && authzData.challengeMethod != "S256") {
-                return {error: "access_denied", error_description:  "Invalid code challenge/code challenge method method for authorization code"};
+            if (authzData.challengeMethod != "plain" && 
+                authzData.challengeMethod != "S256") {
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid code challenge/code " +
+                        "challenge method method for authorization code"
+                };
             }
         }
         if (authzData.challenge) {
-            const hashedVerifier = authzData.challengeMethod == "plain" ? codeVerifier??"" : Hasher.sha256(codeVerifier??"");
-            // we store the challenge in hashed form for security, so if S256 is used this will be a second hash
+            const hashedVerifier = 
+                authzData.challengeMethod == "plain" ? 
+                    codeVerifier??"" : Hasher.sha256(codeVerifier??"");
+            // we store the challenge in hashed form for security, 
+            // so if S256 is used this will be a second hash
             if (Hasher.hash(hashedVerifier) != authzData.challenge) {
-                return {error: "access_denied", error_description:   "Code verifier is incorrect"};
+                return {
+                    error: "access_denied",
+                    error_description: "Code verifier is incorrect"
+                };
             }
         }
 
@@ -850,7 +1213,9 @@ export class OAuthAuthorizationServer {
         }
         if (this.accessTokenExpiry != null) {
             accessTokenPayload.exp = timeCreated + this.accessTokenExpiry
-            dateAccessTokenExpires = new Date(now.getTime()+this.accessTokenExpiry*1000 + this.clockTolerance*1000);
+            dateAccessTokenExpires = 
+                new Date(now.getTime()+this.accessTokenExpiry*1000 + 
+                    this.clockTolerance*1000);
         }
         if (this.resourceServers) {
             accessTokenPayload.aud = this.resourceServers;
@@ -858,12 +1223,15 @@ export class OAuthAuthorizationServer {
 
         // create access token jwt
         const accessToken : string = await new Promise((resolve, reject) => {
-            jwt.sign(accessTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked, keyid: "1"}, 
+            jwt.sign(accessTokenPayload,
+                this.secretOrPrivateKey,
+                { algorithm: this.jwtAlgorithmChecked, keyid: "1" }, 
                 (error: Error | null,
                 encoded: string | undefined) => {
                     if (encoded) resolve(encoded);
                     else if (error) reject(error);
-                    else reject(new CrossauthError(ErrorCode.Unauthorized, "Couldn't create jwt"));
+                    else reject(new CrossauthError(ErrorCode.Unauthorized,
+                        "Couldn't create jwt"));
                 });
         });
 
@@ -891,11 +1259,30 @@ export class OAuthAuthorizationServer {
                 sub: authzData.username,
                 type: "id",
             };
-            if ("email" in scopes && user && "email" in user) idTokenPayload.email = user.email;
-            if ("address" in scopes && user && "address" in user) idTokenPayload.address = user.address;
-            if ("phone" in scopes && user && "phone" in user) idTokenPayload.phone = user.phone;
+            if ("email" in scopes && user && "email" in user) {
+                idTokenPayload.email = user.email;
+            }
+            if ("address" in scopes && user && "address" in user) {
+                idTokenPayload.address = user.address;
+            }
+            if ("phone" in scopes && user && "phone" in user) {
+                idTokenPayload.phone = user.phone;
+            }
             if ("profile" in scopes && user) {
-                for (let field of ["name", "family_name", "given_name", "middle_name", "nickname", "preferred_username", "profile", "picture", "website", "gender", "birthdate", "zoneinfo", "locale", "updated_at"]) {
+                for (let field of ["name",
+                    "family_name",
+                    "given_name",
+                    "middle_name",
+                    "nickname",
+                    "preferred_username",
+                    "profile",
+                    "picture",
+                    "website",
+                    "gender",
+                    "birthdate",
+                    "zoneinfo",
+                    "locale",
+                    "updated_at"]) {
                     idTokenPayload[field] = user[field];
                 }
             }
@@ -911,12 +1298,16 @@ export class OAuthAuthorizationServer {
     
             // create access token jwt
             idToken = await new Promise((resolve, reject) => {
-                jwt.sign(idTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked, keyid: "1"}, 
+                jwt.sign(idTokenPayload, this.secretOrPrivateKey, {
+                    algorithm: this.jwtAlgorithmChecked,
+                    keyid: "1"
+}, 
                     (error: Error | null,
                     encoded: string | undefined) => {
                         if (encoded) resolve(encoded);
                         else if (error) reject(error);
-                        else reject(new CrossauthError(ErrorCode.Unauthorized, "Couldn't create jwt"));
+                        else reject(new CrossauthError(ErrorCode.Unauthorized,
+                            "Couldn't create jwt"));
                     });
             });
     
@@ -938,8 +1329,11 @@ export class OAuthAuthorizationServer {
                 refreshTokenPayload.scope = scopes;
             }
             if (this.refreshTokenExpiry != null) {
-                refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry;
-                dateRefreshTokenExpires = new Date(now.getTime()+this.refreshTokenExpiry*1000 + this.clockTolerance*1000);
+                refreshTokenPayload.exp = 
+                    timeCreated + this.refreshTokenExpiry;
+                dateRefreshTokenExpires = 
+                    new Date(now.getTime()+this.refreshTokenExpiry*1000 + 
+                        this.clockTolerance*1000);
             }
             if (this.resourceServers) {
                 refreshTokenPayload.aud = this.resourceServers;
@@ -947,19 +1341,23 @@ export class OAuthAuthorizationServer {
 
             // create refresh token jwt
             newRefreshToken = await new Promise((resolve, reject) => {
-                jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {algorithm: this.jwtAlgorithmChecked, keyid: "1"}, 
+                jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {
+                    algorithm: this.jwtAlgorithmChecked,
+                    keyid: "1"
+}, 
                     (error: Error | null,
                     encoded: string | undefined) => {
                         if (encoded) resolve(encoded);
                         else if (error) reject(error);
-                        else reject(new CrossauthError(ErrorCode.Unauthorized, "Couldn't create jwt"));
+                        else reject(new CrossauthError(ErrorCode.Unauthorized,
+                            "Couldn't create jwt"));
                     });
             });
 
             // persist refresh token if requested
             if (this.persistRefreshToken && this.keyStorage) {
                 await this.keyStorage?.saveKey(
-                    undefined, // to avoid user storage dependency, we don't set this
+                    undefined, // to avoid user storage dependency
                     REFRESH_TOKEN_PREFIX+Hasher.hash(refreshTokenJti),
                     now,
                     dateRefreshTokenExpires
@@ -971,12 +1369,14 @@ export class OAuthAuthorizationServer {
             access_token : accessToken,
             id_token: idToken,
             refresh_token : newRefreshToken,
-            expires_in : this.accessTokenExpiry==null ? undefined : this.accessTokenExpiry,
+            expires_in : this.accessTokenExpiry==null ? undefined : 
+                this.accessTokenExpiry,
             token_type: "Bearer",
         }
     }
 
-    async validAuthenticationCode(token : string) : Promise<{[key:string]: any}|undefined> {
+    async validAuthenticationCode(token : string) : 
+        Promise<{[key:string]: any}|undefined> {
         try {
             const decoded = await this.validateJwt(token, "refresh");
             if (this.persistRefreshToken) {
@@ -990,7 +1390,8 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    async validRefreshToken(token : string) : Promise<{[key:string]: any}|undefined> {
+    async validRefreshToken(token : string) : 
+        Promise<{[key:string]: any}|undefined> {
         try {
             const decoded = await this.validateJwt(token, "refresh");
             if (this.persistRefreshToken) {
@@ -1004,7 +1405,8 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    async validIdToken(token : string) : Promise<{[key:string]: any}|undefined> {
+    async validIdToken(token : string) : 
+        Promise<{[key:string]: any}|undefined> {
         try {
             const decoded = await this.validateJwt(token, "id");
             return decoded;
@@ -1014,7 +1416,8 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    async validAccessToken(token : string) : Promise<{[key:string]: any}|undefined> {
+    async validAccessToken(token : string) : 
+        Promise<{[key:string]: any}|undefined> {
         try {
             const decoded = await this.validateJwt(token, "access");
             if (this.persistAccessToken) {
@@ -1028,36 +1431,47 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    private async validateJwt(code : string, type? : string) : Promise<{[key:string]: any}> {
+    private async validateJwt(code : string, type? : string) : 
+        Promise<{[key:string]: any}> {
         return  new Promise((resolve, reject) => {
-            jwt.verify(code, this.secretOrPublicKey, {clockTolerance: this.clockTolerance, complete: true}, 
+            jwt.verify(code,
+                this.secretOrPublicKey,
+                { clockTolerance: this.clockTolerance, complete: true }, 
                 (error: Error | null,
                 decoded: {[key:string]:any} | undefined) => {
                     if (decoded) {
                         if (!type || decoded.payload.type == type) {
                             resolve(decoded);
                         } else {
-                            reject(new CrossauthError(ErrorCode.Unauthorized, "Invalid JWT type"));
+                            reject(new CrossauthError(ErrorCode.Unauthorized, 
+                                "Invalid JWT type"));
                         }
                     } else if (error) { 
                         CrossauthLogger.logger.debug(j({err: error}));
-                        reject(new CrossauthError(ErrorCode.Unauthorized, "Invalid JWT signature"));
+                        reject(new CrossauthError(ErrorCode.Unauthorized, 
+                            "Invalid JWT signature"));
                     } else {
-                        reject(new CrossauthError(ErrorCode.Unauthorized, "Couldn't create jwt"));
+                        reject(new CrossauthError(ErrorCode.Unauthorized, 
+                            "Couldn't create jwt"));
                     }
                 });
         });
 
     }
 
-    private validateScope(scope : string) : {error?: string, errorDescription? : string, scopes? : string[]} {
+    private validateScope(scope: string): {
+        error?: string,
+        errorDescription?: string,
+        scopes?: string[]
+} {
         let requestedScopes = [];
         try {
-            requestedScopes = scope.split(" "); /*decodeURI(scope.replace("+"," ")).split(" ");*/ 
+            requestedScopes = scope.split(" ");
         } catch (e) {
             const errorCode = "invalid_scope";
             const errorDescription = `Invalid scope ${scope}`;
-            CrossauthLogger.logger.debug(j({err: CrossauthError.fromOAuthError(errorCode, errorDescription)}));
+            CrossauthLogger.logger.debug(j({err: CrossauthError
+                .fromOAuthError(errorCode, errorDescription)}));
             return {
                 error : errorCode,
                 errorDescription: errorDescription,
@@ -1069,7 +1483,8 @@ export class OAuthAuthorizationServer {
                 if (!(this.validScopes.includes(requestedScope))) {
                     const errorCode = "invalid_scope";
                     const errorDescription = `Illegal scope ${requestedScope}`;
-                    CrossauthLogger.logger.debug(j({err: CrossauthError.fromOAuthError(errorCode, errorDescription)}));
+                    CrossauthLogger.logger.debug(j({err: CrossauthError
+                        .fromOAuthError(errorCode, errorDescription)}));
                     ret = {
                         error : errorCode,
                         errorDescription: errorDescription,
@@ -1084,7 +1499,10 @@ export class OAuthAuthorizationServer {
 
     }
 
-    async createClient(name : string, redirectUri : string[], validFlow? : string[], confidential=true) : Promise<OAuthClient> {
+    async createClient(name: string,
+        redirectUri: string[],
+        validFlow?: string[],
+        confidential = true) : Promise<OAuthClient> {
         const clientId = OAuthAuthorizationServer.randomClientId();
         let clientSecret : string|undefined = undefined;
         if (confidential) {
@@ -1128,7 +1546,8 @@ export class OAuthAuthorizationServer {
             }
         }
         if (!valid) {
-            throw CrossauthError.fromOAuthError("invalid_request", `Invalid redirect Uri ${uri}`);
+            throw CrossauthError.fromOAuthError("invalid_request", 
+            `Invalid redirect Uri ${uri}`);
         }
     }
 
@@ -1139,7 +1558,9 @@ export class OAuthAuthorizationServer {
 
     responseTypesSupported() : string[] {
         let response_types_supported = [];
-        if (this.validFlows.includes(OAuthFlows.AuthorizationCode) || this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || this.validFlows.includes(OAuthFlows.OidcAuthorizationCode)) {
+        if (this.validFlows.includes(OAuthFlows.AuthorizationCode) || 
+            this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || 
+            this.validFlows.includes(OAuthFlows.OidcAuthorizationCode)) {
             response_types_supported.push("code");
         }
         // Not supporting other OIDC flows yet
@@ -1180,8 +1601,12 @@ export class OAuthAuthorizationServer {
 
         return {
             issuer: this.oauthIssuer,
-            authorization_endpoint: new URL(authorizeEndpoint??"authorize", this.oauthIssuer).toString(),
-            token_endpoint: new URL(tokenEndpoint??"token", this.oauthIssuer).toString(),
+            authorization_endpoint: 
+                new URL(authorizeEndpoint??"authorize", 
+                    this.oauthIssuer).toString(),
+            token_endpoint: 
+                new URL(tokenEndpoint??"token",
+                    this.oauthIssuer).toString(),
             token_endpoint_auth_methods_supported: ["client_secret_post"],
             jwks_uri: new URL(jwksUri??"jwks", this.oauthIssuer).toString(),
             response_types_supported: this.responseTypesSupported(),
@@ -1190,16 +1615,20 @@ export class OAuthAuthorizationServer {
             token_endpoint_auth_signing_alg_values_supported: jwtAlgorithms,
             subject_types_supported: ["public"],
             id_token_signing_alg_values_supported: jwtAlgorithms,
-            claims_supported: ["iss", "sub", "aud", "jti", "iat", "type", ...additionalClaims],
+            claims_supported: 
+                ["iss", "sub", "aud", "jti", "iat", "type", 
+                    ...additionalClaims],
             request_uri_parameter_supported: true,
-            require_request_uri_registration: this.requireRedirectUriRegistration,
+            require_request_uri_registration: 
+                this.requireRedirectUriRegistration,
         };
     }
 
     jwks() : Jwks {
         let keys : JsonWebKey[] = [];
         if (this.jwtPublicKey) {
-            const publicKey = createPublicKey(this.jwtPublicKey).export({format: "jwk"});
+            const publicKey = 
+                createPublicKey(this.jwtPublicKey).export({format: "jwk"});
             publicKey.kid = "1";
             keys.push(publicKey)
         }
@@ -1244,19 +1673,39 @@ export class OAuthAuthorizationServer {
         code_challenge_method? : string}) : {error? : string, error_description? : string} {
 
         let error_description : string|undefined = undefined;
-        if (!/^[A-Za-z0-9_-]+$/.test(response_type)) error_description = "response_type is invalid";
-        else if (!/^[A-Za-z0-9_-]+$/.test(client_id)) error_description = "client_id is invalid";
-        else if (scope && !/^[A-Za-z0-9_+ -]+$/.test(scope)) error_description = "scope is invalid";
-        else if (!/^[A-Za-z0-9_-]+$/.test(state)) error_description = "state is invalid";
-        else if (code_challenge && !/^[A-Za-z0-9_-]+$/.test(code_challenge)) error_description = "code_challenge is invalid";
-        else if (code_challenge_method && !/^[A-Za-z0-9_-]+$/.test(code_challenge_method)) error_description = "code_challenge_method is invalid";
+        if (!/^[A-Za-z0-9_-]+$/.test(response_type)) {
+            error_description = "response_type is invalid";
+        }
+        else if (!/^[A-Za-z0-9_-]+$/.test(client_id)) {
+            error_description = "client_id is invalid";
+        }
+        else if (scope && !/^[A-Za-z0-9_+ -]+$/.test(scope)) {
+            error_description = "scope is invalid";
+        }
+        else if (!/^[A-Za-z0-9_-]+$/.test(state)) {
+            error_description = "state is invalid";
+        }
+        else if (code_challenge && !/^[A-Za-z0-9_-]+$/.test(code_challenge)) {
+            error_description = "code_challenge is invalid";
+        }
+        else if (code_challenge_method && 
+            !/^[A-Za-z0-9_-]+$/.test(code_challenge_method)) {
+                error_description = "code_challenge_method is invalid";
+            }
         try {
             new URL(redirect_uri);
         } catch (e) {
             error_description = "redirect_uri is invalid";
         }
-        if (!redirect_uri || redirect_uri.includes('#')) error_description = "redirect_uri is invalid";
-        if (error_description) return {error: "invalid_request", error_description: error_description};
+        if (!redirect_uri || redirect_uri.includes('#')) {
+            error_description = "redirect_uri is invalid";
+        }
+        if (error_description) {
+            return {
+                error: "invalid_request",
+                error_description: error_description
+            };
+        }
         return {};
     }
 }
