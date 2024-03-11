@@ -60,10 +60,12 @@ export interface OAuthAuthorizationServerOptions {
     /** PBKDF2 key length for hashing client secret */
     oauthPbkdf2KeyLength? : number;
 
-    /** If true, only redirect Uri's registered for the client will be accepted */
+    /** If true, only redirect Uri's registered for the client will be 
+     * accepted */
     requireRedirectUriRegistration?: boolean,
 
-    /** If true, the authorization code flow will require either a client secret or PKCE challenger/verifier.  Default true */
+    /** If true, the authorization code flow will require either a client 
+     * secret or PKCE challenger/verifier.  Default true */
     requireClientSecretOrChallenge?: boolean,
 
     /** Authorization code length, before base64url-encoding.  Default 32 */
@@ -73,7 +75,8 @@ export interface OAuthAuthorizationServerOptions {
     jwtAlgorithm? : string,
 
     /** Secret key if using a symmetric cipher for signing the JWT.  
-     * Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
+     * Either this or `jwtSecretKeyFile` is required when using this kind of 
+     * cipher*/
     jwtSecretKey? : string,
 
     /** Filename with secret key if using a symmetric cipher for signing the 
@@ -223,12 +226,16 @@ export class OAuthAuthorizationServer {
         private idTokenClaimsMap : {[key:string]: string} = {};
         validFlows : string[] = ["all"];
     
-    constructor(clientStorage: OAuthClientStorage, keyStorage : KeyStorage, options: OAuthAuthorizationServerOptions) {
+    constructor(clientStorage: OAuthClientStorage,
+        keyStorage: KeyStorage,
+        options: OAuthAuthorizationServerOptions) {
         this.clientStorage = clientStorage;
         this.keyStorage = keyStorage;
         this.userStorage = options.userStorage;
         this.authStorage = options.authStorage;
-        if (options.authenticators) this.authenticators = options.authenticators;
+        if (options.authenticators) {
+            this.authenticators = options.authenticators;
+        }
 
         setParameter("oauthIssuer",
             ParamType.String,
