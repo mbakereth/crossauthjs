@@ -802,6 +802,9 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
 
     const authenticatorId = authenticatorsResponse.authenticators && authenticatorsResponse.authenticators.length > 0 ? authenticatorsResponse.authenticators[0].id : "";
     const clientChallengeRequestReponse = await oauthClient["mfaOobRequest"](mfa_token, authenticatorId);
+    expect(clientChallengeRequestReponse.challenge_type).toBe("oob");
+    expect(clientChallengeRequestReponse.oob_code).toBeDefined();
+    expect(clientChallengeRequestReponse.binding_method).toBe("prompt");
 
     // Make token request
 
@@ -812,7 +815,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
             scope: "read write",
             clientSecret: "DEF",
             mfaToken: mfa_token,
-            oobCode: challengeResponse.oob_code,
+            oobCode: clientChallengeRequestReponse.oob_code,
             bindingCode: otp
         });
 

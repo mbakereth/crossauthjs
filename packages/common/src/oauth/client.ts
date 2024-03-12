@@ -484,7 +484,7 @@ export abstract class OAuthClientBase {
             mfa_token: mfaToken,
             authenticator_id: authenticatorId,
         });
-        if (resp.challenge_type != "oob" || !resp.otp || !resp.binding_method) {
+        if (resp.challenge_type != "oob" || !resp.oob_code || !resp.binding_method) {
             return {error: resp.error??"server_error", error_description: resp.error_description??"Invalid OOB challenge response"};
         }
 
