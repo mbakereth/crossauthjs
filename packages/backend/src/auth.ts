@@ -53,6 +53,11 @@ export abstract class Authenticator {
     abstract mfaType() : "none" | "oob" | "otp";
 
     /**
+     * Used by the OAuth password_mfa grant type.
+     */
+    abstract mfaChannel() : "none" | "email" | "sms";
+
+    /**
      * Should return the user if it exists in storage, otherwise throw {@link @crossauth/common!CrossauthError}:
      * with {@link @crossauth/common!ErrorCode} of `Connection`, `UserNotExist` or `PasswordNotMatch`
      * 
@@ -128,4 +133,5 @@ export abstract class PasswordAuthenticator extends Authenticator {
     secretNames() {return ["password"];}
     transientSecretNames() {return [];}
     mfaType() : "none" | "oob" | "otp" { return "none"; }
+    mfaChannel() : "none" | "email" | "sms" { return "none"; }
 }

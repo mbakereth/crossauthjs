@@ -119,14 +119,16 @@ export abstract class OAuthClientBase {
 
         let resp : Response|undefined = undefined;
         try {
-            const url = new URL("/.well-known/openid-configuration", this.authServerBaseUri);
+            const url = new URL("/.well-known/openid-configuration",
+                this.authServerBaseUri);
             CrossauthLogger.logger.debug(j({msg: `Fetching OIDC config from ${url}`}))
             resp = await fetch(url);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
         }
         if (!resp || !resp.ok) {
-            throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration");
+            throw new CrossauthError(ErrorCode.Connection, 
+                "Couldn't get OIDC configuration");
         }
         this.oidcConfig = {...DEFAULT_OIDCCONFIG};
         try {
@@ -136,26 +138,45 @@ export abstract class OAuthClientBase {
             }
             CrossauthLogger.logger.debug(j({msg: `OIDC Config ${JSON.stringify(this.oidcConfig)}`}));
         } catch (e) {
-            throw new CrossauthError(ErrorCode.Connection, "Unrecognized response from OIDC configuration endpoint");
+            throw new CrossauthError(ErrorCode.Connection, 
+                "Unrecognized response from OIDC configuration endpoint");
         }
     }
 
     protected abstract randomValue(length : number) : string;
     protected abstract sha256(plaintext :string) : string;
 
-    protected async startAuthorizationCodeFlow(scope? : string, pkce : boolean=false) : Promise<{url? : string, error? : string, error_description? : string}> {
+    protected async startAuthorizationCodeFlow(scope?: string,
+        pkce: boolean = false) : 
+        Promise<{
+            url?: string,
+            error?: string,
+            error_description?: string
+        }> {
         CrossauthLogger.logger.debug(j({msg: "Starting authorization code flow"}));
-        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig) await this.loadConfig();      
         if (!this.oidcConfig?.response_types_supported.includes("code")
             || !this.oidcConfig?.response_modes_supported.includes("query")) {
-            return {error: "invalid_request", error_description: "Server does not support authorization code flow"};
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support authorization code flow"
+            };
         }
         if (!this.oidcConfig?.authorization_endpoint) {
-            return {error: "server_error", error_description: "Cannot get authorize endpoint"};
+            return {
+                error: "server_error",
+                error_description: "Cannot get authorize endpoint"
+            };
         }
         this.state = this.randomValue(this.stateLength);
-        if (!this.clientId) return {error: "invalid_request", error_description: "Cannot make authorization code flow without client id"}; 
-        if (!this.redirectUri) return {error: "invalid_request", error_description:  "Cannot make authorization code flow without Redirect Uri"}; 
+        if (!this.clientId) return {
+            error: "invalid_request",
+            error_description: "Cannot make authorization code flow without client id"
+        }; 
+        if (!this.redirectUri) return {
+            error: "invalid_request",
+            error_description: "Cannot make authorization code flow without Redirect Uri"
+        }; 
 
         const base = this.oidcConfig.authorization_endpoint;
         let url = base 
@@ -170,14 +191,19 @@ export abstract class OAuthClientBase {
 
         if (pkce) {
             this.codeVerifier = this.randomValue(this.verifierLength);
-            this.codeChallenge = this.codeChallengeMethod == "plain" ? this.codeVerifier : this.sha256(this.codeVerifier);
+            this.codeChallenge = 
+                this.codeChallengeMethod == "plain" ? 
+                this.codeVerifier : this.sha256(this.codeVerifier);
             url += "&code_challenge=" + this.codeChallenge;
         }
 
         return {url: url};
     }
 
-    protected async redirectEndpoint(code? : string, state? : string, error? : string, errorDescription? : string) : Promise<OAuthTokenResponse>{
+    protected async redirectEndpoint(code?: string,
+        state?: string,
+        error?: string,
+        errorDescription?: string) : Promise<OAuthTokenResponse>{
         if (error || !code) {
             if (!error) error = "server_error";
             if (!errorDescription) errorDescription = "Unknown error";
@@ -191,10 +217,16 @@ export abstract class OAuthClientBase {
         this.authzCode = code;    
 
         if (!this.oidcConfig?.grant_types_supported.includes("authorization_code")) {
-            return {error: "invalid_request", error_description: "Server does not support authorization code grant"};
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support authorization code grant"
+            };
         }
         if (!this.oidcConfig?.token_endpoint) {
-            return {error: "server_error", error_description: "Cannot get token endpoint"};
+            return {
+                error: "server_error",
+                error_description: "Cannot get token endpoint"
+        };
         }
         const url = this.oidcConfig.token_endpoint;
 
@@ -213,7 +245,10 @@ export abstract class OAuthClientBase {
             return this.post(url, params);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            return {error: "server_error", error_description: "Unable to get access token from server"};
+            return {
+                error: "server_error",
+                error_description: "Unable to get access token from server"
+            };
         }
     }
 
@@ -221,13 +256,22 @@ export abstract class OAuthClientBase {
         CrossauthLogger.logger.debug(j({msg: "Starting client credentials flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("client_credentials")) {
-            return {error: "invalid_request", error_description: "Server does not support client credentials grant"};
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support client credentials grant"
+            };
         }
         if (!this.oidcConfig?.token_endpoint) {
             return {error: "server_error", error_description: "Cannot get token endpoint"};
         }
-        if (!this.clientId) return {error: "invalid_request", error_description: "Cannot make client credentials flow without client id"}; 
-        if (!this.clientSecret) return {error: "invalid_request", error_description:  "Cannot make client credentials flow without client secret"}; 
+        if (!this.clientId) return {
+            error: "invalid_request",
+            error_description: "Cannot make client credentials flow without client id"
+        }; 
+        if (!this.clientSecret) return {
+            error: "invalid_request",
+            error_description: "Cannot make client credentials flow without client secret"
+        }; 
 
         const url = this.oidcConfig.token_endpoint;
 
@@ -241,19 +285,30 @@ export abstract class OAuthClientBase {
             return await this.post(url, params);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            return {error: "server_error", error_description: "Error connecting to authorization server"};
+            return {
+                error: "server_error",
+                error_description: "Error connecting to authorization server"
+            };
         }
         //return {url: url, params: params};
     }
 
-    protected async passwordFlow(username : string, password : string, scope? : string) : Promise<{[key:string]:any}> {
+    protected async passwordFlow(username: string,
+        password: string,
+        scope?: string) : Promise<{[key:string]:any}> {
         CrossauthLogger.logger.debug(j({msg: "Starting password flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("password")) {
-            return {error: "invalid_request", error_description: "Server does not support password grant"};
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support password grant"
+            };
         }
         if (!this.oidcConfig?.token_endpoint) {
-            return {error: "server_error", error_description: "Cannot get token endpoint"};
+            return {
+                error: "server_error",
+                error_description: "Cannot get token endpoint"
+            };
         }
 
         const url = this.oidcConfig.token_endpoint;
@@ -270,32 +325,54 @@ export abstract class OAuthClientBase {
             return await this.post(url, params);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            return {error: "server_error", error_description: "Error connecting to authorization server"};
+            return {
+                error: "server_error",
+                error_description: "Error connecting to authorization server"
+            };
         }
         //return {url: url, params: params};
     }
 
 
-    protected async supportedAuthenticators(mfaToken : string) : Promise<{authenticators?: MfaAuthenticatorResponse[], error? : string, error_description? : string}> {
+    protected async supportedAuthenticators(mfaToken : string) : 
+        Promise<{
+            authenticators?: MfaAuthenticatorResponse[],
+            error?: string,
+            error_description?: string
+        }> {
         CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
         if (!this.oidcConfig) await this.loadConfig();
-        if (!this.oidcConfig?.grant_types_supported.includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
-            return {error: "invalid_request", error_description: "Server does not support password_mfa grant"};
+        if (!this.oidcConfig?.grant_types_supported
+            .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support password_mfa grant"
+            };
         }
         if (!this.oidcConfig?.issuer) {
             return {error: "server_error", error_description: "Cannot get issuer"};
         }
 
-        const url = this.oidcConfig.issuer + (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
-        const resp = await this.get(url, {'authorization': 'Bearer ' + mfaToken});
+        const url = 
+            this.oidcConfig.issuer + (this.oidcConfig.issuer.endsWith("/") ? 
+            "" : "/") + "mfa/authenticators";
+        const resp = 
+            await this.get(url, {'authorization': 'Bearer ' + mfaToken});
         if (Array.isArray(resp)) {
-            return {error: "server_error", error_description: "Expected array of authenticators in mfa/authenticators response"};
+            return {
+                error: "server_error",
+                error_description: "Expected array of authenticators in mfa/authenticators response"
+            };
         }
         let authenticators : MfaAuthenticatorResponse[] = [];
         for (let i=0; i<resp.length; ++i) {
             const authenticator = resp[i];
-            if (!authenticator.id || !authenticator.authenticator_type || !authenticator.active) {
-                return {error: "server_error", error_description: "Invalid mfa/authenticators response"};
+            if (!authenticator.id || !authenticator.authenticator_type || 
+                !authenticator.active) {
+                return {
+                    error: "server_error",
+                    error_description: "Invalid mfa/authenticators response"
+                };
             }
             authenticators.push({
                 id: authenticator.id,
@@ -309,7 +386,10 @@ export abstract class OAuthClientBase {
 
     }
 
-    protected async mfaOtp(authenticatorId : string, mfaToken : string, otp: string) : Promise<{
+    protected async mfaOtp(authenticatorId: string,
+        mfaToken: string,
+        otp: string) : 
+        Promise<{
         access_token? : string, 
         refresh_token? : string, 
         id_token?: string, 
@@ -320,14 +400,19 @@ export abstract class OAuthClientBase {
         error_description? : string}> {
         CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
         if (!this.oidcConfig) await this.loadConfig();
-        if (!this.oidcConfig?.grant_types_supported.includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
-            return {error: "invalid_request", error_description: "Server does not support password_mfa grant"};
+        if (!this.oidcConfig?.grant_types_supported
+            .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support password_mfa grant"
+            };
         }
         if (!this.oidcConfig?.issuer) {
             return {error: "server_error", error_description: "Cannot get issuer"};
         }
 
-        const url = this.oidcConfig.issuer + (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
+        const url = this.oidcConfig.issuer + 
+            (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
         const resp = await this.post(url, {
             client_id: this.clientId,
             client_secret: this.clientSecret,
@@ -336,11 +421,17 @@ export abstract class OAuthClientBase {
             authenticator_id: authenticatorId,
         });
         if (resp.challenge_type != "otp") {
-            return {error: resp.error??"server_error", error_description: resp.error_description??"Invalid OTP challenge response"};
+            return {
+                error: resp.error ?? "server_error",
+                error_description: resp.error_description ?? "Invalid OTP challenge response"
+            };
         }
 
         if (!this.oidcConfig?.token_endpoint) {
-            return {error: "server_error", error_description: "Cannot get token endpoint"};
+            return {
+                error: "server_error",
+                error_description: "Cannot get token endpoint"
+            };
         }
 
         const otpUrl = this.oidcConfig.token_endpoint;
@@ -373,14 +464,19 @@ export abstract class OAuthClientBase {
         error_description? : string}> {
         CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
         if (!this.oidcConfig) await this.loadConfig();
-        if (!this.oidcConfig?.grant_types_supported.includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
-            return {error: "invalid_request", error_description: "Server does not support password_mfa grant"};
+        if (!this.oidcConfig?.grant_types_supported
+            .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support password_mfa grant"
+            };
         }
         if (!this.oidcConfig?.issuer) {
             return {error: "server_error", error_description: "Cannot get issuer"};
         }
 
-        const url = this.oidcConfig.issuer + (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
+        const url = this.oidcConfig.issuer + 
+            (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
         const resp = await this.post(url, {
             client_id: this.clientId,
             client_secret: this.clientSecret,
@@ -402,11 +498,17 @@ export abstract class OAuthClientBase {
 
     }
 
-    protected async mfaOobComplete(mfaToken : string, oobCode: string, bindingCode : string) : Promise<OAuthTokenResponse> {
+    protected async mfaOobComplete(mfaToken: string,
+        oobCode: string,
+        bindingCode: string) : Promise<OAuthTokenResponse> {
         CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
         if (!this.oidcConfig) await this.loadConfig();
-        if (!this.oidcConfig?.grant_types_supported.includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
-            return {error: "invalid_request", error_description: "Server does not support password_mfa grant"};
+        if (!this.oidcConfig?.grant_types_supported
+            .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support password_mfa grant"
+            };
         }
         if (!this.oidcConfig?.issuer) {
             return {error: "server_error", error_description: "Cannot get issuer"};
@@ -435,14 +537,21 @@ export abstract class OAuthClientBase {
 
     }
 
-    protected async refreshTokenFlow(refreshToken : string) : Promise<{[key:string]:any}> {
+    protected async refreshTokenFlow(refreshToken : string) : 
+        Promise<{[key:string]:any}> {
         CrossauthLogger.logger.debug(j({msg: "Starting refresh token flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("refresh_token")) {
-            return {error: "invalid_request", error_description: "Server does not support refresh_token grant"};
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support refresh_token grant"
+            };
         }
         if (!this.oidcConfig?.token_endpoint) {
-            return {error: "server_error", error_description: "Cannot get token endpoint"};
+            return {
+                error: "server_error",
+                error_description: "Cannot get token endpoint"
+            };
         }
 
         const url = this.oidcConfig.token_endpoint;
@@ -455,13 +564,21 @@ export abstract class OAuthClientBase {
             return await this.post(url, params);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
-            return {error: "server_error", error_description: "Error connecting to authorization server"};
+            return {
+                error: "server_error",
+                error_description: "Error connecting to authorization server"
+            };
         }
         //return {url: url, params: params};
     }
 
-    protected async post(url : string, params : {[key:string]:any}) : Promise<{[key:string]:any}>{
-        CrossauthLogger.logger.debug(j({msg: "Fetch POST", url: url, params: Object.keys(params)}));
+    protected async post(url : string, params : {[key:string]:any}) : 
+        Promise<{[key:string]:any}>{
+        CrossauthLogger.logger.debug(j({
+            msg: "Fetch POST",
+            url: url,
+            params: Object.keys(params)
+        }));
         const resp = await fetch(url, {
             method: 'POST',
             headers: {
@@ -473,7 +590,8 @@ export abstract class OAuthClientBase {
         return await resp.json();
     }
 
-    protected async get(url : string, headers : {[key:string]:any}) : Promise<{[key:string]:any}|{[key:string]:any}[]>{
+    protected async get(url : string, headers : {[key:string]:any}) : 
+        Promise<{[key:string]:any}|{[key:string]:any}[]>{
         CrossauthLogger.logger.debug(j({msg: "Fetch GET", url: url}));
         const resp = await fetch(url, {
             method: 'GET',

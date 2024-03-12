@@ -3,11 +3,11 @@ import {
     KeyStorage,
     UserStorage,
     OAuthClientStorage,
-    OAuthAuthorizationStorage } from '../storage';
+    OAuthAuthorizationStorage} from '../storage';
 import { Authenticator } from '../auth';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
-import type { OpenIdConfiguration, GrantType, Jwks } from '@crossauth/common';
+import type { OpenIdConfiguration, GrantType, Jwks, MfaAuthenticatorResponse } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import type  { OAuthClient, OAuthTokenResponse } from '@crossauth/common';
 import { CrossauthLogger, j, type Key, type User } from '@crossauth/common';
@@ -21,6 +21,7 @@ const CLIENT_SECRET_LENGTH = 32;
 const AUTHZ_CODE_PREFIX = "authz:";
 const ACCESS_TOKEN_PREFIX = "access:";
 const REFRESH_TOKEN_PREFIX = "refresh:";
+const MFA_TOKEN_PREFIX = "omfa:";
 
 function algorithm(value : string) : Algorithm {
     switch (value) {
@@ -224,6 +225,7 @@ export class OAuthAuthorizationServer {
         private validScopes : string[] = [];
         private idTokenClaims : string[] = [];
         private idTokenClaimsMap : {[key:string]: string} = {};
+        private idTokenClaimsAll : boolean = false;
         validFlows : string[] = ["all"];
     
     constructor(clientStorage: OAuthClientStorage,
@@ -237,182 +239,52 @@ export class OAuthAuthorizationServer {
             this.authenticators = options.authenticators;
         }
 
-        setParameter("oauthIssuer",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_ISSUER",
-            true);
-        setParameter("resourceServers",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_RESOURCE_SERVER");
-        setParameter("oauthPbkdf2Iterations",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_PBKDF2_ITERATIONS");
-        setParameter("oauthPbkdf2Digest",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_PBKDF2_DIGEST");
-        setParameter("oauthPbkdf2KeyLength",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_PBKDF2_KEYLENGTH");
-        setParameter("requireRedirectUriRegistration",
-            ParamType.Boolean,
-            this,
-            options,
-            "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
-        setParameter("requireClientSecretOrChallenge",
-            ParamType.Boolean,
-            this,
-            options,
-            "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
-        setParameter("jwtAlgorithm",
-            ParamType.String,
-            this,
-            options,
-            "JWT_ALGORITHM");
-        setParameter("authorizationCodeLength",
-            ParamType.Number,
-            this,
-            options,
-            "OAUTH_AUTHORIZATION_CODE_LENGTH");
-        setParameter("jwtSecretKeyFile",
-            ParamType.String,
-            this,
-            options,
-            "JWT_SECRET_KEY_FILE");
-        setParameter("jwtPublicKeyFile",
-            ParamType.String,
-            this,
-            options,
-            "JWT_PUBLIC_KEY_FILE");
-        setParameter("jwtPrivateKeyFile",
-            ParamType.String,
-            this,
-            options,
-            "JWT_PRIVATE_KEY_FILE");
-        setParameter("jwtSecretKey",
-            ParamType.String,
-            this,
-            options,
-            "JWT_SECRET_KEY");
-        setParameter("jwtPublicKey",
-            ParamType.String,
-            this,
-            options,
-            "JWT_PUBLIC_KEY");
-        setParameter("jwtPrivateKey",
-            ParamType.String,
-            this,
-            options,
-            "JWT_PRIVATE_KEY");
-        setParameter("persistAccessToken",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_PERSIST_ACCESS_TOKEN");
-        setParameter("issueRefreshToken",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_ISSUE_REFRESH_TOKEN");
-        setParameter("persistRefreshToken",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_PERSIST_REFRESH_TOKEN");
-        setParameter("persistUserToken",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_PERSIST_USER_TOKEN");
-        setParameter("opaqueAccessToken",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_OPAQUE_ACCESS_TOKEN");
-        setParameter("opaqueRefreshToken",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_OPAQUE_REFRESH_TOKEN");
-        setParameter("opaquetUserToken",
-            ParamType.String,
-            this,
-            options,
-            "OAUTH_OPAQUE_USER_TOKEN");
-        setParameter("accessTokenExpiry",
-            ParamType.Number,
-            this,
-            options,
-            "OAUTH_ACCESS_TOKEN_EXPIRY");
-        setParameter("refreshTokenExpiry",
-            ParamType.Number,
-            this,
-            options,
-            "OAUTH_REFRESH_TOKEN_EXPIRY");
-        setParameter("rollingRefreshToken",
-            ParamType.Boolean,
-            this,
-            options,
-            "OAUTH_ROLLING_REFRESH_TOKEN");
-        setParameter("authorizationCodeExpiry",
-            ParamType.Number,
-            this,
-            options,
-            "OAUTH_AUTHORIZATION_CODE_EXPIRY");
-        setParameter("mfaTokenExpiry",
-            ParamType.Number,
-            this,
-            options,
-            "OAUTH_MFA_TOKEN_EXPIRY");
-        setParameter("clockTolerance",
-            ParamType.Number,
-            this,
-            options,
-            "OAUTH_CLOCK_TOLERANCE");
-        setParameter("validateScopes",
-            ParamType.Boolean,
-            this,
-            options,
-            "OAUTH_VALIDATE_SCOPES");
-        setParameter("emptyScopeIsValid",
-            ParamType.Boolean,
-            this,
-            options,
-            "OAUTH_EMPTY_SCOPE_VALID");
-        setParameter("validScopes",
-            ParamType.StringArray,
-            this,
-            options,
-            "OAUTH_VALID_SCOPES");
-        setParameter("validFlows",
-            ParamType.StringArray,
-            this,
-            options,
-            "OAUTH_VALID_FLOWS");
-        setParameter("idTokenClaims",
-            ParamType.StringArray,
-            this,
-            options,
-            "OAUTH_ID_TOKEN_CLAIMS");
-        for (let claim of this.idTokenClaims) {
-            const pair = claim.split(":");
-            if (pair.length != 2) {
-                throw new CrossauthError(ErrorCode.Configuration, 
-                    "Id token claims must be a string of claim:fieldName " +
-                    "separated by spaces");
-                }
-            this.idTokenClaimsMap[pair[0]] = pair[1];
+        setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
+        setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
+        setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
+        setParameter("oauthPbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
+        setParameter("oauthPbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
+        setParameter("requireRedirectUriRegistration", ParamType.Boolean, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
+        setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
+        setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
+        setParameter("authorizationCodeLength", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_LENGTH");
+        setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
+        setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
+        setParameter("jwtPrivateKeyFile", ParamType.String, this, options, "JWT_PRIVATE_KEY_FILE");
+        setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
+        setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
+        setParameter("jwtPrivateKey", ParamType.String, this, options, "JWT_PRIVATE_KEY");
+        setParameter("persistAccessToken", ParamType.String, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
+        setParameter("issueRefreshToken", ParamType.String, this, options, "OAUTH_ISSUE_REFRESH_TOKEN");
+        setParameter("persistRefreshToken", ParamType.String, this, options, "OAUTH_PERSIST_REFRESH_TOKEN");
+        setParameter("persistUserToken", ParamType.String, this, options, "OAUTH_PERSIST_USER_TOKEN");
+        setParameter("opaqueAccessToken", ParamType.String, this, options, "OAUTH_OPAQUE_ACCESS_TOKEN");
+        setParameter("opaqueRefreshToken", ParamType.String, this, options, "OAUTH_OPAQUE_REFRESH_TOKEN");
+        setParameter("opaquetUserToken", ParamType.String, this, options, "OAUTH_OPAQUE_USER_TOKEN");
+        setParameter("accessTokenExpiry", ParamType.Number, this, options, "OAUTH_ACCESS_TOKEN_EXPIRY");
+        setParameter("refreshTokenExpiry", ParamType.Number, this, options, "OAUTH_REFRESH_TOKEN_EXPIRY");
+        setParameter("rollingRefreshToken", ParamType.Boolean, this, options, "OAUTH_ROLLING_REFRESH_TOKEN");
+        setParameter("authorizationCodeExpiry", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_EXPIRY");
+        setParameter("mfaTokenExpiry", ParamType.Number, this, options, "OAUTH_MFA_TOKEN_EXPIRY");
+        setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
+        setParameter("validateScopes", ParamType.Boolean, this, options, "OAUTH_VALIDATE_SCOPES");
+        setParameter("emptyScopeIsValid", ParamType.Boolean, this, options, "OAUTH_EMPTY_SCOPE_VALID");
+        setParameter("validScopes", ParamType.StringArray, this, options, "OAUTH_VALID_SCOPES");
+        setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("idTokenClaims", ParamType.StringArray, this, options, "OAUTH_ID_TOKEN_CLAIMS");
+        if (this.idTokenClaims.length == 1 && this.idTokenClaims[0] == "all") {
+            this.idTokenClaimsAll = true;
+        } else {
+            for (let claim of this.idTokenClaims) {
+                const pair = claim.split(":");
+                if (pair.length != 2) {
+                    throw new CrossauthError(ErrorCode.Configuration, 
+                        "Id token claims must be a string of claim:fieldName separated by spaces");
+                    }
+                this.idTokenClaimsMap[pair[0]] = pair[1];
+            }        
         }
-        
+
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();
@@ -454,8 +326,7 @@ export class OAuthAuthorizationServer {
             }
         } else {
             throw new CrossauthError(ErrorCode.Configuration, 
-                "Must specify either a JWT secret key or a public and "+
-                "private key pair");
+                "Must specify either a JWT secret key or a public and private key pair");
         }
         if (this.jwtSecretKey) {
             this.secretOrPrivateKey = this.secretOrPublicKey =
@@ -479,8 +350,7 @@ export class OAuthAuthorizationServer {
              this.validFlows.includes(OAuthFlows.PasswordMfa) ) 
              && (!this.userStorage || Object.keys(this.authenticators).length == 0)) {
             throw new CrossauthError(ErrorCode.Configuration, 
-                "If password flow or password MFA flow is enabled, "+
-                "userStorage and authenticators must be provided");
+                "If password flow or password MFA flow is enabled, userStorage and authenticators must be provided");
         }
     }
 
@@ -612,7 +482,10 @@ export class OAuthAuthorizationServer {
         let scopes : string[]|undefined;
         let scopesIncludingNull : (string|null)[]|undefined;
         if (!scope && !this.emptyScopeIsValid) {
-            return {error: "invalid_scope", error_description: "Must provide at least one scope"};
+            return {
+                error: "invalid_scope",
+                error_description: "Must provide at least one scope"
+            };
         }
         if (scope) {
             const { error: scopeError,
@@ -638,8 +511,7 @@ export class OAuthAuthorizationServer {
                 const updatedScopes = 
                     [...new Set([...existingScopes, ...newScopes])];
                 CrossauthLogger.logger.debug(j({
-                    msg: "Updating authorizations for " + clientId + " to " + 
-                        updatedScopes}));
+                    msg: "Updating authorizations for " + clientId + " to " + updatedScopes}));
                 this.authStorage.updateAuthorizations(clientId,
                     user?.id,
                     updatedScopes);
@@ -653,48 +525,12 @@ export class OAuthAuthorizationServer {
         }
         return {scopes: scopes};
     }
-    /**
-     * The the OAuth2 authorize endpoint.  All parameters are expected to be
-     * strings and have be URL-decoded.
-     * 
-     * For arguments and return parameters, see OAuth2 documentation.
-     */
-    async tokenPostEndpoint({
-        grantType, 
-        clientId, 
-        scope, 
-        code,
-        clientSecret,
-        codeVerifier,
-        refreshToken,
-        username,
-        password,
-    } : {
-        grantType : string, 
-        clientId : string, 
-        scope? : string, 
-        code? : string,
-        clientSecret? : string,
-        codeVerifier? : string,
-        refreshToken? : string,
-        username? : string,
-        password? : string}) 
-    : Promise<OAuthTokenResponse> {
 
-        const flow = this.inferFlowFromPost(grantType, codeVerifier);
-
-        // get client
-        let client : OAuthClient;
-        try {
-            client = await this.clientStorage.getClient(clientId);
-        } catch (e) {
-            return {
-                error: "access_denied",
-                error_description: "client id does not exist",
-            }
-        }
-
-        // throw an error if client authentication is required not not present
+    private async authenticateClient(flow: string,
+        client: OAuthClient,
+        clientSecret?: string) :
+        Promise<{error?: string, error_description? : string}>
+    {
         let authenticateClient = false;
         switch (flow) {
             case OAuthFlows.AuthorizationCode:
@@ -707,6 +543,7 @@ export class OAuthAuthorizationServer {
                 authenticateClient = true;
                 break;
             case OAuthFlows.Password:
+            case OAuthFlows.PasswordMfa:
                 authenticateClient = (client.confidential || 
                     client.clientSecret != undefined || 
                     clientSecret != undefined);
@@ -729,6 +566,91 @@ export class OAuthAuthorizationServer {
                 error_description: "Client secret is required for this client",
             }
         }
+        const passwordCorrect = 
+            await Hasher.passwordsEqual(clientSecret??"", 
+                client.clientSecret??"");
+        if (!passwordCorrect) {
+            return {
+                error: "access_denied",
+                error_description: "Incorrect client secret",
+            }
+
+        }
+        return {};
+
+    }
+
+    async getClient(clientId : string) : 
+        Promise<{
+            client?: OAuthClient,
+            error?: string,
+            error_description?: string
+    }> {
+        let client : OAuthClient;
+        try {
+            client = await this.clientStorage.getClient(clientId);
+            return {client};
+        } catch (e) {
+            return {
+                error: "access_denied",
+                error_description: "client id does not exist",
+            }
+        }
+
+    }
+
+    /**
+     * The the OAuth2 authorize endpoint.  All parameters are expected to be
+     * strings and have be URL-decoded.
+     * 
+     * For arguments and return parameters, see OAuth2 documentation.
+     */
+    async tokenPostEndpoint({
+        grantType, 
+        clientId, 
+        scope, 
+        code,
+        clientSecret,
+        codeVerifier,
+        refreshToken,
+        username,
+        password,
+        mfaToken,
+        oobCode,
+        bindingCode,
+        otp,
+    } : {
+        grantType : string, 
+        clientId : string, 
+        scope? : string, 
+        code? : string,
+        clientSecret? : string,
+        codeVerifier? : string,
+        refreshToken? : string,
+        username? : string,
+        password? : string,
+        mfaToken? : string,
+        oobCode? : string,
+        bindingCode?: string,
+        otp? : string}) 
+    : Promise<OAuthTokenResponse> {
+
+        const flow = this.inferFlowFromPost(grantType, codeVerifier);
+        if (!flow) return {
+            error: "server_error",
+            error_description: "Unable to determine OAuth flow type",
+
+        }
+
+        // get client
+        const clientResponse = await this.getClient(clientId);
+        if (!clientResponse.client) return clientResponse;    
+        const client = clientResponse.client;
+
+        // throw an error if client authentication is required not not present
+        const clientAuthentication = 
+            await this.authenticateClient(flow, client, clientSecret);
+        if (clientAuthentication.error) return clientAuthentication;
 
         // validate flow type
         if (flow == OAuthFlows.Password) {
@@ -773,6 +695,7 @@ export class OAuthAuthorizationServer {
             createRefreshToken = true;
         }
 
+        let user : User|undefined;
         if (grantType == "authorization_code") {
 
             // validate secret/challenge
@@ -781,23 +704,20 @@ export class OAuthAuthorizationServer {
                 !codeVerifier) {
                 return {
                     error : "access_denied",
-                    error_description: "Must provide either a client secret " +
-                        "or use PKCE",
+                    error_description: "Must provide either a client secret or use PKCE",
                 };
             }
 
             if (client && client.clientSecret && !clientSecret) {
                 return {
                     error : "access_denied",
-                    error_description: "No client secret or code verifier " +
-                     "provided for authorization coode flow",
+                    error_description: "No client secret or code verifier provided for authorization coode flow",
                 };
             }
             if (!code) {
                 return {
                     error : "access_denied",
-                    error_description: "No authorization code provided for " +
-                        "authorization code flow",
+                    error_description: "No authorization code provided for authorization code flow",
                 };
             }
             return await this.getAccessToken({
@@ -806,7 +726,7 @@ export class OAuthAuthorizationServer {
                 clientSecret,
                 codeVerifier,
                 issueRefreshToken: createRefreshToken
-});
+            });
 
         } else if (grantType == "refresh_token") {
     
@@ -821,7 +741,7 @@ export class OAuthAuthorizationServer {
                 clientSecret,
                 codeVerifier,
                 issueRefreshToken: createRefreshToken
-});
+            });
 
         } else if (grantType == "client_credentials") {
 
@@ -863,19 +783,16 @@ export class OAuthAuthorizationServer {
             if (!username || !password) {
                 return {
                     error: "access_denied",
-                    error_description: "Username and/or password not " +
-                        "provided for password flow",
+                    error_description: "Username and/or password not provided for password flow",
                 }
             }
-            let user : User|undefined = undefined;
             try {
                 if (!this.userStorage) {
                     // already checked in constructor but VS code doesn't know
                     return {
                         error: "server_error",
-                        error_description: "Password authentication " +
-                            "not configured"
-};
+                        error_description: "Password authentication not configured"
+                    };
                 }
                 const {user: user1, secrets} = 
                     await this.userStorage.getUserByUsername(username);
@@ -885,8 +802,7 @@ export class OAuthAuthorizationServer {
                         .includes("password"))) {
                     return {
                         error: "access_denied",
-                        error_description: "Password flow used but factor 1 " +
-                            "authenticator does not accept passwords",
+                        error_description: "Password flow used but factor 1 authenticator does not accept passwords",
                     }
                 }
                 await factor1Authenticator.authenticateUser(user1,
@@ -908,9 +824,154 @@ export class OAuthAuthorizationServer {
                 clientSecret, 
                 codeVerifier, 
                 scopes, 
-                issueRefreshToken:
-                 createRefreshToken, 
-                 user});
+                issueRefreshToken: createRefreshToken, 
+                user});
+
+        } else if (grantType == "http://auth0.com/oauth/grant-type/mfa-otp") {
+
+            // validate scopes
+            const { scopes,
+                error: scopeError,
+                error_description: scopeErrorDesciption } = 
+                await this.validateAndPersistScope(clientId, scope, undefined);
+            if (scopeError) {
+                return {
+                    error: scopeError,
+                    error_description: scopeErrorDesciption
+                };
+            }
+ 
+            // validate otp code
+            if (!otp) {
+                return {
+                    error: "access_denied",
+                    error_description: "OTP not provided"
+                };
+            }
+            // validate otp code
+            if (!mfaToken) {
+                return {
+                    error: "access_denied",
+                    error_description: "MFA token not provided"
+                };
+            }
+
+            const mfa = await this.validateMfaToken(mfaToken);
+            if (!mfa.user || !mfa.key) {
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid MFA token"
+                };
+            }
+            const authenticator = this.authenticators[mfa.user.factor2];
+            if (!authenticator || !this.userStorage) {
+                return {
+                    error: "access_denied",
+                    error_description: "MFA type is not supported for OAuth",
+                }
+            }
+            try {
+                const {secrets} = 
+                    await this.userStorage.getUserById(mfa.user.id);
+                await authenticator.authenticateUser(mfa.user,
+                    secrets,
+                    { otp });
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid OTP",
+                }
+            }
+
+
+    
+            return await this.getAccessToken({
+                client, 
+                clientSecret, 
+                codeVerifier, 
+                scopes,
+                issueRefreshToken: createRefreshToken, 
+                user: mfa.user});
+
+        } else if (grantType == "http://auth0.com/oauth/grant-type/mfa-oob") {
+
+            // validate scopes
+            const { scopes,
+                error: scopeError,
+                error_description: scopeErrorDesciption } = 
+                await this.validateAndPersistScope(clientId, scope, undefined);
+            if (scopeError) {
+                return {
+                    error: scopeError,
+                    error_description: scopeErrorDesciption
+                };
+            }
+
+            // validate oob code and binding code
+            if (!oobCode || !bindingCode) {
+                return {
+                    error: "access_denied",
+                    error_description: "OOB code or binding codfe not provided"
+                };
+            }
+
+            // validate MFA token code
+            if (!mfaToken) {
+                return {
+                    error: "access_denied",
+                    error_description: "MFA token not provided"
+                };
+            }
+
+            const mfa = await this.validateMfaToken(mfaToken);
+            if (!mfa.user || !mfa.key) {
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid MFA token"
+                };
+            }
+            const authenticator = this.authenticators[mfa.user.factor2];
+            if (!authenticator || !this.userStorage) {
+                return {
+                    error: "access_denied",
+                    error_description: "MFA type is not supported for OAuth",
+                }
+            }
+            try {
+                const {secrets} = 
+                    await this.userStorage.getUserById(mfa.user.id);
+                    const omfadata = KeyStorage.decodeData(mfa.key.data)["omfa"];
+                    if (!omfadata || !omfadata.otp || !omfadata.oobCode) {
+                        return {
+                            error: "server_error",
+                            error_description: "Cannot retrieve email OTP",
+                        };
+                    }
+                    if (omfadata.oobCode != oobCode) {
+                        return {
+                            error: "access_denied",
+                            error_description: "Invalid OOB code",
+                        };
+                    }
+                    await authenticator.authenticateUser(mfa.user,
+                    {...secrets, otp: omfadata.otp, expiry: mfa.key.expires?.getTime()},
+                    { otp: bindingCode });
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid OTP",
+                }
+            }
+    
+            return await this.getAccessToken({
+                client, 
+                clientSecret, 
+                codeVerifier, 
+                scopes,
+                issueRefreshToken: createRefreshToken, 
+                user: mfa.user});
 
         } else {
 
@@ -928,7 +989,7 @@ export class OAuthAuthorizationServer {
         error_description: string
     }> {
         const mfaToken = Hasher.randomValue(16);
-        const mfaKey = "omfa:" + Hasher.hash(mfaToken);
+        const mfaKey = MFA_TOKEN_PREFIX + Hasher.hash(mfaToken);
         const now = new Date();
         try {
             await this.keyStorage.saveKey(
@@ -936,15 +997,16 @@ export class OAuthAuthorizationServer {
                 mfaKey, 
                 now, 
                 this.mfaTokenExpiry ?  
-                    (new Date(now.getTime() + this.mfaTokenExpiry*1000)) : 
-                    undefined
+                    (new Date(now.getTime() + (this.mfaTokenExpiry+this.clockTolerance)*1000)) : 
+                    undefined,
+                JSON.stringify({omfaaid: user.factor2})
             );
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
             CrossauthLogger.logger.error(j({
                 cerr: ce,
-                msg: "Couldn't save MFA token"
+                msg: "Couldn't save MFA token",
             }));
         }
         return {
@@ -952,6 +1014,197 @@ export class OAuthAuthorizationServer {
             error: "mfa_required",
             error_description: "Multifactor authentication required",
         };
+    }
+
+    private async validateMfaToken(mfaToken : string) :
+        Promise<{
+            user?: User,
+            key? : Key,
+            error?: string,
+            error_description?: string
+        }> {
+
+            let user : User|undefined;
+            let key : Key|undefined;
+            try {
+                const mfaKey = MFA_TOKEN_PREFIX + Hasher.hash(mfaToken);
+                key = await this.keyStorage.getKey(mfaKey);
+                if (!key.userId) {
+                    return {
+                        error: "access_denied",
+                        error_description: "Invalid MFA token",
+                    }
+                }
+                if (!this.userStorage) {
+                    return {
+                        error: "server_error",
+                        error_description: "No user storage defined",
+                    }
+                }
+                const {user: user1} = 
+                    await this.userStorage?.getUserById(key.userId);
+                user = user1;
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                CrossauthLogger.logger.error(j({cerr: e, 
+                    msg: "Invalid MFA token"}));
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid MFA token",
+                }
+            }
+            if (!user) {
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid MFA token",
+                }
+            }
+            try {
+                const ofaaid = KeyStorage.decodeData(key.data)["omfaaid"];
+                if (ofaaid != user.factor2) {
+                    return {
+                        error: "access_denied",
+                        error_description: "authenticatorId not valid for user",
+                    }
+                }
+            } catch (e) {
+                return {
+                    error: "server_error",
+                    error_description: "Error getting data for MFA token",
+                }
+
+            }
+            return {user, key};
+    }
+    async mfaAuthenticatorsEndpoint(mfaToken : string) : 
+    Promise<{
+        authenticators?: MfaAuthenticatorResponse[],
+        error?: string,
+        error_description?: string
+    }> {
+
+        // validate token
+        const resp = await this.validateMfaToken(mfaToken);
+        if (!resp.user) return resp;
+        const user = resp.user;
+
+        if (!user.factor2) {
+            return {authenticators: []};
+        }
+        const authenticator = this.authenticators[user.factor2];
+        if (!authenticator) {
+            return {
+                error: "server_error",
+                error_description: "User has an unsupported MFA authenticator",
+            }
+        }
+
+        let authenticatorResponse : MfaAuthenticatorResponse|undefined;
+        if (authenticator.mfaType() == "otp") {
+            authenticatorResponse = {
+                id : user.factor2,
+                authenticator_type: "otp",
+                active: true,
+            };
+        } else if (authenticator.mfaType() == "oob") {
+            authenticatorResponse = {
+                id : user.factor2,
+                authenticator_type: "oob",
+                active: true,
+                name: user.email??user.username,
+                oob_channel: authenticator.mfaChannel(),
+            };
+        } else {
+            return {
+                error: "server_error",
+                error_description: "User has an unsupported MFA authenticator",
+            }
+
+        }
+
+        return {authenticators: [authenticatorResponse]};
+    }
+
+    async mfaChallengeEndpoint(mfaToken: string,
+        clientId : string,
+        clientSecret : string|undefined,
+        challengeType: string,
+        authenticatorId: string) :
+        Promise<{
+            challenge_type?: string,
+            oob_code? : string,
+            binding_method? : string,
+            error?: string,
+            error_description?: string
+        }> {
+
+        const flow = OAuthFlows.PasswordMfa;
+
+        // get client
+        const clientResponse = await this.getClient(clientId);
+        if (!clientResponse.client) return clientResponse;    
+        const client = clientResponse.client;
+
+        // throw an error if client authentication is required not not present
+        const clientAuthentication = 
+            await this.authenticateClient(flow, client, clientSecret);
+        if (clientAuthentication.error) return clientAuthentication;
+    
+        // validate token
+        const mfa = await this.validateMfaToken(mfaToken);
+        if (!mfa.user || !mfa.key) return mfa;
+
+        if (mfa.user.factor2 != authenticatorId) {
+            return {
+                error: "access_denied",
+                error_description: "Invalid MFA authenticator"
+            }
+        }
+
+        if (challengeType != "otp" && challengeType != "oob") {
+            return {
+                error: "invalid_request",
+                error_description: "Invalid MFA challenge type"
+            };
+        }
+
+        let omfaFields : {[key:string]:any} = {};
+        if (challengeType == "oob") {
+            omfaFields = {
+                oobCode : Hasher.randomValue(16),
+            }
+        }
+        try {
+            const authenticator = this.authenticators[mfa.user.factor2];
+            if (!authenticator) {
+                throw new CrossauthError(ErrorCode.Configuration,
+                    "User's authenticator has not been loaded");
+            }
+            const resp = await authenticator.createOneTimeSecrets(mfa.user);
+            this.keyStorage.updateData(mfa.key.value,
+                "omfa",
+                { ...omfaFields, ...resp });
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+            return {
+                error: "server_error",
+                error_description: "Unable to initiate OOB authentication",
+            }
+        }
+
+        if (challengeType == "otp") {
+            return {
+                challenge_type: "otp"
+            }
+
+        } else /*if (challengeType == "oob")*/ {
+            return {
+                challenge_type: "oob",
+                oob_code: omfaFields?.oobCode,
+                binding_method: "prompt",
+            }
+        }
+
     }
 
     inferFlowFromGet(
@@ -1008,6 +1261,10 @@ export class OAuthAuthorizationServer {
             return OAuthFlows.DeviceCode;
         } else if (grantType == "password") {
             return OAuthFlows.Password;
+        } else if (grantType == "http://auth0.com/oauth/grant-type/mfa-otp") {
+            return OAuthFlows.PasswordMfa;
+        } else if (grantType == "http://auth0.com/oauth/grant-type/mfa-oob") {
+            return OAuthFlows.PasswordMfa;
         }
         return undefined;
 
@@ -1033,8 +1290,7 @@ export class OAuthAuthorizationServer {
                 codeChallengeMethod != "plain") {
                 return {
                     error: "invalid_request",
-                    error_description: "Code challenge method must be S256 " +
-                        "or plain"
+                    error_description: "Code challenge method must be S256 or plain"
                 };
             }
         }
@@ -1071,7 +1327,7 @@ export class OAuthAuthorizationServer {
         }
         if (user) {
             authzData.username = user.username;
-            authzData.userId = user.userId;
+            authzData.id = user.id;
         }
         const authzDataString = JSON.stringify(authzData);
 
@@ -1088,8 +1344,7 @@ export class OAuthAuthorizationServer {
                     authzDataString);
                 success = true;
             } catch (e) {
-                CrossauthLogger.logger.debug(j({msg: `Attempt nmumber${i} " +
-                    "at creating a unique authozation code failed`}));
+                CrossauthLogger.logger.debug(j({msg: `Attempt nmumber${i} at creating a unique authozation code failed`}));
             }
         }
         if (!success) {
@@ -1169,7 +1424,7 @@ export class OAuthAuthorizationServer {
                     err: e,
                     msg: "Couldn't delete authorization code from storatge",
                     clientId: client?.clientId
-}));
+                }));
             }
             scopes = authzData.scope;
         }
@@ -1183,8 +1438,7 @@ export class OAuthAuthorizationServer {
                 authzData.challengeMethod != "S256") {
                 return {
                     error: "access_denied",
-                    error_description: "Invalid code challenge/code " +
-                        "challenge method method for authorization code"
+                    error_description: "Invalid code challenge/code challenge method method for authorization code"
                 };
             }
         }
@@ -1259,7 +1513,7 @@ export class OAuthAuthorizationServer {
 
             // create access token payload
             const idokenJti = Hasher.uuid();
-            const idTokenPayload : {[key:string]: any} = {
+            let idTokenPayload : {[key:string]: any} = {
                 jti: idokenJti,
                 iat: timeCreated,
                 iss: this.oauthIssuer,
@@ -1294,8 +1548,16 @@ export class OAuthAuthorizationServer {
                 }
             }
             if (user) {
-                for (let field in this.idTokenClaims) {
-                    idTokenPayload[field] = user[this.idTokenClaims[field]];
+                if (this.idTokenClaimsAll) {
+                    idTokenPayload = {
+                        ...idTokenPayload,
+                        ...user
+                    };
+                } else {
+                    for (let field in this.idTokenClaims) {
+                        idTokenPayload[field] = user[this.idTokenClaims[field]];
+                    }
+    
                 }
             }
             idTokenPayload.scope = scopes;
@@ -1308,7 +1570,7 @@ export class OAuthAuthorizationServer {
                 jwt.sign(idTokenPayload, this.secretOrPrivateKey, {
                     algorithm: this.jwtAlgorithmChecked,
                     keyid: "1"
-}, 
+                    }, 
                     (error: Error | null,
                     encoded: string | undefined) => {
                         if (encoded) resolve(encoded);
@@ -1351,7 +1613,7 @@ export class OAuthAuthorizationServer {
                 jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {
                     algorithm: this.jwtAlgorithmChecked,
                     keyid: "1"
-}, 
+                    }, 
                     (error: Error | null,
                     encoded: string | undefined) => {
                         if (encoded) resolve(encoded);
@@ -1379,6 +1641,7 @@ export class OAuthAuthorizationServer {
             expires_in : this.accessTokenExpiry==null ? undefined : 
                 this.accessTokenExpiry,
             token_type: "Bearer",
+            scope: scopes? scopes.join(" ") : undefined,
         }
     }
 
@@ -1470,7 +1733,7 @@ export class OAuthAuthorizationServer {
         error?: string,
         errorDescription?: string,
         scopes?: string[]
-} {
+    } {
         let requestedScopes = [];
         try {
             requestedScopes = scope.split(" ");

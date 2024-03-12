@@ -1,8 +1,15 @@
-import type { User, Key, UserSecretsInputFields, UserInputFields } from '@crossauth/common';
+import type {
+    User,
+    Key,
+    UserSecretsInputFields,
+    UserInputFields } from '@crossauth/common';
 //import { getJsonData } from '../../interfaces.ts';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
-import { Authenticator, type AuthenticationParameters, type AuthenticationOptions } from '../auth.ts';
+import {
+    Authenticator,
+    type AuthenticationParameters,
+    type AuthenticationOptions } from '../auth.ts';
 import { setParameter, ParamType } from '../utils.ts';
 import { randomInt }  from 'node:crypto';
 import nunjucks from "nunjucks";
@@ -17,10 +24,12 @@ export interface EmailAuthenticatorOptions extends AuthenticationOptions {
     /** The directory containing views (by default, Nunjucks templates) */
     views? : string;
 
-    /** Template file containing page for producing the text version of the email verification email body */
+    /** Template file containing page for producing the text version of the 
+     * email verification email body */
     emailAuthenticatorTextBody? : string,
 
-    /** Template file containing page for producing the HTML version of the email verification email body */
+    /** Template file containing page for producing the HTML version of the 
+     * email verification email body */
     emailAuthenticatorHtmlBody? : string,
 
     /** Subject for the the email verification email */
@@ -91,6 +100,8 @@ export class EmailAuthenticator extends Authenticator {
      */
     mfaType() : "none" | "oob" | "otp" { return "oob"; }
 
+    mfaChannel() : "none" | "email" | "sms" { return "email"; }
+
     private createEmailer() {
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
@@ -108,7 +119,13 @@ export class EmailAuthenticator extends Authenticator {
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
         if (this.smtpPassword) auth.pass = this.smtpPassword;
-        let mail : {from:string, to:string, subject: string, text?:string, html?:string} = {
+        let mail: {
+            from: string,
+            to: string,
+            subject: string,
+            text?: string,
+            html?: string
+        } = {
             from: this.emailFrom, 
             to: to,
             subject: this.emailAuthenticatorSubject, 
@@ -128,21 +145,46 @@ export class EmailAuthenticator extends Authenticator {
 
     /**
      * Creates and emails the one-time code
-     * @param user the user to create it for.  Uses the `email` field if present, `username` otherwise (which in this case is expected to contain an email address)
+     * @param user the user to create it for.  Uses the `email` field if 
+     *             present, `username` otherwise (which in this case is 
+     *             expected to contain an email address)
      * @returns `userData` containing `username`, `email`, `factor2`
-     *          `sessionData` containing the same plus `otp` and `expiry` which is a Unix time (number).
+     *          `sessionData` containing the same plus `otp` and `expiry` which 
+     *           is a Unix time (number).
      */
-    async prepareConfiguration(user : UserInputFields) : Promise<{userData: {[key:string]: any}, sessionData: {[key:string]: any}}|undefined> {
+    async prepareConfiguration(user : UserInputFields) : 
+        Promise<{
+            userData: { [key: string]: any },
+            sessionData: { [key: string]: any }
+        }|undefined> {
+
+        if (!this.factorName) throw new CrossauthError(ErrorCode.Configuration,
+            "Please set factorName on EmailAuthenticator before using");
 
         const otp = EmailAuthenticator.zeroPad(randomInt(999999), 6);
         const email = user.email?user.email:user.username;
         EmailAuthenticator.validateEmail(email);
         const now = new Date();
-        const expiry = new Date(now.getTime() + 1000*this.emailAuthenticatorTokenExpires).getTime();
-        const userData = {username: user.username, email: email, factor2: this.factorName};
-        const sessionData = {username: user.username, factor2: this.factorName, expiry: expiry, otp: otp}
+        const expiry = 
+            new Date(now.getTime() + 
+                1000*this.emailAuthenticatorTokenExpires).getTime();
+        const userData = {
+            username: user.username,
+            email: email,
+            factor2: this.factorName
+        };
+        const sessionData = {
+            username: user.username,
+            factor2: this.factorName,
+            expiry: expiry,
+            otp: otp
+        }
         const messageId = this.sendToken(email, otp);
-        CrossauthLogger.logger.info(j({msg: "Sent factor otp email", emailMessageId: messageId, email: email}));
+        CrossauthLogger.logger.info(j({
+            msg: "Sent factor otp email",
+            emailMessageId: messageId,
+            email: email
+        }));
         return { userData, sessionData};
     }
 
@@ -152,14 +194,25 @@ export class EmailAuthenticator extends Authenticator {
      * @param sessionKey the session containing the previously created data.
      * @returns 
      */
-    async reprepareConfiguration(_username : string, sessionKey : Key) : Promise<{userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>, newSessionData: {[key:string]: any}|undefined}|undefined> {
+    async reprepareConfiguration(_username : string, sessionKey : Key) : 
+        Promise<{
+            userData: { [key: string]: any },
+            secrets: Partial<UserSecretsInputFields>,
+            newSessionData: { [key: string]: any } | undefined
+            }|undefined> {
         //const data = getJsonData(sessionKey)["2fa"];
         const data = KeyStorage.decodeData(sessionKey.data)["2fa"];
         const otp = EmailAuthenticator.zeroPad(randomInt(999999), 6);
         const now = new Date();
-        const expiry = new Date(now.getTime() + 1000*this.emailAuthenticatorTokenExpires).getTime();
+        const expiry = 
+            new Date(now.getTime() + 
+                1000*this.emailAuthenticatorTokenExpires).getTime();
         const messageId = this.sendToken(data.email, otp);
-        CrossauthLogger.logger.info(j({msg: "Sent factor otp email", emailMessageId: messageId, email: data.email}));
+        CrossauthLogger.logger.info(j({
+            msg: "Sent factor otp email",
+            emailMessageId: messageId,
+            email: data.email
+        }));
         return { 
             userData: {email: data.email, factor2: data.factor2, otp: otp}, 
             secrets: {},
@@ -168,16 +221,22 @@ export class EmailAuthenticator extends Authenticator {
     }
 
     /**
-     * Authenticates the user by comparing the user-provuded otp with the one in secrets.
+     * Authenticates the user by comparing the user-provided otp with the one 
+     * in secrets.
      * 
      * Validation fails if the otp is incorrect or has expired.
      * 
      * @param _user ignored
-     * @param secrets taken from the session and should contain `otp` and `expiry`
+     * @param secrets taken from the session and should contain `otp` and 
+     *                `expiry`
      * @param params user input and should contain `otp`
-     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `InvalidToken` or `Expired`.
+     * @throws {@link @crossauth/common!CrossauthError} with 
+     *         {@link @crossauth/common!ErrorCode} `InvalidToken` or `Expired`.
      */
-    async authenticateUser(_user : User, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
+    async authenticateUser(_user: User,
+        secrets: UserSecretsInputFields,
+        params: AuthenticationParameters) : 
+        Promise<void> {
         if (params.otp != secrets?.otp) {
             throw new CrossauthError(ErrorCode.InvalidToken, "Invalid code");
         }
@@ -190,22 +249,34 @@ export class EmailAuthenticator extends Authenticator {
     /**
      * Does nothing for this class
      */
-    async createPersistentSecrets(_username : string, _params: AuthenticationParameters, _repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
+    async createPersistentSecrets(_username: string,
+        _params: AuthenticationParameters,
+        _repeatParams?: AuthenticationParameters) : 
+        Promise<Partial<UserSecretsInputFields>> {
         return { };
     }
 
     /**
-     * Creates adn emails a new one-time code.
-     * @param user the user to create it for.  Uses the `email` field if present, `username` otherwise (which in this case is expected to contain an email address)
+     * Creates and emails a new one-time code.
+     * @param user the user to create it for.  Uses the `email` field if 
+     *             present, `username` otherwise (which in this case is 
+     *             expected to contain an email address)
      * @returns `otp` and `expiry` as a Unix time (number).
      */
-    async createOneTimeSecrets(user : User) : Promise<Partial<UserSecretsInputFields>> {
+    async createOneTimeSecrets(user : User) : 
+        Promise<Partial<UserSecretsInputFields>> {
         const otp = EmailAuthenticator.zeroPad(randomInt(999999), 6);
         const now = new Date();
-        const expiry = new Date(now.getTime() + 1000*this.emailAuthenticatorTokenExpires).getTime();
+        const expiry = 
+            new Date(now.getTime() + 
+                1000*this.emailAuthenticatorTokenExpires).getTime();
         const email = user.email || user.username;
         const messageId = this.sendToken(email, otp);
-        CrossauthLogger.logger.info(j({msg: "Sent factor otp email", emailMessageId: messageId, email: email}));
+        CrossauthLogger.logger.info(j({
+            msg: "Sent factor otp email",
+            emailMessageId: messageId,
+            email: email
+        }));
         return { otp: otp, expiry: expiry }
     }
 
@@ -253,7 +324,8 @@ export class EmailAuthenticator extends Authenticator {
     }
 
     /**
-     * @returns true - as a code is sent to the registers email address, no additional email verification is needed
+     * @returns true - as a code is sent to the registers email address, no 
+     *          additional email verification is needed
      */
     skipEmailVerificationOnSignup() : boolean {
         return true;
@@ -280,7 +352,9 @@ export class EmailAuthenticator extends Authenticator {
      * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `InvalidEmail`.
      */
     static validateEmail(email : string|undefined)  {
-        if (email==undefined || !EmailAuthenticator.isEmailValid(email)) throw new CrossauthError(ErrorCode.InvalidEmail);
+        if (email==undefined || !EmailAuthenticator.isEmailValid(email)) {
+            throw new CrossauthError(ErrorCode.InvalidEmail);
+        }
     }
 
     /**
