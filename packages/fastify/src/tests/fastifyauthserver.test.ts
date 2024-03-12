@@ -1,14 +1,85 @@
 import { beforeAll, afterEach, expect, test, vi } from 'vitest'
 import path from 'path';
 import fastify from 'fastify';
-import { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage,  Hasher, LocalPasswordAuthenticator } from '@crossauth/backend';
+import {
+    InMemoryUserStorage,
+    InMemoryKeyStorage,
+    InMemoryOAuthClientStorage,
+    Hasher,
+    LocalPasswordAuthenticator,
+    TotpAuthenticator,
+    EmailAuthenticator,
+    UserStorage } from '@crossauth/backend';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
-import { CrossauthError, OAuthFlows } from '@crossauth/common';
+import {
+    CrossauthError,
+    ErrorCode,
+    OAuthFlows,
+    type UserInputFields } from '@crossauth/common';
 import { getTestUserStorage }  from './inmemorytestdata';
+import { authenticator as gAuthenticator } from 'otplib';
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
 export var passwordResetData :  {token : string, extraData: {[key:string]: any}};
+export var emailTokenData :  {to: string, otp : string};
+
+async function createTotpAccount(username: string,
+    password: string,
+    userStorage: UserStorage) {
+
+    const userInputs : UserInputFields = {
+        username: username,
+        email: username + "@email.com",
+        state: "active",
+        factor1: "localpassword", 
+        factor2: "totp", 
+    };
+    let lpAuthenticator = 
+        new LocalPasswordAuthenticator(userStorage, {pbkdf2Iterations: 1_000});
+
+    const totpAuth = new TotpAuthenticator("Unittest");
+    totpAuth.factorName = "totp";
+    const resp = await totpAuth.prepareConfiguration(userInputs);
+    if (!resp?.sessionData) throw new CrossauthError(ErrorCode.UnknownError, 
+        "TOTP created no session data")
+
+    const user = await userStorage.createUser(userInputs, {
+        password: await lpAuthenticator.createPasswordHash(password),
+        totpSecret: resp.sessionData.totpSecret,
+        } );
+
+    return { user, totpSecret: resp.sessionData.totpSecret };
+};
+
+async function createEmailAccount(username: string,
+    password: string,
+    userStorage: UserStorage) {
+
+    const userInputs : UserInputFields = {
+        username: username,
+        email: username + "@email.com",
+        state: "active",
+        factor1: "localpassword", 
+        factor2: "email", 
+    };
+    let lpAuthenticator = 
+        new LocalPasswordAuthenticator(userStorage, {pbkdf2Iterations: 1_000});
+
+    const emailAuth = new EmailAuthenticator()
+    emailAuth.factorName = "email";
+    emailAuth["sendToken"] = async function (to: string, otp : string) {
+        emailTokenData = {otp, to}
+        return "1";
+    };
+
+    const user = await userStorage.createUser(userInputs, {
+        password: await lpAuthenticator.createPasswordHash(password),
+        } );
+
+    return { user };
+};
+
 
 beforeAll(async () => {
 });
@@ -19,6 +90,14 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
     let lpAuthenticator = new LocalPasswordAuthenticator(userStorage, {
         pbkdf2Iterations: 1_000,
     });
+    const totpAuth = new TotpAuthenticator("Unittest");
+    totpAuth.factorName = "totp";
+    const emailAuth = new EmailAuthenticator();
+    emailAuth.factorName = "email";
+    emailAuth["sendToken"] = async function (to: string, otp : string) {
+        emailTokenData = {otp, to}
+        return "1";
+    };
     const clientStorage = new InMemoryOAuthClientStorage();
     const clientSecret = await Hasher.passwordHash("DEF", {
         encode: true,
@@ -58,7 +137,9 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             siteUrl: `http://localhost:3000`,
             userStorage,
             authenticators: {
-                "localpassword": authenticator,
+                localpassword: authenticator,
+                totp: totpAuth,
+                email: emailAuth,
             },
             ...options,
         });
@@ -291,5 +372,155 @@ test('FastifyAuthServer.getAccessTokenWithPasswordFlow', async () => {
     expect(body.access_token).toBeDefined();
     // @ts-ignore
     await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
+
+});
+
+test('FastifyAuthServer.getAccessTokenWithPasswordMfaOtpFlow', async () => {
+
+    let {server, userStorage} = await makeAppWithOptions();
+    const { totpSecret} = 
+        await createTotpAccount("mary", "maryPass123", userStorage);
+
+    let res;
+    let body;
+
+    // first token request
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        payload: {
+            grant_type: "password",
+            scope: "read write",
+            state: "ABCDEF",
+            client_id: "ABC",
+            client_secret: "DEF",
+            username: "mary",
+            password: "maryPass123",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeUndefined();
+    expect(body.mfa_token).toBeDefined();
+    const mfa_token = body.mfa_token;
+
+    res = await server.app.inject({ 
+        method: "GET", 
+        url: `/mfa/authenticators`,  
+        headers: {
+            'authorization': "Bearer " + body.mfa_token,
+        }});
+    body = JSON.parse(res.body);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBe(1);
+
+    // challenge
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/mfa/challenge`,  
+        payload: {
+            mfa_token: mfa_token,
+            client_id : "ABC",
+            client_secret: "DEF",
+            authenticator_id: "totp",
+            challenge_type: "otp",
+    }});
+    body = JSON.parse(res.body);
+    expect(body.challenge_type).toBe("otp");
+
+    const maxTries = 2;
+    for (let i=0; i<maxTries; ++i) {
+        const otp = gAuthenticator.generate(totpSecret);
+        res = await server.app.inject({ 
+            method: "POST",
+            url: '/token',
+            payload: {
+                grant_type: "http://auth0.com/oauth/grant-type/mfa-otp",
+                client_id : "ABC",
+                scope: "read write",
+                client_secret: "DEF",
+                mfa_token: mfa_token,
+                otp: otp
+        }});
+        body = JSON.parse(res.body);
+        if (body.error && i < maxTries-1) continue;
+        expect(body.error).toBeUndefined();
+        expect(body.access_token).toBeDefined();
+        expect(body.scope).toBe("read write");
+        break;
+
+    }
+
+});
+
+test('FastifyAuthServer.getAccessTokenWithPasswordMfaOOBFlow', async () => {
+
+    let {server, userStorage} = await makeAppWithOptions();
+    await createEmailAccount("mary", "maryPass123", userStorage);
+
+    let res;
+    let body;
+
+    // first token request
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        payload: {
+            grant_type: "password",
+            scope: "read write",
+            state: "ABCDEF",
+            client_id: "ABC",
+            client_secret: "DEF",
+            username: "mary",
+            password: "maryPass123",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeUndefined();
+    expect(body.mfa_token).toBeDefined();
+    const mfa_token = body.mfa_token;
+
+    res = await server.app.inject({ 
+        method: "GET", 
+        url: `/mfa/authenticators`,  
+        headers: {
+            'authorization': "Bearer " + body.mfa_token,
+        }});
+    body = JSON.parse(res.body);
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBe(1);
+
+    // challenge
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/mfa/challenge`,  
+        payload: {
+            mfa_token: mfa_token,
+            client_id : "ABC",
+            client_secret: "DEF",
+            authenticator_id: "email",
+            challenge_type: "oob",
+    }});
+    body = JSON.parse(res.body);
+    expect(body.challenge_type).toBe("oob");
+    expect(body.oob_code).toBeDefined();
+    expect(body.binding_method).toBe("prompt");
+
+    const otp = emailTokenData.otp;
+
+    res = await server.app.inject({ 
+        method: "POST",
+        url: '/token',
+        payload: {
+            grant_type: "http://auth0.com/oauth/grant-type/mfa-oob",
+            client_id : "ABC",
+            scope: "read write",
+            client_secret: "DEF",
+            mfa_token: mfa_token,
+            oob_code: body.oob_code,
+            binding_code: otp
+    }});
+    body = JSON.parse(res.body);
+    expect(body.error).toBeUndefined();
+    expect(body.access_token).toBeDefined();
+    expect(body.scope).toBe("read write");
+
 
 });

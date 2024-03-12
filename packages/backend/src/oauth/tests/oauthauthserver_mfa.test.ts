@@ -403,7 +403,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlow', async () => {
     expect(scope).toBe("read write");
 });
 
-test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowInvalidMFAToken', async () => {
+test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidMFAToken', async () => {
     const {clientStorage, client} = await createClient();
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = new InMemoryUserStorage();
@@ -474,7 +474,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowInvalidMFAToken', async (
     expect(access_token2).toBeUndefined();
 });
 
-test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowInvalidOTP', async () => {
+test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOTP', async () => {
     const {clientStorage, client} = await createClient();
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = new InMemoryUserStorage();
@@ -545,7 +545,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowInvalidOTP', async () => 
     expect(access_token2).toBeUndefined();
 });
 
-test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowInvalidOOBCode', async () => {
+test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOOBCode', async () => {
     const {clientStorage, client} = await createClient();
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = new InMemoryUserStorage();

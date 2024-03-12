@@ -1,24 +1,41 @@
-import { type FastifyInstance, type FastifyRequest, type FastifyReply } from 'fastify';
+import {
+    type FastifyInstance,
+    type FastifyRequest,
+    type FastifyReply } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http'
-import { OAuthClientStorage, KeyStorage, OAuthAuthorizationServer, setParameter, ParamType, Hasher } from '@crossauth/backend';
+import {
+    OAuthClientStorage,
+    KeyStorage,
+    OAuthAuthorizationServer,
+    setParameter,
+    ParamType,
+    Hasher } from '@crossauth/backend';
 import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
-import { CrossauthError, CrossauthLogger, type OpenIdConfiguration, j, OAuthFlows, ErrorCode } from '@crossauth/common';
+import {
+    CrossauthError,
+    CrossauthLogger,
+    type OpenIdConfiguration,
+    j,
+    OAuthFlows,
+    ErrorCode,
+    type MfaAuthenticatorResponse } from '@crossauth/common';
 import { FastifyServer, ERROR_500, DEFAULT_ERROR } from './fastifyserver';
 
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
-////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 // OPTIONS
 
-export interface FastifyAuthorizationServerOptions extends OAuthAuthorizationServerOptions {
+export interface FastifyAuthorizationServerOptions 
+    extends OAuthAuthorizationServerOptions {
     errorPage? : string,
     oauthAuthorizePage? : string,
     prefix? : string,
     loginUrl? : string,
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 // FASTIFY INTERFACES
 
 interface AuthorizeQueryType {
@@ -46,7 +63,7 @@ interface UserAuthorizeBodyType {
 interface TokenBodyType {
     grant_type : string,
     client_id : string,
-    client_secret: string,
+    client_secret?: string,
     redirect_uri : string,
     scope? : string,
     state?: string,
@@ -54,6 +71,18 @@ interface TokenBodyType {
     code_verifier? : string,
     username? : string,
     password? : string,
+    mfa_token? : string,
+    oob_code? : string,
+    binding_code? : string,
+    otp? : string,
+}
+
+interface MfaChallengeBodyType {
+    client_id : string,
+    client_secret?: string,
+    challenge_type: string,
+    mfa_token : string,
+    authenticator_id : string,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -80,7 +109,10 @@ export class FastifyAuthorizationServer {
         this.fastifyServer = fastifyServer;
         this.clientStorage = clientStorage;
 
-        this.authServer = new OAuthAuthorizationServer(this.clientStorage, keyStorage, options);
+        this.authServer =
+            new OAuthAuthorizationServer(this.clientStorage,
+                keyStorage,
+                options);
 
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         if (!(this.prefix.endsWith("/"))) this.prefix += "/";
@@ -88,7 +120,8 @@ export class FastifyAuthorizationServer {
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
         setParameter("oauthAuthorizePage", ParamType.String, this, options, "OAUTH_AUTHORIZE_PAGE");
 
-        app.get(this.prefix+'.well-known/openid-configuration', async (_request : FastifyRequest, reply : FastifyReply) =>  {
+        app.get(this.prefix+'.well-known/openid-configuration', 
+            async (_request : FastifyRequest, reply : FastifyReply) =>  {
             return reply.header(...JSONHDR).status(200).send(
                 this.authServer.oidcConfiguration({
                     authorizeEndpoint: this.prefix+"authorize", 
@@ -97,12 +130,15 @@ export class FastifyAuthorizationServer {
                     additionalClaims: []}));
         });
 
-        app.get(this.prefix+'jwks', async (_request : FastifyRequest, reply : FastifyReply) =>  {
+        app.get(this.prefix+'jwks', 
+            async (_request : FastifyRequest, reply : FastifyReply) =>  {
             return reply.header(...JSONHDR).status(200).send(
                 this.authServer.jwks());
         });
 
-        if (this.authServer.validFlows.includes(OAuthFlows.AuthorizationCode) || this.authServer.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
+        if (this.authServer.validFlows.includes(OAuthFlows.AuthorizationCode) || 
+            this.authServer.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) ||
+            this.authServer.validFlows.includes(OAuthFlows.OidcAuthorizationCode)) {
 
             app.get(this.prefix+'authorize', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
@@ -110,16 +146,20 @@ export class FastifyAuthorizationServer {
             });
 
             app.post(this.prefix+'authorize', async (request : FastifyRequest<{ Body: AuthorizeQueryType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
+                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
                 return await this.authorizeEndpoint(request, reply, request.body);
             });
 
 
-            this.app.post(this.prefix+'userauthorize', async (request : FastifyRequest<{ Body: UserAuthorizeBodyType }>, reply : FastifyReply) => {
+            this.app.post(this.prefix+'userauthorize', 
+                async (request: FastifyRequest<{ Body: UserAuthorizeBodyType }>,
+                    reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
 
                 // this should not be called if a user is not logged in
-                if (!request.user) return FastifyServer.sendPageError(reply, 401, this.errorPage);  // not allowed here if not logged in
+                    if (!request.user) return FastifyServer.sendPageError(reply,
+                        401,
+                        this.errorPage);  // not allowed here if not logged in
                 let csrfCookie : string|undefined;
                 let ce : CrossauthError | undefined;
                 try {
@@ -128,19 +168,32 @@ export class FastifyAuthorizationServer {
                 catch (e) {
                     ce = CrossauthError.asCrossauthError(e);
                     ce.message = "Invalid csrf cookie received";
-                    CrossauthLogger.logger.error(j({msg: ce.message, hashedCsrfCookie: csrfCookie?Hasher.hash(csrfCookie) : undefined, user: request.user?.username, cerr: ce}));
+                    CrossauthLogger.logger.error(j({
+                        msg: ce.message,
+                        hashedCsrfCookie: csrfCookie ? 
+                        Hasher.hash(csrfCookie) : undefined,
+                        user: request.user?.username,
+                        cerr: ce
+                    }));
                 }
 
                 if (ce) {
                     if (this.errorPage) {
-                        return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+                        return reply.status(ce.httpStatus).view(this.errorPage, 
+                            {
+                                status: ce.httpStatus,
+                                errorMessage: ce.message,
+                                errorCode: ce.code,
+                                errorCodeName: ce.codeName
+                            });
                     } else {
                         let status : "400" | "401" | "500" = "500";
                         switch (ce.httpStatus) {
                             case 401: status = "401" ; break;
                             case 400: status = "400" ; break;
                         }
-                        return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]??ERROR_500);
+                        return reply.status(ce.httpStatus)
+                            .send(DEFAULT_ERROR[status]??ERROR_500);
                     }
                 }
    
@@ -160,19 +213,34 @@ export class FastifyAuthorizationServer {
             });
         }
 
-        if (this.authServer.validFlows.includes(OAuthFlows.AuthorizationCode) || this.authServer.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
+        if (this.authServer.validFlows.includes(OAuthFlows.AuthorizationCode) || 
+            this.authServer.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) ||
+            this.authServer.validFlows.includes(OAuthFlows.OidcAuthorizationCode) ||
+            this.authServer.validFlows.includes(OAuthFlows.ClientCredentials) ||
+            this.authServer.validFlows.includes(OAuthFlows.Password) ||
+            this.authServer.validFlows.includes(OAuthFlows.PasswordMfa)) {
 
-            this.app.post(this.prefix+'token', async (request : FastifyRequest<{ Body: TokenBodyType }>, reply : FastifyReply) => {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'token', ip: request.ip, user: request.user?.username}));
+            this.app.post(this.prefix+'token', 
+                async (request: FastifyRequest<{ Body: TokenBodyType }>,
+                    reply: FastifyReply) => {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + 'token',
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
 
-                // OAuth spec says we may take client credentials from authorization jeader
+                // OAuth spec says we may take client credentials from 
+                // authorization jeader
                 let clientId = request.body.client_id;
                 let clientSecret = request.body.client_secret;
                 if (request.headers.authorization) {
                     let clientId1 : string|undefined;
                     let clientSecret1 : string|undefined;
                     const parts = request.headers.authorization.split(" ");
-                    if (parts.length == 2 && parts[0].toLocaleLowerCase() == "basic") {
+                    if (parts.length == 2 &&
+                        parts[0].toLocaleLowerCase() == "basic") {
                         const decoded = Hasher.base64Decode(parts[1]);
                         const parts2 = decoded.split(":", 2);
                         if (parts2.length == 2) {
@@ -181,7 +249,9 @@ export class FastifyAuthorizationServer {
                         }
                     }
                     if (clientId1 == undefined || clientSecret1 == undefined) {
-                        CrossauthLogger.logger.warn(j({msg: "Ignoring malform authenization header " + request.headers.authorization}));
+                        CrossauthLogger.logger.warn(j({
+                            msg: "Ignoring malform authenization header " + 
+                                request.headers.authorization}));
                     } else {
                         clientId = clientId1;
                         clientSecret = clientSecret1;
@@ -197,6 +267,10 @@ export class FastifyAuthorizationServer {
                     code: request.body.code,
                     username: request.body.username,
                     password: request.body.password,
+                    mfaToken: request.body.mfa_token,
+                    oobCode: request.body.oob_code,
+                    bindingCode: request.body.binding_code,
+                    otp: request.body.otp,
                 });
 
                 if (resp.error || !resp.access_token) {
@@ -211,47 +285,120 @@ export class FastifyAuthorizationServer {
                 return reply.header(...JSONHDR).send(resp);
             });
         }
+
+        //// PasswordMfa endpoints
+
+        if (this.authServer.validFlows.includes(OAuthFlows.PasswordMfa)) {
+
+            app.get(this.prefix+'mfa/authenticators', 
+                async (request : FastifyRequest, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'GET',
+                        url: this.prefix + 'mfa/authenticators',
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                return await this.mfaAuthenticatorsEndpoint(request, reply);
+            });
+
+            app.post(this.prefix+'mfa/authenticators', 
+                async (request : FastifyRequest, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + 'mfa/authenticators',
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                return await this.mfaAuthenticatorsEndpoint(request, reply);
+            });
+
+            app.post(this.prefix+'mfa/challenge', 
+                async (request : FastifyRequest<{ Body: MfaChallengeBodyType }>, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + 'mfa/challenge',
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                return await this.mfaChallengeEndpoint(request, reply, request.body);
+            });
+        }
     }
 
-    private async authorizeEndpoint(request : FastifyRequest, reply : FastifyReply, query : AuthorizeQueryType) {
-        if (!request.user) return reply.redirect(302, this.loginUrl+"?next="+encodeURIComponent(request.url));
+    private async authorizeEndpoint(request: FastifyRequest,
+        reply: FastifyReply,
+        query: AuthorizeQueryType) {
+        if (!request.user) return reply.redirect(302, 
+            this.loginUrl+"?next="+encodeURIComponent(request.url));
 
-        // this just checks they are valid strings and not empty if required, to avoid XSR vulnerabilities
+        // this just checks they are valid strings and not empty if required, 
+        // to avoid XSR vulnerabilities
         CrossauthLogger.logger.debug(j({msg: "validating authorize parameters"}))
-        let {error_description} = this.authServer.validateAuthorizeParameters(query);
+        let {error_description} = 
+            this.authServer.validateAuthorizeParameters(query);
         let ce : CrossauthError|undefined = undefined;
         if (error_description) {
             ce = new CrossauthError(ErrorCode.BadRequest, error_description);
-            CrossauthLogger.logger.error(j({msg: "authorize parameter invalid", cerr: ce, user: request.user?.username}));
+            CrossauthLogger.logger.error(j({
+                msg: "authorize parameter invalid",
+                cerr: ce,
+                user: request.user?.username
+            }));
         }  else {
-            CrossauthLogger.logger.error(j({msg: "authorize parameter valid", user: request.user?.username}));
+            CrossauthLogger.logger.error(j({
+                msg: "authorize parameter valid",
+                user: request.user?.username
+            }));
 
         }
 
         if (ce) {
             if (this.errorPage) {
-                return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+                return reply.status(ce.httpStatus).view(this.errorPage, 
+                    {
+                        status: ce.httpStatus,
+                        errorMessage: ce.message,
+                        errorCode: ce.code,
+                        errorCodeName: ce.codeName
+                    });
             } else {
                 let status : "401" | "400" | "500" = "500"
                 switch (ce.httpStatus) {
                     case 401: status = "401" ; break;
                     case 400: status = "400" ; break;
                 }
-                return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]??ERROR_500);
+                return reply.status(ce.httpStatus)
+                    .send(DEFAULT_ERROR[status]??ERROR_500);
             }
         }
         let hasAllScopes = false;
-        CrossauthLogger.logger.debug(j({msg: `Checking scopes have been authorized`, scope: query.scope }))
+        CrossauthLogger.logger.debug(j({
+            msg: `Checking scopes have been authorized`,
+            scope: query.scope }))
         if (query.scope) {
-            hasAllScopes = await this.authServer.hasAllScopes(query.client_id, request.user, query.scope.split(" "));
+            hasAllScopes = await this.authServer.hasAllScopes(query.client_id,
+                request.user,
+                query.scope.split(" "));
 
         } else {
-            hasAllScopes = await this.authServer.hasAllScopes(query.client_id, request.user, [null]);
+            hasAllScopes = await this.authServer.hasAllScopes(query.client_id,
+                request.user,
+                [null]);
 
         }
         if (hasAllScopes) {
-            CrossauthLogger.logger.debug(j({msg: `All scopes authorized`, scope: query.scope}))
-            // all scopes have been previously authorized - create an authorization code
+            CrossauthLogger.logger.debug(j({
+                msg: `All scopes authorized`,
+                scope: query.scope
+            }))
+            // all scopes have been previously authorized 
+            // - create an authorization code
             return this.authorize(request, reply, true, {
                 responseType: query.response_type,
                 clientId : query.client_id,
@@ -264,9 +411,13 @@ export class FastifyAuthorizationServer {
            
         } else {
             // requesting new scopes - redirect to page to ask user for it
-            CrossauthLogger.logger.debug(j({msg: `Not all scopes authorized`, scope: query.scope}))
+            CrossauthLogger.logger.debug(j({
+                msg: `Not all scopes authorized`,
+                scope: query.scope
+            }))
             try {
-                const client = await this.clientStorage.getClient(query.client_id);
+                const client = 
+                    await this.clientStorage.getClient(query.client_id);
                 
                 return reply.view(this.oauthAuthorizePage, {
                     user: request.user,
@@ -302,23 +453,25 @@ export class FastifyAuthorizationServer {
 
     }
 
-    private async authorize(request : FastifyRequest, reply : FastifyReply, authorized : boolean, {
-        responseType,
-        clientId,
-        redirectUri,
-        scope,
-        state,
-        codeChallenge,
-        codeChallengeMethod,
-    } : {
-        responseType : string,
-        clientId : string,
-        redirectUri : string,
-        scope? : string,
-        state : string,
-        codeChallenge? : string,
-        codeChallengeMethod?: string,
-    }) {
+    private async authorize(request: FastifyRequest,
+        reply: FastifyReply,
+        authorized: boolean, {
+            responseType,
+            clientId,
+            redirectUri,
+            scope,
+            state,
+            codeChallenge,
+            codeChallengeMethod,
+        } : {
+            responseType : string,
+            clientId : string,
+            redirectUri : string,
+            scope? : string,
+            state : string,
+            codeChallenge? : string,
+            codeChallengeMethod?: string,
+        }) {
         let error : string|undefined;
         let errorDescription : string|undefined;
         let code : string|undefined;
@@ -341,17 +494,25 @@ export class FastifyAuthorizationServer {
 
             // couldn't create an authorization code
             if (error || !code) {
-                const ce = CrossauthError.fromOAuthError(error??"server_error", errorDescription??"Neither code nor error received")
+                const ce = CrossauthError.fromOAuthError(error??"server_error", 
+                    errorDescription??"Neither code nor error received")
                 CrossauthLogger.logger.error(j({cerr: ce}));
                 if (this.errorPage) {
-                    return reply.status(ce.httpStatus).view(this.errorPage, {status: ce.httpStatus, errorMessage: ce.message, errorCode: ce.code, errorCodeName: ce.codeName});
+                    return reply.status(ce.httpStatus).view(this.errorPage, 
+                        {
+                            status: ce.httpStatus,
+                            errorMessage: ce.message,
+                            errorCode: ce.code,
+                            errorCodeName: ce.codeName
+                        });
                 } else {
                     let status : "401" | "400" | "500" = "500"
                     switch (ce.httpStatus) {
                         case 401: status = "401" ; break;
                         case 400: status = "400" ; break;
                     }
-                    return reply.status(ce.httpStatus).send(DEFAULT_ERROR[status]??ERROR_500);
+                    return reply.status(ce.httpStatus)
+                        .send(DEFAULT_ERROR[status]??ERROR_500);
                 }
             }
 
@@ -364,15 +525,65 @@ export class FastifyAuthorizationServer {
         } else {
 
             // resource owner did not grant access
-            const ce = new CrossauthError(ErrorCode.Unauthorized,  "You have not granted access");
-            CrossauthLogger.logger.error(j({msg: errorDescription, errorCode: ce.code, errorCodeName: ce.codeName}));
+            const ce = new CrossauthError(ErrorCode.Unauthorized,  
+                "You have not granted access");
+            CrossauthLogger.logger.error(j({
+                msg: errorDescription,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName
+            }));
             try {
                 OAuthAuthorizationServer.validateUri(redirectUri);
                 return reply.redirect(redirectUri); 
             } catch (e) {
-                CrossauthLogger.logger.error(j({msg: `Couldn't send error message ${ce.codeName} to ${redirectUri}}`}));
+                CrossauthLogger.logger.error(j({
+                    msg: `Couldn't send error message ${ce.codeName} to ${redirectUri}}`}));
             }
         }
+    }
+
+    private async mfaAuthenticatorsEndpoint(request: FastifyRequest,
+        reply: FastifyReply) : 
+        Promise<MfaAuthenticatorResponse[]|
+            {error? : string, error_desciption? : string}> {
+
+        const authHeader = request.headers['authorization']?.split(" ");
+        if (!authHeader || authHeader.length != 2) {
+            return {
+                error: "access_denied",
+                error_desciption: "Invalid authorization header"
+            };
+        }
+        const mfa_token = authHeader[1];
+        const resp = 
+            await this.authServer.mfaAuthenticatorsEndpoint(mfa_token);
+        if (resp.authenticators) {
+            return reply.header(...JSONHDR).status(200).send(resp.authenticators);
+        }
+        const ce = CrossauthError.fromOAuthError(resp.error??"server_error");
+        return reply.header(...JSONHDR).status(ce.httpStatus).send(resp);
+
+    }
+
+    private async mfaChallengeEndpoint(_request: FastifyRequest,
+        reply: FastifyReply,
+        query: MfaChallengeBodyType) : 
+        Promise<MfaAuthenticatorResponse[]|
+            {error? : string, error_desciption? : string}> {
+
+        const resp = 
+            await this.authServer.mfaChallengeEndpoint(query.mfa_token,
+                query.client_id,
+                query.client_secret,
+                query.challenge_type,
+                query.authenticator_id);
+        if (resp.error) {
+            const ce = CrossauthError.fromOAuthError(resp.error);
+            return reply.header(...JSONHDR).status(ce.httpStatus).send(resp);
+        }
+        
+        return reply.header(...JSONHDR).status(200).send(resp);
+
     }
 
     oidcConfiguration() : OpenIdConfiguration {

@@ -884,7 +884,16 @@ export class OAuthAuthorizationServer {
                 }
             }
 
-
+            try {
+                this.keyStorage.deleteKey(mfa.key.value);
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                CrossauthLogger.logger.warn(j({
+                    cerr: e,
+                    msg: "Couldn't delete mfa token",
+                    hashedMfaToken: mfa.key.value
+                }))
+            }
     
             return await this.getAccessToken({
                 client, 
@@ -965,6 +974,17 @@ export class OAuthAuthorizationServer {
                 }
             }
     
+            try {
+                this.keyStorage.deleteKey(mfa.key.value);
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                CrossauthLogger.logger.warn(j({
+                    cerr: e,
+                    msg: "Couldn't delete mfa token",
+                    hashedMfaToken: mfa.key.value
+                }))
+            }
+
             return await this.getAccessToken({
                 client, 
                 clientSecret, 

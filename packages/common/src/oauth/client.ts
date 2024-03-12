@@ -476,7 +476,7 @@ export abstract class OAuthClientBase {
         }
 
         const url = this.oidcConfig.issuer + 
-            (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
+            (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/challenge";
         const resp = await this.post(url, {
             client_id: this.clientId,
             client_secret: this.clientSecret,
