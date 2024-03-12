@@ -1,11 +1,51 @@
 import { PrismaClient } from '@prisma/client'
 import { LocalPasswordAuthenticator } from '@crossauth/backend';
-import { PrismaUserStorage, PrismaOAuthClientStorage, Hasher } from '@crossauth/backend';
-import { CrossauthLogger, OAuthFlows } from '@crossauth/common';
+import {
+  PrismaUserStorage,
+  PrismaOAuthClientStorage,
+  Hasher,
+  UserStorage,
+  TotpAuthenticator } from '@crossauth/backend';
+import {
+  CrossauthLogger,
+  CrossauthError,
+  ErrorCode,
+  OAuthFlows,
+  type UserInputFields } from '@crossauth/common';
+import { authenticator as gAuthenticator } from 'otplib';
 
 const prisma = new PrismaClient();
 
 let userStorage = new PrismaUserStorage({prismaClient : prisma});
+
+async function createTotpAccount(username: string,
+  password: string,
+  userStorage: UserStorage) {
+
+  const userInputs : UserInputFields = {
+      username: username,
+      email: username + "@email.com",
+      state: "active",
+      factor1: "localpassword", 
+      factor2: "totp", 
+  };
+  let lpAuthenticator = 
+      new LocalPasswordAuthenticator(userStorage, {pbkdf2Iterations: 1_000});
+
+  const totpAuth = new TotpAuthenticator("Unittest");
+  totpAuth.factorName = "totp";
+  const resp = await totpAuth.prepareConfiguration(userInputs);
+  if (!resp?.sessionData) throw new CrossauthError(ErrorCode.UnknownError, 
+      "TOTP created no session data")
+
+  const user = await userStorage.createUser(userInputs, {
+      password: await lpAuthenticator.createPasswordHash(password),
+      totpSecret: resp.sessionData.totpSecret,
+      } );
+
+  return { user, totpSecret: resp.sessionData.totpSecret };
+};
+
 
 async function main() {
     await prisma.user.deleteMany();
@@ -21,15 +61,18 @@ async function main() {
   }, {
       password: await authenticator.createPasswordHash("bobPass123"), 
   });
-  const user2 = await userStorage.createUser({
+  /*const user2 = await userStorage.createUser({
       username: "alice", 
       state: "active",
       factor1: "localpassword",
       email: "alice@alice.com",
   }, {
       password: await authenticator.createPasswordHash("alicePass123"), 
-  });
-  console.log({ user1, user2 })
+  });*/
+  const {user: user2, totpSecret} = await createTotpAccount("alice", "alicePass123", userStorage);
+  console.log({ user1,  })
+  console.log({ user2 })
+  console.log({ totpSecret })
 
   const clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
   const clientSecret = await Hasher.passwordHash("DEF", {

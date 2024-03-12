@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/public/style.css"/>
+    <title>Please enter your code</title>
+</head>
+<body>
+    <h1>Please enter your code</h1>
+    <form action="{{action}}" method="POST">
+
+        {% if errorCodeName %}
+            {% if errorCodeName == "InvalidToken" or errorCodeName == "Expired"%}
+                <p class="error">Please enter a valid code</p>
+            {% else %}
+                <p class="error">An error has occurred</p>
+            {% endif %}
+        {% endif %}
+        {% if factor2 == "totp" %}
+            <p>
+                Enter the code from Google Authenticator on your smartphone        
+            </p>
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}">
+                <input type="hidden" name="persist" value="{{ persist }}">
+                <input type="hidden" name="next" value="{{ next }}">
+            <p>
+                <label for="otp">Code</label>
+                <input type="password" name="otp">
+            </p>
+            <p><button type="submit">Submit</button></p>
+        {% elif factor2 == "email" %}
+            <p>
+                Please enter the code we just emailed you        
+            </p>
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}">
+                <input type="hidden" name="persist" value="{{ persist }}">
+                <input type="hidden" name="next" value="{{ next }}">
+                <label for="otp">Code</label>
+                <input type="password" name="otp">
+            </p>
+            <p><button type="submit">Submit</button></p>
+        {% else %}
+            <p class="error">Unknown two-factor authentication type.  please
+                <a href="login">try to log in again</a>.
+            </p>
+        {% endif %}
+    </form>
+</body>
+</html>

@@ -1,5 +1,13 @@
 import { expect } from 'vitest';
-import { OAuthAuthorizationServer, InMemoryOAuthClientStorage, InMemoryKeyStorage, OAuthClientStorage, Hasher, LocalPasswordAuthenticator } from '@crossauth/backend';
+import {
+    OAuthAuthorizationServer,
+    InMemoryOAuthClientStorage,
+    InMemoryKeyStorage,
+    OAuthClientStorage,
+    Hasher,
+    LocalPasswordAuthenticator,
+    TotpAuthenticator,
+    EmailAuthenticator } from '@crossauth/backend';
 import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
 import { OAuthClient, OAuthFlows } from '@crossauth/common';
 import fs from 'node:fs';
@@ -42,7 +50,9 @@ export async function getAuthServer({
     const {clientStorage, client} = await createClient(secretRequired == undefined || secretRequired == true);
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
     const userStorage = await getTestUserStorage();
-    const authenticator = new LocalPasswordAuthenticator(userStorage);
+    const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
+    const totpAuth = new TotpAuthenticator("Unittest");
+    const emailAuth = new EmailAuthenticator();
     let options : OAuthAuthorizationServerOptions = {
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
@@ -53,7 +63,9 @@ export async function getAuthServer({
         validFlows: "all",
         userStorage,
         authenticators : {
-            "localpassword": authenticator,
+            "localpassword": lpAuthenticator,
+            totp: totpAuth,
+            email: emailAuth,
         },
     };
     if (aud) options.resourceServers = aud;
@@ -63,7 +75,7 @@ export async function getAuthServer({
     if (rollingRefreshToken != undefined) options.rollingRefreshToken = rollingRefreshToken;
     const keyStorage = new InMemoryKeyStorage();
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, options);
-    return {client, clientStorage, authServer, keyStorage, userStorage};
+    return {client, clientStorage, authServer, keyStorage, userStorage, emailAuth};
 }
 
 export async function getAuthorizationCode({

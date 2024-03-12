@@ -4,6 +4,7 @@ import { PrismaKeyStorage,
          PrismaOAuthClientStorage, 
          PrismaOAuthAuthorizationStorage, 
          LocalPasswordAuthenticator, 
+         TotpAuthenticator,
         } from '@crossauth/backend';
 import { FastifyServer, FastifyOAuthResourceServer } from '@crossauth/fastify';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
@@ -12,6 +13,7 @@ import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
 import { CrossauthLogger } from '@crossauth/common';
+import { totp } from 'otplib';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
@@ -52,6 +54,7 @@ let clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
 let authStorage = new PrismaOAuthAuthorizationStorage({prismaClient : prisma});
 
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
+let totpAuthenticator = new TotpAuthenticator("Fastify OAuth Server");
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyServer(userStorage, {
@@ -59,12 +62,14 @@ let server = new FastifyServer(userStorage, {
         keyStorage: keyStorage,
         authenticators: {
             localpassword: lpAuthenticator,
+            totp: totpAuthenticator,
         }},
     oAuthAuthServer : {
         clientStorage : clientStorage,
         keyStorage: keyStorage,
         options: {authenticators: {
-            "localpassword": lpAuthenticator
+            "localpassword": lpAuthenticator,
+            totp: totpAuthenticator,
         }},
     },
     oAuthResServer: {

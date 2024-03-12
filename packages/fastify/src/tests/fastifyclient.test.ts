@@ -381,3 +381,6 @@ test('FastifyOAuthClient.bffPost', async () => {
     expect(requestBody.param).toBe("value");
 });
 
+afterAll(async () => {
+    fetchMocker.dontMock();
+});

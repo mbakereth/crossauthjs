@@ -132,6 +132,9 @@ importers:
       nunjucks:
         specifier: ^3.2.4
         version: 3.2.4
+      otplib:
+        specifier: ^12.0.1
+        version: 12.0.1
       tsx:
         specifier: ^4.7.0
         version: 4.7.1

@@ -695,6 +695,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
             return JSON.stringify(challengeResponse)});
         
         const authenticatorId = authenticatorsResponse.authenticators && authenticatorsResponse.authenticators.length > 0 ? authenticatorsResponse.authenticators[0].id : "";
+        const clientChallengeReponse = await oauthClient["mfaOtpRequest"](mfa_token, authenticatorId);
 
         const secondTokenResponse =
             await authServer.tokenPostEndpoint({
@@ -708,13 +709,13 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
 
         fetchMocker.mockResponseOnce((_req) => {
             return JSON.stringify(secondTokenResponse)});
-        const clientChallengeReponse = await oauthClient["mfaOtp"](mfa_token, authenticatorId, otp);
+        const clientChallenge2Reponse = await oauthClient["mfaOtpComplete"](mfa_token, otp);
 
-        if (clientChallengeReponse.error && i < maxTries-1) continue;
+        if (clientChallenge2Reponse.error && i < maxTries-1) continue;
 
-        expect(clientChallengeReponse.error).toBeUndefined();
-        expect(clientChallengeReponse.access_token).toBeDefined();
-        expect(clientChallengeReponse.scope).toBe("read write");
+        expect(clientChallenge2Reponse.error).toBeUndefined();
+        expect(clientChallenge2Reponse.access_token).toBeDefined();
+        expect(clientChallenge2Reponse.scope).toBe("read write");
         break;
 
     }

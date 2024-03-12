@@ -386,18 +386,12 @@ export abstract class OAuthClientBase {
 
     }
 
-    protected async mfaOtp(authenticatorId: string,
-        mfaToken: string,
-        otp: string) : 
+    protected async mfaOtpRequest(authenticatorId: string,
+        mfaToken: string) : 
         Promise<{
-        access_token? : string, 
-        refresh_token? : string, 
-        id_token?: string, 
-        expires_in? : number, 
-        scope? : string, 
-        token_type?: string, 
-        error? : string, 
-        error_description? : string}> {
+            challenge_type? : string, 
+            error? : string, 
+            error_description? : string}> {
         CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
@@ -427,11 +421,32 @@ export abstract class OAuthClientBase {
             };
         }
 
-        if (!this.oidcConfig?.token_endpoint) {
+        return resp;
+    }
+
+    protected async mfaOtpComplete(
+        mfaToken: string,
+        otp: string) : 
+        Promise<{
+        access_token? : string, 
+        refresh_token? : string, 
+        id_token?: string, 
+        expires_in? : number, 
+        scope? : string, 
+        token_type?: string, 
+        error? : string, 
+        error_description? : string}> {
+        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported
+            .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
             return {
-                error: "server_error",
-                error_description: "Cannot get token endpoint"
+                error: "invalid_request",
+                error_description: "Server does not support password_mfa grant"
             };
+        }
+        if (!this.oidcConfig?.issuer) {
+            return {error: "server_error", error_description: "Cannot get issuer"};
         }
 
         const otpUrl = this.oidcConfig.token_endpoint;
