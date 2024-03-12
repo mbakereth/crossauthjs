@@ -1,0 +1,35 @@
+{
+  "name": "oauthpasswordcli",
+  "version": "0.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "build": "pnpx tsc",
+    "start": "node dist/index.js",
+    "dev": "NODE_PATH=`pwd`/node_modules dotenv -e .env.dev tsx src/index.ts",
+    "test": "echo 'no tests defined'",
+    "testonce": "echo 'no tests defined'"
+  },
+  "keywords": [],
+  "author": "Matthew Baker",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "dotenv-cli": "^7.3.0",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@crossauth/backend": "workspace:^",
+    "@crossauth/common": "workspace:^",
+    "@types/dotenv": "^8.2.0",
+    "@types/nunjucks": "^3.2.6",
+    "bunyan": "^1.8.15",
+    "docenv": "^2.0.6",
+    "dotenv": "^16.3.1",
+    "read": "^3.0.1",
+    "tsx": "^4.7.0"
+  }
+}

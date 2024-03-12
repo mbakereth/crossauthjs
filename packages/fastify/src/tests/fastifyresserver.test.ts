@@ -34,7 +34,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -77,7 +77,7 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 

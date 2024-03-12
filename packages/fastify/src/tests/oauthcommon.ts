@@ -113,7 +113,7 @@ export async function getAccessToken() {
 
     const {authServer, client, code, clientStorage} = await getAuthorizationCode();
     const {access_token, error, error_description, refresh_token, expires_in}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 

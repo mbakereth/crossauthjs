@@ -535,7 +535,7 @@ export class OAuthAuthorizationServer {
         switch (flow) {
             case OAuthFlows.AuthorizationCode:
             case OAuthFlows.AuthorizationCodeWithPKCE:
-                authenticateClient = (client.confidential || 
+                authenticateClient = (client.confidential==true || 
                     client.clientSecret != undefined || 
                     clientSecret != undefined);
                 break;
@@ -544,17 +544,17 @@ export class OAuthAuthorizationServer {
                 break;
             case OAuthFlows.Password:
             case OAuthFlows.PasswordMfa:
-                authenticateClient = (client.confidential || 
+                authenticateClient = (client.confidential==true || 
                     client.clientSecret != undefined || 
                     clientSecret != undefined);
                 break;
             case OAuthFlows.RefreshToken:
-                authenticateClient = (client.confidential || 
+                authenticateClient = (client.confidential==true || 
                     client.clientSecret != undefined || 
                     clientSecret != undefined);
                 break;
             case OAuthFlows.DeviceCode:
-                authenticateClient = (client.confidential || 
+                authenticateClient = (client.confidential==true || 
                     client.clientSecret != undefined || 
                     clientSecret != undefined);
                 break;
@@ -566,15 +566,23 @@ export class OAuthAuthorizationServer {
                 error_description: "Client secret is required for this client",
             }
         }
-        const passwordCorrect = 
-            await Hasher.passwordsEqual(clientSecret??"", 
-                client.clientSecret??"");
-        if (!passwordCorrect) {
+        if (authenticateClient && (!clientSecret || !client.clientSecret)) {
             return {
                 error: "access_denied",
-                error_description: "Incorrect client secret",
+                error_description: "Client is confidential but either secret not passed or is missing in database",
             }
+        }
+        if (authenticateClient) {
+            const passwordCorrect = 
+                await Hasher.passwordsEqual(clientSecret??"", 
+                    client.clientSecret??"");
+            if (!passwordCorrect) {
+                return {
+                    error: "access_denied",
+                    error_description: "Incorrect client secret",
+                }
 
+            }
         }
         return {};
 
@@ -605,7 +613,7 @@ export class OAuthAuthorizationServer {
      * 
      * For arguments and return parameters, see OAuth2 documentation.
      */
-    async tokenPostEndpoint({
+    async tokenEndpoint({
         grantType, 
         clientId, 
         scope, 

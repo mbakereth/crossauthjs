@@ -8,7 +8,7 @@ test('ResourceServer.validAccessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -32,7 +32,7 @@ test('ResourceServer.invalidPublicKey', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -56,7 +56,7 @@ test('ResourceServer.invalidSecret', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const { error }
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -68,7 +68,7 @@ test('ResourceServer.invalidAccessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -92,7 +92,7 @@ test('ResourceServer.validCodeChallenge', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({challenge: true});
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -115,7 +115,7 @@ test('ResourceServer.invalidCodeChallenge', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({challenge: true});
     const {error}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -127,7 +127,7 @@ test('ResourceServer.validAud', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({aud: "resourceserver"});
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -151,7 +151,7 @@ test('ResourceServer.invalidAud', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({aud: "resourceserver"});
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -175,7 +175,7 @@ test('ResourceServer.invalidIsser', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -199,7 +199,7 @@ test('ResourceServer.persistAccessToken', async () => {
 
     const {authServer, client, code, keyStorage} = await getAuthorizationCode({persistAccessToken: true});
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -227,7 +227,7 @@ test('ResourceServer.validateWithJwks', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 

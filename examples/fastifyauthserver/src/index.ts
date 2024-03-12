@@ -5,6 +5,7 @@ import { PrismaKeyStorage,
          PrismaOAuthAuthorizationStorage, 
          LocalPasswordAuthenticator, 
          TotpAuthenticator,
+         EmailAuthenticator,
         } from '@crossauth/backend';
 import { FastifyServer, FastifyOAuthResourceServer } from '@crossauth/fastify';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
@@ -55,6 +56,7 @@ let authStorage = new PrismaOAuthAuthorizationStorage({prismaClient : prisma});
 
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
 let totpAuthenticator = new TotpAuthenticator("Fastify OAuth Server");
+let emailAuthenticator = new EmailAuthenticator();
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyServer(userStorage, {
@@ -63,13 +65,15 @@ let server = new FastifyServer(userStorage, {
         authenticators: {
             localpassword: lpAuthenticator,
             totp: totpAuthenticator,
+            email: emailAuthenticator,
         }},
     oAuthAuthServer : {
         clientStorage : clientStorage,
         keyStorage: keyStorage,
         options: {authenticators: {
-            "localpassword": lpAuthenticator,
+            localpassword: lpAuthenticator,
             totp: totpAuthenticator,
+            email: emailAuthenticator,
         }},
     },
     oAuthResServer: {

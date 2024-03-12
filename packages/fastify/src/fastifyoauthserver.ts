@@ -258,7 +258,7 @@ export class FastifyAuthorizationServer {
                     }
                 }
 
-                const resp = await this.authServer.tokenPostEndpoint({
+                const resp = await this.authServer.tokenEndpoint({
                     grantType: request.body.grant_type,
                     clientId : clientId,
                     clientSecret : clientSecret,

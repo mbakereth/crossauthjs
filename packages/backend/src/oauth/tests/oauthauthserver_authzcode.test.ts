@@ -408,7 +408,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
     expect(state).toBe(inputState);
 
     const {access_token,  error: error2}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -424,7 +424,7 @@ test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, refresh_token, expires_in, error, error_description}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -488,7 +488,7 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowNoRolling', async () => 
 
     const {authServer, client, code} = await getAuthorizationCode({rollingRefreshToken: false});
     const {refresh_token, error}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -497,7 +497,7 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowNoRolling', async () => 
     expect(refresh_token).toBeDefined();
 
     const {refresh_token: refresh_token2, error: error2}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "refresh_token", 
             clientId: client.clientId, 
             refreshToken: refresh_token, 
@@ -511,7 +511,7 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({rollingRefreshToken: true});
     const {refresh_token, error}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
@@ -520,7 +520,7 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
     expect(refresh_token).toBeDefined();
 
     const {refresh_token: refresh_token2, error: error2}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "refresh_token", 
             clientId: client.clientId, 
             refreshToken: refresh_token, 
@@ -535,7 +535,7 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdToken', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({oidc: true});
     const {access_token, refresh_token, expires_in, error, error_description, id_token}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 

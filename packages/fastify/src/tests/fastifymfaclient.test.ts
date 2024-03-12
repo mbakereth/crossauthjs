@@ -188,7 +188,7 @@ test('FastifyOAuthClient.Mfa.otp', async () => {
 
     ////// Call password flow - expect MFA to initiate
     const firstTokenResponse = 
-        await authServer.tokenPostEndpoint({
+        await authServer.tokenEndpoint({
             grantType: "password", 
             clientId: "ABC", 
             username: "mary",
@@ -221,7 +221,7 @@ test('FastifyOAuthClient.Mfa.otp', async () => {
         const otp = gAuthenticator.generate(totpSecret);
 
         const {access_token, scope, error: error4, expires_in} =
-        await authServer.tokenPostEndpoint({
+        await authServer.tokenEndpoint({
             grantType: "http://auth0.com/oauth/grant-type/mfa-otp",
             clientId : "ABC",
             scope: "read write",
@@ -283,7 +283,7 @@ test('FastifyOAuthClient.Mfa.oob', async () => {
 
     ////// Call password flow - expect MFA to initiate
     const firstTokenResponse = 
-        await authServer.tokenPostEndpoint({
+        await authServer.tokenEndpoint({
             grantType: "password", 
             clientId: "ABC", 
             username: "mary",
@@ -328,7 +328,7 @@ test('FastifyOAuthClient.Mfa.oob', async () => {
         const otp = emailTokenData.otp;
 
         const {access_token, scope, error: error4, expires_in} =
-        await authServer.tokenPostEndpoint({
+        await authServer.tokenEndpoint({
             grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
             clientId : "ABC",
             scope: "read write",

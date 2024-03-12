@@ -293,9 +293,10 @@ export abstract class OAuthClientBase {
         //return {url: url, params: params};
     }
 
-    protected async passwordFlow(username: string,
+    async passwordFlow(username: string,
         password: string,
-        scope?: string) : Promise<{[key:string]:any}> {
+        scope?: string) : 
+        Promise<OAuthTokenResponse> {
         CrossauthLogger.logger.debug(j({msg: "Starting password flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("password")) {
@@ -334,7 +335,7 @@ export abstract class OAuthClientBase {
     }
 
 
-    protected async supportedAuthenticators(mfaToken : string) : 
+    async mfaAuthenticators(mfaToken : string) : 
         Promise<{
             authenticators?: MfaAuthenticatorResponse[],
             error?: string,
@@ -386,8 +387,8 @@ export abstract class OAuthClientBase {
 
     }
 
-    protected async mfaOtpRequest(authenticatorId: string,
-        mfaToken: string) : 
+    async mfaOtpRequest(mfaToken: string,
+        authenticatorId: string) : 
         Promise<{
             challenge_type? : string, 
             error? : string, 
@@ -424,7 +425,7 @@ export abstract class OAuthClientBase {
         return resp;
     }
 
-    protected async mfaOtpComplete(
+    async mfaOtpComplete(
         mfaToken: string,
         otp: string) : 
         Promise<{
@@ -471,7 +472,8 @@ export abstract class OAuthClientBase {
 
     }
 
-    protected async mfaOobRequest(authenticatorId : string, mfaToken : string) : Promise<{
+    async mfaOobRequest(mfaToken : string, 
+        authenticatorId : string, ) : Promise<{
         challenge_type? : string, 
         oob_code? : string, 
         binding_method?: string, 
@@ -513,7 +515,7 @@ export abstract class OAuthClientBase {
 
     }
 
-    protected async mfaOobComplete(mfaToken: string,
+    async mfaOobComplete(mfaToken: string,
         oobCode: string,
         bindingCode: string) : Promise<OAuthTokenResponse> {
         CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));

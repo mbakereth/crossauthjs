@@ -922,7 +922,7 @@ export class FastifyOAuthClient extends OAuthClient {
     ) : Promise<FastifyReply> {
 
         const authenticatorsResponse = 
-            await this.supportedAuthenticators(mfa_token);
+            await this.mfaAuthenticators(mfa_token);
         if (authenticatorsResponse.error || 
             !authenticatorsResponse.authenticators ||
             !Array.isArray(authenticatorsResponse.authenticators) ||
@@ -944,7 +944,7 @@ export class FastifyOAuthClient extends OAuthClient {
 
         const auth = authenticatorsResponse.authenticators[0] as MfaAuthenticatorResponse;
         if (auth.authenticator_type == "otp") {
-            const resp = await this.mfaOtpRequest(auth.id, mfa_token);
+            const resp = await this.mfaOtpRequest(mfa_token, auth.id);
             if (resp.error || resp.challenge_type!="otp") {
                 const ce = CrossauthError.fromOAuthError(resp.error??"server_error",
                     resp.error_description??"Invalid response from MFA OTP challenge");
@@ -964,7 +964,7 @@ export class FastifyOAuthClient extends OAuthClient {
                 mfa_token: mfa_token,
             });            
         } else if (auth.authenticator_type == "oob") {
-            const resp = await this.mfaOobRequest(auth.id, mfa_token);
+            const resp = await this.mfaOobRequest(mfa_token, auth.id);
             if (resp.error || resp.challenge_type!="oob" || !resp.oob_code || 
                 resp.binding_method != "prompt") {
                 const ce = CrossauthError.fromOAuthError(resp.error??"server_error",

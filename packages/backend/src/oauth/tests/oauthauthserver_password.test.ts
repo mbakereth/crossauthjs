@@ -23,7 +23,7 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
         },
     });
     const {access_token, error}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "password", 
             clientId: client.clientId, 
             username: "bob",
@@ -51,7 +51,7 @@ test('AuthorizationServer.passwordFlow.incorrectPassword', async () => {
         },
     });
     const {access_token, error}
-        = await authServer.tokenPostEndpoint({
+        = await authServer.tokenEndpoint({
             grantType: "password", 
             clientId: client.clientId, 
             username: "bob",

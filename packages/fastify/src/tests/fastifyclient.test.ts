@@ -111,7 +111,7 @@ async function getAccessTokenThroughClient(clientParams : {[key:string]:any}) {
     const {csrfCookie, csrfToken} = getCsrf(res);
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
-    const resp = await authServer.tokenPostEndpoint({
+    const resp = await authServer.tokenEndpoint({
         grantType: "password", 
         clientId : "ABC", 
         scope : "read write", 
@@ -217,7 +217,7 @@ test('FastifyOAuthClient.clientCredentialsFlow', async () => {
     expect(body.body.client_secret).toBe("DEF");
     expect(body.body.scope).toBe("read write");
 
-    const resp = await authServer.tokenPostEndpoint({
+    const resp = await authServer.tokenEndpoint({
         grantType: body.body.grant_type, 
         clientId : body.body.client_id, 
         scope : body.body.scope, 
@@ -251,6 +251,7 @@ test('FastifyOAuthClient.passwordFlow', async () => {
         username: "bob",
         password: "bobPass123",
      }});
+    console.log(res);
     body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
     expect(body.body.grant_type).toBe("password");
@@ -260,7 +261,7 @@ test('FastifyOAuthClient.passwordFlow', async () => {
     expect(body.body.username).toBe("bob");
     expect(body.body.password).toBe("bobPass123");
 
-    const resp = await authServer.tokenPostEndpoint({
+    const resp = await authServer.tokenEndpoint({
         grantType: body.body.grant_type, 
         clientId : body.body.client_id, 
         scope : body.body.scope, 
@@ -280,7 +281,7 @@ test('FastifyOAuthClient.refreshToken', async () => {
     const {authServer, access_token, refresh_token} = await getAccessToken();
     expect(access_token).toBeDefined();
 
-    const resp = await authServer.tokenPostEndpoint({
+    const resp = await authServer.tokenEndpoint({
         grantType: "refresh_token", 
         clientId : "ABC", 
         clientSecret : "DEF",
@@ -381,6 +382,3 @@ test('FastifyOAuthClient.bffPost', async () => {
     expect(requestBody.param).toBe("value");
 });
 
-afterAll(async () => {
-    fetchMocker.dontMock();
-});

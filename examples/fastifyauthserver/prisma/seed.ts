@@ -5,7 +5,8 @@ import {
   PrismaOAuthClientStorage,
   Hasher,
   UserStorage,
-  TotpAuthenticator } from '@crossauth/backend';
+  TotpAuthenticator,
+  EmailAuthenticator } from '@crossauth/backend';
 import {
   CrossauthLogger,
   CrossauthError,
@@ -46,6 +47,29 @@ async function createTotpAccount(username: string,
   return { user, totpSecret: resp.sessionData.totpSecret };
 };
 
+async function createEmailAccount(username: string,
+  password: string,
+  userStorage: UserStorage) {
+
+  const userInputs : UserInputFields = {
+      username: username,
+      email: username + "@email.com",
+      state: "active",
+      factor1: "localpassword", 
+      factor2: "email", 
+  };
+  let lpAuthenticator = 
+      new LocalPasswordAuthenticator(userStorage, {pbkdf2Iterations: 1_000});
+
+  const emailAuth = new EmailAuthenticator()
+  emailAuth.factorName = "email";
+
+  const user = await userStorage.createUser(userInputs, {
+      password: await lpAuthenticator.createPasswordHash(password),
+      } );
+
+  return { user };
+};
 
 async function main() {
     await prisma.user.deleteMany();
@@ -70,9 +94,11 @@ async function main() {
       password: await authenticator.createPasswordHash("alicePass123"), 
   });*/
   const {user: user2, totpSecret} = await createTotpAccount("alice", "alicePass123", userStorage);
-  console.log({ user1,  })
+  const {user: user3} = await createEmailAccount("mary", "maryPass123", userStorage);
+  console.log({ user1 })
   console.log({ user2 })
   console.log({ totpSecret })
+  console.log({ user3 })
 
   const clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
   const clientSecret = await Hasher.passwordHash("DEF", {
