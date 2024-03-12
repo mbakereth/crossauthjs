@@ -1850,7 +1850,7 @@ export class OAuthAuthorizationServer {
         let grantTypes : GrantType[] = [];
         this.validFlows.forEach((flow) => {
             const grantType = OAuthFlows.grantType(flow);
-            if (grantType) grantTypes.push(grantType);
+            if (grantType) grantTypes = [...grantTypes, ...grantType];
         })
 
         const jwtAlgorithms = [

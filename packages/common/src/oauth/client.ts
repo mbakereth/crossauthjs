@@ -37,22 +37,22 @@ export class OAuthFlows {
         ];
     }
 
-    static grantType(oauthFlow : string) : GrantType|undefined {
+    static grantType(oauthFlow : string) : GrantType[]|undefined {
         switch (oauthFlow) {
             case OAuthFlows.AuthorizationCode:
             case OAuthFlows.AuthorizationCodeWithPKCE:
                 case OAuthFlows.OidcAuthorizationCode:
-                    return "authorization_code";
+                    return ["authorization_code"];
             case OAuthFlows.ClientCredentials:
-                return "client_credentials";
+                return ["client_credentials"];
             case OAuthFlows.RefreshToken:
-                return "refresh_token";
+                return ["refresh_token"];
             case OAuthFlows.Password:
-                return "password";
+                return ["password"];
             case OAuthFlows.PasswordMfa:
-                return "http://auth0.com/oauth/grant-type/mfa-otp";
+                return ["http://auth0.com/oauth/grant-type/mfa-otp"];
             case OAuthFlows.DeviceCode:
-                return "device_code";
+                return ["device_code"];
         }
         return undefined;
     }
@@ -358,7 +358,7 @@ export abstract class OAuthClientBase {
             "" : "/") + "mfa/authenticators";
         const resp = 
             await this.get(url, {'authorization': 'Bearer ' + mfaToken});
-        if (Array.isArray(resp)) {
+        if (!Array.isArray(resp)) {
             return {
                 error: "server_error",
                 error_description: "Expected array of authenticators in mfa/authenticators response"
@@ -412,7 +412,7 @@ export abstract class OAuthClientBase {
         }
 
         const url = this.oidcConfig.issuer + 
-            (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/authenticators";
+            (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/challenge";
         const resp = await this.post(url, {
             client_id: this.clientId,
             client_secret: this.clientSecret,

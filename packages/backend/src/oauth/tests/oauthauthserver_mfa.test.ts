@@ -1,4 +1,5 @@
-import { test, expect } from 'vitest';
+import createFetchMock from 'vitest-fetch-mock';
+import { test, expect, vi, beforeAll, afterAll } from 'vitest';
 import { OAuthAuthorizationServer } from '../authserver';
 import { createClient } from './common';
 import { UserStorage } from '../../storage';
@@ -8,8 +9,38 @@ import { InMemoryKeyStorage, InMemoryUserStorage } from '../../storage/inmemorys
 import { LocalPasswordAuthenticator } from '../..';
 import { authenticator as gAuthenticator } from 'otplib';
 import { CrossauthError, ErrorCode, UserInputFields } from '@crossauth/common';
+import { OpenIdConfiguration } from '@crossauth/common';
+import { OAuthClient } from '../client'
+
+const fetchMocker = createFetchMock(vi);
+fetchMocker.enableMocks();
 
 export var emailTokenData :  {to: string, otp : string};
+
+beforeAll(async () => {
+    fetchMocker.doMock();
+});
+
+const oidcConfiguration : OpenIdConfiguration = {
+    issuer: "http://server.com",
+    authorization_endpoint: "http://server.com/authorize",
+    token_endpoint: "http://server.com/token",
+    token_endpoint_auth_methods_supported: ["client_secret_post"],
+    jwks_uri: "http://server.com/jwks",
+    response_types_supported: ["code"],
+    response_modes_supported: ["query"],
+    grant_types_supported: ["authorization_code",
+        "client_credentials",
+        "password",
+        "http://auth0.com/oauth/grant-type/mfa-otp",
+        "http://auth0.com/oauth/grant-type/mfa-oob"],
+    token_endpoint_auth_signing_alg_values_supported: ["RS256"],
+    subject_types_supported: ["public"],
+    id_token_signing_alg_values_supported: ["RS256"],
+    claims_supported: ["iss", "sub", "aud", "jti", "iat", "type"],
+    request_uri_parameter_supported: true,
+    require_request_uri_registration: true,
+}
 
 async function createTotpAccount(username: string,
     password: string,
@@ -583,4 +614,216 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowInvalidOOBCode', async ()
 
     expect(error4).toBe("access_denied");
     expect(access_token2).toBeUndefined();
+});
+
+test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => {
+
+    /// Make server
+
+    const {clientStorage, client} = await createClient();
+    const keyStorage = new InMemoryKeyStorage();
+    const userStorage = new InMemoryUserStorage();
+
+    const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
+    const totpAuth = new TotpAuthenticator("Unittest");
+    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtPrivateKeyFile : "keys/rsa-private-key.pem",
+        jwtPublicKeyFile : "keys/rsa-public-key.pem",
+        validateScopes : true,
+        validScopes: "read, write",
+        userStorage: userStorage,
+        authenticators: {
+            "localpassword" : lpAuthenticator,
+            "totp": totpAuth,
+        },
+    });
+
+    const { totpSecret} = 
+        await createTotpAccount("bob", "bobPass123", userStorage);
+
+    /// Make client
+    const oauthClient = new OAuthClient("http://authserver.com", { 
+        clientId: "ABC",
+        clientSecret: "DEF",
+        redirectUri: "http://client.com/authzcode"
+    });
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await oauthClient.loadConfig();
+
+    /// Make initial token post request with username/password
+    const firstTokenResponse = 
+        await authServer.tokenPostEndpoint({
+            grantType: "password", 
+            clientId: client.clientId, 
+            username: "bob",
+            password: "bobPass123" ,
+            clientSecret: "DEF"});
+
+    fetchMocker.mockResponseOnce((_req) => {
+        return JSON.stringify(firstTokenResponse)});
+
+    const clientFirstTokenResponse = await oauthClient["passwordFlow"]("bob", "bobPass123", "read write");
+    expect(clientFirstTokenResponse.access_token).toBeUndefined();
+    expect(clientFirstTokenResponse.error).toBe("mfa_required");
+    expect(clientFirstTokenResponse.mfa_token).toBeDefined();
+    const mfa_token = clientFirstTokenResponse.mfa_token;
+
+    /// Make authenticators request
+
+    const authenticatorsResponse = 
+        await authServer.mfaAuthenticatorsEndpoint(mfa_token??"");
+
+    fetchMocker.mockResponseOnce((_req) => {
+        return JSON.stringify(authenticatorsResponse.authenticators)});
+    
+    const clientAuthenticatorsResponse = await oauthClient["supportedAuthenticators"](mfa_token);
+    expect(clientAuthenticatorsResponse.authenticators).toBeDefined();
+
+    /// Make challenge request
+    const challengeResponse =
+        await authServer.mfaChallengeEndpoint(mfa_token ?? "",
+            client.clientId,
+            "DEF",
+            "otp",
+            "totp");
+        
+    const maxTries = 2;
+    for (let i=0; i<maxTries; ++i) {
+        const otp = gAuthenticator.generate(totpSecret);
+
+        fetchMocker.mockResponseOnce((_req) => {
+            return JSON.stringify(challengeResponse)});
+        
+        const authenticatorId = authenticatorsResponse.authenticators && authenticatorsResponse.authenticators.length > 0 ? authenticatorsResponse.authenticators[0].id : "";
+
+        const secondTokenResponse =
+            await authServer.tokenPostEndpoint({
+                grantType: "http://auth0.com/oauth/grant-type/mfa-otp",
+                clientId : client.clientId,
+                scope: "read write",
+                clientSecret: "DEF",
+                mfaToken: mfa_token,
+                otp: otp
+            });
+
+        fetchMocker.mockResponseOnce((_req) => {
+            return JSON.stringify(secondTokenResponse)});
+        const clientChallengeReponse = await oauthClient["mfaOtp"](mfa_token, authenticatorId, otp);
+
+        if (clientChallengeReponse.error && i < maxTries-1) continue;
+
+        expect(clientChallengeReponse.error).toBeUndefined();
+        expect(clientChallengeReponse.access_token).toBeDefined();
+        expect(clientChallengeReponse.scope).toBe("read write");
+        break;
+
+    }
+});
+
+test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => {
+
+    /// Make server
+
+    const {clientStorage, client} = await createClient();
+    const keyStorage = new InMemoryKeyStorage();
+    const userStorage = new InMemoryUserStorage();
+
+    const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
+    const emailAuth = new EmailAuthenticator();
+    emailAuth["sendToken"] = async function (to: string, otp : string) {
+        emailTokenData = {otp, to}
+        return "1";
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtPrivateKeyFile : "keys/rsa-private-key.pem",
+        jwtPublicKeyFile : "keys/rsa-public-key.pem",
+        validateScopes : true,
+        validScopes: "read, write",
+        userStorage: userStorage,
+        authenticators: {
+            "localpassword" : lpAuthenticator,
+            "email": emailAuth,
+        },
+    });
+
+    await createEmailAccount("bob", "bobPass123", userStorage);
+
+    /// Make client
+    const oauthClient = new OAuthClient("http://authserver.com", { 
+        clientId: "ABC",
+        clientSecret: "DEF",
+        redirectUri: "http://client.com/authzcode"
+    });
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await oauthClient.loadConfig();
+
+    /// Make initial token post request with username/password
+
+    const firstTokenResponse
+        = await authServer.tokenPostEndpoint({
+            grantType: "password", 
+            clientId: client.clientId, 
+            username: "bob",
+            password: "bobPass123" ,
+            clientSecret: "DEF"});
+
+    fetchMocker.mockResponseOnce((_req) => {
+        return JSON.stringify(firstTokenResponse)});
+
+    const clientFirstTokenResponse = await oauthClient["passwordFlow"]("bob", "bobPass123", "read write");
+    expect(clientFirstTokenResponse.access_token).toBeUndefined();
+    expect(clientFirstTokenResponse.error).toBe("mfa_required");
+    expect(clientFirstTokenResponse.mfa_token).toBeDefined();
+    const mfa_token = clientFirstTokenResponse.mfa_token;
+    
+    /// Make authenticators request
+
+    const authenticatorsResponse = 
+        await authServer.mfaAuthenticatorsEndpoint(mfa_token??"");
+
+    fetchMocker.mockResponseOnce((_req) => {
+        return JSON.stringify(authenticatorsResponse.authenticators)});
+    
+    const clientAuthenticatorsResponse = await oauthClient["supportedAuthenticators"](mfa_token);
+    expect(clientAuthenticatorsResponse.authenticators).toBeDefined();
+
+    /// Make challenge request
+
+   const challengeResponse =
+        await authServer.mfaChallengeEndpoint(mfa_token ?? "",
+            client.clientId,
+            "DEF",
+            "oob",
+            "email");
+    const otp = emailTokenData.otp;
+    
+    fetchMocker.mockResponseOnce((_req) => {
+        return JSON.stringify(challengeResponse)});
+
+    const authenticatorId = authenticatorsResponse.authenticators && authenticatorsResponse.authenticators.length > 0 ? authenticatorsResponse.authenticators[0].id : "";
+    const clientChallengeRequestReponse = await oauthClient["mfaOobRequest"](mfa_token, authenticatorId);
+
+    // Make token request
+
+    const secondTokenResponse =
+        await authServer.tokenPostEndpoint({
+            grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
+            clientId : client.clientId,
+            scope: "read write",
+            clientSecret: "DEF",
+            mfaToken: mfa_token,
+            oobCode: challengeResponse.oob_code,
+            bindingCode: otp
+        });
+
+    fetchMocker.mockResponseOnce((_req) => {
+        return JSON.stringify(secondTokenResponse)});
+    const clientChallengeReponse = await oauthClient["mfaOobComplete"](mfa_token, authenticatorId, otp);
+    expect(clientChallengeReponse.error).toBeUndefined();
+    expect(clientChallengeReponse.access_token).toBeDefined();
+    expect(clientChallengeReponse.scope).toBe("read write");
+});
+
+afterAll(async () => {
+    fetchMocker.dontMock();
 });
