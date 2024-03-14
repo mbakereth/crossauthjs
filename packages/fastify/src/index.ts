@@ -15,7 +15,10 @@ declare module 'fastify' {
       user: User|undefined,
       csrfToken: string|undefined,
       apiKey: ApiKey,
+      authType : "cookie" | "oauth" | "oidc" | "apiKey" | undefined,
+      scope: string[] | undefined,
       accessTokenPayload: {[key:string]:any}|undefined,
+      idTokenPayload: {[key:string]:any}|undefined,
       authError: string|undefined,
       authErrorDescription: string|undefined,
     }

@@ -49,6 +49,7 @@ export async function getAuthServer({
     let options : OAuthAuthorizationServerOptions = {
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
+        jwtKeyType: "RS256",
         validateScopes : true,
         validScopes: "read, write, openid",
         issueRefreshToken: true,
@@ -82,7 +83,18 @@ export async function getAuthorizationCode({
      oidc? : boolean,
     } = {}) {
     const secretRequired = challenge == undefined;
-    const {client, clientStorage, authServer, keyStorage, userStorage} = await getAuthServer({challenge, aud, persistAccessToken, secretRequired, rollingRefreshToken});
+    const { client,
+        clientStorage,
+        authServer,
+        keyStorage,
+        userStorage } = 
+        await getAuthServer({
+            challenge,
+            aud,
+            persistAccessToken,
+            secretRequired,
+            rollingRefreshToken
+});
     const {user} = await userStorage.getUserByUsername("bob");
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;

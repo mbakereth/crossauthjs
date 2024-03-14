@@ -54,6 +54,7 @@ export async function getAuthServer({
     const totpAuth = new TotpAuthenticator("Unittest");
     const emailAuth = new EmailAuthenticator();
     let options : OAuthAuthorizationServerOptions = {
+        jwtKeyType: "RS256",
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,

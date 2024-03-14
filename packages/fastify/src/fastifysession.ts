@@ -567,7 +567,8 @@ export class FastifySessionServer {
             // we now either have a valid CSRF token, or none at all
     
             // validate any session cookie.  Remove if invalid
-            request.user = undefined;
+            //request.user = undefined;
+            //request.authType = undefined;
             const sessionCookieValue = this.getSessionCookieValue(request);
             CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
             if (sessionCookieValue) {
@@ -576,6 +577,7 @@ export class FastifySessionServer {
                     if (this.validateSession) this.validateSession(key, user, request);
     
                     request.user = user;
+                    request.authType = "cookie";
                     CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(request)}));

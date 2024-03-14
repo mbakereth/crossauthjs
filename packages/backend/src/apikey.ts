@@ -63,12 +63,20 @@ export class ApiKeyManager {
     /**
      * Creates a new random key and returns it, unsigned.  It is also persisted in the key storage as a 
      * hash of the unsigned part prefixed with {@link prefix()}.
-     * @param name a name for they key.  This is for the user to refer to it (eg, for showing the keys the user has created or deleting a key)
-     * @param userId id for the user who owns this key, which may be undefined for keys not associated with a user
-     * @param data any application-specific extra data.  You may, for example, want to include scopes. eg {scope: ["read", "write"]}
+     * @param name a name for they key.  This is for the user to refer to it 
+     *             (eg, for showing the keys the user has created or deleting 
+     *             a key)
+     * @param userId id for the user who owns this key, which may be undefined 
+     *               for keys not associated with a user
+     * @param data any application-specific extra data.
+     *              If it contains an array called `scope` and this array 
+     *              contains `editUser`, the api key can be used for user
+     *              manipulation functions (eg change password)}
      * @param expiry expiry as a number of seconds from now
-     * @param extraFields any extra fields to save in key storage, and pass back in the {@link Key} object.
-     * @returns the new key as a {@link ApiKey} object, plus the token for the Authorization header (with the signature appended.)
+     * @param extraFields any extra fields to save in key storage, and pass 
+     *                    back in the {@link Key} object.
+     * @returns the new key as a {@link ApiKey} object, plus the token for the 
+     *          Authorization header (with the signature appended.)
      */
     async createKey(name : string, userId : string|number|undefined, data? : {[key:string]: any}, expiry? : number,
         extraFields?: {[key:string]: any}) : Promise<{key: ApiKey, token: string}> {

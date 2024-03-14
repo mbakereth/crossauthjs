@@ -13,6 +13,7 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
 
     const authenticator = new LocalPasswordAuthenticator(userStorage);
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -41,6 +42,7 @@ test('AuthorizationServer.passwordFlow.incorrectPassword', async () => {
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,

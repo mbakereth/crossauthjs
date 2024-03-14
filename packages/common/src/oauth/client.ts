@@ -1,6 +1,10 @@
 import { CrossauthLogger, j } from '..';
 import { CrossauthError, ErrorCode } from '..';
-import { OpenIdConfiguration, DEFAULT_OIDCCONFIG, type GrantType } from '..';
+import {
+    OpenIdConfiguration,
+    OAuthTokenConsumerBase,
+    DEFAULT_OIDCCONFIG,
+    type GrantType } from '..';
 
 export class OAuthFlows {
     static readonly All = "all";
@@ -83,6 +87,7 @@ export abstract class OAuthClientBase {
     protected stateLength = 32;
     protected authzCode : string = "";
     protected oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
+    protected tokenConsumer : OAuthTokenConsumerBase;
 
     constructor({authServerBaseUri,
         clientId,
@@ -91,6 +96,7 @@ export abstract class OAuthClientBase {
         codeChallengeMethod,
         stateLength,
         verifierLength,
+        tokenConsumer,
     } : {
         authServerBaseUri : string,
         stateLength? : number,
@@ -98,8 +104,10 @@ export abstract class OAuthClientBase {
         clientId? : string,
         clientSecret? : string,
         redirectUri? : string,
-        codeChallengeMethod? : "plain" | "S256"
+        codeChallengeMethod? : "plain" | "S256",
+        tokenConsumer : OAuthTokenConsumerBase,
     }) {
+        this.tokenConsumer = tokenConsumer;
         this.authServerBaseUri = authServerBaseUri;
         if (verifierLength) this.verifierLength = verifierLength;
         if (stateLength) this.stateLength = stateLength;
@@ -133,11 +141,13 @@ export abstract class OAuthClientBase {
         this.oidcConfig = {...DEFAULT_OIDCCONFIG};
         try {
             const body = await resp.json();
+            console.log(body);
             for (const [key, value] of Object.entries(body)) {
                 this.oidcConfig[key] = value;
             }
             CrossauthLogger.logger.debug(j({msg: `OIDC Config ${JSON.stringify(this.oidcConfig)}`}));
         } catch (e) {
+            console.log(e);
             throw new CrossauthError(ErrorCode.Connection, 
                 "Unrecognized response from OIDC configuration endpoint");
         }
@@ -619,6 +629,15 @@ export abstract class OAuthClientBase {
             },
         });
         return await resp.json();
+    }
+
+    async validateIdToken(token : string) : 
+        Promise<{[key:string]:any}|undefined>{
+        try {
+            return await this.tokenConsumer.tokenAuthorized(token, "id");
+        } catch (e) {
+            return undefined;
+        }
     }
 }
 

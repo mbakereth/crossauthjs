@@ -251,7 +251,6 @@ test('FastifyOAuthClient.passwordFlow', async () => {
         username: "bob",
         password: "bobPass123",
      }});
-    console.log(res);
     body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
     expect(body.body.grant_type).toBe("password");

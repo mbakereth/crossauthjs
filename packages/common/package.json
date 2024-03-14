@@ -25,5 +25,8 @@
     "vite": "^5.0.8",
     "vite-plugin-dts": "^3.6.4",
     "vitest": "^1.1.0"
+  },
+  "dependencies": {
+    "jose": "^5.2.3"
   }
 }

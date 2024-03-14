@@ -75,6 +75,9 @@ export interface OAuthAuthorizationServerOptions {
     /** The algorithm to sign JWTs with.  Default `RS256` */
     jwtAlgorithm? : string,
 
+    /** Type of key in jwtPublicKey, jwtPublicKeyFile, etc, eg RS256*/
+    jwtKeyType? : string,
+
     /** Secret key if using a symmetric cipher for signing the JWT.  
      * Either this or `jwtSecretKeyFile` is required when using this kind of 
      * cipher*/
@@ -199,6 +202,7 @@ export class OAuthAuthorizationServer {
         private jwtAlgorithm = "RS256";
         private jwtAlgorithmChecked : Algorithm = "RS256";
         private authorizationCodeLength = 32;
+        private jwtKeyType = "";
         private jwtSecretKey = "";
         private jwtPublicKey = "";
         private jwtPrivateKey = "";
@@ -248,6 +252,7 @@ export class OAuthAuthorizationServer {
         setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
         setParameter("authorizationCodeLength", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_LENGTH");
+        setParameter("jwtKeyType", ParamType.String, this, options, "JWT_KEY_TYPE");
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
         setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
         setParameter("jwtPrivateKeyFile", ParamType.String, this, options, "JWT_PRIVATE_KEY_FILE");
@@ -334,6 +339,10 @@ export class OAuthAuthorizationServer {
         } else {
             this.secretOrPrivateKey = this.jwtPrivateKey;
             this.secretOrPublicKey = this.jwtPublicKey;
+        }
+        if ((this.jwtPublicKey || this.jwtPrivateKey) && !this.jwtKeyType) {
+            throw new CrossauthError(ErrorCode.Configuration,
+                "If setting jwtPublicKey or jwtPrivate key, must also set jwtKeyType");
         }
 
         if (this.opaqueAccessToken) this.persistAccessToken = true;
@@ -1927,7 +1936,10 @@ export class OAuthAuthorizationServer {
         if (this.jwtPublicKey) {
             const publicKey = 
                 createPublicKey(this.jwtPublicKey).export({format: "jwk"});
+            //const publicKey = await jose.importSPKI(this.jwtPublicKey, this.jwtKeyType);
+
             publicKey.kid = "1";
+            publicKey.alg = this.jwtKeyType;
             keys.push(publicKey)
         }
         return { keys };

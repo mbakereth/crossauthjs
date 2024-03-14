@@ -53,9 +53,9 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
         app, undefined, {}, {authServerBaseUri: "http://server.com"}
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.loadConfig();
+    await resserver.tokenConsumer.loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.loadJwks();
+    await resserver.tokenConsumer.loadJwks();
     // @ts-ignore
     const reply : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token}
@@ -100,9 +100,9 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
     });
 
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.loadConfig();
+    await resserver.tokenConsumer.loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.loadJwks();
+    await resserver.tokenConsumer.loadJwks();
     // @ts-ignore
     const reply : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token}

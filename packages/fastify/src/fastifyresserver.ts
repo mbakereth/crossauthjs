@@ -10,16 +10,16 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
 }
 
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
-    private authServer?: FastifyAuthorizationServer;
+    //private authServer?: FastifyAuthorizationServer;
     private protectedEndpoints : {[key:string]: {scope? : string}} = {};
 
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>, 
-        authServer? : FastifyAuthorizationServer,
+        _authServer? : FastifyAuthorizationServer,
         protectedEndpoints? : {[key:string]: {scope? : string}},
         options : FastifyOAuthResourceServerOptions = {}) {
         super(options);
-        this.authServer = authServer;
+        //this.authServer = authServer;
 
         if (protectedEndpoints) {
             const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;
@@ -40,6 +40,17 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
         app.addHook('preHandler', async (request : FastifyRequest, _reply : FastifyReply) => {
             const authResponse = await this.authorized(request);
             request.accessTokenPayload = authResponse?.tokenPayload;
+            if (authResponse?.tokenPayload?.scope) {
+                if (Array.isArray(authResponse.tokenPayload.scope)) {
+                    let scope : string[] = [];
+                    for (let tokenScope of authResponse.tokenPayload.scope) {
+                        if (typeof tokenScope == "string") scope.push(tokenScope);
+                    }
+                    request.scope = scope;
+                } else if (typeof authResponse.tokenPayload.scope == "string") {
+                    request.scope = authResponse.tokenPayload.scope.split(" ");
+                }
+            }
             request.authError = authResponse?.error
             request.authErrorDescription = authResponse?.error_description;
             CrossauthLogger.logger.debug(j({msg: "Resource server url", url: request.url, authorized: request.accessTokenPayload!= undefined}));
@@ -52,7 +63,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                 if ("scope" in this.protectedEndpoints[urlWithoutQuery]) {
                     header += ' scope="' + this.protectedEndpoints[urlWithoutQuery]["scope"];
                 }
-                reply.header("WWW-Authenticate:", header);
+                reply.header("WWW-Authenticate", header);
                 CrossauthLogger.logger.debug(j({msg: "Adding www-authenticate header to reply"}));
             }
         });
@@ -64,17 +75,11 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
         error? : string, 
         error_description?: string}|undefined> {
         try {
-            if ((!this.keys || this.keys.length == 0) && this.authServer) {
-                // we will get the keys from the auth server directly rather than let the
-                // base class to a fetch
-                await this.loadConfig(this.authServer.oidcConfiguration())
-                await this.loadJwks(this.authServer.authServer.jwks());
-            }
             const header = request.headers.authorization;
             if (header && header.startsWith("Bearer ")) {
                 const parts = header.split(" ");
                 if (parts.length == 2) {
-                    const resp = await this.tokenAuthorized(parts[1]);
+                    const resp = await this.accessTokenAuthorized(parts[1]);
                     if (resp) {
                         return {authorized: true, tokenPayload: resp};
                     } else {

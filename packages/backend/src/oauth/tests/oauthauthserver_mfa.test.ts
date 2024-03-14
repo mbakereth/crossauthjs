@@ -102,6 +102,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlow', async () => {
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -177,6 +178,7 @@ test('AuthorizationServer.Mfa.invalidMfa1', async () => {
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -250,6 +252,7 @@ test('AuthorizationServer.Mfa.invalidMfa2', async () => {
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -301,6 +304,7 @@ test('AuthorizationServer.Mfa.invalidMfa3', async () => {
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -343,6 +347,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlow', async () => {
         return "1";
     };
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -415,6 +420,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidMFAToken', async () => {
         return "1";
     };
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -486,6 +492,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOTP', async () => {
         return "1";
     };
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -557,6 +564,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOOBCode', async () => {
         return "1";
     };
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -627,6 +635,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
@@ -737,6 +746,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
         return "1";
     };
     const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+        jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,

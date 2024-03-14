@@ -55,7 +55,7 @@ test('AuthorizationServer.ClientCredFlow.missingScopeValid', async () => {
 
 test('AuthorizationServer.ClientCredFlow.missingScopeInvalid', async () => {
 
-    const {authServer, client} = await getAuthServer({emptyScopeIsValid: false});
+    const {authServer} = await getAuthServer({emptyScopeIsValid: false});
     const {error}
         = await authServer.tokenEndpoint({
             grantType: "client_credentials", 

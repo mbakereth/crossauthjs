@@ -2,8 +2,11 @@ import { OAuthClientBase, OAuthFlows } from '@crossauth/common';
 import { Hasher } from '../hasher';
 import { setParameter, ParamType } from '../utils';
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
+import {
+    OAuthBackendTokenConsumer,
+    type OAuthBackendTokenConsumerOptions } from './tokenconsumer';
 
-export interface OAuthClientOptions {
+export interface OAuthClientOptions extends OAuthBackendTokenConsumerOptions {
     stateLength? : number,
     verifierLength? : number,
     clientId? : string,
@@ -17,8 +20,14 @@ export class OAuthClient extends OAuthClientBase {
     protected validFlows : string[] = [];
 
     constructor(authServerBaseUri : string, options : OAuthClientOptions) {
-        super({authServerBaseUri, ...options});
-        this.authServerBaseUri = authServerBaseUri;
+        const options1 = {
+            clientId: "",
+        }
+        setParameter("clientId", ParamType.String, options1, options, "OAUTH_CLIENT_ID", true);
+        super({ authServerBaseUri, 
+            tokenConsumer: new OAuthBackendTokenConsumer(options1.clientId, { 
+                authServerBaseUri, ...options }), ...options });
+
         setParameter("stateLength", ParamType.String, this, options, "OAUTH_STATE_LENGTH");
         setParameter("verifierLength", ParamType.String, this, options, "OAUTH_VERIFIER_LENGTH");
         setParameter("clientId", ParamType.String, this, options, "OAUTH_CLIENT_ID");

@@ -462,6 +462,8 @@ export class FastifyOAuthClient extends OAuthClient {
             });
         }
 
+        ///////// Authorization code flow with PKCE
+
         if (this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
             this.server.app.get(this.prefix+'authzcodeflowpkce', 
                 async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, 
