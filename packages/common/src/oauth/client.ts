@@ -141,7 +141,6 @@ export abstract class OAuthClientBase {
         this.oidcConfig = {...DEFAULT_OIDCCONFIG};
         try {
             const body = await resp.json();
-            console.log(body);
             for (const [key, value] of Object.entries(body)) {
                 this.oidcConfig[key] = value;
             }
@@ -639,6 +638,16 @@ export abstract class OAuthClientBase {
             return undefined;
         }
     }
+
+    async idTokenAuthorized(idToken: string) 
+        : Promise<{[key:string]: any}|undefined> {
+            try {
+                return await this.tokenConsumer.tokenAuthorized(idToken, "id");
+            } catch (e) {
+                CrossauthLogger.logger.warn(j({err: e}));
+                return undefined;
+            }
+        }
 }
 
 export interface MfaAuthenticatorResponse {

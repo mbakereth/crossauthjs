@@ -80,7 +80,8 @@ export class OAuthBackendTokenConsumer extends OAuthTokenConsumerBase {
         tokenType: "access" | "refresh" | "id") : Promise<{[key:string]: any}|undefined> {
         const payload = await super.tokenAuthorized(token, tokenType);
         if (payload) {
-            if (this.persistAccessToken && this.keyStorage) {
+            if (tokenType == "access" && this.persistAccessToken && 
+                this.keyStorage) {
                 try {
                     const key = "access:" + Hasher.hash(payload.jti);
                     const tokenInStorage = await this.keyStorage.getKey(key);

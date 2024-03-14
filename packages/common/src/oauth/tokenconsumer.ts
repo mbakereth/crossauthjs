@@ -56,7 +56,7 @@ export abstract class OAuthTokenConsumerBase {
 
         if (this.jwtPublicKey && !this.jwtKeyType) {
             throw new CrossauthError(ErrorCode.Configuration, 
-                "If specifying jwtPublic key, must also specify jwkKeyType")
+                "If specifying jwtPublic key, must also specify jwtKeyType")
         }
     }
 
