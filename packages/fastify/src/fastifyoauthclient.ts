@@ -16,6 +16,7 @@ import {
 import type { OAuthClientOptions } from '@crossauth/backend';
 import { FastifyServer, type FastifyErrorFn } from './fastifyserver';
 import type { CsrfBodyType } from './fastifysession.ts';
+import { decode } from "node:punycode";
 
 const JSONHDR : [string,string] = 
     ['Content-Type', 'application/json; charset=utf-8'];
@@ -60,6 +61,7 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
 }[],
     bffEndpointName? : string,
     bffBaseUrl? : string,
+    profileUrl? : string,
 }
 
 
@@ -148,12 +150,25 @@ async function pageError(server: FastifyServer,
         });
 }
 
+function decodePayload(token : string|undefined) : {[key:string]: any}|undefined {
+    let payload : {[key:string]: any}|undefined = undefined;
+    if (token) {
+        try {
+            payload = JSON.parse(Hasher.base64Decode(token.split(".")[1]))
+        } catch (e) {
+            CrossauthLogger.logger.error(j({msg: "Couldn't decode id token"}));
+        }
+    }
+    return payload;
+
+}
 async function sendJson(_client: FastifyOAuthClient,
     _request: FastifyRequest,
     reply: FastifyReply,
     oauthResponse: OAuthTokenResponse) : Promise<FastifyReply> {
     return reply.header(...JSONHDR).status(200)
-        .send({ok: true, ...oauthResponse});
+        .send({ok: true, ...oauthResponse, 
+            id_payload: decodePayload(oauthResponse.id_token)});
 }
 
 async function sendInPage(client: FastifyOAuthClient,
@@ -170,19 +185,45 @@ async function sendInPage(client: FastifyOAuthClient,
                 errorCodeName: ce.codeName,
                 errorCode: ce.code
             });
-    } else if (oauthResponse.access_token) {
-        try {
-            if (oauthResponse.access_token) {
-                const jti = jwtDecode(oauthResponse.access_token)?.jti;
-                const hash = jti ? Hasher.hash(jti) : undefined;
-                CrossauthLogger.logger.debug(j({msg: "Got access token", accessTokenHash: hash}));
+    } else {
+        if (oauthResponse.access_token) {
+            try {
+                if (oauthResponse.access_token) {
+                    const jti = jwtDecode(oauthResponse.access_token)?.jti;
+                    const hash = jti ? Hasher.hash(jti) : undefined;
+                    CrossauthLogger.logger.debug(j({msg: "Got access token", accessTokenHash: hash}));
+                }
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
             }
-        } catch (e) {
-            CrossauthLogger.logger.debug(j({err: e}));
+        }
+        if (oauthResponse.id_token) {
+            try {
+                if (oauthResponse.id_token) {
+                    const jti = jwtDecode(oauthResponse.id_token)?.jti;
+                    const hash = jti ? Hasher.hash(jti) : undefined;
+                    CrossauthLogger.logger.debug(j({msg: "Got id token", idTokenHash: hash}));
+                }
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
+        }
+        if (oauthResponse.refresh_token) {
+            try {
+                if (oauthResponse.refresh_token) {
+                    const jti = jwtDecode(oauthResponse.refresh_token)?.jti;
+                    const hash = jti ? Hasher.hash(jti) : undefined;
+                    CrossauthLogger.logger.debug(j({msg: "Got refresh token", refreshTokenHash: hash}));
+                }
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
         }
     }
     try {
-        return reply.status(200).view(client.authorizedPage, {});
+        return reply.status(200).view(client.authorizedPage, 
+            {...oauthResponse,
+                id_payload: decodePayload(oauthResponse.id_token)} );
     } catch (e) {
         const ce = e as CrossauthError;
         return reply.status(ce.httpStatus)
@@ -205,16 +246,42 @@ async function saveInSessionAndLoad(client: FastifyOAuthClient, request : Fastif
                 errorCodeName: ce.codeName,
                 errorCode: ce.code
             });
-    } else if (oauthResponse.access_token) {
-        try {
-            const jti = jwtDecode(oauthResponse.access_token)?.jti;
-            const hash = jti ? Hasher.hash(jti) : undefined;
-            CrossauthLogger.logger.debug(j({
-                msg: "Got access token",
-                accessTokenHash: hash
-            }));
-        } catch (e) {
-            CrossauthLogger.logger.debug(j({err: e}));
+    } else {
+        if (oauthResponse.access_token) {
+            try {
+                const jti = jwtDecode(oauthResponse.access_token)?.jti;
+                const hash = jti ? Hasher.hash(jti) : undefined;
+                CrossauthLogger.logger.debug(j({
+                    msg: "Got access token",
+                    accessTokenHash: hash
+                }));
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
+        }
+        if (oauthResponse.id_token) {
+            try {
+                const jti = jwtDecode(oauthResponse.id_token)?.jti;
+                const hash = jti ? Hasher.hash(jti) : undefined;
+                CrossauthLogger.logger.debug(j({
+                    msg: "Got id token",
+                    idTokenHash: hash
+                }));
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
+        }
+        if (oauthResponse.refresh_token) {
+            try {
+                const jti = jwtDecode(oauthResponse.refresh_token)?.jti;
+                const hash = jti ? Hasher.hash(jti) : undefined;
+                CrossauthLogger.logger.debug(j({
+                    msg: "Got refresh token",
+                    refreshTokenHash: hash
+                }));
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
         }
     }
     try {
@@ -239,7 +306,9 @@ async function saveInSessionAndLoad(client: FastifyOAuthClient, request : Fastif
                     errorCode: ErrorCode.Configuration
                 });
         }
-        return reply.status(200).view(client.authorizedPage, {});
+        return reply.status(200).view(client.authorizedPage, 
+            {...oauthResponse,
+                id_payload: decodePayload(oauthResponse.id_token)} );
     } catch (e) {
         const ce = e as CrossauthError;
         return reply.status(ce.httpStatus)
@@ -265,17 +334,44 @@ async function saveInSessionAndRedirect(client: FastifyOAuthClient,
                 errorCodeName: ce.codeName,
                 errorCode: ce.code
             });
-    } else if (oauthResponse.access_token) {
-        try {
-            const jti = jwtDecode(oauthResponse.access_token)?.jti;
-            const hash = jti ? Hasher.hash(jti) : undefined;
-            CrossauthLogger.logger.debug(j({
-                msg: "Got access token",
-                accessTokenHash: hash
-            }));
-        } catch (e) {
-            CrossauthLogger.logger.debug(j({err: e}));
+    } else  {
+        if (oauthResponse.access_token) {
+            try {
+                const jti = jwtDecode(oauthResponse.access_token)?.jti;
+                const hash = jti ? Hasher.hash(jti) : undefined;
+                CrossauthLogger.logger.debug(j({
+                    msg: "Got access token",
+                    accessTokenHash: hash
+                }));
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
         }
+        if (oauthResponse.id_token) {
+            try {
+                const jti = jwtDecode(oauthResponse.id_token)?.jti;
+                const hash = jti ? Hasher.hash(jti) : undefined;
+                CrossauthLogger.logger.debug(j({
+                    msg: "Got id token",
+                    idTokenHash: hash
+                }));
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
+        }
+        if (oauthResponse.refresh_token) {
+            try {
+                const jti = jwtDecode(oauthResponse.refresh_token)?.jti;
+                const hash = jti ? Hasher.hash(jti) : undefined;
+                CrossauthLogger.logger.debug(j({
+                    msg: "Got refresh token",
+                    refreshTokenHash: hash
+                }));
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
+        }
+
     }
     try {
         let sessionCookieValue = client.server.getSessionCookieValue(request);
@@ -325,7 +421,7 @@ export class FastifyOAuthClient extends OAuthClient {
     mfaOtpPage : string = "mfaotp.njk"
     mfaOobPage : string = "mfaoob.njk"
     authorizedPage : string = "authorized.njk";
-    authorizedUrl : string = "authorized.njk";
+    authorizedUrl : string = "authorized";
     sessionDataName : string = "oauth";
     private receiveTokenFn : 
         (client: FastifyOAuthClient,
@@ -356,6 +452,7 @@ export class FastifyOAuthClient extends OAuthClient {
         }[] = [];
     private bffEndpointName = "bff";
     private bffBaseUrl? : string;
+    private profileUrl? : string;
 
     constructor(server: FastifyServer,
         authServerBaseUri: string,
@@ -381,6 +478,7 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("mfaOobPage", ParamType.String, this, options, "OAUTH_MFA_OOB_PAGE");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
+        setParameter("profileUrl", ParamType.String, this, options, "OAUTH_CLIENT_PROFILE_URL");
         if (this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
         if (options.bffEndpoints) this.bffEndpoints = options.bffEndpoints;
 
@@ -747,6 +845,27 @@ export class FastifyOAuthClient extends OAuthClient {
             }
         }
 
+        // Profile endpoint
+        if (this.profileUrl) {
+            this.server.app.get(this.prefix+this.profileUrl, 
+                async (request : FastifyRequest, reply : FastifyReply) => {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'GET',
+                        url: this.prefix + this.profileUrl,
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                const oauthData = await this.server.getSessionData(request, "oauth");
+                if (!oauthData) {
+                    return reply.header(...JSONHDR).status(401).send({ok: false});
+                }
+                const payload = decodePayload(oauthData.id_token);
+                return reply.header(...JSONHDR).status(200).send({ok: true, ...payload});
+            });
+        }
+
+
         // Add BFF endpoints
         if (this.bffEndpoints.length > 0 && !this.bffBaseUrl) {
             throw new CrossauthError(ErrorCode.Configuration, "If enabling BFF endpoints, must also define bffBaseUrl");
@@ -786,6 +905,9 @@ export class FastifyOAuthClient extends OAuthClient {
                 
                         try {
                             const oauthData = await this.server.getSessionData(request, "oauth");
+                            if (!oauthData) {
+                                return reply.header(...JSONHDR).status(401).send({ok: false});
+                            }
                             let access_token = oauthData?.access_token;
                             if (oauthData && oauthData.access_token) {
                                 const resp = await server.oAuthClient?.refreshIfExpired(request, reply, oauthData.refresh_token, oauthData.expires_at);

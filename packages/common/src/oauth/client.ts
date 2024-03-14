@@ -146,7 +146,6 @@ export abstract class OAuthClientBase {
             }
             CrossauthLogger.logger.debug(j({msg: `OIDC Config ${JSON.stringify(this.oidcConfig)}`}));
         } catch (e) {
-            console.log(e);
             throw new CrossauthError(ErrorCode.Connection, 
                 "Unrecognized response from OIDC configuration endpoint");
         }

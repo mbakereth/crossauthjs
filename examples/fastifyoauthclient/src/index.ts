@@ -72,6 +72,7 @@ const server = new FastifyServer(userStorage, {
     tokenResponseType: "saveInSessionAndLoad",
     bffEndpoints: [{url: "/resource", methods: ["GET"]}],
     bffBaseUrl: process.env["RESOURCE_SERVER"],
+    profileUrl: "profile",
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
@@ -92,6 +93,12 @@ app.get('/clientcredentialsex', async (request : FastifyRequest, reply : Fastify
 
 app.get('/passwordex', async (request : FastifyRequest, reply : FastifyReply) =>  {
     return reply.view('passwordex.njk', {user: request.user, csrfToken: request.csrfToken});
+}
+);
+
+app.get('/oidcex', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    if (!request.user) return reply.redirect(302, "/login?next=/oidcex");
+    return reply.view('oidc.njk', {user: request.user});
 }
 );
 

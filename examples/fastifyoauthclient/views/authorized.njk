@@ -2,11 +2,31 @@
     <head>
         <title>Client</title>
         <link rel="stylesheet" href="/public/style.css"/>
+
+        <script>
+            function profile() {
+                fetch("/profile")
+                .then(function(response) {return response.json()}).then(function(response) {
+                    document.getElementById("profile").innerHTML = "<pre>"+JSON.stringify(response, null, '\t')+"</pre>"
+                })
+                .catch(function(error) {
+                    document.getElementById("profile").text = error;
+                })
+            }
+        </script>
     </head>
     <body>
         <h1>Authorization</h1>
 
         <p>Authorization was successful</p>
+
+        {% if id_payload %}
+        <p>Username {{id_payload.sub }}</p>
+        <p>Email {{id_payload.email }}</p>
+        {% endif %}
+
+        <p><button onclick="profile()">Profile</button></p>
+        <p id="profile"></p>
 
         <p><a href="/">Home</a></p>
     </body>

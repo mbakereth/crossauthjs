@@ -737,6 +737,7 @@ export class OAuthAuthorizationServer {
                     error_description: "No authorization code provided for authorization code flow",
                 };
             }
+
             return await this.getAccessToken({
                 client,
                 code,
@@ -1548,7 +1549,20 @@ export class OAuthAuthorizationServer {
 
         if (scopes && scopes.includes("openid")) {
 
-            // create access token payload
+            if (this.userStorage && authzData.username) {
+                try {
+                    const {user : user1} = 
+                        await this.userStorage.getUserByUsername(authzData.username);
+                    user = user1;
+                } catch (e) {
+                    CrossauthLogger.logger.error(j({err: e}));
+                    return {
+                        error: "server_error",
+                        error_description: "Couldn't load user data"
+                    }
+                }
+            }
+            // create id token payload
             const idokenJti = Hasher.uuid();
             let idTokenPayload : {[key:string]: any} = {
                 jti: idokenJti,
@@ -1557,16 +1571,16 @@ export class OAuthAuthorizationServer {
                 sub: authzData.username,
                 type: "id",
             };
-            if ("email" in scopes && user && "email" in user) {
+            if (scopes.includes("email") && user?.email) {
                 idTokenPayload.email = user.email;
             }
-            if ("address" in scopes && user && "address" in user) {
+            if (scopes.includes("address") && user && "address" in user) {
                 idTokenPayload.address = user.address;
             }
-            if ("phone" in scopes && user && "phone" in user) {
+            if (scopes.includes("phone") && user && "phone" in user) {
                 idTokenPayload.phone = user.phone;
             }
-            if ("profile" in scopes && user) {
+            if (scopes.includes("profile") && user) {
                 for (let field of ["name",
                     "family_name",
                     "given_name",
