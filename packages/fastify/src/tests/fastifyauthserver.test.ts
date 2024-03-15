@@ -132,6 +132,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             secret: "ABCDEFG",
             allowedFactor2: "none",
             validScopes: "read, write",
+            jwtKeyType: "RS256",
             jwtPublicKeyFile: "keys/rsa-public-key.pem",
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
             siteUrl: `http://localhost:3000`,

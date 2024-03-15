@@ -49,6 +49,8 @@ export function getJsonData(key : Key) : {[key:string]:any} {
 export interface UserInputFields {
     username : string,
     state : string,
+    email? : string,
+    admin? : boolean,
     [ key : string ] : any,
 }
 export interface User extends UserInputFields {
