@@ -3300,7 +3300,7 @@ export class FastifySessionServer {
         const cookieValue = this.getSessionCookieValue(request);
         if (!cookieValue) return "";
         try {
-            return Hasher.hash(cookieValue);
+            return Hasher.hash(cookieValue.split(".")[0]);
         } catch (e) {}
         return "";
     }
@@ -3309,7 +3309,7 @@ export class FastifySessionServer {
         const cookieValue = this.getCsrfCookieValue(request);
         if (!cookieValue) return "";
         try {
-            return Hasher.hash(cookieValue);
+            return Hasher.hash(cookieValue.split(".")[0]);
         } catch (e) {}
         return "";
     }
