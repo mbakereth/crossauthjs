@@ -5,6 +5,9 @@
     </head>
     <body>
         <h2>Change Two-Factor Authentication</h2>
+        {% if required %}
+         <p>You are required to change your passwords</p>
+        {% endif %}
         {% if message %}
             <p class="success">{{ message}}</p>
             <p><button onclick="window.location.href='{{next or '/'}}'">OK</button></p>
@@ -15,6 +18,7 @@
             <form method="POST" action="changefactor2">
                 <input type="hidden" name="csrfToken" value="{{csrfToken}}"/>
                 <input type="hidden" name="next" value="{{next or '/'}}"/>
+                <input type="hidden" name="required" value="{{ required }}"/>
                 {% if allowedFactor2|length > 1 %}
                     {% for item in allowedFactor2 %}
                             <p>

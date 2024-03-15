@@ -6,6 +6,7 @@ import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from './utils';
 import { type User } from '@crossauth/common';
+import { KeyPrefix, UserState } from '@crossauth/common';
 
 const TOKEN_LENGTH = 16; // in bytes, before base64url
 
@@ -163,11 +164,11 @@ export class TokenEmailer {
     }
 
     static hashEmailVerificationToken(token : string) : string {
-        return "e:" + Hasher.hash(token);
+        return KeyPrefix.emailVerificationToken + Hasher.hash(token);
     }
 
     static hashPasswordResetToken(token : string) : string {
-        return "p:" + Hasher.hash(token);
+        return KeyPrefix.passwordResetToken + Hasher.hash(token);
     }
 
     private async createAndSaveEmailVerificationToken(userId : string | number, 
@@ -244,7 +245,7 @@ export class TokenEmailer {
             // this message is to validate a new email (email change)
             TokenEmailer.validateEmail(email);
         } else {
-            email = user.email;
+            email = user.email??user.username;
             if (email) {
                 TokenEmailer.validateEmail(email);
             } else {
@@ -280,7 +281,7 @@ export class TokenEmailer {
         try {
             if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
             const {user} = await this.userStorage.getUserById(storedToken.userId, {skipEmailVerifiedCheck: true});
-            let email = user.email.toLowerCase();
+            let email = (user.email??user.username).toLowerCase();
             if (email) {
                 TokenEmailer.validateEmail(email);
             } else {
@@ -339,7 +340,11 @@ export class TokenEmailer {
         let storedToken = await this.keyStorage.getKey(hash);
         if (!storedToken.userId) throw new CrossauthError(ErrorCode.InvalidKey);
         if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
-        const {user} = await this.userStorage.getUserById(storedToken.userId);
+        const {user} = await this.userStorage.getUserById(storedToken.userId, 
+            {skipActiveCheck: true });
+        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded) {
+            throw new CrossauthError(ErrorCode.UserNotActive);
+        }
         const now = new Date().getTime();
         if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
         return user;
@@ -389,8 +394,13 @@ export class TokenEmailer {
                 "Either passwordResetTextBody or passwordResetTextBody must be set to send email verification emails");
                 throw error;
         }
-        let {user} = await this.userStorage.getUserById(userId);
-        let email = user.email.toLowerCase();
+        let {user} = await this.userStorage.getUserById(userId, {
+            skipActiveCheck: true
+        });
+        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded) {
+            throw new CrossauthError(ErrorCode.UserNotActive);
+        }
+        let email = (user.email??user.username).toLowerCase();
         if (email) {
             TokenEmailer.validateEmail(email);
         } else {

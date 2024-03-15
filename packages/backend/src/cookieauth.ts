@@ -1,6 +1,7 @@
 import type { User, Key } from '@crossauth/common';
+import { KeyPrefix } from '@crossauth/common';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
-import { UserStorage, KeyStorage } from './storage';
+import { UserStorage, KeyStorage, UserStorageGetOptions } from './storage';
 import { type TokenEmailerOptions } from './emailtokens.ts';
 import { Hasher } from './hasher';
 import { CrossauthLogger, j } from '@crossauth/common';
@@ -330,7 +331,7 @@ export class SessionCookie {
     ///// Session IDs
 
     static hashSessionKey(sessionKey : string) : string {
-        return "s:" + Hasher.hash(sessionKey);
+        return KeyPrefix.session + Hasher.hash(sessionKey);
     }
 
     /**
@@ -470,10 +471,10 @@ export class SessionCookie {
      *          sessionId
      * @throws a {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
      */
-    async getUserForSessionKey(cookieValue: string) : Promise<{user: User|undefined, key : Key}> {
+    async getUserForSessionKey(cookieValue: string, options? : UserStorageGetOptions) : Promise<{user: User|undefined, key : Key}> {
         const key = await this.getSessionKey(cookieValue);
         if (key.userId) {
-            let {user} = await this.userStorage.getUserById(key.userId);
+            let {user} = await this.userStorage.getUserById(key.userId, options);
             return {user, key};
         } else {
             return {user: undefined, key};
@@ -526,6 +527,6 @@ export class SessionCookie {
         if (except) {
             except = SessionCookie.hashSessionKey(except);
         }
-        await this.keyStorage.deleteAllForUser(userId, "s:", except);
+        await this.keyStorage.deleteAllForUser(userId, KeyPrefix.session, except);
     }
 }

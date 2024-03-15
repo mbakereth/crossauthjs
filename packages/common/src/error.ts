@@ -84,7 +84,13 @@ export enum ErrorCode {
     KeyExists,
 
     /** Thrown if the user needs to reset his or her password */
+    PasswordChangeNeeded,
+
+    /** Thrown if the user needs to reset his or her password */
     PasswordResetNeeded,
+
+    /** Thrown if the user needs to reset factor2 before logging in */
+    Factor2ResetNeeded,
 
     /** Thrown when something is missing or inconsistent in configuration */
     Configuration,
@@ -231,8 +237,14 @@ export class CrossauthError extends Error {
             _message = "Algorithm not supported";
         } else if (code == ErrorCode.KeyExists) {
             _message = "Attempt to create a key that already exists";
+        } else if (code == ErrorCode.PasswordChangeNeeded) {
+            _message = "User must change password";
+            _httpStatus = 403;
         } else if (code == ErrorCode.PasswordResetNeeded) {
             _message = "User must reset password";
+            _httpStatus = 403;
+        } else if (code == ErrorCode.Factor2ResetNeeded) {
+            _message = "User must reset 2FA";
             _httpStatus = 403;
         } else if (code == ErrorCode.Configuration) {
             _message = "There was an error in the configuration";
@@ -262,6 +274,7 @@ export class CrossauthError extends Error {
             _httpStatus = 500;
         } else {
             _message = "Unknown error";
+            _httpStatus = 500;
         }    
         if (message != undefined && !Array.isArray(message)) {
             _message = message;

@@ -77,3 +77,24 @@ export interface OAuthClient {
     validFlow : string[],
     [ key : string ] : any,
 }
+
+export class UserState {
+    static readonly active = "active";
+    static readonly disabled = "disabled";
+    static readonly awaitingTwoFactorSetup = "awaitingtwofactorsetup";
+    static readonly awaitingEmailVerification = "awaitingemailverification";
+    static readonly passwordChangeNeeded = "passwordchangeneeded";
+    static readonly passwordResetNeeded = "passwordresetneeded";
+    static readonly factor2ResetNeeded = "factor2resetneeded";
+}
+
+export class KeyPrefix {
+    static readonly session = "s:"
+    static readonly passwordResetToken = "p:"
+    static readonly emailVerificationToken = "e:"
+    static readonly apiKey = "api:"
+    static readonly authorizationCode = "authz:";
+    static readonly accessToken = "access:";
+    static readonly refreshToken = "refresh:";
+    static readonly mfaToken = "omfa:";
+}

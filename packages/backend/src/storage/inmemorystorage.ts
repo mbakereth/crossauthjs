@@ -1,7 +1,7 @@
 import { UserStorage, KeyStorage, type UserStorageGetOptions, type UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage, type OAuthAuthorizationStorageOptions } from '../storage';
 import { type User, type UserSecrets, type Key, type UserInputFields, type UserSecretsInputFields, type OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
-import { CrossauthLogger, j } from '@crossauth/common';
+import { CrossauthLogger, j, UserState } from '@crossauth/common';
 
 /**
  * Optional parameters for {@link InMemoryUserStorage}.
@@ -75,19 +75,27 @@ export class InMemoryUserStorage extends UserStorage {
 
             const user = this.usersByUsername[usernameNormalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
-            if (options?.skipActiveCheck!=true && user["state"]=="passwordreset") {
-                CrossauthLogger.logger.debug(j({msg: "Password reset reqzured"}));
+            if (options?.skipActiveCheck!=true && user["state"]==UserState.passwordChangeNeeded) {
+                CrossauthLogger.logger.debug(j({msg: "Password change required"}));
+                throw new CrossauthError(ErrorCode.PasswordChangeNeeded);
+            }
+            if (options?.skipActiveCheck!=true && user["state"]==UserState.passwordResetNeeded) {
+                CrossauthLogger.logger.debug(j({msg: "Password reset required"}));
                 throw new CrossauthError(ErrorCode.PasswordResetNeeded);
             }
-            if (options?.skipActiveCheck!=true && user["state"]=="awaitingtwofactorsetup") {
+            if (options?.skipActiveCheck!=true && user["state"]==UserState.factor2ResetNeeded) {
+                CrossauthLogger.logger.debug(j({msg: "2FA reset required"}));
+                throw new CrossauthError(ErrorCode.Factor2ResetNeeded);
+            }
+            if (options?.skipActiveCheck!=true && user["state"]==UserState.awaitingTwoFactorSetup) {
                 CrossauthLogger.logger.debug(j({msg: "2FA setup is not complete"}));
                 throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
             }
-            if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification") {
+            if (options?.skipEmailVerifiedCheck!=true && user['state'] == UserState.awaitingEmailVerification) {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
-            if (options?.skipActiveCheck!=true && user['state'] == "disabled") {
+            if (options?.skipActiveCheck!=true && user['state'] == UserState.disabled) {
                 CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }

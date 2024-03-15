@@ -1,6 +1,15 @@
 //import { getJsonData } from '@crossauth/common';
-import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields } from '@crossauth/common';
-import { ErrorCode, CrossauthError } from '@crossauth/common';
+import type {
+    User,
+    UserSecrets,
+    Key,
+    UserInputFields,
+    UserSecretsInputFields } from '@crossauth/common';
+import {
+    ErrorCode,
+    CrossauthError,
+    KeyPrefix,
+    UserState } from '@crossauth/common';
 import { UserStorage, KeyStorage } from './storage.ts';
 import { type AuthenticationParameters, Authenticator } from './auth.ts';
 import type { LocalPasswordAuthenticatorOptions }  from "./authenticators/passwordauth.ts";
@@ -132,9 +141,19 @@ export class SessionManager {
      * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
-    async login(username : string, params : AuthenticationParameters, extraFields : {[key:string] : any} = {}, persist? : boolean, user? : User) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string, user: User, secrets: UserSecrets}> {
-
-        let bypass2FA = user != undefined;
+    async login(username: string,
+        params: AuthenticationParameters,
+        extraFields: { [key: string]: any } = {},
+        persist?: boolean,
+        user?: User,
+        bypass2FA : boolean = false) 
+        : Promise<{
+            sessionCookie: Cookie,
+            csrfCookie: Cookie,
+            csrfFormOrHeaderValue: string,
+            user: User,
+            secrets: UserSecrets,
+        }> {
 
         let secrets : UserSecrets;
         if (!user) {
@@ -149,9 +168,16 @@ export class SessionManager {
 
         }
 
-        // create a session ID - bound to user if no 2FA, anonymous otherwiyse
+        // create a session ID - bound to user if no 2FA and no password change required, anonymous otherwise
         let sessionCookie : Cookie;
-        if (!bypass2FA && user.factor2 && user.factor2 != "") {
+        if (user.state == UserState.passwordChangeNeeded) {
+            // create an anonymous session and store the username and 2FA data in it
+            const resp = await this.createAnonymousSession({data: JSON.stringify({"passwordchange": {username: user.username}})});
+            sessionCookie = resp.sessionCookie;
+        } else if (user.state == UserState.factor2ResetNeeded) {
+            const resp = await this.createAnonymousSession({data: JSON.stringify({"factor2change": {username: user.username}})});
+            sessionCookie = resp.sessionCookie;
+        } else if (!bypass2FA && user.factor2 && user.factor2 != "") {
             // create an anonymous session and store the username and 2FA data in it
             const { sessionCookie: newSesionCookie } = await this.initiateTwoFactorLogin(user);
             sessionCookie = newSesionCookie;
@@ -168,7 +194,8 @@ export class SessionManager {
 
         // delete any password reset tokens that still exist for this user.
         try {
-            this.emailTokenStorage.deleteAllForUser(user.id, "p:");
+            this.emailTokenStorage.deleteAllForUser(user.id, 
+                KeyPrefix.passwordResetToken);
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
@@ -534,7 +561,13 @@ export class SessionManager {
      */
     async completeTwoFactorSetup(params : AuthenticationParameters, sessionCookieValue : string) : Promise<User> {
         let newSignup = false;
-        let {user, key} = await this.session.getUserForSessionKey(sessionCookieValue);
+        let {user, key} = 
+            await this.session.getUserForSessionKey(sessionCookieValue, {
+                skipActiveCheck: true
+            });
+        if (user && (user.state != UserState.active && user.state != UserState.factor2ResetNeeded)) {
+            throw new CrossauthError(ErrorCode.UserNotActive);
+        }
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         let data = KeyStorage.decodeData(key.data)["2fa"];
         //let data = getJsonData(key)["2fa"];
@@ -719,7 +752,8 @@ export class SessionManager {
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
         try {
-            this.emailTokenStorage.deleteAllForUser(user.id, "p:");
+            this.emailTokenStorage.deleteAllForUser(user.id, 
+                KeyPrefix.passwordResetToken);
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
@@ -737,7 +771,12 @@ export class SessionManager {
      * @param email the user's email (where the token will be sent)
 .     */
     async requestPasswordReset(email : string) : Promise<void> {
-        const {user} = await this.userStorage.getUserByEmail(email);
+        const {user} = await this.userStorage.getUserByEmail(email, {
+            skipActiveCheck: true
+        });
+        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded) {
+            throw new CrossauthError(ErrorCode.UserNotActive);
+        }
         await this.tokenEmailer?.sendPasswordResetToken(user.id);
     }
 
@@ -797,7 +836,8 @@ export class SessionManager {
 
         // delete any password reset tokens
         try {
-            this.emailTokenStorage.deleteAllForUser(user.id, "p:");
+            this.emailTokenStorage.deleteAllForUser(user.id, 
+                KeyPrefix.passwordResetToken);
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
@@ -864,14 +904,15 @@ export class SessionManager {
         const factor = factorNumber == 1 ? user.factor1 : user.factor2;
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
         await this.userStorage.updateUser(
-            {id: user.id},
+            {id: user.id, state: "active"},
             await this.authenticators[factor].createPersistentSecrets(user.username, params, repeatParams),
         );
         //this.keyStorage.deleteKey(TokenEmailer.hashPasswordResetToken(token));
 
         // delete all password reset tokens
         try {
-            this.emailTokenStorage.deleteAllForUser(user.id, "p:");
+            this.emailTokenStorage.deleteAllForUser(user.id, 
+                KeyPrefix.passwordResetToken);
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: user.username}));
             CrossauthLogger.logger.debug(j({err: e}));

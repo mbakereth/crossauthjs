@@ -18,6 +18,7 @@ import {
     type UserInputFields } from '@crossauth/common';
 import { getTestUserStorage }  from './inmemorytestdata';
 import { authenticator as gAuthenticator } from 'otplib';
+import { KeyPrefix } from '@crossauth/common';
 
 //export var server : FastifyCookieAuthServer;
 export var confirmEmailData :  {token : string, email : string, extraData: {[key:string]: any}};
@@ -259,7 +260,7 @@ test('FastifyAuthServer.getAccessTokenWhileLoggedIn', async () => {
     const state = params.state;
     expect(state).toBe("ABC123");
     expect(code).toBeDefined();
-    await keyStorage.getKey("authz:"+Hasher.hash(code??""));
+    await keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code??""));
 
     res = await server.app.inject({ 
         method: "POST", 

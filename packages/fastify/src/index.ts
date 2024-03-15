@@ -12,6 +12,7 @@ import { User, ApiKey } from '@crossauth/common';
 
 declare module 'fastify' {
     export interface FastifyRequest {
+      halfUser: User|undefined,
       user: User|undefined,
       csrfToken: string|undefined,
       apiKey: ApiKey,

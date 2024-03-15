@@ -15,7 +15,7 @@ export interface UserStorageGetOptions {
     /**
      * If true, a valid user will be returned even if state is not set to `active`
      */
-    skipActiveCheck? : boolean
+    skipActiveCheck? : boolean,
 }
 
 /**

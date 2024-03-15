@@ -1,4 +1,5 @@
 import type { ApiKey } from '@crossauth/common';
+import { KeyPrefix } from '@crossauth/common';
 import { KeyStorage } from './storage.ts';
 import { setParameter, ParamType } from './utils.ts';
 import { Hasher } from './hasher';
@@ -15,10 +16,12 @@ export interface ApiKeyManagerOptions {
     /** Server secret.  Needed for emailing tokens and for csrf tokens */
     secret? : string;
 
-    /** The prefix to add to the hashed key in storage.  Defaults to "api:" */
+    /** The prefix to add to the hashed key in storage.  Defaults to 
+     * {@link @crossauth/common!KeyPrefix}.apiKey
+     */
     prefix? : string;
 
-    /** The name of the speak in the Authorization header.  Defaults to "ApiKey" */
+    /** The token type in the Authorization header.  Defaults to "ApiKey" */
     authScheme? : string;
 }
 
@@ -39,8 +42,10 @@ export class ApiKeyManager {
     private keyLength : number = 16;
     private secret : string = "";
 
-    /** The prefix to add to the hashed key in storage.  Defaults to "api:" */
-    prefix = "api:";
+    /** The prefix to add to the hashed key in storage.  Defaults to 
+     * {@link @crossauth/common!KeyPrefix}.apiKey
+     */
+    prefix = KeyPrefix.apiKey;
 
     /** The name of the speak in the Authorization header.  Defaults to "ApiKey" */
     authScheme? : string = "ApiKey";

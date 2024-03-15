@@ -9,8 +9,8 @@ import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import type { OpenIdConfiguration, GrantType, Jwks, MfaAuthenticatorResponse } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
-import type  { OAuthClient, OAuthTokenResponse } from '@crossauth/common';
-import { CrossauthLogger, j, type Key, type User } from '@crossauth/common';
+import type  { OAuthClient, OAuthTokenResponse, Key, User } from '@crossauth/common';
+import { CrossauthLogger, j, KeyPrefix } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, type JsonWebKey } from 'crypto'
 import fs from 'node:fs';
@@ -18,10 +18,6 @@ import fs from 'node:fs';
 const CLIENT_ID_LENGTH = 16;
 const CLIENT_SECRET_LENGTH = 32;
 
-const AUTHZ_CODE_PREFIX = "authz:";
-const ACCESS_TOKEN_PREFIX = "access:";
-const REFRESH_TOKEN_PREFIX = "refresh:";
-const MFA_TOKEN_PREFIX = "omfa:";
 
 function algorithm(value : string) : Algorithm {
     switch (value) {
@@ -1027,7 +1023,7 @@ export class OAuthAuthorizationServer {
         error_description: string
     }> {
         const mfaToken = Hasher.randomValue(16);
-        const mfaKey = MFA_TOKEN_PREFIX + Hasher.hash(mfaToken);
+        const mfaKey = KeyPrefix.mfaToken + Hasher.hash(mfaToken);
         const now = new Date();
         try {
             await this.keyStorage.saveKey(
@@ -1065,7 +1061,7 @@ export class OAuthAuthorizationServer {
             let user : User|undefined;
             let key : Key|undefined;
             try {
-                const mfaKey = MFA_TOKEN_PREFIX + Hasher.hash(mfaToken);
+                const mfaKey = KeyPrefix.mfaToken + Hasher.hash(mfaToken);
                 key = await this.keyStorage.getKey(mfaKey);
                 if (!key.userId) {
                     return {
@@ -1376,7 +1372,7 @@ export class OAuthAuthorizationServer {
             try {
                 authzCode = Hasher.randomValue(this.authorizationCodeLength);
                 this.keyStorage.saveKey(undefined,
-                    AUTHZ_CODE_PREFIX + Hasher.hash(authzCode),
+                    KeyPrefix.authorizationCode + Hasher.hash(authzCode),
                     created,
                     expires,
                     authzDataString);
@@ -1446,7 +1442,7 @@ export class OAuthAuthorizationServer {
             // authorization code
             let key : Key|undefined;
             try {
-                key = await this.keyStorage.getKey(AUTHZ_CODE_PREFIX+Hasher.hash(code));
+                key = await this.keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code));
                 authzData = KeyStorage.decodeData(key.data);
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -1538,7 +1534,7 @@ export class OAuthAuthorizationServer {
         if (this.persistAccessToken && this.keyStorage) {
             await this.keyStorage?.saveKey(
                 undefined, // to avoid user storage dependency, we don't set this
-                ACCESS_TOKEN_PREFIX+Hasher.hash(accessTokenJti),
+                KeyPrefix.accessToken+Hasher.hash(accessTokenJti),
                 now,
                 dateAccessTokenExpires
             );
@@ -1678,7 +1674,7 @@ export class OAuthAuthorizationServer {
             if (this.persistRefreshToken && this.keyStorage) {
                 await this.keyStorage?.saveKey(
                     undefined, // to avoid user storage dependency
-                    REFRESH_TOKEN_PREFIX+Hasher.hash(refreshTokenJti),
+                    KeyPrefix.refreshToken+Hasher.hash(refreshTokenJti),
                     now,
                     dateRefreshTokenExpires
                 );
@@ -1701,7 +1697,7 @@ export class OAuthAuthorizationServer {
         try {
             const decoded = await this.validateJwt(token, "refresh");
             if (this.persistRefreshToken) {
-                const hash = "refresh:" + Hasher.hash(decoded.jti);
+                const hash = KeyPrefix.refreshToken + Hasher.hash(decoded.jti);
                 await this.keyStorage.getKey(hash);
             }
             return decoded;
@@ -1716,7 +1712,7 @@ export class OAuthAuthorizationServer {
         try {
             const decoded = await this.validateJwt(token, "refresh");
             if (this.persistRefreshToken) {
-                const hash = "refresh:" + Hasher.hash(decoded.payload.jti);
+                const hash = KeyPrefix.refreshToken + Hasher.hash(decoded.payload.jti);
                 await this.keyStorage.getKey(hash);
             }
             return decoded;
@@ -1742,7 +1738,7 @@ export class OAuthAuthorizationServer {
         try {
             const decoded = await this.validateJwt(token, "access");
             if (this.persistAccessToken) {
-                const hash = "access:" + Hasher.hash(decoded.payload.jti);
+                const hash = KeyPrefix.accessToken + Hasher.hash(decoded.payload.jti);
                 await this.keyStorage.getKey(hash);
             }
             return decoded;

@@ -2,7 +2,7 @@ import { KeyStorage } from '../storage';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
 import { CrossauthLogger, j } from '@crossauth/common';
-import { CrossauthError, ErrorCode } from '@crossauth/common';
+import { CrossauthError, ErrorCode, KeyPrefix } from '@crossauth/common';
 import fs from 'node:fs';
 import {
     OAuthTokenConsumerBase,
@@ -83,7 +83,7 @@ export class OAuthBackendTokenConsumer extends OAuthTokenConsumerBase {
             if (tokenType == "access" && this.persistAccessToken && 
                 this.keyStorage) {
                 try {
-                    const key = "access:" + Hasher.hash(payload.jti);
+                    const key = KeyPrefix.accessToken + Hasher.hash(payload.jti);
                     const tokenInStorage = await this.keyStorage.getKey(key);
                     const now = new Date();
                     if (tokenInStorage.expires && tokenInStorage.expires?.getTime() < now.getTime()) {

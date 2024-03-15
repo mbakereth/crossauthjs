@@ -2,7 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { UserStorage, KeyStorage, type UserStorageGetOptions, type UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage } from '../storage';
 import { type User, type UserSecrets, type UserInputFields, type UserSecretsInputFields, type Key, type OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode, OAuthFlows } from'@crossauth/common';
-import { CrossauthLogger, j } from '@crossauth/common';
+import { CrossauthLogger, j, UserState } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
 
 /**
@@ -105,21 +105,29 @@ export class PrismaUserStorage extends UserStorage {
             CrossauthLogger.logger.error(j({err: error}));
             throw error;
         }
-        if (options?.skipActiveCheck!=true && prismaUser["state"]=="awaitingtwofactorsetup") {
-            CrossauthLogger.logger.debug(j({msg: "TOTP setup is not complete"}));
+        if (options?.skipActiveCheck!=true && prismaUser["state"]==UserState.awaitingTwoFactorSetup) {
+            CrossauthLogger.logger.debug(j({msg: "2FA setup is not complete"}));
             throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
         }
-        if (options?.skipActiveCheck!=true && prismaUser["state"]=="disabled") {
+        if (options?.skipActiveCheck!=true && prismaUser["state"]==UserState.disabled) {
             CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
-        if (options?.skipEmailVerifiedCheck!=true && prismaUser["state"]=="awaitingemailverification") {
+        if (options?.skipEmailVerifiedCheck!=true && prismaUser["state"]==UserState.awaitingEmailVerification) {
             CrossauthLogger.logger.debug(j({msg: "User has not verified email"}));
             throw new CrossauthError(ErrorCode.EmailNotVerified);
         }
-        if (prismaUser["state"] == "resetpassword") {
+        if (options?.skipActiveCheck!=true && prismaUser["state"] == UserState.passwordChangeNeeded) {
+            CrossauthLogger.logger.debug(j({msg: "User must change password"}));
+            throw new CrossauthError(ErrorCode.PasswordChangeNeeded);
+        }
+        if (options?.skipActiveCheck!=true && prismaUser["state"] == UserState.passwordResetNeeded) {
             CrossauthLogger.logger.debug(j({msg: "User must reset password"}));
             throw new CrossauthError(ErrorCode.PasswordResetNeeded);
+        }
+        if (options?.skipActiveCheck!=true && prismaUser["state"]==UserState.factor2ResetNeeded) {
+            CrossauthLogger.logger.debug(j({msg: "2FA reset required"}));
+            throw new CrossauthError(ErrorCode.Factor2ResetNeeded);
         }
         const secrets = prismaUser.secrets || {};
         if (prismaUser.secrets) {
