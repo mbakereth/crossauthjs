@@ -3333,7 +3333,7 @@ export class FastifySessionServer {
         }
 
         // if not found, try to get token from body
-        if (!token) {
+        if (!token && request.body?.csrfToken) {
             token = request.body.csrfToken;
         }
         if (token) {

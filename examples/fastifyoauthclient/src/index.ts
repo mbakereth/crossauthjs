@@ -72,7 +72,7 @@ const server = new FastifyServer(userStorage, {
     tokenResponseType: "saveInSessionAndLoad",
     bffEndpoints: [{url: "/resource", methods: ["GET"]}],
     bffBaseUrl: process.env["RESOURCE_SERVER"],
-    profileUrl: "profile",
+    tokenEndpoints: ["id_token"],
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {

@@ -57,10 +57,10 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
         url: string,
         methods: ("GET" | "POST" | "PUT" | "DELETE" | "PATCH")[],
         matchSubUrls?: boolean
-}[],
+    }[],
     bffEndpointName? : string,
     bffBaseUrl? : string,
-    profileUrl? : string,
+    tokenEndpoints? : ("access_token"|"refresh_token"|"id_token")[],
 }
 
 
@@ -390,7 +390,7 @@ export class FastifyOAuthClient extends OAuthClient {
         }[] = [];
     private bffEndpointName = "bff";
     private bffBaseUrl? : string;
-    private profileUrl? : string;
+    private tokenEndpoints : ("access_token"|"refresh_token"|"id_token")[] = [];
 
     constructor(server: FastifyServer,
         authServerBaseUri: string,
@@ -416,7 +416,8 @@ export class FastifyOAuthClient extends OAuthClient {
         setParameter("mfaOobPage", ParamType.String, this, options, "OAUTH_MFA_OOB_PAGE");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
-        setParameter("profileUrl", ParamType.String, this, options, "OAUTH_CLIENT_PROFILE_URL");
+        if (options.tokenEndpoints) this.tokenEndpoints = options.tokenEndpoints;
+
         if (this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
         if (options.bffEndpoints) this.bffEndpoints = options.bffEndpoints;
 
@@ -787,26 +788,31 @@ export class FastifyOAuthClient extends OAuthClient {
             }
         }
 
-        // Profile endpoint
-        if (this.profileUrl) {
-            this.server.app.get(this.prefix+this.profileUrl, 
-                async (request : FastifyRequest, reply : FastifyReply) => {
+        // Token endpoints
+        for (let tokenType of this.tokenEndpoints) {
+            console.log("Add endpoint", tokenType)
+            this.server.app.post(this.prefix+tokenType, 
+                async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
                     CrossauthLogger.logger.info(j({
                         msg: "Page visit",
-                        method: 'GET',
-                        url: this.prefix + this.profileUrl,
+                        method: 'POST',
+                        url: this.prefix + tokenType,
                         ip: request.ip,
                         user: request.user?.username
                     }));
+                if (!request.csrfToken) {
+                    return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
+                }
                 const oauthData = await this.server.getSessionData(request, "oauth");
                 if (!oauthData) {
-                    return reply.header(...JSONHDR).status(401).send({ok: false});
+                    return reply.header(...JSONHDR).status(204).send();
                 }
-                const payload = decodePayload(oauthData.id_token);
-                return reply.header(...JSONHDR).status(200).send({ok: true, ...payload});
+                const payload = decodePayload(oauthData[tokenType]);
+                if (!payload) return reply.header(...JSONHDR).status(204).send();
+
+                return reply.header(...JSONHDR).status(200).send({...payload});
             });
         }
-
 
         // Add BFF endpoints
         if (this.bffEndpoints.length > 0 && !this.bffBaseUrl) {

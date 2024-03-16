@@ -4,13 +4,39 @@
         <link rel="stylesheet" href="/public/style.css"/>
 
         <script>
-            function profile() {
-                fetch("/profile")
-                .then(function(response) {return response.json()}).then(function(response) {
-                    document.getElementById("profile").innerHTML = "<pre>"+JSON.stringify(response, null, '\t')+"</pre>"
+            function fetchIdToken(csrfToken) {
+                fetch("/id_token", {
+                    method: "POST",
+                    headers: {
+                        "X-CROSSAUTH-CSRF": csrfToken,
+                    }
+                })
+                .then(function(response) {
+                    if (response.status == 200) {
+                        return response.json();
+                    }
+                    if (response.status == 204) {
+                        throw new Error("There is no ID token")
+                    }
+                    throw new Error("Couldn't fetch token")       
+                })
+                .then(function(response) {
+                    document.getElementById("idtoken").innerHTML = "<pre>"+JSON.stringify(response, null, '\t')+"</pre>"
                 })
                 .catch(function(error) {
-                    document.getElementById("profile").text = error;
+                    document.getElementById("idtoken").innerHTML = error;
+                })
+            }
+            function idtoken() {
+                fetch("/api/getcsrftoken", {})
+                .then(function(response) {return response.json()}).then(function(response) {
+                    if (response.ok) {
+                        fetchIdToken(response.csrfToken);
+                    }
+                    throw new Error("COuldn't fetch CSRF token")
+                })
+                .catch(function(error) {
+                    document.getElementById("idtoken").innerHTML = error;
                 })
             }
         </script>
@@ -20,13 +46,8 @@
 
         <p>Authorization was successful</p>
 
-        {% if id_payload %}
-        <p>Username {{id_payload.sub }}</p>
-        <p>Email {{id_payload.email }}</p>
-        <p><button onclick="profile()">Profile</button></p>
-        <p id="profile"></p>
-        {% endif %}
-
+        <p><button onclick="idtoken()">ID Token</button></p>
+        <p id="idtoken"></p>
 
         <p><a href="/">Home</a></p>
     </body>
