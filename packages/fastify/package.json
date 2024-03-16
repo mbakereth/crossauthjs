@@ -15,7 +15,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "dotenv -e .env.unittest vitest",
-    "testoncw": "dotenv -e .env.unittest vitest run",
+    "testonce": "dotenv -e .env.unittest vitest run",
     "doc": "typedoc",
     "preinstall": "bash ../../removeprismaclient.sh",
     "postinstall": "bash ../../copyprismaclient.sh && bash ../../ifdotenv.sh -e .env.unittest prisma generate",

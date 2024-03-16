@@ -34,6 +34,7 @@ export async function getAuthServer({
     emptyScopeIsValid, 
     secretRequired,
     rollingRefreshToken,
+    idTokenClaims,
     } : {
     challenge?: boolean, 
     aud?: string, 
@@ -41,6 +42,7 @@ export async function getAuthServer({
     emptyScopeIsValid? : boolean, 
     secretRequired? : boolean,
     rollingRefreshToken? : boolean,
+    idTokenClaims? : string,
 } = {}) {
     const {clientStorage, client} = await createClient(secretRequired == undefined || secretRequired == true);
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
@@ -51,7 +53,7 @@ export async function getAuthServer({
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         jwtKeyType: "RS256",
         validateScopes : true,
-        validScopes: "read, write, openid",
+        validScopes: "read, write, openid, email1",
         issueRefreshToken: true,
         emptyScopeIsValid: emptyScopeIsValid,
         validFlows: "all",
@@ -59,6 +61,7 @@ export async function getAuthServer({
         authenticators: {
             "localpassword": authenticator,
         },
+        idTokenClaims,
     };
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {
@@ -75,12 +78,14 @@ export async function getAuthorizationCode({
     aud, 
     persistAccessToken,
     rollingRefreshToken,
-    oidc = false,
+    scopes = "read write",
+    idTokenClaims,
 } : {challenge?: boolean,
      aud?: string, 
      persistAccessToken? : boolean,
      rollingRefreshToken? : boolean,
-     oidc? : boolean,
+     scopes? : string,
+     idTokenClaims? : string,
     } = {}) {
     const secretRequired = challenge == undefined;
     const { client,
@@ -93,7 +98,8 @@ export async function getAuthorizationCode({
             aud,
             persistAccessToken,
             secretRequired,
-            rollingRefreshToken
+            rollingRefreshToken,
+            idTokenClaims,
 });
     const {user} = await userStorage.getUserByUsername("bob");
     const inputState = "ABCXYZ";
@@ -105,7 +111,7 @@ export async function getAuthorizationCode({
             responseType: "code", 
             clientId: client.clientId, 
             redirectUri: client.redirectUri[0], 
-            scope: "read write" + (oidc == true ? " openid" : ""), 
+            scope: scopes, 
             state: inputState,
             codeChallenge: codeChallenge,
             user});

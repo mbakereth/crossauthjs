@@ -5,6 +5,7 @@ export enum ParamType {
     Number,
     Boolean,
     StringArray,
+    Json,
 }
 
 function getOption(param : string, options: {[key:string]: any}) {
@@ -31,7 +32,13 @@ function hasOption(param : string, options: {[key:string]: any}) : boolean {
 
 function setFromOption(instance : any, param : string, type : ParamType, options : {[key:string]: any}) {
     const value = getOption(param, options);
-    instance[param.replace(".", "_")] = type == ParamType.StringArray ? value.split(/ *, */) : value;
+    if (type == ParamType.StringArray) {
+        instance[param.replace(".", "_")] = value.split(/ *, */);
+    } else if (type == ParamType.Json) {
+        instance[param.replace(".", "_")] = JSON.parse(value);
+    } else {
+        instance[param.replace(".", "_")] = value;
+    }
 }
 
 function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvFile : string) {
@@ -49,7 +56,10 @@ function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvF
         case ParamType.Boolean:
             instance[key] = ["1", "true"].includes(process.env[nameInEnvFile]?.toLowerCase()??"");
             break;
-    }
+        case ParamType.Json:
+            instance[key] = JSON.parse((process.env[nameInEnvFile]??"{}"));
+            break;
+        }
 }
 
 
@@ -63,5 +73,8 @@ export function setParameter(param : string,
         throw new CrossauthError(ErrorCode.Configuration, param + " is required");
     }
         if (hasOption(param, options)) setFromOption(instance, param, type, options);
-        else if (envName && nameInEnvFile in process.env && process.env[nameInEnvFile] != undefined) setFromEnv(instance, param, type, nameInEnvFile);     
+        else if (envName && nameInEnvFile in process.env && 
+            process.env[nameInEnvFile] != undefined) {
+            setFromEnv(instance, param, type, nameInEnvFile);     
+        }
 }

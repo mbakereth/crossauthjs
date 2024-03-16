@@ -7,9 +7,17 @@ import {
 import { Authenticator } from '../auth';
 import { setParameter, ParamType } from '../utils';
 import { Hasher } from '../hasher';
-import type { OpenIdConfiguration, GrantType, Jwks, MfaAuthenticatorResponse } from '@crossauth/common';
+import type {
+    OpenIdConfiguration,
+    GrantType,
+    Jwks,
+    MfaAuthenticatorResponse } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
-import type  { OAuthClient, OAuthTokenResponse, Key, User } from '@crossauth/common';
+import type {
+    OAuthClient,
+    OAuthTokenResponse,
+    Key,
+    User } from '@crossauth/common';
 import { CrossauthLogger, j, KeyPrefix } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, type JsonWebKey } from 'crypto'
@@ -177,6 +185,10 @@ export interface OAuthAuthorizationServerOptions {
     /** Required if activating the password flow */
     authenticators? : {[key:string] : Authenticator};
 
+    /** A JSON string of customs fields per scope to put in id token.
+     * `{"scope": "all"}` or `{"scope": {"idtokenfield" : "userfield"}}`.
+     * If `scope` is `all` then it applies to all scopes
+     */
     idTokenClaims? : string;
 }
 
@@ -223,9 +235,7 @@ export class OAuthAuthorizationServer {
         private emptyScopeIsValid : boolean = true;
         private validateScopes : boolean = false;
         private validScopes : string[] = [];
-        private idTokenClaims : string[] = [];
-        private idTokenClaimsMap : {[key:string]: string} = {};
-        private idTokenClaimsAll : boolean = false;
+        private idTokenClaims : {[key:string] : any} = {};
         validFlows : string[] = ["all"];
     
     constructor(clientStorage: OAuthClientStorage,
@@ -272,19 +282,7 @@ export class OAuthAuthorizationServer {
         setParameter("emptyScopeIsValid", ParamType.Boolean, this, options, "OAUTH_EMPTY_SCOPE_VALID");
         setParameter("validScopes", ParamType.StringArray, this, options, "OAUTH_VALID_SCOPES");
         setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
-        setParameter("idTokenClaims", ParamType.StringArray, this, options, "OAUTH_ID_TOKEN_CLAIMS");
-        if (this.idTokenClaims.length == 1 && this.idTokenClaims[0] == "all") {
-            this.idTokenClaimsAll = true;
-        } else {
-            for (let claim of this.idTokenClaims) {
-                const pair = claim.split(":");
-                if (pair.length != 2) {
-                    throw new CrossauthError(ErrorCode.Configuration, 
-                        "Id token claims must be a string of claim:fieldName separated by spaces");
-                    }
-                this.idTokenClaimsMap[pair[0]] = pair[1];
-            }        
-        }
+        setParameter("idTokenClaims", ParamType.Json, this, options, "OAUTH_ID_TOKEN_CLAIMS");
 
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {
@@ -1594,19 +1592,43 @@ export class OAuthAuthorizationServer {
                     idTokenPayload[field] = user[field];
                 }
             }
+
+            // populate claims from custom set
             if (user) {
-                if (this.idTokenClaimsAll) {
-                    idTokenPayload = {
-                        ...idTokenPayload,
-                        ...user
-                    };
-                } else {
-                    for (let field in this.idTokenClaims) {
-                        idTokenPayload[field] = user[this.idTokenClaims[field]];
+                if (scopes) {
+                    for (let scope of scopes) {
+                        if (scope in this.idTokenClaims) {
+                            if (this.idTokenClaims[scope] == "all") {
+                                idTokenPayload = {
+                                    ...idTokenPayload,
+                                    ...user
+                                };
+                            } else {
+                                for (let field in this.idTokenClaims[scope]) {
+                                    idTokenPayload[field] = 
+                                        user[this.idTokenClaims[scope][field]];
+                                }
+                            }
+
+                        }
                     }
-    
+                } 
+                if ("all" in this.idTokenClaims) {
+                    const claims = this.idTokenClaims["all"]
+                    if (claims == "all") {
+                        idTokenPayload = {
+                            ...idTokenPayload,
+                            ...user
+                        };
+                    } else {
+                        for (let field in claims) {
+                            idTokenPayload[field] = 
+                                user[claims[field]];
+                        }
+                    }
                 }
             }
+            
             idTokenPayload.scope = scopes;
             if (this.accessTokenExpiry != null) {
                 idTokenPayload.exp = timeCreated + this.accessTokenExpiry

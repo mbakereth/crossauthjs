@@ -546,7 +546,7 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
 
 test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdToken', async () => {
 
-    const {authServer, client, code} = await getAuthorizationCode({oidc: true});
+    const {authServer, client, code} = await getAuthorizationCode({scopes: "read write openid"});
     const {access_token, refresh_token, expires_in, error, error_description, id_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
@@ -581,6 +581,79 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdToken', async () => {
     expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
     expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
     expect(decodedIdToken?.payload.sub).toBe("bob");
+
+    expect(expires_in).toBe(60*60);
+});
+
+test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenAllClaims', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode({scopes: "read write openid",
+        idTokenClaims: '{"all": {"email1": "email"}}'});
+    const {access_token, refresh_token, expires_in, error, error_description, id_token}
+        = await authServer.tokenEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(error_description).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(3);
+    expect(["read", "write", "openid"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write", "openid"]).toContain(decodedAccessToken?.payload.scope[1]);
+    expect(["read", "write", "openid"]).toContain(decodedAccessToken?.payload.scope[2]);
+    expect(decodedAccessToken?.payload.sub).toBe("bob");
+
+    const decodedRefreshToken
+        = await authServer.validRefreshToken(refresh_token??"");
+    expect(decodedRefreshToken).toBeDefined();
+    expect(decodedRefreshToken?.payload.scope.length).toBe(3);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[0]);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
+
+    const decodedIdToken
+        = await authServer.validIdToken(id_token??"");
+    expect(decodedIdToken).toBeDefined();
+    expect(decodedIdToken?.payload.scope.length).toBe(3);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[0]);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
+    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
+    expect(decodedIdToken?.payload.sub).toBe("bob");
+    expect(decodedIdToken?.payload.email1).toBe("bob@bob.com");
+
+    expect(expires_in).toBe(60*60);
+});
+
+test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenSCopedClaims', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode({scopes: "read write openid email1",
+        idTokenClaims: '{"email1": {"email1": "email"}}'});
+    const {access_token, refresh_token, expires_in, error, error_description, id_token}
+        = await authServer.tokenEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(error_description).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+
+    const decodedRefreshToken
+        = await authServer.validRefreshToken(refresh_token??"");
+    expect(decodedRefreshToken).toBeDefined();
+
+    const decodedIdToken
+        = await authServer.validIdToken(id_token??"");
+    expect(decodedIdToken).toBeDefined();
+    expect(decodedIdToken?.payload.sub).toBe("bob");
+    expect(decodedIdToken?.payload.email1).toBe("bob@bob.com");
 
     expect(expires_in).toBe(60*60);
 });
