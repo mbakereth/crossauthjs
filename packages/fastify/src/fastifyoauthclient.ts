@@ -60,7 +60,8 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     }[],
     bffEndpointName? : string,
     bffBaseUrl? : string,
-    tokenEndpoints? : ("access_token"|"refresh_token"|"id_token")[],
+    tokenEndpoints? : ("access_token"|"refresh_token"|"id_token"|
+        "have_access_token"|"have_refresh"|"have_id")[],
 }
 
 
@@ -390,7 +391,8 @@ export class FastifyOAuthClient extends OAuthClient {
         }[] = [];
     private bffEndpointName = "bff";
     private bffBaseUrl? : string;
-    private tokenEndpoints : ("access_token"|"refresh_token"|"id_token")[] = [];
+    private tokenEndpoints : ("access_token"|"refresh_token"|"id_token"|
+        "have_access_token"|"have_refresh"|"have_id")[] = [];
 
     constructor(server: FastifyServer,
         authServerBaseUri: string,
@@ -790,7 +792,6 @@ export class FastifyOAuthClient extends OAuthClient {
 
         // Token endpoints
         for (let tokenType of this.tokenEndpoints) {
-            console.log("Add endpoint", tokenType)
             this.server.app.post(this.prefix+tokenType, 
                 async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
                     CrossauthLogger.logger.info(j({
@@ -803,13 +804,24 @@ export class FastifyOAuthClient extends OAuthClient {
                 if (!request.csrfToken) {
                     return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
                 }
+                let isHave = false;
+                let tokenName : string = tokenType;
+                if (tokenType.startsWith("have_")) {
+                    tokenName = tokenType.replace("have_", "");
+                    isHave = true;
+                }
                 const oauthData = await this.server.getSessionData(request, "oauth");
                 if (!oauthData) {
+                    if (isHave) return reply.header(...JSONHDR).status(200).send({ok: false});
                     return reply.header(...JSONHDR).status(204).send();
                 }
-                const payload = decodePayload(oauthData[tokenType]);
-                if (!payload) return reply.header(...JSONHDR).status(204).send();
+                const payload = decodePayload(oauthData[tokenName]);
+                if (!payload) {
+                    if (isHave) return reply.header(...JSONHDR).status(200).send({ok: false});
+                    return reply.header(...JSONHDR).status(204).send();
+                }
 
+                if (isHave) return reply.header(...JSONHDR).status(200).send({ok: true});
                 return reply.header(...JSONHDR).status(200).send({...payload});
             });
         }

@@ -69,10 +69,10 @@ const server = new FastifyServer(userStorage, {
     loginUrl: "login",
     validFlows: "all", // activate all OAuth flows
     loginProtectedFlows: OAuthFlows.AuthorizationCode + ", " + OAuthFlows.AuthorizationCodeWithPKCE,
-    tokenResponseType: "saveInSessionAndLoad",
+    tokenResponseType: "saveInSessionAndRedirect",
     bffEndpoints: [{url: "/resource", methods: ["GET"]}],
     bffBaseUrl: process.env["RESOURCE_SERVER"],
-    tokenEndpoints: ["id_token"],
+    tokenEndpoints: ["id_token", "have_access_token"],
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
@@ -99,6 +99,16 @@ app.get('/passwordex', async (request : FastifyRequest, reply : FastifyReply) =>
 app.get('/oidcex', async (request : FastifyRequest, reply : FastifyReply) =>  {
     if (!request.user) return reply.redirect(302, "/login?next=/oidcex");
     return reply.view('oidc.njk', {user: request.user});
+}
+);
+
+app.get('/authorized', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    return reply.view('authorized.njk', {});
+}
+);
+
+app.get('/error', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    return reply.view('error.njk', {});
 }
 );
 

@@ -4,7 +4,11 @@
         <link rel="stylesheet" href="/public/style.css"/>
 
         <script>
-            function fetchIdToken(csrfToken) {
+            window.onload = function() {
+                fetchWithCsrf("haveAccessToken")
+            };
+
+            function idToken(csrfToken) {
                 fetch("/id_token", {
                     method: "POST",
                     headers: {
@@ -27,16 +31,40 @@
                     document.getElementById("idtoken").innerHTML = error;
                 })
             }
-            function idtoken() {
+
+            function haveAccessToken(csrfToken) {
+                fetch("/have_access_token", {
+                    method: "POST",
+                    headers: {
+                        "X-CROSSAUTH-CSRF": csrfToken,
+                    }
+                })
+                .then(function(response) {
+                    if (response.status == 200) {
+                        return response.json();
+                    }
+                    throw new Error("Couldn't get access token")       
+                })
+                .then(function(response) {
+                    console.log("Response", response);
+                    if (!response.ok) window.location = "/error";
+                })
+                .catch(function(error) {
+                    window.location = "/error";
+                })
+            }
+
+            function fetchWithCsrf(fnName) {
                 fetch("/api/getcsrftoken", {})
                 .then(function(response) {return response.json()}).then(function(response) {
                     if (response.ok) {
-                        fetchIdToken(response.csrfToken);
+                       // fetchIdToken(response.csrfToken);
+                       window[fnName](response.csrfToken);
                     }
-                    throw new Error("COuldn't fetch CSRF token")
+                    throw new Error("Couldn't fetch CSRF token")
                 })
                 .catch(function(error) {
-                    document.getElementById("idtoken").innerHTML = error;
+                    console.log(error);
                 })
             }
         </script>
@@ -46,7 +74,7 @@
 
         <p>Authorization was successful</p>
 
-        <p><button onclick="idtoken()">ID Token</button></p>
+        <p><button onclick="fetchWithCsrf('idToken')">ID Token</button></p>
         <p id="idtoken"></p>
 
         <p><a href="/">Home</a></p>
