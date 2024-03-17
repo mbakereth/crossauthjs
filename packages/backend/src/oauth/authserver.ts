@@ -74,7 +74,7 @@ export interface OAuthAuthorizationServerOptions {
     requireClientSecretOrChallenge?: boolean,
 
     /** Authorization code length, before base64url-encoding.  Default 32 */
-    authorizationCodeLength? : number,
+    codeLength? : number,
 
     /** The algorithm to sign JWTs with.  Default `RS256` */
     jwtAlgorithm? : string,
@@ -119,23 +119,9 @@ export interface OAuthAuthorizationServerOptions {
     /** Whether to issue a refresh token.  Default false */
     issueRefreshToken? : boolean,
 
-    /** Whether to persist refresh tokens in key storage.  Default false */
-    persistRefreshToken? : boolean,
-
-    /** Whether to persist user tokens in key storage.  Default false */
-    persistUserToken? : boolean,
-
     /** If true, access token will contain no data, just a random string.  
      * This will turn persistAccessToken on.  Default false. */
     opaqueAccessToken? : boolean,
-
-    /** If true, refresh token will contain no data, just a random string.  
-     * This will turn persistRefreshToken on.  Default false. */
-    opaqueRefreshToken? : boolean,
-
-    /** If true, user token will contain no data, just a random string.  
-     * This will turn persistUserToken on.  Default false. */
-    opaqueUserToken? : boolean,
 
     /** Expiry for access tokens in seconds.  If null, they don't expire.  
      * Defult 1 hour */
@@ -209,7 +195,7 @@ export class OAuthAuthorizationServer {
         private requireClientSecretOrChallenge = true;
         private jwtAlgorithm = "RS256";
         private jwtAlgorithmChecked : Algorithm = "RS256";
-        private authorizationCodeLength = 32;
+        private codeLength = 32;
         private jwtKeyType = "";
         private jwtSecretKey = "";
         private jwtPublicKey = "";
@@ -221,11 +207,7 @@ export class OAuthAuthorizationServer {
         private secretOrPublicKey = "";
         private persistAccessToken = false;
         private issueRefreshToken = false;
-        private persistRefreshToken = false;
-        private persistUserToken = false;
         private opaqueAccessToken = false;
-        private opaqueRefreshToken = false;
-        private opaquetUserToken = false;
         private accessTokenExpiry : number|null = 60*60;
         private refreshTokenExpiry : number|null = 60*60;
         private rollingRefreshToken : boolean = true;
@@ -257,7 +239,7 @@ export class OAuthAuthorizationServer {
         setParameter("requireRedirectUriRegistration", ParamType.Boolean, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
         setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
-        setParameter("authorizationCodeLength", ParamType.Number, this, options, "OAUTH_AUTHORIZATION_CODE_LENGTH");
+        setParameter("codeLength", ParamType.Number, this, options, "OAUTH_CODE_LENGTH");
         setParameter("jwtKeyType", ParamType.String, this, options, "JWT_KEY_TYPE");
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
         setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
@@ -267,11 +249,7 @@ export class OAuthAuthorizationServer {
         setParameter("jwtPrivateKey", ParamType.String, this, options, "JWT_PRIVATE_KEY");
         setParameter("persistAccessToken", ParamType.String, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
         setParameter("issueRefreshToken", ParamType.String, this, options, "OAUTH_ISSUE_REFRESH_TOKEN");
-        setParameter("persistRefreshToken", ParamType.String, this, options, "OAUTH_PERSIST_REFRESH_TOKEN");
-        setParameter("persistUserToken", ParamType.String, this, options, "OAUTH_PERSIST_USER_TOKEN");
         setParameter("opaqueAccessToken", ParamType.String, this, options, "OAUTH_OPAQUE_ACCESS_TOKEN");
-        setParameter("opaqueRefreshToken", ParamType.String, this, options, "OAUTH_OPAQUE_REFRESH_TOKEN");
-        setParameter("opaquetUserToken", ParamType.String, this, options, "OAUTH_OPAQUE_USER_TOKEN");
         setParameter("accessTokenExpiry", ParamType.Number, this, options, "OAUTH_ACCESS_TOKEN_EXPIRY");
         setParameter("refreshTokenExpiry", ParamType.Number, this, options, "OAUTH_REFRESH_TOKEN_EXPIRY");
         setParameter("rollingRefreshToken", ParamType.Boolean, this, options, "OAUTH_ROLLING_REFRESH_TOKEN");
@@ -340,14 +318,6 @@ export class OAuthAuthorizationServer {
         }
 
         if (this.opaqueAccessToken) this.persistAccessToken = true;
-        if (this.opaqueRefreshToken) this.persistRefreshToken = true;
-        if (this.opaquetUserToken) this.persistUserToken = true;
-
-        if ((this.persistAccessToken || this.persistRefreshToken || 
-            this.persistUserToken) && !this.keyStorage) {
-            throw new CrossauthError(ErrorCode.Configuration, 
-                "Key storage required for persisting tokens");
-        }
 
         if ((this.validFlows.includes(OAuthFlows.Password) || 
              this.validFlows.includes(OAuthFlows.PasswordMfa) ) 
@@ -355,6 +325,12 @@ export class OAuthAuthorizationServer {
             throw new CrossauthError(ErrorCode.Configuration, 
                 "If password flow or password MFA flow is enabled, userStorage and authenticators must be provided");
         }
+
+        if ((this.issueRefreshToken || this.persistAccessToken) &&
+            !this.keyStorage) {
+                throw new CrossauthError(ErrorCode.Configuration,
+                    "Must have key storage if persisting access tokens or issuing refresh tokens");
+            }
     }
 
     /**
@@ -742,17 +718,37 @@ export class OAuthAuthorizationServer {
 
         } else if (grantType == "refresh_token") {
     
-            if (!this.validRefreshToken(refreshToken??"")) {
+            const refreshData = await this.getRefreshTokenData(refreshToken);
+            if (!refreshData || !this.userStorage) {
                 return {
                     error: "access_denied",
                     error_description: "Refresh token is invalid",
+                }
+            }
+            let user : User|undefined;
+            if (refreshData.username) {
+                try {
+                    const {user: user1} = await this.userStorage?.getUserByUsername(refreshData.username);
+                    user = user1;
+                } catch (e) {
+                    CrossauthLogger.logger.error(j({
+                        err: e,
+                        msg: "Couldn't get user for refresh token.  Doesn't exist?",
+                        username: refreshData.username
+                    }))
+                    return {
+                        error: "access_denied",
+                        error_description: "Refresh token is invalid",
+                    }
                 }
             }
             return await this.getAccessToken({
                 client,
                 clientSecret,
                 codeVerifier,
-                issueRefreshToken: createRefreshToken
+                issueRefreshToken: createRefreshToken,
+                scopes: refreshData.scope,
+                user: user
             });
 
         } else if (grantType == "client_credentials") {
@@ -1020,7 +1016,7 @@ export class OAuthAuthorizationServer {
         error: string,
         error_description: string
     }> {
-        const mfaToken = Hasher.randomValue(16);
+        const mfaToken = Hasher.randomValue(this.codeLength);
         const mfaKey = KeyPrefix.mfaToken + Hasher.hash(mfaToken);
         const now = new Date();
         try {
@@ -1203,7 +1199,7 @@ export class OAuthAuthorizationServer {
         let omfaFields : {[key:string]:any} = {};
         if (challengeType == "oob") {
             omfaFields = {
-                oobCode : Hasher.randomValue(16),
+                oobCode : Hasher.randomValue(this.codeLength),
             }
         }
         try {
@@ -1342,10 +1338,10 @@ export class OAuthAuthorizationServer {
         // create authorization code and data to store with the key
         const created = new Date();
         const expires = 
-        this.authorizationCodeExpiry ? 
-            new Date(created.getTime() + this.authorizationCodeExpiry*1000 + 
-                this.clockTolerance*1000) : 
-            undefined;
+            this.authorizationCodeExpiry ? 
+                new Date(created.getTime() + this.authorizationCodeExpiry*1000 + 
+                    this.clockTolerance*1000) : 
+                undefined;
         const authzData : {[key:string]: any} = {
         }
         if (scopes) {
@@ -1368,7 +1364,7 @@ export class OAuthAuthorizationServer {
         let authzCode = "";
         for (let i=0; i<10 && !success; ++i) {
             try {
-                authzCode = Hasher.randomValue(this.authorizationCodeLength);
+                authzCode = Hasher.randomValue(this.codeLength);
                 this.keyStorage.saveKey(undefined,
                     KeyPrefix.authorizationCode + Hasher.hash(authzCode),
                     created,
@@ -1538,7 +1534,6 @@ export class OAuthAuthorizationServer {
             );
         }
 
-        let newRefreshToken : string|undefined = undefined;
         let idToken : string|undefined = undefined;
 
         if (scopes && scopes.includes("openid")) {
@@ -1651,62 +1646,42 @@ export class OAuthAuthorizationServer {
     
         }
 
-        if (issueRefreshToken) {
-            // create refresh token payload
-            const refreshTokenJti = Hasher.uuid();
+        let refreshToken : string|undefined = undefined;
+        if (issueRefreshToken) { 
+            // create refresh token 
+            refreshToken = Hasher.randomValue(this.codeLength); 
             let dateRefreshTokenExpires : Date|undefined;
-            const refreshTokenPayload : {[key:string]: any} = {
-                jti: refreshTokenJti,
-                iat: timeCreated,
-                iss: this.oauthIssuer,
-                sub: authzData.username,
-                type: "refresh",
+            const refreshData : {[key:string]: any} = {
+                username: authzData.username,
                 client_id: client.clientId,
-            };
+
+            }
             if (scopes) {
-                refreshTokenPayload.scope = scopes;
+                refreshData.scope = scopes;
             }
+            let refreshTokenExpires : Date|undefined = undefined;
             if (this.refreshTokenExpiry != null) {
-                refreshTokenPayload.exp = 
-                    timeCreated + this.refreshTokenExpiry;
-                dateRefreshTokenExpires = 
-                    new Date(now.getTime()+this.refreshTokenExpiry*1000 + 
-                        this.clockTolerance*1000);
-            }
-            if (this.resourceServers) {
-                refreshTokenPayload.aud = this.resourceServers;
-            }
+                refreshTokenExpires = 
+                    this.refreshTokenExpiry ? 
+                        new Date(timeCreated + this.refreshTokenExpiry*1000 + 
+                            this.clockTolerance*1000) : 
+                        undefined;
+                    }
 
-            // create refresh token jwt
-            newRefreshToken = await new Promise((resolve, reject) => {
-                jwt.sign(refreshTokenPayload, this.secretOrPrivateKey, {
-                    algorithm: this.jwtAlgorithmChecked,
-                    keyid: "1"
-                    }, 
-                    (error: Error | null,
-                    encoded: string | undefined) => {
-                        if (encoded) resolve(encoded);
-                        else if (error) reject(error);
-                        else reject(new CrossauthError(ErrorCode.Unauthorized,
-                            "Couldn't create jwt"));
-                    });
-            });
-
-            // persist refresh token if requested
-            if (this.persistRefreshToken && this.keyStorage) {
-                await this.keyStorage?.saveKey(
-                    undefined, // to avoid user storage dependency
-                    KeyPrefix.refreshToken+Hasher.hash(refreshTokenJti),
-                    now,
-                    dateRefreshTokenExpires
-                );
-            }
+            // save refresh token
+            await this.keyStorage?.saveKey(
+                undefined, // to avoid user storage dependency
+                KeyPrefix.refreshToken+Hasher.hash(refreshToken),
+                now,
+                dateRefreshTokenExpires,
+                JSON.stringify(refreshData)
+            );
         }
         
         return {
             access_token : accessToken,
             id_token: idToken,
-            refresh_token : newRefreshToken,
+            refresh_token : refreshToken,
             expires_in : this.accessTokenExpiry==null ? undefined : 
                 this.accessTokenExpiry,
             token_type: "Bearer",
@@ -1714,30 +1689,37 @@ export class OAuthAuthorizationServer {
         }
     }
 
-    async validAuthenticationCode(token : string) : 
-        Promise<{[key:string]: any}|undefined> {
+    async validAuthorizationCode(code : string) : 
+        Promise<boolean> {
         try {
-            const decoded = await this.validateJwt(token, "refresh");
-            if (this.persistRefreshToken) {
-                const hash = KeyPrefix.refreshToken + Hasher.hash(decoded.jti);
-                await this.keyStorage.getKey(hash);
-            }
-            return decoded;
+            const hash = KeyPrefix.authorizationCode + Hasher.hash(code);
+            await this.keyStorage.getKey(hash);
+            return true;
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
-            return undefined;
+            return false;
         }
     }
 
     async validRefreshToken(token : string) : 
-        Promise<{[key:string]: any}|undefined> {
+        Promise<boolean> {
         try {
-            const decoded = await this.validateJwt(token, "refresh");
-            if (this.persistRefreshToken) {
-                const hash = KeyPrefix.refreshToken + Hasher.hash(decoded.payload.jti);
-                await this.keyStorage.getKey(hash);
-            }
-            return decoded;
+            const hash = KeyPrefix.refreshToken + Hasher.hash(token);
+            await this.keyStorage.getKey(hash);
+            return true;
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+            return false;
+        }
+    }
+
+    async getRefreshTokenData(token? : string) : 
+        Promise<{[key:string]:any}|undefined> {
+        if (!token) return undefined;
+        try {
+            const hash = KeyPrefix.refreshToken + Hasher.hash(token);
+            const key = await this.keyStorage.getKey(hash);
+            return JSON.parse(key.data||"{}");
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
             return undefined;

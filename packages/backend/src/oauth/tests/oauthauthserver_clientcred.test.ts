@@ -19,12 +19,13 @@ test('AuthorizationServer.ClientCredFlow.accessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
 
-    const decodedRefreshToken
+    const valid
         = await authServer.validRefreshToken(refresh_token??"");
-        expect(decodedRefreshToken).toBeDefined()
-        expect(decodedRefreshToken?.payload.scope.length).toBe(2);
-    expect(["read", "write"]).toContain(decodedRefreshToken?.payload.scope[0]);
-    expect(["read", "write"]).toContain(decodedRefreshToken?.payload.scope[1]);
+    expect(valid).toBe(true)
+    const refreshData = await authServer.getRefreshTokenData(refresh_token??"");
+    expect(["read", "write"]).toContain(refreshData?.scope[0]);
+    expect(["read", "write"]).toContain(refreshData?.scope[1]);
+    expect(refreshData?.username).toBeUndefined();
 
     expect(expires_in).toBe(60*60);
 });
@@ -45,10 +46,9 @@ test('AuthorizationServer.ClientCredFlow.missingScopeValid', async () => {
         expect(decodedAccessToken).toBeDefined();
         expect(decodedAccessToken?.payload.scope).toBeUndefined();
 
-    const decodedRefreshToken
+    const valid
         = await authServer.validRefreshToken(refresh_token??"");
-    expect(decodedRefreshToken).toBeDefined();
-    expect(decodedRefreshToken?.payload.scope).toBeUndefined();
+    expect(valid).toBe(true);
 
     expect(expires_in).toBe(60*60);
 });

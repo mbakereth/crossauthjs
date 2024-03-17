@@ -453,12 +453,14 @@ test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     expect(decodedAccessToken?.payload.sub).toBe("bob");
 
-    const decodedRefreshToken
+    const valid
         = await authServer.validRefreshToken(refresh_token??"");
-    expect(decodedRefreshToken).toBeDefined();
-    expect(decodedRefreshToken?.payload.scope.length).toBe(2);
-    expect(["read", "write"]).toContain(decodedRefreshToken?.payload.scope[0]);
-    expect(["read", "write"]).toContain(decodedRefreshToken?.payload.scope[1]);
+    expect(valid).toBe(true);
+    const refreshData = await authServer.getRefreshTokenData(refresh_token??"");
+    expect(["read", "write"]).toContain(refreshData?.scope[0]);
+    expect(["read", "write"]).toContain(refreshData?.scope[1]);
+    expect(refreshData?.username).toBe("bob");
+
 
     expect(expires_in).toBe(60*60);
 });
@@ -472,9 +474,9 @@ test('AuthorizationServer.AuthzCodeFlow.invalidfAccessToken', async () => {
 
 test('AuthorizationServer.AuthzCodeFlow.invalidfRefreshToken', async () => {
     const {authServer} = await getAuthorizationCode();
-    const decodedRefreshToken
+    const valid
         = await authServer.validRefreshToken("ABC");
-    expect(decodedRefreshToken).toBeUndefined();
+    expect(valid).toBe(false);
 });
 
 test('AuthorizationServer.AuthzCodeFlow.oidcConfiguration', async () => {
@@ -500,16 +502,33 @@ test('AuthorizationServer.AuthzCodeFlow.jwks', async () => {
 test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowNoRolling', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({rollingRefreshToken: false});
-    const {refresh_token, error}
+    const {refresh_token, error, access_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
+            scope: "read write",
             clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(refresh_token).toBeDefined();
 
-    const {refresh_token: refresh_token2, error: error2}
+    let decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    expect(decodedAccessToken?.payload.sub).toBe("bob");
+
+    const valid
+        = await authServer.validRefreshToken(refresh_token??"");
+    expect(valid).toBe(true);
+    const refreshData = await authServer.getRefreshTokenData(refresh_token??"");
+    expect(["read", "write"]).toContain(refreshData?.scope[0]);
+    expect(["read", "write"]).toContain(refreshData?.scope[1]);
+    expect(refreshData?.username).toBe("bob");
+
+    const {refresh_token: refresh_token2, access_token: access_token2, error: error2}
         = await authServer.tokenEndpoint({
             grantType: "refresh_token", 
             clientId: client.clientId, 
@@ -518,21 +537,47 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowNoRolling', async () => 
     expect(error2).toBeUndefined();
     expect(refresh_token2).toBeUndefined();
 
+    decodedAccessToken
+        = await authServer.validAccessToken(access_token2??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    expect(decodedAccessToken?.payload.sub).toBe("bob");
+
 });
 
 test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({rollingRefreshToken: true});
-    const {refresh_token, error}
+    const {refresh_token, error, access_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
             clientId: client.clientId, 
             code: code, 
+            scope: "read write",
             clientSecret: "DEF"});
     expect(error).toBeUndefined();
     expect(refresh_token).toBeDefined();
 
-    const {refresh_token: refresh_token2, error: error2}
+    let valid
+        = await authServer.validRefreshToken(refresh_token??"");
+    expect(valid).toBe(true);
+    let refreshData = await authServer.getRefreshTokenData(refresh_token??"");
+    expect(["read", "write"]).toContain(refreshData?.scope[0]);
+    expect(["read", "write"]).toContain(refreshData?.scope[1]);
+    expect(refreshData?.username).toBe("bob");
+
+    let decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    expect(decodedAccessToken?.payload.sub).toBe("bob");
+
+
+    const {refresh_token: refresh_token2, access_token: access_token2, error: error2}
         = await authServer.tokenEndpoint({
             grantType: "refresh_token", 
             clientId: client.clientId, 
@@ -541,6 +586,22 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
     expect(error2).toBeUndefined();
     expect(refresh_token2).toBeDefined();
     expect(refresh_token2).not.toBe(refresh_token);
+
+    decodedAccessToken
+        = await authServer.validAccessToken(access_token2??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    expect(decodedAccessToken?.payload.sub).toBe("bob");
+
+    valid
+        = await authServer.validRefreshToken(refresh_token??"");
+    expect(valid).toBe(true);
+    refreshData = await authServer.getRefreshTokenData(refresh_token??"");
+    expect(["read", "write"]).toContain(refreshData?.scope[0]);
+    expect(["read", "write"]).toContain(refreshData?.scope[1]);
+    expect(refreshData?.username).toBe("bob");
 
 });
 
@@ -565,21 +626,22 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdToken', async () => {
     expect(["read", "write", "openid"]).toContain(decodedAccessToken?.payload.scope[2]);
     expect(decodedAccessToken?.payload.sub).toBe("bob");
 
-    const decodedRefreshToken
+    const valid
         = await authServer.validRefreshToken(refresh_token??"");
-    expect(decodedRefreshToken).toBeDefined();
-    expect(decodedRefreshToken?.payload.scope.length).toBe(3);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[0]);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
+    expect(valid).toBe(true);
+    const refreshData = await authServer.getRefreshTokenData(refresh_token??"");
+    expect(["read", "write", "openid"]).toContain(refreshData?.scope[0]);
+    expect(["read", "write", "openid"]).toContain(refreshData?.scope[1]);
+    expect(["read", "write", "openid"]).toContain(refreshData?.scope[2]);
+    expect(refreshData?.username).toBe("bob");
 
     const decodedIdToken
         = await authServer.validIdToken(id_token??"");
     expect(decodedIdToken).toBeDefined();
     expect(decodedIdToken?.payload.scope.length).toBe(3);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[0]);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
+    expect(["read", "write", "openid"]).toContain(decodedIdToken?.payload.scope[0]);
+    expect(["read", "write", "openid"]).toContain(decodedIdToken?.payload.scope[1]);
+    expect(["read", "write", "openid"]).toContain(decodedIdToken?.payload.scope[2]);
     expect(decodedIdToken?.payload.sub).toBe("bob");
 
     expect(expires_in).toBe(60*60);
@@ -607,21 +669,22 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenAllClaims', async 
     expect(["read", "write", "openid"]).toContain(decodedAccessToken?.payload.scope[2]);
     expect(decodedAccessToken?.payload.sub).toBe("bob");
 
-    const decodedRefreshToken
+    const valid
         = await authServer.validRefreshToken(refresh_token??"");
-    expect(decodedRefreshToken).toBeDefined();
-    expect(decodedRefreshToken?.payload.scope.length).toBe(3);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[0]);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
+    expect(valid).toBe(true);
+    const refreshData = await authServer.getRefreshTokenData(refresh_token??"");
+    expect(["read", "write", "openid"]).toContain(refreshData?.scope[0]);
+    expect(["read", "write", "openid"]).toContain(refreshData?.scope[1]);
+    expect(["read", "write", "openid"]).toContain(refreshData?.scope[2]);
+    expect(refreshData?.username).toBe("bob");
 
     const decodedIdToken
         = await authServer.validIdToken(id_token??"");
     expect(decodedIdToken).toBeDefined();
     expect(decodedIdToken?.payload.scope.length).toBe(3);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[0]);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[1]);
-    expect(["read", "write", "openid"]).toContain(decodedRefreshToken?.payload.scope[2]);
+    expect(["read", "write", "openid"]).toContain(decodedIdToken?.payload.scope[0]);
+    expect(["read", "write", "openid"]).toContain(decodedIdToken?.payload.scope[1]);
+    expect(["read", "write", "openid"]).toContain(decodedIdToken?.payload.scope[2]);
     expect(decodedIdToken?.payload.sub).toBe("bob");
     expect(decodedIdToken?.payload.email1).toBe("bob@bob.com");
 
@@ -645,9 +708,9 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenSCopedClaims', asy
         = await authServer.validAccessToken(access_token??"");
     expect(decodedAccessToken).toBeDefined();
 
-    const decodedRefreshToken
+    const valid
         = await authServer.validRefreshToken(refresh_token??"");
-    expect(decodedRefreshToken).toBeDefined();
+    expect(valid).toBe(true);
 
     const decodedIdToken
         = await authServer.validIdToken(id_token??"");
