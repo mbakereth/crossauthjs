@@ -259,7 +259,7 @@ test('FastifyServer.wrongSession', async () => {
     const session = server["sessionServer"]["sessionManager"]["session"];
     if (!session) throw new Error("Sessions not enabled");
     const sessionId = session.unsignCookie(sessionCookie);
-    const sessionHash = SessionCookie.hashSessionKey(sessionId);
+    const sessionHash = SessionCookie.hashSessionId(sessionId);
     const key = await keyStorage.getKey(sessionHash);
     keyStorage.updateKey({value: sessionHash, expires: new Date(key.created.getTime()-1000)});
     res = await server.app.inject({ method: "GET", cookies: {SESSIONID: sessionCookie}, url: "/changepassword" });

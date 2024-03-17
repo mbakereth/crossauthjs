@@ -5,7 +5,6 @@ import { SessionManager } from '../session';
 import { LocalPasswordAuthenticator } from '../authenticators/passwordauth';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
 import { getTestUserStorage }  from '../storage/tests/inmemorytestdata';
-import { CrossauthError } from '@crossauth/common';
 
 export var userStorage : InMemoryUserStorage;
 
@@ -20,7 +19,7 @@ test('SessionCookie.createSessionKey', async () => {
     const auth = new SessionCookie(userStorage, keyStorage, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX", siteUrl: "http://locahost:3000"});
     const {user: bob} = await userStorage.getUserByUsername("bob");
     let { value, created: dateCreated, expires } = await auth.createSessionKey(bob.id);
-    let key = await keyStorage.getKey(SessionCookie.hashSessionKey(value));
+    let key = await keyStorage.getKey(SessionCookie.hashSessionId(value));
     expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
     expect(key.userId).toStrictEqual(bob.id);
@@ -36,11 +35,12 @@ test('CookieSessionManager.loginGetKeyLogout', async () => {
     let authenticator = new LocalPasswordAuthenticator(userStorage);
     let manager = new SessionManager(userStorage, keyStorage, {localpassword: authenticator}, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
     let {user: bob, sessionCookie: cookie } = await manager.login("bob", {password: "bobPass123"});
-    const user = await manager.userForSessionKey(cookie.value);
+    const sessionId = manager.getSessionId(cookie.value);
+    const {user} = await manager.userForSessionId(sessionId);
     expect(user).toBeDefined();
     if (user) expect(user.username).toBe(bob.username);
-    await manager.logout(cookie.value);
-    await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError();
+    await manager.logout(sessionId);
+    await expect(async () => {await manager.userForSessionId(sessionId)}).rejects.toThrowError();
 });
 
 test('CookieSessionManager.logoutFromAll', async() => {
@@ -48,12 +48,13 @@ test('CookieSessionManager.logoutFromAll', async() => {
     let authenticator = new LocalPasswordAuthenticator(userStorage);
     let manager = new SessionManager(userStorage, keyStorage, {localpassword: authenticator}, {secret: "ABCDEFGHIJKLMNOPQRSTUVWX"});
     let {user: bob, sessionCookie: cookie } = await manager.login("bob", {password: "bobPass123"});
-    const user = await manager.userForSessionKey(cookie.value);
+    const sessionId = manager.getSessionId(cookie.value);
+    const {user} = await manager.userForSessionId(sessionId);
     expect(user).toBeDefined();
     if (user) {
         expect(user.username).toBe(bob.username);
         await manager.logoutFromAll(user.username);
-        await expect(async () => {await manager.userForSessionKey(cookie.value)}).rejects.toThrowError();
+        await expect(async () => {await manager.userForSessionId(sessionId)}).rejects.toThrowError();
     }
 })
 

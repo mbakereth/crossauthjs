@@ -411,9 +411,10 @@ test('FastifyOAuthClient.refreshIfExpiredEndpoint_Interactive', async () => {
     // expire token
     if (!server.sessionServer) throw new Error("No session server");
     const sessionManager = server.sessionServer["sessionManager"];
-    let sessionData = await sessionManager.dataForSessionKey(sessionCookie);
+    const sessionId = sessionManager.getSessionId(sessionCookie);
+    let sessionData = await sessionManager.dataForSessionId(sessionId);
     sessionData.oauth.expires_at = Date.now() - 1000;
-    await sessionManager.updateSessionData(sessionCookie, "oauth", sessionData.oauth)
+    await sessionManager.updateSessionData(sessionId, "oauth", sessionData.oauth)
     fetchMocker.mockResponseOnce((_request) => {return JSON.stringify({access_token: access_token2, refresh_token: refresh_token2})});
     res = await server.app.inject({ method: "POST", url: "/refreshtokensifexpired", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
@@ -466,9 +467,10 @@ test('FastifyOAuthClient.refreshIfExpiredEndpoint_NonInteractive', async () => {
     // expire token
     if (!server.sessionServer) throw new Error("No session server");
     const sessionManager = server.sessionServer["sessionManager"];
-    let sessionData = await sessionManager.dataForSessionKey(sessionCookie);
+    const sessionId = sessionManager.getSessionId(sessionCookie);
+    let sessionData = await sessionManager.dataForSessionId(sessionId);
     sessionData.oauth.expires_at = Date.now() - 1000;
-    await sessionManager.updateSessionData(sessionCookie, "oauth", sessionData.oauth)
+    await sessionManager.updateSessionData(sessionId, "oauth", sessionData.oauth)
     fetchMocker.mockResponseOnce((_request) => {return JSON.stringify({access_token: access_token2, refresh_token: refresh_token2})});
     res = await server.app.inject({ method: "POST", url: "/api/refreshtokensifexpired", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
@@ -476,7 +478,7 @@ test('FastifyOAuthClient.refreshIfExpiredEndpoint_NonInteractive', async () => {
     body = JSON.parse(res.body);
     //expect(body.args.access_token).toBe(access_token2);
     expect(body.ok).toBe(true);
-    sessionData = await sessionManager.dataForSessionKey(sessionCookie);
+    sessionData = await sessionManager.dataForSessionId(sessionId);
     expect(sessionData.oauth.access_token).toBe(access_token2)
 
 });

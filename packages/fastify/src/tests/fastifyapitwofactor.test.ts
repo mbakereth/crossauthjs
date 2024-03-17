@@ -206,6 +206,9 @@ async function createNonTotpAccount(server : FastifyServer) {
 
 };
 
+////////////////////////////////////////////////////////////////////
+// Tests
+
 test('FastifyServer.api.signupTotpWithoutEmailVerification', async () => {
     let {server} = await makeAppWithOptions({enableEmailVerification: false});
 
@@ -626,9 +629,10 @@ test('FastifyServer.api.loginEmailTokenExpired', async () => {
     // @ts-ignore we will ignore the possibilty of being undefined
     const sessionManager = server["sessionServer"]["sessionManager"];
     expect(sessionManager).toBeDefined();
+    const sessionId = sessionManager.getSessionId(sessionCookie);
     // @ts-ignore we will ignore the possibilty of being undefined
-    const sessionData = (await sessionManager.dataForSessionKey(sessionCookie))["2fa"];
-    const {key} = await sessionManager.userForSessionCookieValue(sessionCookie);
+    const sessionData = (await sessionManager.dataForSessionId(sessionId))["2fa"];
+    const {key} = await sessionManager.userForSessionId(sessionId);
     expect(sessionData?.expiry).toBeDefined();
     // @ts-ignore we will ignore the possibilty of being undefined
     const now = Date.now();
@@ -636,7 +640,7 @@ test('FastifyServer.api.loginEmailTokenExpired', async () => {
     const expired = new Date(now-1000);
     sessionData.expiry = expired.getTime();
     await keyStorage.updateData(
-        SessionCookie.hashSessionKey(key.value), 
+        SessionCookie.hashSessionId(key.value), 
         "2fa",
         sessionData);
 
@@ -671,9 +675,10 @@ test('FastifyServer.api.signupEmailWithoutEmailVerificationExpiredCode', async (
     // @ts-ignore
     const sessionManager = server["sessionServer"]["sessionManager"];
     expect(sessionManager).toBeDefined();
+    const sessionId = sessionManager.getSessionId(sessionCookie);
     // @ts-ignore we will ignore the possibilty of being undefined
-    const sessionData = (await sessionManager.dataForSessionKey(sessionCookie))["2fa"];
-    const {key} = await sessionManager.userForSessionCookieValue(sessionCookie);
+    const sessionData = (await sessionManager.dataForSessionId(sessionId))["2fa"];
+    const {key} = await sessionManager.userForSessionId(sessionId);
     expect(sessionData?.expiry).toBeDefined();
     // @ts-ignore we will ignore the possibilty of being undefined
     const now = Date.now();
@@ -681,7 +686,7 @@ test('FastifyServer.api.signupEmailWithoutEmailVerificationExpiredCode', async (
     const expired = new Date(now-1000);
     sessionData.expiry = expired.getTime();
     await keyStorage.updateData(
-        SessionCookie.hashSessionKey(key.value), 
+        SessionCookie.hashSessionId(key.value), 
         "2fa",
         sessionData);
 

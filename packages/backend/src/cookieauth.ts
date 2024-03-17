@@ -330,8 +330,8 @@ export class SessionCookie {
 
     ///// Session IDs
 
-    static hashSessionKey(sessionKey : string) : string {
-        return KeyPrefix.session + Hasher.hash(sessionKey);
+    static hashSessionId(sessionId : string) : string {
+        return KeyPrefix.session + Hasher.hash(sessionId);
     }
 
     /**
@@ -356,7 +356,7 @@ export class SessionCookie {
         let expires = this.expiry(dateCreated);
         let succeeded = false;
         while (numTries < maxTries && !succeeded) {
-            const hashedSessionId = SessionCookie.hashSessionKey(sessionId);
+            const hashedSessionId = SessionCookie.hashSessionId(sessionId);
             try {
                 // save the new session - if it exists, an error will be thrown
                 if (this.idleTimeout > 0 && userId) {
@@ -451,7 +451,7 @@ export class SessionCookie {
     
     async updateSessionKey(sessionKey : Partial<Key>) : Promise<void> {
         if (!sessionKey.value) throw new CrossauthError(ErrorCode.InvalidKey, "No session when updating activity");
-        sessionKey.value = SessionCookie.hashSessionKey(sessionKey.value);
+        sessionKey.value = SessionCookie.hashSessionId(sessionKey.value);
         this.keyStorage.updateKey(sessionKey);
     }
 
@@ -471,8 +471,8 @@ export class SessionCookie {
      *          sessionId
      * @throws a {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
      */
-    async getUserForSessionKey(cookieValue: string, options? : UserStorageGetOptions) : Promise<{user: User|undefined, key : Key}> {
-        const key = await this.getSessionKey(cookieValue);
+    async getUserForSessionId(sessionId: string, options? : UserStorageGetOptions) : Promise<{user: User|undefined, key : Key}> {
+        const key = await this.getSessionKey(sessionId);
         if (key.userId) {
             let {user} = await this.userStorage.getUserById(key.userId, options);
             return {user, key};
@@ -488,30 +488,30 @@ export class SessionCookie {
      * 
      * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
      * 
-     * @param sessionKey the value in the session cookie
+     * @param sessionId the unsigned value of the session cookie
      * @returns a {@link User } object, with the password hash removed.
      * @throws a {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId`, `Expired` or `UserNotExist`.
      */
-    async getSessionKey(cookieValue: string) : Promise<Key> {
-        const sessionId = this.unsignCookie(cookieValue);
+    async getSessionKey(sessionId: string) : Promise<Key> {
+        //const sessionId = this.unsignCookie(cookieValue);
         const now = Date.now();
-        const hashedSessionId = SessionCookie.hashSessionKey(sessionId);
+        const hashedSessionId = SessionCookie.hashSessionId(sessionId);
         const key = await this.keyStorage.getKey(hashedSessionId);
         key.value = sessionId; // storage only has hashed version
         if (key.expires) {
             if (now > key.expires.getTime()) {
-                CrossauthLogger.logger.warn(j({msg: "Session key in cookie expired in key storage", hashedSessionCookie: Hasher.hash(cookieValue)}));
+                CrossauthLogger.logger.warn(j({msg: "Session id in cookie expired in key storage", hashedSessionCookie: Hasher.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.Expired);
             }
         }
         if (key.userId && this.idleTimeout > 0 && key.lastActive 
             && now > key.lastActive.getTime() + this.idleTimeout*1000) {
-                CrossauthLogger.logger.warn(j({msg: "Session cookie with expired idle time received", hashedSessionCookie: Hasher.hash(cookieValue)}));
+                CrossauthLogger.logger.warn(j({msg: "Session cookie with expired idle time received", hashedSessionCookie: Hasher.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.Expired);
         }
         if (this.filterFunction) {
             if (!this.filterFunction(key)) {
-                CrossauthLogger.logger.warn(j({msg: "Filter function on session key in cookie failed", hashedSessionCookie: Hasher.hash(cookieValue)}));
+                CrossauthLogger.logger.warn(j({msg: "Filter function on session id in cookie failed", hashedSessionCookie: Hasher.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.InvalidKey);
             }
         }
@@ -525,7 +525,7 @@ export class SessionCookie {
      */
     async deleteAllForUser(userId : string | number, except: string|undefined) {
         if (except) {
-            except = SessionCookie.hashSessionKey(except);
+            except = SessionCookie.hashSessionId(except);
         }
         await this.keyStorage.deleteAllForUser(userId, KeyPrefix.session, except);
     }

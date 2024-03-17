@@ -238,9 +238,9 @@ export class SessionManager {
      * @param sessionKey the session ID to remove.
      * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`
      */
-    async logout(sessionCookieValue : string) : Promise<void> {
-        const key = await this.session.getSessionKey(sessionCookieValue);
-        return await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(key.value));
+    async logout(sessionId : string) : Promise<void> {
+        const key = await this.session.getSessionKey(sessionId);
+        return await this.keyStorage.deleteKey(SessionCookie.hashSessionId(key.value));
     }
 
     /**
@@ -259,14 +259,13 @@ export class SessionManager {
      * 
      * If the user is undefined, or the key has expired, returns undefined.
      * 
-     * @param sessionCookieValue the session key to look up in session storage
+     * @param sessionId the session key to look up in session storage
      * @returns the {@link User} (without password hash) matching the  session key
      * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
-    async userForSessionCookieValue(sessionCookieValue : string) : Promise<{key: Key, user: User|undefined}> {
-        let {key, user} = await this.session.getUserForSessionKey(sessionCookieValue);
-        return {key, user};
+    async userForSessionId(sessionId : string) : Promise<{key: Key, user: User|undefined}> {
+        return await this.session.getUserForSessionId(sessionId);
     }
 
     /**
@@ -280,9 +279,9 @@ export class SessionManager {
      * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
-    async dataStringForSessionKey(sessionCookieValue : string) : Promise<string|undefined> {
+    async dataStringForSessionId(sessionId : string) : Promise<string|undefined> {
         try {
-            let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
+            let {key} = await this.session.getUserForSessionId(sessionId);
             return key.data;
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e);
@@ -307,8 +306,8 @@ export class SessionManager {
      * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
-    async dataForSessionKey(sessionCookieValue : string) : Promise<{[key:string]:any}> {
-        const str = await this.dataStringForSessionKey(sessionCookieValue);
+    async dataForSessionId(sessionId : string) : Promise<{[key:string]:any}> {
+        const str = await this.dataStringForSessionId(sessionId);
         if (!str || str.length == 0) return {};
         return JSON.parse(str);
     }
@@ -340,17 +339,6 @@ export class SessionManager {
         return this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
     }
 
-    /**
-     * Returns the user for a session key if it is valid, or undefined if ther is none,
-     * 
-     * Thows an exception if the session id is not valid
-     * @param sessionCookieValue the value of the session id cookie
-     * @returns user or undefined
-     */
-    async userForSessionKey(sessionCookieValue : string) : Promise<User|undefined> {
-        return (await this.session.getUserForSessionKey(sessionCookieValue)).user;
-    }
-
     getSessionId(sessionCookieValue : string) : string {
         return this.session.unsignCookie(sessionCookieValue);
     }
@@ -378,8 +366,8 @@ export class SessionManager {
      * If sessionIdleTimeout is set, update the last activcity time in key storage to current time
      * @param sessionId the session Id to update.
      */
-    async updateSessionActivity(sessionCookieValue : string) : Promise<void> {
-        const key = await this.session.getSessionKey(sessionCookieValue);
+    async updateSessionActivity(sessionId : string) : Promise<void> {
+        const {key} = await this.session.getSessionKey(sessionId);
         if (this.session.idleTimeout > 0) {
             this.session.updateSessionKey({
                 value: key.value,
@@ -392,10 +380,10 @@ export class SessionManager {
      * If sessionIdleTimeout is set, update the last activcity time in key storage to current time
      * @param sessionId the session Id to update.
      */
-    async updateSessionData(sessionCookieValue : string, name : string, value : {[key:string]:any}) : Promise<void> {
-        const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const hashedSessionKey = SessionCookie.hashSessionKey(sessionId);
-        CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Hasher.hash(sessionCookieValue)}));
+    async updateSessionData(sessionId : string, name : string, value : {[key:string]:any}) : Promise<void> {
+        //const sessionId = this.session.unsignCookie(sessionCookieValue);
+        const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
+        CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Hasher.hash(sessionId)}));
         await this.keyStorage.updateData(hashedSessionKey, name, value);
     }
     
@@ -403,9 +391,9 @@ export class SessionManager {
      * Deletes the given session ID from the key storage (not the cookie)
      * @param sessionId the session Id to delete
      */
-    async deleteSession(sessionCookieValue : string) : Promise<void> {
-        const sessionId = this.session.unsignCookie(sessionCookieValue)
-        return await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(sessionId));
+    async deleteSession(sessionId : string) : Promise<void> {
+        //const sessionId = this.session.unsignCookie(sessionCookieValue)
+        return await this.keyStorage.deleteKey(SessionCookie.hashSessionId(sessionId));
     }
 
     /**
@@ -443,7 +431,7 @@ export class SessionManager {
      * @param user : details to save in the user table
      * @param params : params the parameters needed to authenticate with factor1
      *                   (eg password)
-     * @param sessionCookieValue the anonymous session cookie 
+     * @param sessionId the anonymous session cookie 
      * @param repeatParams if passed, these will be compared with `params` and
      *                     if they don't match, `PasswordMatch` is thrown.
      * @return `userId` the id of the created user.  
@@ -454,12 +442,12 @@ export class SessionManager {
     async initiateTwoFactorSignup(
         user : UserInputFields, 
         params : AuthenticationParameters, 
-        sessionCookieValue : string,
+        sessionId : string,
         repeatParams? : AuthenticationParameters) : Promise<{userId: string|number, userData : {[key:string] : any}}> {
         if (!this.authenticators[user.factor1]) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
         if (!this.authenticators[user.factor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
         const authenticator = this.authenticators[user.factor2];
-        const sessionId = this.session.unsignCookie(sessionCookieValue);
+        //const sessionId = this.session.unsignCookie(sessionCookieValue);
         const factor2Data = await authenticator.prepareConfiguration(user);
         const userData = (factor2Data == undefined) ? {} : factor2Data.userData;
         const sessionData = (factor2Data == undefined) ? {} : factor2Data.sessionData;
@@ -467,7 +455,7 @@ export class SessionManager {
         const factor1Secrets = await this.authenticators[user.factor1].createPersistentSecrets(user.username, params, repeatParams);
         user.state = "awaitingtwofactorsetup";
         await this.keyStorage.updateData(
-            SessionCookie.hashSessionKey(sessionId), 
+            SessionCookie.hashSessionId(sessionId), 
             "2fa",
             sessionData);
 
@@ -480,15 +468,15 @@ export class SessionManager {
      * created and activated.  Called when changing 2FA or changing its parameters.
      * @param user the logged in user
      * @param newFactor2 new second factor to change user to
-     * @param sessionCookieValue the session cookie for the user
+     * @param sessionId the session cookie for the user
      * @returns the 2FA data that can be displayed to the user in the confifugre 2FA
      *          step (such as the secret and QR code for TOTP).
      */
     async initiateTwoFactorSetup(
         user : User, 
         newFactor2 : string|undefined,
-        sessionCookieValue : string) : Promise<{[key:string] : any}> {
-        const sessionId = this.session.unsignCookie(sessionCookieValue);
+        sessionId : string) : Promise<{[key:string] : any}> {
+        //const sessionId = this.session.unsignCookie(sessionCookieValue);
         if (newFactor2 && newFactor2 != "none") {
             if (!this.authenticators[newFactor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
             const authenticator = this.authenticators[newFactor2];
@@ -497,7 +485,7 @@ export class SessionManager {
             const sessionData = (factor2Data == undefined) ? {} : factor2Data.sessionData;
 
             await this.keyStorage.updateData(
-                SessionCookie.hashSessionKey(sessionId),
+                SessionCookie.hashSessionId(sessionId),
                 "2fa",
                 sessionData);
             return userData;
@@ -506,7 +494,7 @@ export class SessionManager {
         // this part is for turning off 2FA
         await this.userStorage.updateUser({id: user.id, factor2: newFactor2??""});
         await this.keyStorage.updateData(
-            SessionCookie.hashSessionKey(sessionId), 
+            SessionCookie.hashSessionId(sessionId), 
             "2fa",
             undefined);
         return {};
@@ -519,7 +507,7 @@ export class SessionManager {
      * This can be called if the user has finished signing up with factor1 but
      * closed the browser before completing factor2 setup.  Call it if the user
      * signs up again with the same factor1 credentials.
-     * @param sessionCookieValue the anonymous session ID for the user
+     * @param sessionId the anonymous session ID for the user
      * @returns `userId` the id of the created user
      *          `userData` data that can be displayed to the user in the page to 
      *           complete 2FA set up (eg the secret key and QR codee for TOTP),
@@ -528,12 +516,12 @@ export class SessionManager {
      *          secret but only `userData` has the QR code, since it can be
      *          generated from the shared secret.
      */
-    async repeatTwoFactorSignup(sessionCookieValue: string) : Promise<{userId: string|number, userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}> {
-        const sessionData = (await this.dataForSessionKey(sessionCookieValue))["2fa"];
+    async repeatTwoFactorSignup(sessionId: string) : Promise<{userId: string|number, userData: {[key:string]: any}, secrets: Partial<UserSecretsInputFields>}> {
+        const sessionData = (await this.dataForSessionId(sessionId))["2fa"];
         const username = sessionData.username;
         const factor2 = sessionData.factor2;
-        const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const hashedSessionKey = SessionCookie.hashSessionKey(sessionId);
+        //const sessionId = this.session.unsignCookie(sessionId);
+        const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
         const sessionKey = await this.keyStorage.getKey(hashedSessionKey);
         const authenticator = this.authenticators[factor2];
 
@@ -555,14 +543,14 @@ export class SessionManager {
      * If successful, the new user object is returned.  Otherwise an exception
      * is thrown,
      * @param params the parameters from user input needed to authenticate (eg TOTP code)
-     * @param sessionCookieValue the session cookie value (ie still signed)
+     * @param sessionId the session cookie value (ie still signed)
      * @returns the user object
      * @throws {@link @crossauth/common!CrossauthError} if authentication fails.
      */
-    async completeTwoFactorSetup(params : AuthenticationParameters, sessionCookieValue : string) : Promise<User> {
+    async completeTwoFactorSetup(params : AuthenticationParameters, sessionId : string) : Promise<User> {
         let newSignup = false;
         let {user, key} = 
-            await this.session.getUserForSessionKey(sessionCookieValue, {
+            await this.session.getUserForSessionId(sessionId, {
                 skipActiveCheck: true
             });
         if (user && (user.state != UserState.active && user.state != UserState.factor2ResetNeeded)) {
@@ -598,7 +586,7 @@ export class SessionManager {
         if (!skipEmailVerification && newSignup && this.enableEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(user.id, undefined)
         }
-        await this.keyStorage.updateData(SessionCookie.hashSessionKey(key.value), "2fa", undefined);
+        await this.keyStorage.updateData(SessionCookie.hashSessionId(key.value), "2fa", undefined);
         return {...user, ...newUser};
     }
 
@@ -631,14 +619,14 @@ export class SessionManager {
      * 
      * Creates an anonymous session and coorresponding CSRF token
      * @param user the user, which should aleady have been authenticated with factor1
-     * @param sessionCookieValue the logged in session associated with the user
+     * @param sessionId the logged in session associated with the user
      * @param requestBody the parameters from the request made before being redirected to factor2 authentication
      * @param url the requested url, including path and query parameters
      * @returns If a token was passed a new anonymous session cookie and corresponding CSRF cookie and token.
      */
     async initiateTwoFactorPageVisit(
         user : User,
-        sessionCookieValue : string,
+        sessionId : string,
         requestBody : {[key:string]: any},
         url : string|undefined) : Promise<{sessionCookie: Cookie|undefined, csrfCookie: Cookie|undefined, csrfFormOrHeaderValue: string|undefined}>  {
         const authenticator = this.authenticators[user.factor2];
@@ -651,14 +639,14 @@ export class SessionManager {
             // user is not logged in - create an anonymous session
             const resp = await this.createAnonymousSession({});
             sessionCookie = resp.sessionCookie;
-            sessionCookieValue = sessionCookie.value;
+            sessionId = sessionCookie.value;
             csrfCookie = resp.csrfCookie;
             csrfFormOrHeaderValue = resp.csrfFormOrHeaderValue
     
         }
 
-        const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const hashedSessionId = SessionCookie.hashSessionKey(sessionId)
+        //const sessionId = this.session.unsignCookie(sessionCookieValue);
+        const hashedSessionId = SessionCookie.hashSessionId(sessionId)
         this.keyStorage.updateData(hashedSessionId, "pre2fa", {username: user.username, factor2: user.factor2, secrets: secrets, body: requestBody, url: url});
 
         return {
@@ -673,12 +661,12 @@ export class SessionManager {
      * 
      * If successful, returns.  Otherwise an exception is thrown.
      * @param params the parameters from user input needed to authenticate (eg TOTP code)
-     * @param sessionCookieValue the session cookie value (ie still signed)
+     * @param sessionId the session cookie value (ie still signed)
      * @returns the user object
      * @throws {@link @crossauth/common!CrossauthError} if authentication fails.
      */
-    async completeTwoFactorPageVisit(params : AuthenticationParameters, sessionCookieValue : string) : Promise<void> {
-        let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
+    async completeTwoFactorPageVisit(params : AuthenticationParameters, sessionId : string) : Promise<void> {
+        let {key} = await this.session.getUserForSessionId(sessionId);
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         let data = KeyStorage.decodeData(key.data);
         // let data = getJsonData(key);
@@ -693,7 +681,7 @@ export class SessionManager {
             if (secretNames.includes(secret)) newSecrets[secret] = data[secret];
         }
         await authenticator.authenticateUser(undefined, {...newSecrets, ...data.pre2fa.secrets}, params);
-        await this.keyStorage.updateData(SessionCookie.hashSessionKey(key.value), "pre2fa", undefined);
+        await this.keyStorage.updateData(SessionCookie.hashSessionId(key.value), "pre2fa", undefined);
     }
 
     /**
@@ -701,17 +689,17 @@ export class SessionManager {
      * 
      * If successful, returns.  Otherwise an exception is thrown.
      * @param params the parameters from user input needed to authenticate (eg TOTP code)
-     * @param sessionCookieValue the session cookie value (ie still signed)
+     * @param sessionId the session id (unsigned)
      * @returns the 2FA data that was created on initiation
      * @throws {@link @crossauth/common!CrossauthError} if authentication fails.
      */
-    async cancelTwoFactorPageVisit(sessionCookieValue : string) : Promise<{[key:string]:any}> {
-        let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
+    async cancelTwoFactorPageVisit(sessionId : string) : Promise<{[key:string]:any}> {
+        let {key} = await this.session.getUserForSessionId(sessionId);
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         let data = KeyStorage.decodeData(key.data);
         //let data = getJsonData(key);
         if (!("pre2fa" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "Two factor authentication not initiated");
-        await this.keyStorage.updateData(SessionCookie.hashSessionKey(key.value), "pre2fa", undefined);
+        await this.keyStorage.updateData(SessionCookie.hashSessionId(key.value), "pre2fa", undefined);
         return data.pre2fa;
     }
 
@@ -723,7 +711,7 @@ export class SessionManager {
      * and a new session will be created, bound to the user.  The anonymous session
      * will be deleted.
      * @param params the user-provided parameters to authenticate with (eg TOTP code).
-     * @param sessionCookieValue the user's anonymous session
+     * @param sessionId the user's anonymous session
      * @param extraFields extra fields to add to the user-bound new session table entry
      * @param persist if true, the cookie will be perstisted (with an expiry value);
      *                otberwise it will be a session-only cookie.
@@ -732,8 +720,8 @@ export class SessionManager {
      *          `csrfToken` the new CSRF token corresponding to the cookie
      *          `user` the newly-logged in user.
      */
-    async completeTwoFactorLogin(params : AuthenticationParameters, sessionCookieValue : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string, user: User}> {
-        let {key} = await this.session.getUserForSessionKey(sessionCookieValue);
+    async completeTwoFactorLogin(params : AuthenticationParameters, sessionId : string, extraFields : {[key:string]:any} = {}, persist? : boolean) : Promise<{sessionCookie: Cookie, csrfCookie: Cookie, csrfFormOrHeaderValue: string, user: User}> {
+        let {key} = await this.session.getUserForSessionId(sessionId);
         if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
         let data = KeyStorage.decodeData(key.data)["2fa"];
         //let data = getJsonData(key)["2fa"];
@@ -745,7 +733,7 @@ export class SessionManager {
         await authenticator.authenticateUser(user, {...secrets, ...data}, params);
 
         const newSessionKey = await this.session.createSessionKey(user.id, extraFields);
-        await this.keyStorage.deleteKey(SessionCookie.hashSessionKey(key.value));
+        await this.keyStorage.deleteKey(SessionCookie.hashSessionId(key.value));
         const sessionCookie = this.session.makeCookie(newSessionKey, persist);
 
         const csrfToken = this.csrfTokens.createCsrfToken();

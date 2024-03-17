@@ -321,7 +321,7 @@ export class FastifyServer {
                 CrossauthLogger.logger.debug(j({err: e2}));
                 CrossauthLogger.logger.error(j({
                     cerr: e2,
-                    hashedSessionCookie: this.sessionServer?.getHashOfSessionCookie(request)
+                    hashedSessionCookie: this.sessionServer?.getHashOfSessionId(request)
 }))
                 return reply.status(401).send(ERROR_401);                
             }

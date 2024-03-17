@@ -602,6 +602,19 @@ export class FastifySessionServer {
         // request.user
         app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
 
+            CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
+            let sessionCookieValue = this.getSessionCookieValue(request);
+            let reportSession : {[key:string]:string} = {}
+            if (sessionCookieValue) {
+                try {
+                    reportSession.hashedSessionId = 
+                    Hasher.hash(this.sessionManager.getSessionId(sessionCookieValue));
+                } catch {
+                    reportSession.hashedSessionCookie = 
+                        Hasher.hash(sessionCookieValue);
+                }
+            }
+
             // check if CSRF token is in cookie (and signature is valid)
             // remove it if it is not.
             // we are not checking it matches the CSRF token in the header or
@@ -637,7 +650,7 @@ export class FastifySessionServer {
                         msg: "Couldn't create CSRF token",
                         cerr: e,
                         user: request.user?.username,
-                        hashedSessionCookie: this.getHashOfSessionCookie(request)
+                        ...reportSession,
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     reply.clearCookie(this.sessionManager.csrfCookieName);
@@ -653,7 +666,7 @@ export class FastifySessionServer {
                             msg: "Couldn't create CSRF token",
                             cerr: e,
                             user: request.user?.username,
-                            hashedSessionCookie: this.getHashOfSessionCookie(request)
+                            ...reportSession,
                         }));
                         CrossauthLogger.logger.debug(j({err: e}));
                     }
@@ -665,14 +678,15 @@ export class FastifySessionServer {
             // validate any session cookie.  Remove if invalid
             //request.user = undefined;
             //request.authType = undefined;
-            const sessionCookieValue = this.getSessionCookieValue(request);
-            CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
+            sessionCookieValue = this.getSessionCookieValue(request);
             if (sessionCookieValue) {
                 try {
-                    let {key, user} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
+                    const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
+                    let {key, user} = await this.sessionManager.userForSessionId(sessionId);
                     if (this.validateSession) this.validateSession(key,
                         user,
                         request);
+                    request.sessionId = sessionId;
     
                     request.user = user;
                     request.authType = "cookie";
@@ -683,7 +697,7 @@ export class FastifySessionServer {
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({
                         msg: "Invalid session cookie received",
-                        hashedSessionCookie: this.getHashOfSessionCookie(request)
+                        hashOfSessionId: this.getHashOfSessionId(request)
                     }));
                     reply.clearCookie(this.sessionManager.sessionCookieName);
                 }
@@ -699,9 +713,10 @@ export class FastifySessionServer {
                 request.user?.factor2 && 
                 (this.factor2ProtectedPageEndpoints.includes(request.url) || 
                 this.factor2ProtectedApiEndpoints.includes(request.url))) {
+                const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                 if (!(["GET", "OPTIONS", "HEAD"].includes(request.method))) {
                     const sessionData = 
-                        await this.sessionManager.dataForSessionKey(sessionCookieValue);
+                        await this.sessionManager.dataForSessionId(sessionId);
                     if (("pre2fa") in sessionData) {
                         // 2FA has started - validate it
                         CrossauthLogger.logger.debug("Completing 2FA");
@@ -716,12 +731,12 @@ export class FastifySessionServer {
                                 request.body[field];
                         }
 
-                        const sessionCookieValue = this.getSessionCookieValue(request);
-                        if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie found");
+                        //const sessionCookieValue = this.getSessionCookieValue(request);
+                        //if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie found");
                         let error : CrossauthError|undefined = undefined;
                         try {
                             //await this.sessionManager.completeTwoFactorPageVisit(request.body, sessionCookieValue);
-                            await this.sessionManager.completeTwoFactorPageVisit(secrets, sessionCookieValue);
+                            await this.sessionManager.completeTwoFactorPageVisit(secrets, sessionId);
                         } catch (e) {
                             error = CrossauthError.asCrossauthError(e);
                             CrossauthLogger.logger.debug(j({err: e}));
@@ -742,9 +757,9 @@ export class FastifySessionServer {
                                 CrossauthLogger.logger.debug("Error - cancelling 2FA");
                                 // the 2FA data and start again
                                 try {
-                                    await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
+                                    await this.sessionManager.cancelTwoFactorPageVisit(sessionId);
                                 } catch (e) {
-                                    CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: request.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(request)}));
+                                    CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: request.user?.username, hashOfSessionId: this.getHashOfSessionId(request)}));
                                     CrossauthLogger.logger.debug(j({err:e}))
                                 }
                                 request.body = {
@@ -774,7 +789,7 @@ export class FastifySessionServer {
                         // 2FA has not started - start it
                         this.validateCsrfToken(request);
                         CrossauthLogger.logger.debug("Starting 2FA");
-                        this.sessionManager.initiateTwoFactorPageVisit(request.user, sessionCookieValue, request.body, request.url.replace(/\?.*$/,""));
+                        this.sessionManager.initiateTwoFactorPageVisit(request.user, sessionId, request.body, request.url.replace(/\?.*$/,""));
                         if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
                             return reply.redirect(this.prefix+"factor2");
                         } else {
@@ -789,15 +804,16 @@ export class FastifySessionServer {
                     // cancel any pending 2FA
                     const sessionCookieValue = this.getSessionCookieValue(request);
                     if (sessionCookieValue) {
+                        const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                         const sessionData = 
-                            await this.sessionManager.dataForSessionKey(sessionCookieValue);
+                            await this.sessionManager.dataForSessionId(sessionId);
                         if (("pre2fa") in sessionData) {
                             CrossauthLogger.logger.debug("Cancelling 2FA");
                             try {
-                                await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
+                                await this.sessionManager.cancelTwoFactorPageVisit(sessionId);
                             } catch (e) {
                                 CrossauthLogger.logger.debug(j({err:e}));
-                                CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: request.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(request)}));
+                                CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: request.user?.username, hashOfSessionId: this.getHashOfSessionId(request)}));
                             }      
                         }
                     }
@@ -1081,9 +1097,8 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.debug(j({err: e}));
                 let factor2 : string|undefined;
                 try {
-                    const sessionKey = this.getSessionCookieValue(request);
-                    const data = sessionKey ? 
-                        await this.sessionManager.dataForSessionKey(sessionKey) : 
+                    const data = request.sessionId ? 
+                        await this.sessionManager.dataForSessionId(request.sessionId) : 
                         undefined;
                     factor2 = data?.factor2;
                 } catch (e) {
@@ -1134,11 +1149,12 @@ export class FastifySessionServer {
                     url: this.prefix + 'factor2',
                     ip: request.ip
                 }));
-            const sessionCookie = this.getSessionCookieValue(request);
-            if (!sessionCookie) throw new CrossauthError(ErrorCode.Unauthorized, 
+            if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
                 "No session cookie present");
+            const sessionCookieValue = this.getSessionCookieValue(request);
+            const sessionId = this.sessionManager.getSessionId(sessionCookieValue??"")
             const sessionData = 
-            await this.sessionManager.dataForSessionKey(sessionCookie);
+            await this.sessionManager.dataForSessionId(sessionId);
             if (!sessionData?.pre2fa) throw new CrossauthError(ErrorCode.Unauthorized, 
                 "2FA not initiated");
             let data = {
@@ -1330,8 +1346,7 @@ export class FastifySessionServer {
 
                 CrossauthLogger.logger.debug(j({err: e}));
                 try {
-                    const sessionValue = this.getSessionCookieValue(request);
-                    if (!sessionValue) {
+                    if (!request.sessionId) {
                         // this shouldn't happen - user's cannot call this URL without having a session,
                         // user or anonymous.  However, just in case...
                         const ce = CrossauthError.asCrossauthError(e);
@@ -1341,10 +1356,10 @@ export class FastifySessionServer {
                     }
 
                     // normal error - wrong code, etc.  show the page again
-                    let data = (await this.sessionManager.dataForSessionKey(sessionValue))["2fa"];
+                    let data = (await this.sessionManager.dataForSessionId(request.sessionId))["2fa"];
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({msg: "Signup two factor failure", user: data?.username, errorCodeName: ce.codeName, errorCode: ce.code}));
-                    const { userData } = await this.sessionManager.repeatTwoFactorSignup(sessionValue);
+                    const { userData } = await this.sessionManager.repeatTwoFactorSignup(request.sessionId);
                     return this.handleError(e, request, reply, (reply, error) => {
                             return reply.view(this.configureFactor2Page, {
                             errorMessage: error.message,
@@ -1385,9 +1400,6 @@ export class FastifySessionServer {
                     ip: request.ip,
                     user: request.user?.username
                 }));
-                /*if (!this.sessionUser(request)) return FastifyServer.sendPageError(reply,
-                    401,
-                    this.errorPage);*/
                 if (!this.sessionUser(request) || !request.user) {
                     // user is not logged on - check if there is an anonymous 
                     // session with passwordchange set (meaning the user state
@@ -1429,9 +1441,6 @@ export class FastifySessionServer {
                     ip: request.ip,
                     user: request.user?.username
                 }));
-                /*if (!this.sessionUser(request)) return FastifyServer.sendPageError(reply,
-                    401,
-                    this.errorPage);  // not allowed here if not logged in*/
             try {
                 return await this.changePassword(request, reply, 
                 (reply, _user) => {
@@ -2022,7 +2031,7 @@ export class FastifySessionServer {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
                     msg: "Login failure",
-                    hashOfSessionCookie: this.getHashOfSessionCookie(request),
+                    hashOfSessionId: this.getHashOfSessionId(request),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
                 }));
@@ -2130,7 +2139,7 @@ export class FastifySessionServer {
                     method: 'GET',
                     url: this.prefix + 'api/configurefactor2',
                     ip: request.ip,
-                    hashOfSessionCookie: this.getHashOfSessionCookie(request)
+                    hashOfSessionId: this.getHashOfSessionId(request)
                 }));
             try {
                 return await this.reconfigureFactor2(request, reply, 
@@ -2168,7 +2177,7 @@ export class FastifySessionServer {
                     method: 'POST',
                     url: this.prefix + 'api/configurefactor2',
                     ip: request.ip,
-                    hashOfSessionCookie: this.getHashOfSessionCookie(request)
+                    hashOfSessionId: this.getHashOfSessionId(request)
                 }));
             try {
                 return await this.configureFactor2(request, reply, 
@@ -2448,7 +2457,7 @@ export class FastifySessionServer {
                     url: this.prefix + 'api/userforsessionkey',
                     ip: request.ip,
                     user: request.user?.username,
-                    hashedSessionCookie: this.getHashOfSessionCookie(request)
+                    hashOfSessionId: this.getHashOfSessionId(request)
                 }));
                 if (!this.sessionUser(request)) return this.sendJsonError(reply,
                     401,
@@ -2459,9 +2468,11 @@ export class FastifySessionServer {
             //await this.validateCsrfToken(request)
             try {
                 let user : User|undefined;
-                const sessionId = this.getSessionCookieValue(request);
-                if (sessionId) user = 
-                    await this.sessionManager.userForSessionKey(sessionId);
+                if (request.sessionId) {
+                    const resp = 
+                        await this.sessionManager.userForSessionId(request.sessionId);
+                    user = resp.user;
+                }
                 return reply.header(...JSONHDR).send({ok: true, user : user});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
@@ -2479,7 +2490,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.error(j({
                     msg: error,
                     user: request.user?.username,
-                    hashedSessionCookie: this.getHashOfSessionCookie(request),
+                    hashOfSessionId: this.getHashOfSessionId(request),
                     errorCodeName: codeName,
                     errorCode: code
                 }));
@@ -2584,7 +2595,7 @@ export class FastifySessionServer {
             } catch (e) {
                 CrossauthLogger.logger.warn(j({
                     msg: "Couldn't delete session ID from database",
-                    hashedSessionCookie: this.getHashOfSessionCookie(request)
+                    hashOfSessionId: this.getHashOfSessionId(request)
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
             }
@@ -2603,8 +2614,8 @@ export class FastifySessionServer {
         // save the old session ID so we can delete it after (the anonymous session)
         // If there isn't one it is an error - only allowed to this URL with a 
         // valid session
-        const oldSessionCookieValue = this.getSessionCookieValue(request);
-        if (!oldSessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized);
+        const oldSessionId = request.sessionId;
+        if (!oldSessionId) throw new CrossauthError(ErrorCode.Unauthorized);
 
         // get data from request body
         const persist = request.body.persist;
@@ -2616,7 +2627,7 @@ export class FastifySessionServer {
         let extraFields = this.addToSession ? this.addToSession(request) : {}
         const {sessionCookie, csrfCookie, user} = 
             await this.sessionManager.completeTwoFactorLogin(request.body, 
-                oldSessionCookieValue, 
+                oldSessionId, 
                 extraFields, 
                 persist);
         CrossauthLogger.logger.debug(j({
@@ -2689,7 +2700,7 @@ export class FastifySessionServer {
             } catch (e) {
                 CrossauthLogger.logger.warn(j({
                     msg: "Couldn't delete session ID from database",
-                    hashedSessionCookie: this.getHashOfSessionCookie(request)
+                    hashOfSessionId: this.getHashOfSessionId(request)
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
             }
@@ -2706,7 +2717,6 @@ export class FastifySessionServer {
         // throw an error if the CSRF token is invalid
         //await this.validateCsrfToken(request);
         if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
-
         // get data from the request body
         // make sure the requested second factor is valid
         const username = request.body.username;
@@ -2753,7 +2763,7 @@ export class FastifySessionServer {
         } else if (this.enableEmailVerification) {
             user.state = "awaitingemailverification";
         }
-    
+
         // call the implementor-provided hook to validate the user fields
         let userErrors = this.validateUserFn(user);
 
@@ -2779,14 +2789,14 @@ export class FastifySessionServer {
                 twoFactorInitiated = true;
             } // all other errors are legitimate ones - we ignore them
         }
-        
+
         // login (this may be just first stage of 2FA)
         if ((!request.body.factor2) && !twoFactorInitiated) {
             // not enabling 2FA
             await this.sessionManager.createUser(user,
                 request.body,
                 repeatSecrets);
-            if (!this.enableEmailVerification) {
+                if (!this.enableEmailVerification) {
                 return this.login(request, reply, (request, user) => {
                     return successFn(request, {}, user)});
             }
@@ -2796,26 +2806,31 @@ export class FastifySessionServer {
             let userData : {[key:string] : any};
             if (twoFactorInitiated) {
                 // account already created but 2FA setup not complete
-                const sessionValue = this.getSessionCookieValue(request);
-                if (!sessionValue) throw new CrossauthError(ErrorCode.Unauthorized);
+                if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized);
                 const resp = 
-                    await this.sessionManager.repeatTwoFactorSignup(sessionValue);
+                    await this.sessionManager.repeatTwoFactorSignup(request.sessionId);
                 userData = resp.userData;
             } else {
                 // account not created - create one with state awaiting 2FA setup
                 const sessionValue = 
                     await this.createAnonymousSession(request, reply);
+                const sessionId = this.sessionManager.getSessionId(sessionValue);
                 const resp = 
                     await this.sessionManager.initiateTwoFactorSignup(user,
                         request.body,
-                        sessionValue,
+                        sessionId,
                         repeatSecrets);
                 userData = resp.userData;
             }
 
             // pass caller back 2FA parameters
             try {
-                let data : {userData: {[key:string] : any}, username: string, next : string, csrfToken: string|undefined} = 
+                let data: {
+                    userData: { [key: string]: any },
+                    username: string,
+                    next: string,
+                    csrfToken: string | undefined
+                } = 
                 {
                     userData: userData,
                     username: username,
@@ -2840,8 +2855,7 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, data: {[key:string]:any}, user? : User) => void) {
         
         // can only call this if logged in and CSRF token is valid
-        const sessionValue = await this.getSessionCookieValue(request);
-        if (!request.user || !sessionValue || !this.sessionUser(request)) {
+        if (!request.user || !request.sessionId || !this.sessionUser(request)) {
             throw new CrossauthError(ErrorCode.Unauthorized);
         }
 
@@ -2857,7 +2871,7 @@ export class FastifySessionServer {
         const userData = 
             await this.sessionManager.initiateTwoFactorSetup(request.user,
                 factor2,
-                sessionValue);
+                request.sessionId);
 
         // show user result
         let data : {[key:string] : any} = 
@@ -2877,12 +2891,11 @@ export class FastifySessionServer {
         if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
         // get the session - it may be a real user or anonymous
-        const sessionCookieValue = this.getSessionCookieValue(request);
-        if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, 
+        if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
             "No session active while enabling 2FA.  Please enable cookies");
         // finish 2FA setup - validate secrets and update user
         let user = await this.sessionManager.completeTwoFactorSetup(request.body, 
-            sessionCookieValue);
+            request.sessionId);
         if (!this.sessionUser(request) && !this.enableEmailVerification) {
             // we skip the login if the user is already logged in and we are not doing email verification
             return this.loginWithUser(user, true, request, reply, 
@@ -2924,8 +2937,7 @@ export class FastifySessionServer {
         } else {
             user = request.user;
         }
-        const sessionValue = this.getSessionCookieValue(request);
-        if (!sessionValue) {
+        if (!request.sessionId) {
             throw new CrossauthError(ErrorCode.Unauthorized);
         }
 
@@ -2946,7 +2958,7 @@ export class FastifySessionServer {
 
         // get data to show user to finish 2FA setup
         const userData = await this.sessionManager
-            .initiateTwoFactorSetup(user, newFactor2, sessionValue);
+            .initiateTwoFactorSetup(user, newFactor2, request.sessionId);
 
         // show data to user
         let data: {
@@ -3199,9 +3211,8 @@ export class FastifySessionServer {
         successFn : (reply : FastifyReply) => void) {
 
             // logout
-        let sessionId = this.getSessionCookieValue(request);
-        if (sessionId) {
-                await this.sessionManager.logout(sessionId);
+        if (request.sessionId) {
+                await this.sessionManager.logout(request.sessionId);
         }
 
         // clear cookies
@@ -3209,13 +3220,13 @@ export class FastifySessionServer {
             + this.sessionManager.sessionCookieName}));
         reply.clearCookie(this.sessionManager.sessionCookieName);
         reply.clearCookie(this.sessionManager.csrfCookieName);
-        if (sessionId) {
+        if (request.sessionId) {
             try {
-                await this.sessionManager.deleteSession(sessionId);
+                await this.sessionManager.deleteSession(request.sessionId);
             } catch (e) {
                 CrossauthLogger.logger.warn(j({
                     msg: "Couldn't delete session ID from database",
-                    hashedSessionCookie: this.getHashOfSessionCookie(request)
+                    hashOfSessionId: this.getHashOfSessionId(request)
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
             }
@@ -3265,7 +3276,7 @@ export class FastifySessionServer {
         CrossauthLogger.logger.debug(j({err: ce}));
             CrossauthLogger.logger.error(j({
                 cerr: ce,
-                hashedSessionCookie: this.getHashOfSessionCookie(request),
+                hashOfSessionId: this.getHashOfSessionId(request),
                 user: request.user?.username
             }));
         return errorFn(reply, ce);
@@ -3296,11 +3307,10 @@ export class FastifySessionServer {
         return undefined;
     }
 
-    getHashOfSessionCookie(request : FastifyRequest) : string {
-        const cookieValue = this.getSessionCookieValue(request);
-        if (!cookieValue) return "";
+    getHashOfSessionId(request : FastifyRequest) : string {
+        if (!request.sessionId) return "";
         try {
-            return Hasher.hash(cookieValue.split(".")[0]);
+            return Hasher.hash(request.sessionId);
         } catch (e) {}
         return "";
     }
@@ -3407,17 +3417,15 @@ export class FastifySessionServer {
     }
 
     async updateSessionData(request : FastifyRequest, name : string, value : {[key:string]:any}) {
-        const sessionCookieValue = this.getSessionCookieValue(request);
-        if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
-        await this.sessionManager.updateSessionData(sessionCookieValue, name, value);
+        if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
+        await this.sessionManager.updateSessionData(request.sessionId, name, value);
     }
 
     async getSessionData(request : FastifyRequest, name : string) 
         : Promise<{[key:string]:any}|undefined>{
-        const sessionCookieValue = this.getSessionCookieValue(request);
         try {
-            const data = sessionCookieValue ? 
-                await this.sessionManager.dataForSessionKey(sessionCookieValue) : 
+            const data = request.sessionId ? 
+                await this.sessionManager.dataForSessionId(request.sessionId) : 
                 undefined;
             if (data && name in data) return data[name];
         } catch (e) {
@@ -3431,11 +3439,10 @@ export class FastifySessionServer {
     }
 
     async getSessionKey(request : FastifyRequest) : Promise<Key|undefined>{
-        const sessionCookieValue = this.getSessionCookieValue(request);
-        if (!sessionCookieValue) return undefined;
+        if (!request.sessionId) return undefined;
         try {
             const {key} = await this.sessionManager
-                .userForSessionCookieValue(sessionCookieValue) 
+                .userForSessionId(request.sessionId) 
             return key;
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
