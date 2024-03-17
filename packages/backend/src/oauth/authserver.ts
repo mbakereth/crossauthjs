@@ -1650,7 +1650,6 @@ export class OAuthAuthorizationServer {
         if (issueRefreshToken) { 
             // create refresh token 
             refreshToken = Hasher.randomValue(this.codeLength); 
-            let dateRefreshTokenExpires : Date|undefined;
             const refreshData : {[key:string]: any} = {
                 username: authzData.username,
                 client_id: client.clientId,
@@ -1673,7 +1672,7 @@ export class OAuthAuthorizationServer {
                 undefined, // to avoid user storage dependency
                 KeyPrefix.refreshToken+Hasher.hash(refreshToken),
                 now,
-                dateRefreshTokenExpires,
+                refreshTokenExpires,
                 JSON.stringify(refreshData)
             );
         }

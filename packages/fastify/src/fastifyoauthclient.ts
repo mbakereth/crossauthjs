@@ -38,10 +38,10 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     passwordFlowUrl? : string,
     passwordOtpUrl? : string,
     passwordOobUrl? : string,
-    receiveTokenFn?: (client: FastifyOAuthClient,
+    receiveTokenFn?: (oauthResponse: OAuthTokenResponse,
+        client: FastifyOAuthClient,
         request: FastifyRequest,
-        reply: FastifyReply,
-        oauthResponse: OAuthTokenResponse) => Promise<FastifyReply>;
+        reply?: FastifyReply) => Promise<FastifyReply>;
     errorFn? :FastifyErrorFn ;
     tokenResponseType? : 
         "sendJson" | 
@@ -89,7 +89,7 @@ interface ClientCredentialsBodyType {
 }
 
 interface RefreshTokenBodyType {
-    refreshToken: string,
+    refreshToken?: string,
     csrfToken? : string,
 }
 
@@ -162,13 +162,15 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
     return payload;
 
 }
-async function sendJson(_client: FastifyOAuthClient,
+async function sendJson(oauthResponse: OAuthTokenResponse,
+    _client: FastifyOAuthClient,
     _request: FastifyRequest,
-    reply: FastifyReply,
-    oauthResponse: OAuthTokenResponse) : Promise<FastifyReply> {
-    return reply.header(...JSONHDR).status(200)
-        .send({ok: true, ...oauthResponse, 
-            id_payload: decodePayload(oauthResponse.id_token)});
+    reply?: FastifyReply) : Promise<FastifyReply|undefined> {
+    if (reply) {
+        return reply.header(...JSONHDR).status(200)
+            .send({ok: true, ...oauthResponse, 
+                id_payload: decodePayload(oauthResponse.id_token)});
+    }
 }
 
 function logTokens(oauthResponse: OAuthTokenResponse) {
@@ -210,111 +212,140 @@ function logTokens(oauthResponse: OAuthTokenResponse) {
     }
 }
 
-async function sendInPage(client: FastifyOAuthClient,
+async function sendInPage(oauthResponse: OAuthTokenResponse,
+    client: FastifyOAuthClient,
     _request: FastifyRequest,
-    reply: FastifyReply,
-    oauthResponse: OAuthTokenResponse) : Promise<FastifyReply> {
+    reply?: FastifyReply) : Promise<FastifyReply|undefined> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
             oauthResponse.error_description);
-        return reply.status(ce.httpStatus)
-            .view(client.errorPage, {
-                status: ce.httpStatus,
-                errorMessage: ce.message,
-                errorCodeName: ce.codeName,
-                errorCode: ce.code
-            });
+        if (reply) {
+            return reply.status(ce.httpStatus)
+                .view(client.errorPage, {
+                    status: ce.httpStatus,
+                    errorMessage: ce.message,
+                    errorCodeName: ce.codeName,
+                    errorCode: ce.code
+                });
+        }
     }
 
     logTokens(oauthResponse);
-    try {
-        return reply.status(200).view(client.authorizedPage, 
-            {...oauthResponse,
-                id_payload: decodePayload(oauthResponse.id_token)} );
-    } catch (e) {
-        const ce = e as CrossauthError;
-        return reply.status(ce.httpStatus)
-            .view(client.errorPage, {
-                status: ce.httpStatus,
-                errorMessage: ce.message,
-                errorCodeName: ce.codeName
-            });
+
+    if (reply) {
+        try {
+            return reply.status(200).view(client.authorizedPage, 
+                {...oauthResponse,
+                    id_payload: decodePayload(oauthResponse.id_token)} );
+        } catch (e) {
+            const ce = e as CrossauthError;
+            return reply.status(ce.httpStatus)
+                .view(client.errorPage, {
+                    status: ce.httpStatus,
+                    errorMessage: ce.message,
+                    errorCodeName: ce.codeName
+                });
+        }
     }
 }
 
-async function saveInSessionAndLoad(client: FastifyOAuthClient,
+async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
+    client: FastifyOAuthClient,
     request: FastifyRequest,
-    reply: FastifyReply,
-    oauthResponse: OAuthTokenResponse) : Promise<FastifyReply> {
+    reply?: FastifyReply,
+    ) : Promise<FastifyReply|undefined> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
             oauthResponse.error_description);
-        return reply.status(ce.httpStatus)
-            .view(client.errorPage, {
-                status: ce.httpStatus,
-                errorMessage: ce.message,
-                errorCodeName: ce.codeName,
-                errorCode: ce.code
-            });
+        if (reply) {
+            return reply.status(ce.httpStatus)
+                .view(client.errorPage, {
+                    status: ce.httpStatus,
+                    errorMessage: ce.message,
+                    errorCodeName: ce.codeName,
+                    errorCode: ce.code
+                });
+            }
     }
 
     logTokens(oauthResponse);
     try {
         let sessionCookieValue = client.server.getSessionCookieValue(request);
-        if (!sessionCookieValue) {
+        if (!reply && !sessionCookieValue) {
+            throw new CrossauthError(ErrorCode.InvalidSession,
+                "No session data found containing tokens")
+        }
+        if (!sessionCookieValue && reply) {
             sessionCookieValue = 
                 await client.server.createAnonymousSession(request,
                     reply,
                     { [client.sessionDataName]: oauthResponse });
         } else {
             const expires_at = Date.now() + (oauthResponse.expires_in??0)*1000;
+            const existingData = 
+                await client.server.getSessionData(request, client.sessionDataName);
             await client.server.updateSessionData(request,
                 client.sessionDataName,
-                { ...oauthResponse, expires_at });
+                { ...existingData??{},  ...oauthResponse, expires_at });
         }
-        if (!client.authorizedPage) {
-            return reply.status(500)
-                .view(client.errorPage, {
-                    status: 500,
-                    errorMessage: "Authorized url not configured",
-                    errorCodeName: ErrorCode[ErrorCode.Configuration],
-                    errorCode: ErrorCode.Configuration
-                });
+
+        if (reply) {
+            if (!client.authorizedPage) {
+                return reply.status(500)
+                    .view(client.errorPage, {
+                        status: 500,
+                        errorMessage: "Authorized url not configured",
+                        errorCodeName: ErrorCode[ErrorCode.Configuration],
+                        errorCode: ErrorCode.Configuration
+                    });
+            }
+            return reply.status(200).view(client.authorizedPage, 
+                {...oauthResponse,
+                    id_payload: decodePayload(oauthResponse.id_token)} );
         }
-        return reply.status(200).view(client.authorizedPage, 
-            {...oauthResponse,
-                id_payload: decodePayload(oauthResponse.id_token)} );
     } catch (e) {
         const ce = e as CrossauthError;
-        return reply.status(ce.httpStatus)
-            .view(client.errorPage, {
-                status: ce.httpStatus,
-                errorMessage: ce.message,
-                errorCodeName: ce.codeName
-            });
+        CrossauthLogger.logger.debug(j({err: ce}));
+        CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
+        if (reply) {
+            return reply.status(ce.httpStatus)
+                .view(client.errorPage, {
+                    status: ce.httpStatus,
+                    errorMessage: ce.message,
+                    errorCodeName: ce.codeName
+                });
+        }
     }
 }
 
-async function saveInSessionAndRedirect(client: FastifyOAuthClient,
+async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
+    client: FastifyOAuthClient,
     request: FastifyRequest,
-    reply: FastifyReply,
-    oauthResponse: OAuthTokenResponse) : Promise<FastifyReply> {
+    reply?: FastifyReply,
+    ) : Promise<FastifyReply|undefined> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
             oauthResponse.error_description);
-        return reply.status(ce.httpStatus)
-            .view(client.errorPage, {
-                status: ce.httpStatus,
-                errorMessage: ce.message,
-                errorCodeName: ce.codeName,
-                errorCode: ce.code
-            });
+        if (reply) {
+            return reply.status(ce.httpStatus)
+                .view(client.errorPage, {
+                    status: ce.httpStatus,
+                    errorMessage: ce.message,
+                    errorCodeName: ce.codeName,
+                    errorCode: ce.code
+                });
+        }
     }
 
     logTokens(oauthResponse);
+
     try {
         let sessionCookieValue = client.server.getSessionCookieValue(request);
-        if (!sessionCookieValue) {
+        if (!reply && !sessionCookieValue) {
+            throw new CrossauthError(ErrorCode.InvalidSession,
+                "No session data found containing tokens")
+        }
+        if (!sessionCookieValue && reply) {
             sessionCookieValue = 
                 await client.server.createAnonymousSession(request,
                     reply,
@@ -322,29 +353,38 @@ async function saveInSessionAndRedirect(client: FastifyOAuthClient,
         } else {
             const expires_at = 
                 (new Date().getTime() + (oauthResponse.expires_in??0)*1000);
+                const existingData = 
+                await client.server.getSessionData(request, client.sessionDataName);
             await client.server.updateSessionData(request,
                 client.sessionDataName,
-                { ...oauthResponse, expires_at });
+                { ...existingData??{}, ...oauthResponse, expires_at });
         }
-        if (!client.authorizedUrl) {
-            return reply.status(500)
-                .view(client.errorPage, {
-                    status: 500,
-                    errorMessage: "Authorized url not configured",
-                    errorCodeName: ErrorCode[ErrorCode.Configuration],
-                    errorCode: ErrorCode.Configuration
-                });
 
+        if (reply) {
+            if (!client.authorizedUrl) {
+                return reply.status(500)
+                    .view(client.errorPage, {
+                        status: 500,
+                        errorMessage: "Authorized url not configured",
+                        errorCodeName: ErrorCode[ErrorCode.Configuration],
+                        errorCode: ErrorCode.Configuration
+                    });
+
+            }
+            return reply.redirect(client.authorizedUrl);
         }
-        return reply.redirect(client.authorizedUrl);
     } catch (e) {
         const ce = e as CrossauthError;
-        return reply.status(ce.httpStatus)
-            .view(client.errorPage, {
-                status: ce.httpStatus,
-                errorMessage: ce.message,
-                errorCodeName: ce.codeName
-            });
+        CrossauthLogger.logger.debug(j({err: ce}));
+        CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
+        if (reply) {
+            return reply.status(ce.httpStatus)
+                .view(client.errorPage, {
+                    status: ce.httpStatus,
+                    errorMessage: ce.message,
+                    errorCodeName: ce.codeName
+                });
+        }
     }
 }
 
@@ -363,11 +403,11 @@ export class FastifyOAuthClient extends OAuthClient {
     authorizedUrl : string = "authorized";
     sessionDataName : string = "oauth";
     private receiveTokenFn : 
-        (client: FastifyOAuthClient,
+        ( oauthResponse: OAuthTokenResponse,
+            client: FastifyOAuthClient,
             request: FastifyRequest,
-            reply: FastifyReply,
-            oauthResponse: OAuthTokenResponse) 
-            => Promise<FastifyReply> = sendJson;
+            reply?: FastifyReply) 
+            => Promise<FastifyReply|undefined> = sendJson;
     private errorFn : FastifyErrorFn = jsonError;
     private loginUrl : string = "/login";
     private loginProtectedFlows : string[] = [];
@@ -566,7 +606,7 @@ export class FastifyOAuthClient extends OAuthClient {
                             reply,
                             ce);
                     }
-                    return await this.receiveTokenFn(this, request, reply, resp);
+                    return await this.receiveTokenFn(resp, this, request, reply);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
@@ -615,7 +655,7 @@ export class FastifyOAuthClient extends OAuthClient {
                             reply,
                             ce);
                     }
-                    return await this.receiveTokenFn(this, request, reply, resp);
+                    return await this.receiveTokenFn(resp, this, request, reply);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
@@ -642,21 +682,45 @@ export class FastifyOAuthClient extends OAuthClient {
                         ip: request.ip,
                         user: request.user?.username
                     }));
-                if (this.server.sessionServer) {
-                    // if sessions are enabled, require a csrf token
-                    const {error, reply: reply1} = 
-                        await server.errorIfCsrfInvalid(request,
+
+                // if sessions are enabled, require a csrf token
+                const {error, reply: reply1} = 
+                    await server.errorIfCsrfInvalid(request,
+                        reply,
+                        this.errorFn);
+                if (error) return reply1;
+
+                // get refresh token from body if present, otherwise
+                // try to find in session
+                let refreshToken : string | undefined = request.body.refreshToken;
+                if (!refreshToken && this.server.sessionServer) {
+                    const oauthData = await this.server.getSessionData(request, "oauth");
+                    if (!oauthData?.refresh_token) {
+                        const ce = new CrossauthError(ErrorCode.BadRequest,
+                            "No refresh token in session or in parameters");
+                        return await this.errorFn(this.server,
+                            request,
                             reply,
-                            this.errorFn);
-                    if (error) return reply1;
+                            ce);
+                    }
+                    refreshToken = oauthData.refresh_token;
+                } 
+                if (!refreshToken) {
+                    const ce = new CrossauthError(ErrorCode.BadRequest,
+                        "No refresh token supplied");
+                    return await this.errorFn(this.server,
+                        request,
+                        reply,
+                        ce);
                 }
+
                 if (!request.user && 
                     (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
                     return reply.status(401).header(...JSONHDR)
                         .send({ok: false, msg: "Access denied"});                }               
                 try {
                     const resp = 
-                        await this.refreshTokenFlow(request.body.refreshToken);
+                        await this.refreshTokenFlow(refreshToken);
                     if (resp.error) {
                         const ce = CrossauthError.fromOAuthError(resp.error, 
                             resp.error_description);
@@ -665,7 +729,7 @@ export class FastifyOAuthClient extends OAuthClient {
                             reply,
                             ce);
                     }
-                    return await this.receiveTokenFn(this, request, reply, resp);
+                    return await this.receiveTokenFn(resp, this, request, reply);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
@@ -677,6 +741,30 @@ export class FastifyOAuthClient extends OAuthClient {
                     return await this.errorFn(this.server, request, reply, ce);
                 }
             });
+
+            this.server.app.post(this.prefix+"refreshtokensifexpired", 
+            async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'POST',
+                    url: this.prefix + "refreshtokens",
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+                return this.refreshTokens(request, reply, false);
+        });
+        this.server.app.post(this.prefix+"api/refreshtokensifexpired", 
+            async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'POST',
+                    url: this.prefix + "refreshtokens",
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+                return this.refreshTokens(request, reply, true);
+        });
+
         }
 
         ///////// Password (and MFA) flow
@@ -789,6 +877,8 @@ export class FastifyOAuthClient extends OAuthClient {
                 });
             }
         }
+ 
+
 
         // Token endpoints
         for (let tokenType of this.tokenEndpoints) {
@@ -815,7 +905,10 @@ export class FastifyOAuthClient extends OAuthClient {
                     if (isHave) return reply.header(...JSONHDR).status(200).send({ok: false});
                     return reply.header(...JSONHDR).status(204).send();
                 }
-                const payload = decodePayload(oauthData[tokenName]);
+                let payload = oauthData[tokenName];
+                if (["access_token", "id_token"].includes(tokenName)) {
+                    payload = decodePayload(oauthData[tokenName]);
+                }
                 if (!payload) {
                     if (isHave) return reply.header(...JSONHDR).status(200).send({ok: false});
                     return reply.header(...JSONHDR).status(204).send();
@@ -888,6 +981,7 @@ export class FastifyOAuthClient extends OAuthClient {
                                 const resp = 
                                     await server.oAuthClient?.refreshIfExpired(request,
                                         reply,
+                                        true,
                                         oauthData.refresh_token,
                                         oauthData.expires_at);
                                 if (resp?.access_token) {
@@ -977,7 +1071,7 @@ export class FastifyOAuthClient extends OAuthClient {
                             csrfToken: request.csrfToken
                         });            
                 }
-                return await this.receiveTokenFn(this, request, reply, resp);
+                return await this.receiveTokenFn(resp, this, request, reply);
                
             } else if (resp.error) {
                 const ce = CrossauthError.fromOAuthError(resp.error, 
@@ -997,7 +1091,7 @@ export class FastifyOAuthClient extends OAuthClient {
                         csrfToken: request.csrfToken
                     });            
             }
-            return await this.receiveTokenFn(this, request, reply, resp);
+            return await this.receiveTokenFn(resp, this, request, reply);
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.error(j({
@@ -1149,7 +1243,7 @@ export class FastifyOAuthClient extends OAuthClient {
                 csrfToken: request.csrfToken
             });
         }
-        return await this.receiveTokenFn(this, request, reply, resp);
+        return await this.receiveTokenFn(resp, this, request, reply)??reply;
     }
 
     private async passwordOob(isApi: boolean,
@@ -1187,11 +1281,12 @@ export class FastifyOAuthClient extends OAuthClient {
                 csrfToken: request.csrfToken
             });
         }
-        return await this.receiveTokenFn(this, request, reply, resp);
+        return await this.receiveTokenFn(resp, this, request, reply)??reply;
     }
 
     async refreshIfExpired(request: FastifyRequest,
-        reply: FastifyReply,
+        reply : FastifyReply,
+        silent : boolean,
         refreshToken?: string,
         expiresAt?: number) 
         : Promise<{
@@ -1200,9 +1295,18 @@ export class FastifyOAuthClient extends OAuthClient {
             expires_at?: number,
             error?: string,
             error_description?: string
-        }|undefined> {
-            if (!expiresAt || !refreshToken) return undefined;
-            if (expiresAt <= Date.now()) {
+        }|FastifyReply|undefined> {
+            if (!expiresAt || !refreshToken) {
+                if (!silent) {
+                    return await this.receiveTokenFn({},
+                        this,
+                        request,
+                        silent ? undefined : reply);
+                }
+                return undefined;
+            }
+
+        if (expiresAt <= Date.now()) {
             try {
                 const resp = await this.refreshTokenFlow(refreshToken);
                 if (!resp.error && !resp.access_token) {
@@ -1210,8 +1314,17 @@ export class FastifyOAuthClient extends OAuthClient {
                     resp.error_description = "Unexpectedly did not receive error or access token";
                 }
                 if (!resp.error) {
-                    await this.receiveTokenFn(this, request, reply, resp);
+                    const resp1 = await this.receiveTokenFn(resp,
+                        this,
+                        request,
+                        silent ? undefined : reply);
+                    if (!silent) return resp1;
                 } 
+                if (!silent) {
+                    const ce = CrossauthError.fromOAuthError(resp.error??"server_error", 
+                        resp.error_description);
+                    return await this.errorFn(this.server, request, reply, ce)
+                }
                 return {
                     access_token: resp.access_token,
                     refresh_token: resp.refresh_token,
@@ -1225,6 +1338,10 @@ export class FastifyOAuthClient extends OAuthClient {
                     cerr: e,
                     msg: "Failed refreshing access token"
                 }));
+                if (!silent) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    return await this.errorFn(this.server, request, reply, ce)
+                }
                 return {
                     error: "server_error",
                     error_description: "Failed refreshing access token"
@@ -1233,4 +1350,36 @@ export class FastifyOAuthClient extends OAuthClient {
         }
         return undefined;
     }
+
+    private async refreshTokens(request: FastifyRequest<{ Body: CsrfBodyType }>,
+        reply: FastifyReply,
+        silent: boolean) {
+        if (!request.csrfToken) {
+            return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
+        }
+        const oauthData = await this.server.getSessionData(request, "oauth");
+        if (!oauthData?.refresh_token) {
+            if (silent) {
+                return reply.header(...JSONHDR).status(204).send();
+            } else {
+                const ce = new CrossauthError(ErrorCode.InvalidSession,
+                    "No tokens found in session")
+                return await this.errorFn(this.server,
+                    request,
+                    reply,
+                    ce);
+            }
+        }
+
+        const resp = 
+            await this.server.oAuthClient?.refreshIfExpired(request,
+                reply,
+                silent,
+                oauthData.refresh_token,
+                oauthData.expires_at);
+
+        if (!silent) return resp;
+        return reply.header(...JSONHDR).status(200).send({ok: true});
+    };
+
 }

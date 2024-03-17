@@ -120,9 +120,10 @@ async function getAccessTokenThroughClient(clientParams : {[key:string]:any}) {
         password: "bobPass123",
     });
     const access_token = resp.access_token;
+    const refresh_token = resp.refresh_token;
 
     // @ts-ignore
-    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token})});
+    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token, refresh_token: refresh_token})});
     res = await server.app.inject({ method: "POST", url: "/passwordflow", cookies: {CSRFTOKEN: csrfCookie}, payload: {
         csrfToken: csrfToken,
         scope: "read write",
@@ -132,7 +133,7 @@ async function getAccessTokenThroughClient(clientParams : {[key:string]:any}) {
     const sessionCookie = getSession(res);
 
 
-    return {server, keyStorage: keyStorage, access_token, sessionCookie}
+    return {server, keyStorage: keyStorage, access_token, sessionCookie, authServer, refresh_token}
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -290,7 +291,7 @@ test('FastifyOAuthClient.refreshToken', async () => {
     expect(resp.access_token).toBeDefined();
 });
 
-async function receiveFn(_client: FastifyOAuthClient, _request : FastifyRequest, reply : FastifyReply, _oauthResponse : OAuthTokenResponse) : Promise<FastifyReply> {
+async function receiveFn(_oauthResponse : OAuthTokenResponse, _client: FastifyOAuthClient, _request : FastifyRequest, reply? : FastifyReply) : Promise<FastifyReply|undefined> {
     return reply;
 }
 
@@ -305,7 +306,7 @@ test('FastifyOAuthClient.refreshIfExpiredIsExpired', async () => {
     fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()??"{}")}));
     if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
     // @ts-ignore
-    let res = await server.oAuthClient?.refreshIfExpired(null, null, refresh_token, Date.now()-10000);
+    let res = await server.oAuthClient?.refreshIfExpired(null, null, true, refresh_token, Date.now()-10000);
     expect(res?.access_token).toBeDefined();
 });
 
@@ -320,8 +321,164 @@ test('FastifyOAuthClient.refreshIfExpiredIsNotExpired', async () => {
     //fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()??"{}")}));
     if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
     // @ts-ignore
-    let res = await server.oAuthClient?.refreshIfExpired(null, null, refresh_token, Date.now()+expires_in);
+    let res = await server.oAuthClient?.refreshIfExpired(null, null, true, refresh_token, Date.now()+expires_in);
     expect(res?.access_token).toBeUndefined();
+});
+
+test('FastifyOAuthClient.refreshFlowEndpoint', async () => { 
+    const { server, access_token, refresh_token, sessionCookie, authServer } = await getAccessTokenThroughClient({
+        tokenResponseType: "saveInSessionAndLoad",
+        bffBaseUrl: "http://res.com",
+        bffEndpoints: [{ url: "/test", methods: ["GET"],
+        tokenResponseType: "saveInSessionAndRedirect" }],
+
+    });
+    expect(access_token).toBeDefined();
+    //if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    let res;
+    let body;
+
+    // get the csrf token
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("passwordflow.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+    const resp = await authServer.tokenEndpoint({
+        grantType: "refresh_token", 
+        clientId : "ABC", 
+        scope : "read write", 
+        clientSecret : "DEF",
+        refreshToken: refresh_token,
+    });
+    const access_token2 = resp.access_token;
+    const refresh_token2 = resp.refresh_token;
+
+    
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token2, refresh_token: refresh_token2})});
+    res = await server.app.inject({ method: "POST", url: "/refreshtokenflow", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+     }});
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("authorized.njk")
+    expect(body.args.access_token).toBeDefined();
+    expect(body.args.refresh_token).toBeDefined();
+
+});
+
+test('FastifyOAuthClient.refreshIfExpiredEndpoint_Interactive', async () => { 
+    const { server, access_token, refresh_token, sessionCookie, authServer } = await getAccessTokenThroughClient({
+        tokenResponseType: "saveInSessionAndLoad",
+        bffBaseUrl: "http://res.com",
+        bffEndpoints: [{ url: "/test", methods: ["GET"],
+        tokenResponseType: "saveInSessionAndRedirect" }],
+
+    });
+
+    expect(access_token).toBeDefined();
+    //if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    let res;
+    let body;
+
+    // get the csrf token
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("passwordflow.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+    // @ts-ignore
+    //fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token2, refresh_token: refresh_token2})});
+    res = await server.app.inject({ method: "POST", url: "/refreshtokensifexpired", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+     }});
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("authorized.njk");
+
+    const resp = await authServer.tokenEndpoint({
+        grantType: "refresh_token", 
+        clientId : "ABC", 
+        scope : "read write", 
+        clientSecret : "DEF",
+        refreshToken: refresh_token,
+    });
+    const access_token2 = resp.access_token;
+    const refresh_token2 = resp.refresh_token;
+    
+
+    // expire token
+    if (!server.sessionServer) throw new Error("No session server");
+    const sessionManager = server.sessionServer["sessionManager"];
+    let sessionData = await sessionManager.dataForSessionKey(sessionCookie);
+    sessionData.oauth.expires_at = Date.now() - 1000;
+    await sessionManager.updateSessionData(sessionCookie, "oauth", sessionData.oauth)
+    fetchMocker.mockResponseOnce((_request) => {return JSON.stringify({access_token: access_token2, refresh_token: refresh_token2})});
+    res = await server.app.inject({ method: "POST", url: "/refreshtokensifexpired", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+     }});
+    body = JSON.parse(res.body);
+    expect(body.args.access_token).toBe(access_token2);
+
+});
+
+test('FastifyOAuthClient.refreshIfExpiredEndpoint_NonInteractive', async () => { 
+    const { server, access_token, refresh_token, sessionCookie, authServer } = await getAccessTokenThroughClient({
+        tokenResponseType: "saveInSessionAndLoad",
+        bffBaseUrl: "http://res.com",
+        bffEndpoints: [{ url: "/test", methods: ["GET"],
+        tokenResponseType: "saveInSessionAndRedirect" }],
+
+    });
+
+    expect(access_token).toBeDefined();
+    //if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    let res;
+    let body;
+
+    // get the csrf token
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("passwordflow.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+    // @ts-ignore
+    //fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token2, refresh_token: refresh_token2})});
+    res = await server.app.inject({ method: "POST", url: "/api/refreshtokensifexpired", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+     }});
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+
+    const resp = await authServer.tokenEndpoint({
+        grantType: "refresh_token", 
+        clientId : "ABC", 
+        scope : "read write", 
+        clientSecret : "DEF",
+        refreshToken: refresh_token,
+    });
+    const access_token2 = resp.access_token;
+    const refresh_token2 = resp.refresh_token;
+    
+
+    // expire token
+    if (!server.sessionServer) throw new Error("No session server");
+    const sessionManager = server.sessionServer["sessionManager"];
+    let sessionData = await sessionManager.dataForSessionKey(sessionCookie);
+    sessionData.oauth.expires_at = Date.now() - 1000;
+    await sessionManager.updateSessionData(sessionCookie, "oauth", sessionData.oauth)
+    fetchMocker.mockResponseOnce((_request) => {return JSON.stringify({access_token: access_token2, refresh_token: refresh_token2})});
+    res = await server.app.inject({ method: "POST", url: "/api/refreshtokensifexpired", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+     }});
+    body = JSON.parse(res.body);
+    //expect(body.args.access_token).toBe(access_token2);
+    expect(body.ok).toBe(true);
+    sessionData = await sessionManager.dataForSessionKey(sessionCookie);
+    expect(sessionData.oauth.access_token).toBe(access_token2)
+
 });
 
 test('FastifyOAuthClient.bffGet', async () => {
@@ -380,4 +537,3 @@ test('FastifyOAuthClient.bffPost', async () => {
     const requestBody = JSON.parse(body.body);
     expect(requestBody.param).toBe("value");
 });
-
