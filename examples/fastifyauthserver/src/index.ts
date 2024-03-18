@@ -81,7 +81,7 @@ let server = new FastifyServer(userStorage, {
     }}, {
         app: app,
         views: path.join(__dirname, '../views'),
-        allowedFactor2: "none",
+        allowedFactor2: "totp, email, none",
         enableEmailVerification: false,
         validFlows: "all",
         validScopes: "read, write",

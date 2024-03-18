@@ -1024,6 +1024,8 @@ export class FastifySessionServer {
                     } else if (this.allowedFactor2.length > 0 && 
                         (user.state == UserState.factor2ResetNeeded || 
                         !this.allowedFactor2.includes(user.factor2?user.factor2:"none"))) {
+                        CrossauthLogger.logger.debug(j({msg: `Factor2 reset needed.  Factor2 is ${user.factor2}, state is ${user.state}, allowed factor2 is [${this.allowedFactor2.join(", ")}]`,
+                            username: user.username}))
                         if (this.endpoints.includes("changefactor2")) {
                             CrossauthLogger.logger.debug(j({msg: "Factor 2 reset needed - sending redirect"}));
                             return reply.redirect("/changefactor2?required=true&next="+encodeURIComponent("login?next="+next));
