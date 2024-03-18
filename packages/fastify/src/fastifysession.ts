@@ -166,8 +166,6 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
      */
     emailVerifiedPage? : string,
 
-    allowedFactor2? : string,
-
     factor2ProtectedPageEndpoints?: string,
     factor2ProtectedApiEndpoints?: string,
 }

@@ -12,7 +12,7 @@ import type {
     GrantType,
     Jwks,
     MfaAuthenticatorResponse } from '@crossauth/common';
-import { CrossauthError, ErrorCode } from '@crossauth/common';
+import { CrossauthError, ErrorCode, UserState } from '@crossauth/common';
 import type {
     OAuthClient,
     OAuthTokenResponse,
@@ -176,6 +176,9 @@ export interface OAuthAuthorizationServerOptions {
      * If `scope` is `all` then it applies to all scopes
      */
     idTokenClaims? : string;
+
+    allowedFactor2? : string,
+
 }
 
 export class OAuthAuthorizationServer {
@@ -219,7 +222,8 @@ export class OAuthAuthorizationServer {
         private validScopes : string[] = [];
         private idTokenClaims : {[key:string] : any} = {};
         validFlows : string[] = ["all"];
-    
+        allowedFactor2 : string[] = [];
+
     constructor(clientStorage: OAuthClientStorage,
         keyStorage: KeyStorage,
         options: OAuthAuthorizationServerOptions) {
@@ -261,6 +265,7 @@ export class OAuthAuthorizationServer {
         setParameter("validScopes", ParamType.StringArray, this, options, "OAUTH_VALID_SCOPES");
         setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
         setParameter("idTokenClaims", ParamType.Json, this, options, "OAUTH_ID_TOKEN_CLAIMS");
+        setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
 
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {
@@ -825,7 +830,16 @@ export class OAuthAuthorizationServer {
                 }
             }
             if (user.factor2) {
-                return await this.createMfaRequest(user);
+                if (this.allowedFactor2.length > 0 && 
+                    (user.state == UserState.factor2ResetNeeded || 
+                    !this.allowedFactor2.includes(user.factor2?user.factor2:"none"))) {
+                        return {
+                            error: "access_denied",
+                            error_description: "2FA needs to be reconfigured"
+                        }
+                    } else {
+                        return await this.createMfaRequest(user);
+                    }
             }
             return await this.getAccessToken({
                 client, 
