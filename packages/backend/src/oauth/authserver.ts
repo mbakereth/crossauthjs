@@ -777,18 +777,6 @@ export class OAuthAuthorizationServer {
             });
 
         } else if (grantType == "password") {
-
-            // validate scopes
-            const { scopes,
-                error: scopeError,
-                error_description: scopeErrorDesciption } = 
-                await this.validateAndPersistScope(clientId, scope, undefined);
-            if (scopeError) {
-                return {
-                    error: scopeError,
-                    error_description: scopeErrorDesciption
-                };
-            }
     
             // validate username and password
             if (!username || !password) {
@@ -826,6 +814,17 @@ export class OAuthAuthorizationServer {
                     error: "access_denied",
                     error_description: "Username and/or password do not match",
                 }
+            }
+            // validate scopes
+            const { scopes,
+                error: scopeError,
+                error_description: scopeErrorDesciption } = 
+                await this.validateAndPersistScope(clientId, scope, user);
+            if (scopeError) {
+                return {
+                    error: scopeError,
+                    error_description: scopeErrorDesciption
+                };
             }
             if (user.factor2) {
                 if (this.allowedFactor2.length > 0 && 
