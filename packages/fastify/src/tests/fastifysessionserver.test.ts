@@ -24,12 +24,13 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
     const server = new FastifyServer(userStorage, {
+        authenticators: {
+            localpassword: lpAuthenticator,
+            totp: totpAuthenticator,
+        },
         session: {
             keyStorage: keyStorage, 
-            authenticators: {
-                localpassword: lpAuthenticator,
-                totp: totpAuthenticator,
-            }}}, {
+        }}, {
             app: app,
             views: path.join(__dirname, '../views'),
             secret: "ABCDEFG",

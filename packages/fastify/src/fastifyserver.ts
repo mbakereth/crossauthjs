@@ -1,4 +1,7 @@
-import fastify, { type FastifyInstance, type FastifyRequest, type FastifyReply } from 'fastify';
+import fastify, {
+    type FastifyInstance,
+    type FastifyRequest,
+    type FastifyReply } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http'
 import view from '@fastify/view';
 import fastifyFormBody from '@fastify/formbody';
@@ -148,10 +151,10 @@ export class FastifyServer {
      * @param options see {@link FastifyServerOptions}
      */
     constructor(userStorage: UserStorage,
-        { session, apiKey, oAuthAuthServer, oAuthClient, oAuthResServer } : {
-                session?: {
+        { authenticators, session, apiKey, oAuthAuthServer, oAuthClient, oAuthResServer } : {
+            authenticators? : {[key:string]: Authenticator}, 
+            session?: {
                     keyStorage: KeyStorage, 
-                    authenticators: {[key:string]: Authenticator}, 
                     options?: FastifySessionServerOptions,
                 },
                 apiKey?: {
@@ -212,10 +215,14 @@ export class FastifyServer {
         this.app.decorateRequest('csrfToken', undefined);
 
         if (session) { 
+            if (!authenticators) {
+                throw new CrossauthError(ErrorCode.Configuration,
+                    "If using session management, must also supply authenticators");
+            }
             const sessionServer = new FastifySessionServer(this.app,
                 userStorage,
                 session.keyStorage,
-                session.authenticators,
+                authenticators,
                 { ...options, ...session.options });
             this.sessionServer = sessionServer; // for testing only
         }
@@ -235,6 +242,7 @@ export class FastifyServer {
                 this,
                 oAuthAuthServer.clientStorage,
                 oAuthAuthServer.keyStorage,
+                authenticators,
                 { ...extraOptions, ...options, ...oAuthAuthServer.options });
         }
 

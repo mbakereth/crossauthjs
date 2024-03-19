@@ -58,18 +58,23 @@ export async function getAuthServer({
         emptyScopeIsValid: emptyScopeIsValid,
         validFlows: "all",
         userStorage,
-        authenticators: {
-            "localpassword": authenticator,
-        },
         idTokenClaims,
     };
+    const authenticators = {
+        "localpassword": authenticator,
+    };
+
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {
         options.persistAccessToken = true;
     }
     if (rollingRefreshToken != undefined) options.rollingRefreshToken = rollingRefreshToken;
     const keyStorage = new InMemoryKeyStorage();
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, options);
+    const authServer = 
+        new OAuthAuthorizationServer(clientStorage,
+            keyStorage,
+            authenticators,
+            options);
     return {client, clientStorage, authServer, keyStorage, userStorage};
 }
 

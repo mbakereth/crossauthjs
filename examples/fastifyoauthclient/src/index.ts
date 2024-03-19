@@ -53,11 +53,12 @@ let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 const server = new FastifyServer(userStorage, {
+    authenticators: {
+        localpassword: lpAuthenticator,
+    },
     session: {
         keyStorage: keyStorage,
-        authenticators: {
-            localpassword: lpAuthenticator,
-        }},
+    },
     oAuthClient: {
         authServerBaseUri: process.env["AUTHORIZATION_SERVER"],
     }}, {

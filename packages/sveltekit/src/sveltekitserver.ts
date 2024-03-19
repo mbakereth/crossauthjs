@@ -1,5 +1,6 @@
 import { SvelteKitSessionServer, type SvelteKitSessionServerOptions } from './sveltekitsession';
 import { UserStorage, KeyStorage, Authenticator } from '@crossauth/backend';
+import { CrossauthError, ErrorCode } from '@crossauth/common';
 import type { Handle, RequestEvent, ResolveOptions, MaybePromise, } from '@sveltejs/kit';
 
 export interface SvelteKitServerOptions {
@@ -15,11 +16,12 @@ export class SvelteKitServer {
     hooks : (Handle);
     
     constructor(userStorage: UserStorage, {
+        authenticators,
         session
     } : {
+        authenticators?: {[key:string]: Authenticator}, 
         session? : {
             keyStorage: KeyStorage, 
-            authenticators: {[key:string]: Authenticator}, 
             options?: SvelteKitSessionServerOptions,
 }
     }, options : SvelteKitServerOptions = {}) {
@@ -28,7 +30,11 @@ export class SvelteKitServer {
 
         this.userStorage = userStorage;
         if (session) {
-            this.sessionServer = new SvelteKitSessionServer(userStorage, session.keyStorage, session.authenticators, {...session.options, ...options});
+            if (!authenticators) {
+                throw new CrossauthError(ErrorCode.Configuration,
+                    "I fusing session management, must supply authenticators")
+            }
+            this.sessionServer = new SvelteKitSessionServer(userStorage, session.keyStorage, authenticators, {...session.options, ...options});
         }
 
         this.hooks = async ({event, resolve}) => {

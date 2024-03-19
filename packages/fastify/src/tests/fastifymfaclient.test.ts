@@ -134,13 +134,14 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
         return "1";
     };
     return {server: new FastifyServer(userStorage, {
+        authenticators: {
+            localpassword: lpAuthenticator,
+            totp: totpAuth,
+            email: emailAuth,
+        },
         session: {
             keyStorage: keyStorage,
-            authenticators: {
-                localpassword: lpAuthenticator,
-                totp: totpAuth,
-                email: emailAuth,
-            }},
+        },
         oAuthClient: {
             authServerBaseUri: "http://server.com",
         }}, {

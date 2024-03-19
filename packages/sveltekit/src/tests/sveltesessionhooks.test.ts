@@ -11,11 +11,12 @@ function makeServer() {
     const authenticator = new LocalPasswordAuthenticator(userStorage);
 
     const server = new SvelteKitServer(userStorage, {
+        authenticators: {
+            password: authenticator
+        },
         session: {
             keyStorage: keyStorage,
-            authenticators: {
-                password: authenticator
-            }
+            
         }}, {secret: "ABCDEFG"});   
     const handle = server.hooks;
     const resolver = new MockResolver("Response");

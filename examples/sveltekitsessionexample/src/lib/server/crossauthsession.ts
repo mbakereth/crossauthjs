@@ -8,9 +8,9 @@ const userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFi
 const keyStorage = new PrismaKeyStorage({prismaClient : prisma});
 const passwordAuthenticator = new LocalPasswordAuthenticator(userStorage);
 export const crossauth = new SvelteKitServer(userStorage, {
+    authenticators: {
+        password: passwordAuthenticator
+    },
     session: {
         keyStorage: keyStorage,
-        authenticators: {
-            password: passwordAuthenticator
-        }
     }}, {});

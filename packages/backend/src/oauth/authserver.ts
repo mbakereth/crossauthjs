@@ -168,9 +168,6 @@ export interface OAuthAuthorizationServerOptions {
     /** Required if activating the password flow */
     userStorage? : UserStorage;
 
-    /** Required if activating the password flow */
-    authenticators? : {[key:string] : Authenticator};
-
     /** A JSON string of customs fields per scope to put in id token.
      * `{"scope": "all"}` or `{"scope": {"idtokenfield" : "userfield"}}`.
      * If `scope` is `all` then it applies to all scopes
@@ -226,13 +223,14 @@ export class OAuthAuthorizationServer {
 
     constructor(clientStorage: OAuthClientStorage,
         keyStorage: KeyStorage,
-        options: OAuthAuthorizationServerOptions) {
+        authenticators? : {[key:string] : Authenticator},
+        options: OAuthAuthorizationServerOptions = {}) {
         this.clientStorage = clientStorage;
         this.keyStorage = keyStorage;
         this.userStorage = options.userStorage;
         this.authStorage = options.authStorage;
-        if (options.authenticators) {
-            this.authenticators = options.authenticators;
+        if (authenticators) {
+            this.authenticators = authenticators;
         }
 
         setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);

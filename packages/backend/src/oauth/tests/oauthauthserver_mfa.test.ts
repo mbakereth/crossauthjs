@@ -101,17 +101,19 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlow', async () => {
 
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "totp": totpAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "totp": totpAuth,
-        },
     });
 
     const { totpSecret} = 
@@ -177,17 +179,19 @@ test('AuthorizationServer.Mfa.invalidMfa1', async () => {
 
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "totp": totpAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "totp": totpAuth,
-        },
     });
 
     const { totpSecret} = 
@@ -251,17 +255,19 @@ test('AuthorizationServer.Mfa.invalidMfa2', async () => {
 
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "totp": totpAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "totp": totpAuth,
-        },
     });
 
     await createTotpAccount("bob", "bobPass123", userStorage);
@@ -303,17 +309,19 @@ test('AuthorizationServer.Mfa.invalidMfa3', async () => {
 
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "totp": totpAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "totp": totpAuth,
-        },
     });
 
     await createTotpAccount("bob", "bobPass123", userStorage);
@@ -346,17 +354,19 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlow', async () => {
         emailTokenData = {otp, to}
         return "1";
     };
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "email": emailAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "email": emailAuth,
-        },
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
@@ -419,17 +429,19 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidMFAToken', async () => {
         emailTokenData = {otp, to}
         return "1";
     };
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "email": emailAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "email": emailAuth,
-        },
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
@@ -491,17 +503,18 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOTP', async () => {
         emailTokenData = {otp, to}
         return "1";
     };
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "email": emailAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "email": emailAuth,
-        },
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
@@ -563,17 +576,19 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOOBCode', async () => {
         emailTokenData = {otp, to}
         return "1";
     };
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "email": emailAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage,
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "email": emailAuth,
-        },
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
@@ -634,17 +649,19 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
 
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "totp": totpAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "totp": totpAuth,
-        },
     });
 
     const { totpSecret} = 
@@ -745,17 +762,19 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
         emailTokenData = {otp, to}
         return "1";
     };
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : lpAuthenticator,
+        "email": emailAuth,
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : lpAuthenticator,
-            "email": emailAuth,
-        },
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);

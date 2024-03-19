@@ -60,13 +60,14 @@ let emailAuthenticator = new EmailAuthenticator();
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyServer(userStorage, {
+    authenticators: {
+        localpassword: lpAuthenticator,
+        totp: totpAuthenticator,
+        email: emailAuthenticator,
+    },
     session: {
         keyStorage: keyStorage,
-        authenticators: {
-            localpassword: lpAuthenticator,
-            totp: totpAuthenticator,
-            email: emailAuthenticator,
-        }},
+    },
     oAuthAuthServer : {
         clientStorage : clientStorage,
         keyStorage: keyStorage,

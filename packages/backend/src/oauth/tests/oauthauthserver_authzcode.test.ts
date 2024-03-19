@@ -16,17 +16,20 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage, 
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
+
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
@@ -52,7 +55,12 @@ test('AuthorizationServer.AuthzCodeFlow.scopePersistence', async () => {
     const authStorage = new InMemoryOAuthAuthorizationStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const authenticators =  {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
@@ -60,9 +68,6 @@ test('AuthorizationServer.AuthzCodeFlow.scopePersistence', async () => {
         validScopes: "read, write",
         authStorage : authStorage,
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -92,7 +97,12 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeDisallowed', async () => {
     const authStorage = new InMemoryOAuthAuthorizationStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
@@ -101,9 +111,6 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeDisallowed', async () => {
         emptyScopeIsValid: false,
         authStorage : authStorage,
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {error, error_description} 
@@ -126,7 +133,12 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeAllowed', async () => {
     const authStorage = new InMemoryOAuthAuthorizationStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
@@ -135,9 +147,6 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeAllowed', async () => {
         authStorage : authStorage,
         emptyScopeIsValid: true,
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
    });
     const inputState = "ABCXYZ";
     const {error, error_description} 
@@ -161,16 +170,18 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -197,16 +208,18 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyPr
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKey : publicKey,
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -233,16 +246,18 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKeyFi
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtSecretKeyFile : "keys/secretkey.txt",
         jwtAlgorithm: "HS256",
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -269,15 +284,17 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKey',
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators, {
         jwtSecretKey : secretKey,
         jwtAlgorithm: "HS256",
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
@@ -302,16 +319,18 @@ test('AuthorizationServer.AuthzCodeFlow.invalidScope', async () => {
     const {clientStorage, client} = await createClient();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        new InMemoryKeyStorage(), 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {error} 
@@ -329,16 +348,18 @@ test('AuthorizationServer.AuthzCodeFlow.invalidRedirectUri', async () => {
     const {clientStorage, client} = await createClient();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        new InMemoryKeyStorage(), 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {error} 
@@ -363,23 +384,28 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKeyInConstructor', async () => {
         validScopes: "read, write",
 
     } 
-    await expect(async () => {new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), options)}).rejects.toThrowError();
+    await expect(async () => {new OAuthAuthorizationServer(clientStorage,
+        new InMemoryKeyStorage(), 
+        undefined, 
+        options)}).rejects.toThrowError();
 });
 
 test('AuthorizationServer.AuthzCodeFlow.invalidResponseType', async () => {
     const {clientStorage, client} = await createClient();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        new InMemoryKeyStorage(), 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {error} 
@@ -398,16 +424,18 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
     const {clientStorage, client} = await createClient();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, new InMemoryKeyStorage(), {
+    const authenticators = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        new InMemoryKeyStorage(), 
+        authenticators, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key-wrong.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const inputState = "ABCXYZ";
     const {code, state, error} 

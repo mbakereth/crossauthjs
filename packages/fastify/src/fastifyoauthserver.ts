@@ -9,6 +9,7 @@ import {
     OAuthAuthorizationServer,
     setParameter,
     ParamType,
+    Authenticator,
     Hasher } from '@crossauth/backend';
 import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
 import {
@@ -103,7 +104,8 @@ export class FastifyAuthorizationServer {
         fastifyServer : FastifyServer,
         clientStorage : OAuthClientStorage, 
         keyStorage : KeyStorage,
-        options : FastifyAuthorizationServerOptions) {
+        authenticators? : {[key:string]: Authenticator},
+        options : FastifyAuthorizationServerOptions = {}) {
 
         this.app = app;
         this.fastifyServer = fastifyServer;
@@ -112,6 +114,7 @@ export class FastifyAuthorizationServer {
         this.authServer =
             new OAuthAuthorizationServer(this.clientStorage,
                 keyStorage,
+                authenticators,
                 options);
 
         setParameter("prefix", ParamType.String, this, options, "PREFIX");

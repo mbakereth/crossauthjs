@@ -53,6 +53,11 @@ export async function getAuthServer({
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
     const emailAuth = new EmailAuthenticator();
+    const authenticators = {
+        "localpassword": lpAuthenticator,
+        totp: totpAuth,
+        email: emailAuth,
+    };
     let options : OAuthAuthorizationServerOptions = {
         jwtKeyType: "RS256",
         jwtPrivateKey : privateKey,
@@ -63,11 +68,6 @@ export async function getAuthServer({
         emptyScopeIsValid: emptyScopeIsValid,
         validFlows: "all",
         userStorage,
-        authenticators : {
-            "localpassword": lpAuthenticator,
-            totp: totpAuth,
-            email: emailAuth,
-        },
     };
     if (aud) options.resourceServers = aud;
     if (persistAccessToken) {
@@ -75,7 +75,10 @@ export async function getAuthServer({
     }
     if (rollingRefreshToken != undefined) options.rollingRefreshToken = rollingRefreshToken;
     const keyStorage = new InMemoryKeyStorage();
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, options);
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators,
+        options);
     return {client, clientStorage, authServer, keyStorage, userStorage, emailAuth};
 }
 

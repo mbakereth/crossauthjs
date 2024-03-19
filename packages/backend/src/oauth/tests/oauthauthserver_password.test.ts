@@ -12,16 +12,18 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
     const userStorage = await getTestUserStorage();
 
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "localpassword" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "localpassword" : authenticator
-        },
     });
     const {access_token, error}
         = await authServer.tokenEndpoint({
@@ -41,16 +43,18 @@ test('AuthorizationServer.passwordFlow.incorrectPassword', async () => {
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = await getTestUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
-    const authServer = new OAuthAuthorizationServer(clientStorage, keyStorage, {
+    const auth = {
+        "password" : authenticator
+    };
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        auth, {
         jwtKeyType: "RS256",
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
         validScopes: "read, write",
         userStorage: userStorage,
-        authenticators: {
-            "password" : authenticator
-        },
     });
     const {access_token, error}
         = await authServer.tokenEndpoint({
