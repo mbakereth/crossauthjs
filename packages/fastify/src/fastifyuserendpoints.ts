@@ -121,6 +121,7 @@ export class FastifyUserEndpoints {
                     const data = await this.sessionServer.getSessionData(request, "factor2change")
                     if (!data?.username) {
                         if (!this.sessionServer.isSessionUser(request)) {
+                            // as we create session data, user has to be logged in with cookies
                             return FastifyServer.sendPageError(reply,
                         401,
                         this.sessionServer.errorPage);
@@ -344,7 +345,7 @@ export class FastifyUserEndpoints {
                     ip: request.ip,
                     user: request.user?.username
                 }));
-            if (!this.sessionServer.isSessionUser(request)) return this.sessionServer.sendJsonError(reply, 401);
+            if (!this.sessionServer.canEditUser(request)) return this.sessionServer.sendJsonError(reply, 401);
             try {
                 return await this.changePassword(request, reply, 
                 (reply, _user) => {return reply.header(...JSONHDR).send({
@@ -912,7 +913,7 @@ export class FastifyUserEndpoints {
         // or else if login has been initiated but a password change is
         // required
         let user : User
-        if (!this.sessionServer.canEditUser(request) || !request.user) {
+        if (!this.sessionServer.isSessionUser(request) || !request.user) {
             // user is not logged on - check if there is an anonymous 
             // session with passwordchange set (meaning the user state
             // was set to changepasswordneeded when logging on)
@@ -927,6 +928,8 @@ export class FastifyUserEndpoints {
             } else {
                 throw new CrossauthError(ErrorCode.Unauthorized);
             }
+        } else if (!this.sessionServer.canEditUser(request)) {
+            throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         } else {
             user = request.user;
         }
@@ -936,7 +939,7 @@ export class FastifyUserEndpoints {
 
         // validate the CSRF token
         //await this.validateCsrfToken(request);
-        if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
+        if (!request.csrfToken) {
             throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
@@ -994,17 +997,20 @@ export class FastifyUserEndpoints {
                     });
                 user = resp.user;
                 required = true;
+                if (!request.csrfToken) {
+                    throw new CrossauthError(ErrorCode.InvalidCsrf);
+                }
             } else {
                 throw new CrossauthError(ErrorCode.Unauthorized);
             }
         } else if (!this.sessionServer.canEditUser(request)) {
             throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         } else {
+            //this.validateCsrfToken(request)
+            if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+            }
             user = request.user;
-        }
-        //this.validateCsrfToken(request)
-        if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
-            throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
         // get the authenticator for factor1 (passwords on factor2 are not supported)
@@ -1138,9 +1144,9 @@ export class FastifyUserEndpoints {
                  "password reset not enabled");
         }
 
-        // validate the CSRDF token
+        // validate the CSRF token
         //await this.validateCsrfToken(request);
-        if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
+        if (!request.csrfToken) { // always require CSRF - user not logged in for this endpoint
             throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
@@ -1175,7 +1181,7 @@ export class FastifyUserEndpoints {
 
         // check the CSRF token is valid
         //await this.validateCsrfToken(request);
-        if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
+        if (!request.csrfToken) { // user is not logged on so always require token
             throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
