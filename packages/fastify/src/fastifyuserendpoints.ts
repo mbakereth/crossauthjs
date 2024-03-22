@@ -907,11 +907,12 @@ export class FastifyUserEndpoints {
             throw new CrossauthError(ErrorCode.Unauthorized);
         }*/
 
-        // can only call this if logged in and CSRF token is valid,
+        // can only call this if logged in, is allowed to edit his or per profile,
+        // and CSRF token is valid,
         // or else if login has been initiated but a password change is
         // required
         let user : User
-        if (!this.sessionServer.isSessionUser(request) || !request.user) {
+        if (!this.sessionServer.canEditUser(request) || !request.user) {
             // user is not logged on - check if there is an anonymous 
             // session with passwordchange set (meaning the user state
             // was set to changepasswordneeded when logging on)
@@ -996,6 +997,8 @@ export class FastifyUserEndpoints {
             } else {
                 throw new CrossauthError(ErrorCode.Unauthorized);
             }
+        } else if (!this.sessionServer.canEditUser(request)) {
+            throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         } else {
             user = request.user;
         }
