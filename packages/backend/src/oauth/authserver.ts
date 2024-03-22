@@ -832,7 +832,7 @@ export class OAuthAuthorizationServer {
                     !this.allowedFactor2.includes(user.factor2?user.factor2:"none"))) {
                         return {
                             error: "access_denied",
-                            error_description: "2FA needs to be reconfigured"
+                            error_description: "2FA method not allowed or needs to be reconfigured"
                         }
                     } else {
                         return await this.createMfaRequest(user);

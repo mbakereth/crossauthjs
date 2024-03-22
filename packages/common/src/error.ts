@@ -52,6 +52,9 @@ export enum ErrorCode {
     /** Thrown for the OAuth insufficient_scope error  */
     InsufficientScope,
 
+    /** Returned if user is valid but doesn't have permission to access resource */
+    InsufficientPriviledges,
+
     /** Returned with an HTTP 403 response */
     Forbidden,
 
@@ -226,6 +229,12 @@ export class CrossauthError extends Error {
             _message = "Hash is not in a valid format";
         } else if (code == ErrorCode.InvalidKey) {
             _message = "Key is invalid";
+            _httpStatus = 401;
+        } else if (code == ErrorCode.Forbidden) {
+            _message = "You do not have permission to access this resource";
+            _httpStatus = 402;
+        } else if (code == ErrorCode.InsufficientPriviledges) {
+            _message = "You do not have the right privileges to access this resource";
             _httpStatus = 401;
         } else if (code == ErrorCode.InvalidCsrf) {
             _message = "CSRF token is invalid";

@@ -69,11 +69,22 @@ app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
 }
 );
 
-// create a sample login-protected page
+// create a login-protected page for user to edit account
 app.get('/protected', async (request : FastifyRequest, reply : FastifyReply) =>  {
     if (!request.user) return reply.redirect(302, "/login?next=/protected");
     return reply.view('protected.njk', {user: request.user});
 }
 );
+
+// create an admin entry page
+app.get('/admin', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    return reply.redirect(302, "/admin/");
+});
+
+app.get('/admin/', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    if (!request.user) return reply.redirect(302, "/login?next=/protected");
+    if (!request.user.admin) return reply.status(401).send(new Error('Access denied'));
+    return reply.view('admin/index.njk', {user: request.user});
+});
 
 server.start(port);

@@ -15,7 +15,11 @@
             <p><a href="signup">Sign up</a></p>
         {% endif %}
 
-        <p><a href="protected">Protected page</a></p>
+        <p><a href="protected">User page</a></p>
+
+    {% if user.admin %}
+        <p><a href="/admin/">Admin page</a></p>
+    {% endif %}
 
     </body>
 </html>

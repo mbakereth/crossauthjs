@@ -24,11 +24,20 @@ async function main() {
       username: "alice", 
       state: "active",
       factor1: "localpassword",
+      factor2: "email",
       email: "alice@alice.com",
   }, {
       password: await authenticator.createPasswordHash("alicePass123"), 
   });
-  console.log({ user1, user2 })
+  const admin = await userStorage.createUser({
+    username: "admin", 
+    state: "active",
+    factor1: "localpassword",
+    email: "admin@admin.com",
+}, {
+    password: await authenticator.createPasswordHash("adminPass123"), 
+});
+console.log({ user1, user2, admin })
 }
 main()
   .then(async () => {

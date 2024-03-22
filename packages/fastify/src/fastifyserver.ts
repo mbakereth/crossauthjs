@@ -144,7 +144,7 @@ export class FastifyServer {
     readonly oAuthAuthServer? : FastifyAuthorizationServer;
     readonly oAuthClient? : FastifyOAuthClient;
     readonly oAuthResServer? : FastifyOAuthResourceServer;
-    private isAdminFn: (user : User) => boolean = defaultIsAdminFn;
+    private static isAdminFn: (user : User) => boolean = defaultIsAdminFn;
 
     /**
      * Integrates fastify session, API key and OAuth servers
@@ -178,7 +178,7 @@ export class FastifyServer {
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
 
-        if (options.isAdminFn) this.isAdminFn = options.isAdminFn;
+        if (options.isAdminFn) FastifyServer.isAdminFn = options.isAdminFn;
 
         if (options.app) {
             this.app = options.app;
@@ -441,7 +441,7 @@ export class FastifyServer {
         return await this.sessionServer.createAnonymousSession(request, reply, data);
     }
 
-    isAdmin(user : User) { return this.isAdminFn(user); }
+    static isAdmin(user : User) { return FastifyServer.isAdminFn(user); }
 
     /**
      * Starts the Fastify app on the given port.  

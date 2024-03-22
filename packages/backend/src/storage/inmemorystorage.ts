@@ -47,8 +47,15 @@ export class InMemoryUserStorage extends UserStorage {
         : Promise<User> {
 
             user.usernameNormalized = UserStorage.normalize(user.username);
+            if (user.usernameNormalized in this.usersByUsername) {
+                throw new CrossauthError(ErrorCode.UserExists);
+            }
             if ("email" in user && user.email) {
                 user.emailNormalized = UserStorage.normalize(user.email);
+                if (user.emailNormalized in this.getUserByEmail) {
+                    throw new CrossauthError(ErrorCode.UserExists);
+                }
+    
             }
 
             const userToStore = {id: user.username, ...user}

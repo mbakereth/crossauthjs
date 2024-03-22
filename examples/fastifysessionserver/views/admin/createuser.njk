@@ -1,0 +1,62 @@
+<html>
+    <head>
+        <title>Create an account</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+    </head>
+    <body>
+        <h1>Create An Account</h1>
+        {% if message %}
+            <p class="success">{{ message }}</p>
+        {% else %}
+            {% if errorMessage %}
+                <p class="error">
+                {% if errorCodeName == "PasswordFormat" %}
+                    Password must be at leat 8 characters, contain at least one lowercase letter, one
+                    uppercase letter and one digit.
+                {% elif errorCodeName == "PasswordMatch" %}
+                    Passwords do not match
+                {% elif errorCodeName == "UserExists" %}
+                    Username or email already exists
+                {% else %}
+                    {{ errorMessage }}
+                {% endif %}
+                </p>
+            {% endif %}
+            <form method="POST" action="createuser">
+                <input type="hidden" name="next" value="{{ next }}"/>
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                <p>
+                    <label for="username">Username</label><br>
+                    <input type="text" name="username" size="20" value="{{ username }}" />
+                </p>
+                <p>
+                    <label for="password">Password</label><br>
+                    <input type="password" name="password" size="20" />
+                </p>
+                <p>
+                    <label for="repeat_password">Repeat Password</label><br>
+                    <input type="password" name="repeat_password" size="20" />
+                </p>
+                <p>
+                    <label for="user_email">Email</label><br>
+                    <input type="email" name="user_email" size="20" value="{{ user_email }}"/>
+                </p>
+                <p>
+                    <label for="state">Status</label><br>
+                    <input type="radio" id="state_active", name="state" value="active" checked> <label for="state_active">Active</label>
+                    <input type="radio" id="state_factor2ResetNeeded", name="state" value="factor2ResetNeeded"> <label for="state_factor2ResetNeeded">Factor 2 Reset Needed</label>
+                    <input type="radio" id="state_inactive", name="state" value="inactive"> <label for="state_state_inactive">Inactive</label>
+                </p>
+                {% if allowedFactor2|length > 1 %}
+                <p>
+                    <label for="factor2">Two Factor Authentication</label><br>
+                    {% for item in allowedFactor2 %}
+                            <input type="radio" id="factor2_{{item.name}}", name="factor2" value="{{ item.name }}" {% if (item.name == factor2 or (factor2|length == 0 and loop.first)) %}checked{% endif %}> <label for="factor2_{{item.name}}">{{ item.friendlyName }}</label>
+                    {% endfor %}
+                </p>
+                {% endif %}
+                <p><button type="submit">Sign Up</button></p>
+            </form>
+        {% endif %}
+    </body>
+</html>

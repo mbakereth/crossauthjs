@@ -20,6 +20,7 @@ model User {
     factor1             String      @default("localpassword")
     factor2             String      @default("")
     state               String      @default("active")
+    admin               Boolean     @default(false)
 
     session             Key[]
     apiKey              ApiKey[]

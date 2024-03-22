@@ -411,10 +411,12 @@ export class SessionManager {
      * @param extraFields and extra fields to add to the user table entry
      * @returns the userId
      */
-    async createUser(user : UserInputFields, params: AuthenticationParameters, repeatParams?: AuthenticationParameters)
+    async createUser(user : UserInputFields, params: AuthenticationParameters, repeatParams?: AuthenticationParameters, skipEmailVerification : boolean = false)
         : Promise<User> {
         if (!(this.authenticators[user.factor1])) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
-        const skipEmailVerification = this.authenticators[user.factor1].skipEmailVerificationOnSignup() == true;
+        if (this.authenticators[user.factor1].skipEmailVerificationOnSignup() == true) {
+            skipEmailVerification = true;
+        }
         let secrets = await this.authenticators[user.factor1].createPersistentSecrets(user.username, params, repeatParams);
         const newUser = await this.userStorage.createUser(user, secrets);
         if (!skipEmailVerification && this.enableEmailVerification && this.tokenEmailer) {
