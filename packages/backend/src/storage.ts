@@ -107,6 +107,8 @@ export abstract class UserStorage {
      */
     abstract deleteUserByUsername(username : string) : Promise<void>;
 
+    abstract getUsers(skip? : number, take? : number) : Promise<User[]>;
+
     /**
      * Usernames and emails are stored in lowercase, normalized format.  This function returns that normalization
      * @param str the string to normalize

@@ -10,19 +10,47 @@ import {
 } from '@crossauth/common';
 import type { User } from '@crossauth/common';
 import { FastifyServer } from './fastifyserver';
-import { FastifySessionServer,
-    type FastifySessionServerOptions,
-    type CsrfBodyType,
-    type LoginQueryType,
-    type SignupBodyType,
-    type AuthenticatorDetails } from './fastifysession';
-import {
+import { FastifySessionServer } from './fastifysession';
+import type { FastifySessionServerOptions,
+    CsrfBodyType,
+    LoginQueryType,
+    SignupBodyType,
+    AuthenticatorDetails } from './fastifysession';
+    import {
     setParameter,
     ParamType,
-    Hasher } from '@crossauth/backend';
+    UserStorage } from '@crossauth/backend';
 import type {
     AuthenticationParameters } from '@crossauth/backend';
-import { STATUS_CODES } from 'http';
+
+async function defaultUserSearchFn(searchTerm: string,
+    userStorage: UserStorage) : Promise<User[]> {
+        let users : User[] = [];
+    try {
+        const {user} = 
+            await userStorage.getUserByUsername(searchTerm);
+            users.push(user);
+    } catch (e1) {
+        const ce1 = CrossauthError.asCrossauthError(e1);
+        if (ce1.code != ErrorCode.UserNotExist) {
+            CrossauthLogger.logger.debug(j({err: ce1}));
+            throw ce1;
+        }
+        try {
+            const {user} = 
+                await userStorage.getUserByEmail(searchTerm);
+                users.push(user);
+        } catch (e2) {
+            const ce2 = CrossauthError.asCrossauthError(e2);
+            if (ce2.code != ErrorCode.UserNotExist) {
+                CrossauthLogger.logger.debug(j({err: ce2}));
+                throw ce1;
+            }
+        }
+    }
+    return users;
+
+}
 
 /////////////////////////////////////////////////////////////////////
 // Fastify data types
@@ -30,6 +58,30 @@ import { STATUS_CODES } from 'http';
 interface CreateUserBodyType extends SignupBodyType {
 }
 
+interface SelectUserQueryType {
+    next? : string,
+    search? : string,
+    skip? : number,
+    take? : number,
+    haveNext? : boolean,
+    havePrevious? : boolean,
+}
+
+interface UserParamType {
+    id : string|number,
+}
+
+interface EditBodyType extends CsrfBodyType {
+    errorMessage?: string,
+    errorMessages?: string[], 
+    errorCode?: number, 
+    errorCodeName?: string, 
+}
+
+interface UpdateUserBodyType extends EditBodyType {
+    username : string,
+    [key:string] : any,
+}
 const JSONHDR : [string,string] = 
     ['Content-Type', 'application/json; charset=utf-8'];
 
@@ -39,20 +91,30 @@ const JSONHDR : [string,string] =
 export class FastifyAdminEndpoints {
     private sessionServer : FastifySessionServer;
     private adminPrefix = "/admin/";
+    private userSearchFn : 
+        (searchTerm : string, userStorage : UserStorage) => Promise<User[]> =
+        defaultUserSearchFn;
 
     // pages
-    private createUserPage = "admin/createuser.njk";
+    private adminCreateUserPage = "admin/createuser.njk";
+    private adminSelectUserPage = "admin/selectuser.njk";
+    private adminUpdateUserPage = "admin/updateuser.njk";
 
     constructor(sessionServer : FastifySessionServer,
         options: FastifySessionServerOptions = {}) {
 
         this.sessionServer = sessionServer;
         setParameter("adminPrefix", ParamType.String, this, options, "ADMIN_PREFIX");
-        setParameter("createUserPage", ParamType.Boolean, this, options, "ADMIN_CREATE_USER_PAGE");
+        setParameter("adminCreateUserPage", ParamType.Boolean, this, options, "ADMIN_CREATE_USER_PAGE");
+        setParameter("adminSelectUserPage", ParamType.Boolean, this, options, "ADMIN_SELECT_USER_PAGE");
+        setParameter("adminUpdateUserPage", ParamType.Boolean, this, options, "ADMIN_UPDATE_USER_PAGE");
         if (!this.adminPrefix.endsWith("/")) this.adminPrefix += "/";
         if (!this.adminPrefix.startsWith("/")) "/" + this.adminPrefix;
 
     }
+
+    ///////////////////////////////////////////////////////////////////
+    // Endpoints
 
     addCreateUserEndpoints() {
         this.sessionServer.app.get(this.adminPrefix+'createuser', 
@@ -80,7 +142,7 @@ export class FastifyAdminEndpoints {
             if (request.query.next) {
                 data["next"] = request.query.next;
             }
-            return reply.view(this.createUserPage, data);
+            return reply.view(this.adminCreateUserPage, data);
         });
 
         this.sessionServer.app.post(this.adminPrefix+'createuser', 
@@ -114,27 +176,22 @@ export class FastifyAdminEndpoints {
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
-                    let extraFields : {[key:string] : string|number|boolean|Date|undefined} = {};
-                    for (let field in request.body) {
-                        if (field.startsWith("user_")) extraFields[field] = request.body[field];
-                    }
                     const ce = CrossauthError.asCrossauthError(e);
                     const statusCode = 
                         ce.httpStatus >= 400 && ce.httpStatus <= 499 ? 
                             ce.httpStatus : 200;
-                    return reply.status(statusCode).view(this.createUserPage, {
+                    return reply.status(statusCode).view(this.adminCreateUserPage, {
                         errorMessage: error.message,
                         errorMessages: error.messages, 
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         next: next, 
                         persist: request.body.persist,
-                        username: request.body.username,
                         csrfToken: request.csrfToken,
                         factor2: request.body.factor2,
                         allowedFactor2: this.sessionServer.allowedFactor2Details(),
                         urlprefix: this.adminPrefix, 
-                        ...extraFields,
+                        ...request.body,
                         });
                     
                 });
@@ -182,6 +239,212 @@ export class FastifyAdminEndpoints {
             }
         });
     }
+
+    addSelectUserEndpoints() {
+        this.sessionServer.app.get(this.adminPrefix+'selectuser', 
+            async (request: FastifyRequest<{ Querystring: SelectUserQueryType }>,
+                reply: FastifyReply)  => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'GET',
+                    url: this.adminPrefix + 'selectuser',
+                    ip: request.ip
+                }));
+                if (!request?.user || !FastifyServer.isAdmin(request.user)) {
+                    return this.accessDeniedPage(request, reply);                    
+                }
+                try {
+                    let users : User[] = [];
+                    let skip = Number(request.query.skip);
+                    let take = Number(request.query.take);
+                    if (!skip) skip = 0;
+                    if (!take) take = 10;
+                    if (request.query.search) {
+                        users = await this.userSearchFn(request.query.search, 
+                            this.sessionServer.userStorage)
+                    } else {
+                        users = 
+                            await this.sessionServer.userStorage.getUsers(skip, 
+                                take);
+                    }
+                    let data: {
+                        urlprefix: string,
+                        next?: any,
+                        skip: number,
+                        take: number,
+                        users: User[],
+                        haveNext : boolean,
+                        havePrevious : boolean,
+                    } = {
+                        urlprefix: this.adminPrefix,
+                        skip: skip,
+                        take: take,
+                        users: users,
+                        havePrevious: skip > 0,
+                        haveNext : take != undefined && users.length == take,
+                    };
+                if (request.query.next) {
+                    data["next"] = request.query.next;
+                }
+                return reply.view(this.adminSelectUserPage, data);
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.error(j({err: e}));
+                return FastifyServer.sendPageError(reply,
+                    ce.httpStatus,
+                    this.sessionServer.errorPage,
+                    ce.message, ce);
+
+            }
+        });
+    };
+
+    addUpdateUserEndpoints() {
+        this.sessionServer.app.get(this.adminPrefix+'updateuser/:id', 
+            async (request: FastifyRequest<{ Params: UserParamType }>,
+                reply: FastifyReply)  => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'GET',
+                    url: this.adminPrefix + 'updateuser',
+                    ip: request.ip
+                }));
+                if (!request?.user || !FastifyServer.isAdmin(request.user)) {
+                    return this.accessDeniedPage(request, reply);                    
+                }
+                try {
+                    const {user} = 
+                        await this.sessionServer.userStorage.getUserById(request.params.id)
+                    let data: {
+                        urlprefix: string,
+                        csrfToken?: string,
+                        user : User,
+                    } = {
+                        urlprefix: this.adminPrefix,
+                        csrfToken: request.csrfToken,
+                        user: user,
+                    };
+                return reply.view(this.adminUpdateUserPage, data);
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.error(j({err: e}));
+                return FastifyServer.sendPageError(reply,
+                    ce.httpStatus,
+                    this.sessionServer.errorPage,
+                    ce.message, ce);
+
+            }
+        });
+
+        this.sessionServer.app.post(this.adminPrefix+'updateuser/:id', 
+            async (request: FastifyRequest<{Params: UserParamType, Body: UpdateUserBodyType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'POST',
+                    url: this.adminPrefix + 'updateuser',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+                if (!this.sessionServer.canEditUser(request)) return FastifyServer.sendPageError(reply,
+                    401,
+                    this.sessionServer.errorPage);
+            let user : User|undefined;
+            try {
+                const {user: user1} = await 
+                    this.sessionServer.userStorage.getUserById(request.params.id);
+                user = user1;
+                return await this.updateUser(user, request, reply, 
+                (reply, _user, emailVerificationRequired) => {
+                    const message = emailVerificationRequired 
+                        ? "Please click on the link in your email to verify your email address."
+                        : "User's details have been updated";
+                    return reply.view(this.adminUpdateUserPage, {
+                        csrfToken: request.csrfToken,
+                        message: message,
+                        urlprefix: this.adminPrefix, 
+                        allowedFactor2: this.sessionServer.allowedFactor2Details(),
+                    });
+                });
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.error(j({msg: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
+                CrossauthLogger.logger.debug(j({err: e}));
+                return this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                    if (!user) {
+                        return FastifyServer.sendPageError(reply,
+                            ce.httpStatus,
+                            this.sessionServer.errorPage,
+                            ce.message, ce);
+        
+                    }
+                    return reply.view(this.adminUpdateUserPage, {
+                        user: user,
+                        errorMessage: error.message,
+                        errorMessages: error.messages, 
+                        errorCode: error.code, 
+                        errorCodeName: ErrorCode[error.code], 
+                        csrfToken: request.csrfToken,
+                        urlprefix: this.adminPrefix, 
+                        allowedFactor2: this.sessionServer.allowedFactor2Details(),
+                        ...request.body,
+                    });
+                });
+            }
+        });
+    };
+
+    addApiUpdateUserEndpoints() {
+        this.sessionServer.app.post(this.adminPrefix+'api/updateuser/:id', 
+            async (request: FastifyRequest<{Params: UserParamType, Body: UpdateUserBodyType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "API visit",
+                    method: 'POST',
+                    url: this.adminPrefix + 'api/updateuser',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+            if (!this.sessionServer.canEditUser(request)) {
+                return this.sessionServer.sendJsonError(reply, 401);
+            }
+            let user : User|undefined;
+            try {
+                const {user: user1} = await 
+                    this.sessionServer.userStorage.getUserById(request.params.id);
+                user = user1;
+                return await this.updateUser(user, request, reply, 
+                (reply, _user, emailVerificationRequired) => 
+                    {return reply.header(...JSONHDR).send({
+                    ok: true,
+                    emailVerificationRequired: emailVerificationRequired,
+                })});
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e); 
+                CrossauthLogger.logger.error(j({
+                    msg: "Update user failure",
+                    user: request.user?.username,
+                    errorCodeName: ce.codeName,
+                    errorCode: ce.code
+                }));
+                CrossauthLogger.logger.debug(j({err: e}));
+                return this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                    reply.status(this.sessionServer.errorStatus(e)).header(...JSONHDR)
+                        .send({
+                            ok: false,
+                            errorMessage: error.message,
+                            errorMessages: error.messages,
+                            errorCode: error.code,
+                            errorCodeName: ErrorCode[error.code]
+                    });                    
+                }, true);
+            }
+        });
+    }
+
+
+    ///////////////////////////////////////////////////////////
+    // Internal functions
 
     private async createUser(request : FastifyRequest<{ Body: CreateUserBodyType }>, 
         reply : FastifyReply, 
@@ -265,4 +528,37 @@ export class FastifyAdminEndpoints {
 
     } 
 
+    private async updateUser(user : User, request : FastifyRequest<{ Body: UpdateUserBodyType }>, 
+        reply : FastifyReply, 
+        successFn : (res : FastifyReply, user : User, emailVerificationRequired : boolean)
+        => void) {
+
+        // can only call this if logged in and CSRF token is valid
+        if (!this.sessionServer.canEditUser(request) || !request.user) {
+            throw new CrossauthError(ErrorCode.Unauthorized);
+        }
+        //await this.validateCsrfToken(request);
+        if (this.sessionServer.isSessionUser(request) && !request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
+
+        user = this.sessionServer.updateUserFn(user,
+            request,
+            this.sessionServer.userStorage.userEditableFields);
+        if (user.factor2 && user.factor2 != "none") {
+            user.state = UserState.factor2ResetNeeded;
+            CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.factor2ResetNeeded}`, 
+            username: user.username}));
+        } 
+    
+        // validate the new user using the implementor-provided function
+        let errors = this.sessionServer.validateUserFn(user);
+        if (errors.length > 0) {
+            throw new CrossauthError(ErrorCode.FormEntry, errors);
+        }
+
+        // update the user
+        let emailVerificationNeeded = 
+            await this.sessionServer.sessionManager.updateUser(request.user, user);
+
+        return successFn(reply, request.user, emailVerificationNeeded);
+    }
 }

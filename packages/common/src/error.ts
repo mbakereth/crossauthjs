@@ -167,7 +167,7 @@ export class CrossauthError extends Error {
         let _message : string;
         let _httpStatus = 500;
         if (code == ErrorCode.UserNotExist) {
-            _message = "Username does not exist";
+            _message = "User does not exist";
             _httpStatus = 401;
         } else if (code == ErrorCode.PasswordInvalid) {
             _message = "Password doesn't match"

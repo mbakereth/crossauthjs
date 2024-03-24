@@ -152,3 +152,26 @@ test('FastifyServer.adminapi.adminPermissions', async () => {
     expect(body.ok).toBe(false);
 });
 
+test('FastifyServer.adminapi.updateUser', async () => {
+
+    const {server, userStorage} = await makeAppWithOptions();
+    const {csrfCookie, csrfToken, sessionCookie} = await login(server);
+
+    let res;
+    let body;
+
+    const {user} = await userStorage.getUserByUsername("bob");
+    res = await server.app.inject({
+        method: "POST",
+        url: "/admin/api/updateuser/"+user.id,
+        cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie },
+        payload: {
+            user_email: "bob1@bob.com",
+            csrfToken: csrfToken 
+        }
+    });
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    const {user: editedUser} = await userStorage.getUserByUsername("bob");
+    expect(editedUser.email).toBe("bob1@bob.com");
+});

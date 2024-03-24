@@ -1,0 +1,52 @@
+<html>
+    <head>
+        <title>Update User</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+    </head>
+    <body>
+        <h1>Update User</h1>
+        {% if message %}
+            <p class="success">{{ message }}</p>
+            <p><a href="/admin/updateuser/{{ user.id }}">Back</a></p>
+        {% else %}
+            {% if errorMessage %}
+                <p class="error">
+                    {{ errorMessage }}
+                </p>
+            {% endif %}
+            <form method="POST">
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                <table>
+                    <tr>
+                        <td><label>User ID</label></td>
+                        <td>{{ user.id }}</td>
+                    </tr>
+                    <tr>
+                        <td><label for="username">Username</label></td>
+                        <td><input type="text" name="username" value="{{ username or user.username }}"></td>
+                    </tr>
+                    <tr>
+                        <td>Password</td>
+                        <td>************ &nbsp;<a href="changepassword">Change...</a></td>
+                    </tr>
+                    <tr>
+                        <td><label for="user_email">Email</label></td>
+                        <td><input type="email" name="user_email" value="{{ user_email or user.email }}"></td>
+                    </tr>
+                    {% if allowedFactor2 and allowedFactor2|length > 0 %}
+                        <tr>
+                            <td>Two-factor authentication</td>
+                            <td>
+                                {{ user.factor2 or "none" }}
+                                &nbsp;<a href="changefactor2?next=updateuser">Change...</a>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </table>
+                <button type="submit">Update</button>
+            </form>
+        {% endif %}
+
+        <p><a href="/admin/">Admin Home</a></p>
+    </body>
+</html>

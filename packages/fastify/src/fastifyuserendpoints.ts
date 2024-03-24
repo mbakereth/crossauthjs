@@ -21,6 +21,11 @@ import type {
     
 /////////////////////////////////////////////////////////////////////
 // Fastify data types
+
+export interface UpdateUserBodyType extends CsrfBodyType {
+    [key: string] : string|undefined,
+}
+
 interface ChangeFactor2QueryType {
     next? : string,
     required? : boolean,
@@ -100,6 +105,134 @@ export class FastifyUserEndpoints {
 
     //////////////////////////////////////////////////////////////////
     // Endpoints
+
+    addUpdateUserEndpoints(prefix : string, updateUserPage : string) {
+        this.sessionServer.app.get(prefix+'updateuser', 
+            async (request: FastifyRequest,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'GET',
+                    url: prefix + 'updateuser',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+            if (!request.user || !this.sessionServer.canEditUser(request)) {
+                return FastifyServer.sendPageError(reply,
+                    401,
+                    this.sessionServer.errorPage);
+            }
+            if (updateUserPage)  { // if is redundant but VC Code complains without it
+                let data : {urlprefix: string, csrfToken: string|undefined, user: User, allowedFactor2: {[key:string]: any}} = {
+                    urlprefix: prefix, 
+                    csrfToken: request.csrfToken, 
+                    user: request.user,
+                    allowedFactor2: this.sessionServer.allowedFactor2Details(),
+                };
+                return reply.view(updateUserPage, data);
+            }
+        });
+
+        this.sessionServer.app.post(prefix+'updateuser', 
+            async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'POST',
+                    url: prefix + 'updateuser',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+                if (!this.sessionServer.canEditUser(request)) return FastifyServer.sendPageError(reply,
+                    401,
+                    this.sessionServer.errorPage);
+                let extraFields : {[key:string] : string|number|boolean|Date|undefined} = {};
+                for (let field in request.body) {
+                    if (field.startsWith("user_")) extraFields[field] = request.body[field];
+                }
+
+                try {
+                    return await this.updateUser(request, reply, 
+                    (reply, _user, emailVerificationRequired) => {
+                        const message = emailVerificationRequired 
+                            ? "Please click on the link in your email to verify your email address."
+                            : "Your details have been updated";
+                        return reply.view(updateUserPage, {
+                            csrfToken: request.csrfToken,
+                            message: message,
+                            urlprefix: prefix, 
+                            allowedFactor2: this.sessionServer.allowedFactor2Details(),
+                        });
+                    });
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    CrossauthLogger.logger.error(j({msg: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    let extraFields : { [key : string] : any }= {};
+                    for (let field in request.body) {
+                        if (field.startsWith("user_")) extraFields[field] = 
+                            request.body[field];
+                    }
+                    return this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                        return reply.view(updateUserPage, {
+                            user: request.user,
+                            errorMessage: error.message,
+                            errorMessages: error.messages, 
+                            errorCode: error.code, 
+                            errorCodeName: ErrorCode[error.code], 
+                            csrfToken: request.csrfToken,
+                            urlprefix: prefix, 
+                            allowedFactor2: this.sessionServer.allowedFactor2Details(),
+                            ...extraFields,
+                        });
+                    });
+                }
+        });
+    }
+
+    addApiUpdateUserEndpoints(prefix : string) {
+        this.sessionServer.app.post(prefix+'api/updateuser', 
+            async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "API visit",
+                    method: 'POST',
+                    url: prefix + 'api/updateuser',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+            if (!this.sessionServer.canEditUser(request)) {
+                return this.sessionServer.sendJsonError(reply, 401);
+            }
+            try {
+                return await this.updateUser(request, reply, 
+                (reply, _user, emailVerificationRequired) => 
+                    {return reply.header(...JSONHDR).send({
+                    ok: true,
+                    emailVerificationRequired: emailVerificationRequired,
+                })});
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e); 
+                CrossauthLogger.logger.error(j({
+                    msg: "Update user failure",
+                    user: request.user?.username,
+                    errorCodeName: ce.codeName,
+                    errorCode: ce.code
+                }));
+                CrossauthLogger.logger.debug(j({err: e}));
+                return this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                    reply.status(this.sessionServer.errorStatus(e)).header(...JSONHDR)
+                        .send({
+                            ok: false,
+                            errorMessage: error.message,
+                            errorMessages: error.messages,
+                            errorCode: error.code,
+                            errorCodeName: ErrorCode[error.code]
+                    });                    
+                }, true);
+            }
+        });
+    }
 
     addChangeFactor2Endpoints(prefix: string,
         changeFactor2Page: string,
@@ -896,6 +1029,42 @@ export class FastifyUserEndpoints {
 
     //////////////////////////////////////////////////////////////////
     // Endpoint internal functions
+
+    private async updateUser(request : FastifyRequest<{ Body: UpdateUserBodyType }>, 
+        reply : FastifyReply, 
+        successFn : (res : FastifyReply, user : User, emailVerificationRequired : boolean)
+        => void) {
+
+        // can only call this if logged in and CSRF token is valid
+        if (!this.sessionServer.canEditUser(request) || !request.user) {
+            throw new CrossauthError(ErrorCode.Unauthorized);
+        }
+        //await this.validateCsrfToken(request);
+        if (this.sessionServer.isSessionUser(request) && !request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
+
+        // get new user fields from form, including from the 
+        // implementor-provided hook
+        let user : User = {
+            id: request.user.id,
+            username: request.user.username,
+            state: "active",
+        };
+        user = this.sessionServer.updateUserFn(user,
+            request,
+            this.sessionServer.userStorage.userEditableFields);
+
+        // validate the new user using the implementor-provided function
+        let errors = this.sessionServer.validateUserFn(user);
+        if (errors.length > 0) {
+            throw new CrossauthError(ErrorCode.FormEntry, errors);
+        }
+
+        // update the user
+        let emailVerificationNeeded = 
+            await this.sessionServer.sessionManager.updateUser(request.user, user);
+
+        return successFn(reply, request.user, emailVerificationNeeded);
+    }
 
     private async changeFactor2(request : FastifyRequest<{ Body: ChangeFactor2BodyType }>, 
         reply : FastifyReply, 

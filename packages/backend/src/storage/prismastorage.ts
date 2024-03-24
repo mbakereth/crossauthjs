@@ -27,6 +27,13 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
     prismaClient? : PrismaClient,
 
     includes? : string[];
+
+    /**
+     * This works around a Fastify limitation.  If the id passed to 
+     * getUserById() is a string but is numeric, first try forcing it to
+     * a number before selecting.  If that fails, try it as the string,
+     */
+    forceIdToNumber? : boolean,
 }
 
 /**
@@ -56,6 +63,7 @@ export class PrismaUserStorage extends UserStorage {
     private prismaClient : PrismaClient;
     private includes : string[] = ["secrets"];
     private includesObject : {[key:string]:boolean} = {};
+    private forceIdToNumber : boolean = true;
 
     /**
      * Creates a PrismaUserStorage object, optionally overriding defaults.
@@ -70,7 +78,8 @@ export class PrismaUserStorage extends UserStorage {
         setParameter("userSecretsTable", ParamType.String, this, options, "USER_SECRETS_TABLE");
         setParameter("idColumn", ParamType.String, this, options, "USER_ID_COLUMN");
         setParameter("includes", ParamType.String, this, options, "USER_INCLUDES");
-	this.includes.forEach((item) => {this.includesObject[item] = true});
+        setParameter("forceIdToNumber", ParamType.String, this, options, "USER_FORCE_ID_TO_NUMBER");
+	    this.includes.forEach((item) => {this.includesObject[item] = true});
 
         if (options && options.prismaClient) {
             this.prismaClient = options.prismaClient;
@@ -101,10 +110,8 @@ export class PrismaUserStorage extends UserStorage {
             error = new CrossauthError(ErrorCode.Connection); 
 
         }
-        if (error) {
-            CrossauthLogger.logger.error(j({err: error}));
-            throw error;
-        }
+        if (error) throw error;
+        
         if (options?.skipActiveCheck!=true && prismaUser["state"]==UserState.awaitingTwoFactorSetup) {
             CrossauthLogger.logger.debug(j({msg: "2FA setup is not complete"}));
             throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
@@ -174,7 +181,20 @@ export class PrismaUserStorage extends UserStorage {
      */
     async getUserById(id : string | number, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
-        return this.getUser(this.idColumn, id, options);
+        if (this.forceIdToNumber && typeof(id) == "string" && id.match(/^[+-]?[0-9]+$/)) {
+            try {
+                return await this.getUser(this.idColumn, Number(id), options);
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                if (ce.code == ErrorCode.UserNotExist) {
+                    return await this.getUser(this.idColumn, id, options);
+                } else {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw e;
+                }
+            }
+        }
+        return await this.getUser(this.idColumn, id, options);
     }
 
     /**
@@ -305,6 +325,30 @@ export class PrismaUserStorage extends UserStorage {
     if (error) throw error;
 
    }
+
+async getUsers(skip? : number, take? : number) : Promise<User[]> {
+    let opts : {[key:string]:number} = {};
+    if (skip) opts.skip = skip;
+    if (take) opts.take = take;
+
+    try {
+        // @ts-ignore  (because types only exist when do prismaClient.table...)
+        return await this.prismaClient[this.userTable].findMany({
+            ...opts,
+            orderBy: [
+                {
+                    usernameNormalized: 'asc',
+                },
+            ],
+            include: this.includesObject,
+        });
+    }  catch (e) {
+        CrossauthLogger.logger.error(j({err: e}));
+        throw new CrossauthError(ErrorCode.Connection, "Couldn't select from user table")
+    }
+      
+}
+
 
 }
 

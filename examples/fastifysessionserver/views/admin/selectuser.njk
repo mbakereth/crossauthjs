@@ -1,0 +1,83 @@
+<html>
+    <head>
+        <title>Select User</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+        <script>
+            function previousPage() {
+                const skipEl = document.getElementById("skip");
+                const takeEl = document.getElementById("take");
+                let skip = Number(skipEl.value);
+                let take = Number(takeEl.value);
+                if (take > 0) {
+                    skip -= take;
+                    if (skip < 0) skip = 0;
+                } else {
+                    skip = 0;
+                }
+                skipEl.value = skip;
+                takeEl.value = take;
+                const form = document.getElementById("tableForm");
+                form.submit();
+            }
+            function nextPage() {
+                const skipEl = document.getElementById("skip");
+                const takeEl = document.getElementById("take");
+                let skip = Number(skipEl.value);
+                let take = Number(takeEl.value);
+                if (take > 0) {
+                    skip += take;
+                }
+                skipEl.value = skip;
+                takeEl.value = take;
+                const form = document.getElementById("tableForm");
+                form.submit();
+            }
+        </script>
+    </head>
+    <body>
+        <h1>Select User</h1>
+
+
+            <form>
+            <p>
+                <label for="search">Search</label><br>
+                <input type="text"id="search" name="search" size="20" value="{{ search }}" onkeyup="search()" />
+                <input type="hidden" name="next" value="{{ next }}"/>
+            </p>
+            </form>
+            <form id="tableForm">
+                <input type="hidden" name="next" value="{{ next }}"/>
+                <input type="hidden" id="skip" name="skip" value="{{ skip }}"/>
+                <input type="hidden" id="take" name="take" value="{{ take }}"/>
+
+                <table>
+                    <tr>
+                        <th>Id</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Action</th>
+                    </tr>
+                {% for user in users %}  
+                    <tr>
+                        <td>{{ user.id }}</th>
+                        <td>{{ user.username }}</th>
+                        <td>{{ user.email}}</th>
+                        <td><a href="updateuser/{{user.id}}">Edit...</a></th>
+                    </tr>
+                {% endfor %}
+                <p>
+                    {% if havePrevious %}
+                        <button type="button" onclick="previousPage()">Previous</button>
+                    {% endif %}
+                    {% if haveNext %}
+                        <button type="button" onclick="nextPage()">Next</button>
+                    {% endif %}
+                    </p>
+                </table>
+            </form>
+
+        <p><a href="createuser">Create user</a></p>
+        <p><a href="/admin/">Admin Home</a></p>
+    </body>
+</html>
+

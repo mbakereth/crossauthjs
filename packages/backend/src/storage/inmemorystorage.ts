@@ -32,7 +32,7 @@ export class InMemoryUserStorage extends UserStorage {
 
     /**
      * Creates a InMemoryUserStorage object, optionally overriding defaults.
-     * @param options {@see InMemoryUserStorageOptions}
+     * @param options @see {@link InMemoryUserStorageOptions}
     */
     constructor(options : InMemoryUserStorageOptions = {}) {
         super(options);
@@ -46,23 +46,23 @@ export class InMemoryUserStorage extends UserStorage {
     async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
         : Promise<User> {
 
-            user.usernameNormalized = UserStorage.normalize(user.username);
-            if (user.usernameNormalized in this.usersByUsername) {
+        user.usernameNormalized = UserStorage.normalize(user.username);
+        if (user.usernameNormalized in this.usersByUsername) {
+            throw new CrossauthError(ErrorCode.UserExists);
+        }
+        if ("email" in user && user.email) {
+            user.emailNormalized = UserStorage.normalize(user.email);
+            if (user.emailNormalized in this.getUserByEmail) {
                 throw new CrossauthError(ErrorCode.UserExists);
             }
-            if ("email" in user && user.email) {
-                user.emailNormalized = UserStorage.normalize(user.email);
-                if (user.emailNormalized in this.getUserByEmail) {
-                    throw new CrossauthError(ErrorCode.UserExists);
-                }
-    
-            }
 
-            const userToStore = {id: user.username, ...user}
-            this.usersByUsername[user.usernameNormalized] = userToStore;
-            this.secretsByUsername[user.usernameNormalized] = secrets??{};
-            if ("email" in user && user.email) this.usersByEmail[user.emailNormalized] = userToStore;
-            if ("email" in user && user.email) this.secretsByEmail[user.emailNormalized] = secrets??{};
+        }
+
+        const userToStore = {id: user.username, ...user}
+        this.usersByUsername[user.usernameNormalized] = userToStore;
+        this.secretsByUsername[user.usernameNormalized] = secrets??{};
+        if ("email" in user && user.email) this.usersByEmail[user.emailNormalized] = userToStore;
+        if ("email" in user && user.email) this.secretsByEmail[user.emailNormalized] = secrets??{};
 
         return {id: user.username, ...user};
     }
@@ -200,6 +200,20 @@ export class InMemoryUserStorage extends UserStorage {
                 delete this.secretsByEmail[emailNormalized];
             }
         }
+    }
+    
+    
+    async getUsers(skip? : number, take? : number) : Promise<User[]> {
+        const keys = Object.keys(this.usersByUsername).sort();
+        let users : User[] = [];
+        if (!skip) skip = 0;
+        let last = take? take : keys.length;
+        if (last >= keys.length-skip) last = keys.length-skip;
+        for (let i=skip; i<last; ++i) {
+            users.push(this.usersByUsername[keys[i]]);
+        }
+
+        return users;
     }
 }
 

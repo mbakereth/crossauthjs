@@ -105,7 +105,6 @@ test('FastifyServer.admin.createUser', async () => {
     const {csrfCookie, csrfToken, sessionCookie} = await login(server);
 
     let res;
-    let body;
 
     res = await server.app.inject({
         method: "POST",
@@ -124,7 +123,7 @@ test('FastifyServer.admin.createUser', async () => {
 });
 
 test('FastifyServer.admin.createExistingUser', async () => {
-    const {server, userStorage} = await makeAppWithOptions();
+    const {server} = await makeAppWithOptions();
     const {csrfCookie, csrfToken, sessionCookie} = await login(server);
 
     let res;
@@ -147,7 +146,7 @@ test('FastifyServer.admin.createExistingUser', async () => {
 });
 
 test('FastifyServer.admin.adminPermissions', async () => {
-    const {server, userStorage} = await makeAppWithOptions();
+    const {server} = await makeAppWithOptions();
     const {csrfCookie, csrfToken, sessionCookie} = 
     await login(server, "bob", "bobPass123");
 
@@ -185,4 +184,26 @@ test('FastifyServer.admin.adminPermissions', async () => {
     expect(res.statusCode).toBe(401);
     body = JSON.parse(res.body)
     expect(body.template).toBe("admin/createuser.njk");
+});
+
+test('FastifyServer.admin.updateUser', async () => {
+    const {server, userStorage} = await makeAppWithOptions();
+    const {csrfCookie, csrfToken, sessionCookie} = await login(server);
+
+    let res;
+
+    const {user} = await userStorage.getUserByUsername("bob");
+    res = await server.app.inject({
+        method: "POST",
+        url: "/admin/updateuser/"+user.id,
+        cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie },
+        payload: {
+            username: "bob",
+            user_email: "bob1@bob.com",
+            csrfToken: csrfToken 
+        }
+    });
+    expect(res.statusCode).toBe(200);
+    const {user: editedUser} = await userStorage.getUserByUsername("bob");
+    expect(editedUser.email).toBe("bob1@bob.com");
 });

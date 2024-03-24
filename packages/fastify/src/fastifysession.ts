@@ -23,7 +23,7 @@ import type {
     AuthenticationParameters,
     SessionManagerOptions } from '@crossauth/backend';
 import { FastifyServer } from './fastifyserver';
-import { FastifyUserEndpoints } from './fastifyuserendpoints'
+import { FastifyUserEndpoints, type UpdateUserBodyType } from './fastifyuserendpoints'
 import { FastifyAdminEndpoints } from './fastifyadminendpoints'
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
@@ -175,6 +175,14 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
     factor2ProtectedApiEndpoints?: string,
 
     editUserScope? : string,
+
+    ///////////////////////////////////////////
+    // Admin pages
+
+    adminCreateUserPage? : string,
+    adminSelectUserPage? : string,
+
+    userSearchFn? : (searchTerm : string, userStorage : UserStorage) => Promise<User[]>;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -191,9 +199,10 @@ export const SessionPageEndpoints = [
 ];
 
 export const SessionAdminPageEndpoints = [
-    "createuser",
-    "changepassword",
-    "updateuser",
+    "admin/createuser",
+    "admin/changepassword",
+    "admin/selectuser",
+    "admin/updateuser",
 ];
 
 /**
@@ -209,9 +218,9 @@ export const SessionApiEndpoints = [
 ];
 
 export const SessionAdminApiEndpoints = [
-    "api/createuser",
-    "api/changepassword",
-    "api/updateuser",
+    "admin/api/createuser",
+    "admin/api/changepassword",
+    "admin/api/updateuser",
 ];
 
 /**
@@ -331,11 +340,6 @@ export interface SignupBodyType extends LoginBodyType {
     factor2? : string,
     [key : string]: string|number|Date|boolean|undefined, // for extensible user object fields
 }
-
-interface UpdateUserBodyType extends CsrfBodyType {
-    [key: string] : string|undefined,
-}
-
 
 export interface LoginQueryType {
     next? : string;
@@ -834,7 +838,8 @@ export class FastifySessionServer {
         }
 
         if (this.endpoints.includes("updateuser")) {
-            this.addUpdateUserEndpoints();
+            this.userEndpoints.addUpdateUserEndpoints(this.prefix,
+                 this.updateUserPage);
         }
 
         if (this.endpoints.includes("requestpasswordreset")) {
@@ -890,7 +895,7 @@ export class FastifySessionServer {
         }
 
         if (this.endpoints.includes("api/updateuser")) {
-            this.addApiUpdateUserEndpoints();
+            this.userEndpoints.addApiUpdateUserEndpoints(this.prefix);
         }
 
         if (this.endpoints.includes("api/resetpassword")) {
@@ -919,11 +924,20 @@ export class FastifySessionServer {
 
         ///// Admin
 
-        if (this.endpoints.includes("createuser")) {
+        if (this.endpoints.includes("admin/createuser")) {
             this.adminEndpoints.addCreateUserEndpoints();
         }
-        if (this.endpoints.includes("api/createuser")) {
+        if (this.endpoints.includes("admin/api/createuser")) {
             this.adminEndpoints.addApiCreateUserEndpoints();
+        }
+        if (this.endpoints.includes("admin/selectuser")) {
+            this.adminEndpoints.addSelectUserEndpoints();
+        }
+        if (this.endpoints.includes("admin/updateuser")) {
+            this.adminEndpoints.addUpdateUserEndpoints();
+        }
+        if (this.endpoints.includes("admin/api/updateuser")) {
+            this.adminEndpoints.addApiUpdateUserEndpoints();
         }
 
 
@@ -1266,79 +1280,6 @@ export class FastifySessionServer {
         });
     }
     
-    private addUpdateUserEndpoints() {
-        this.app.get(this.prefix+'updateuser', 
-            async (request: FastifyRequest<{ Querystring: LoginQueryType }>,
-                reply: FastifyReply) => {
-                CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
-                    method: 'GET',
-                    url: this.prefix + 'updateuser',
-                    ip: request.ip,
-                    user: request.user?.username
-                }));
-            if (!request.user || !this.canEditUser(request)) return FastifyServer.sendPageError(reply, 401, this.errorPage);
-            if (this.updateUserPage)  { // if is redundant but VC Code complains without it
-                let data : {urlprefix: string, csrfToken: string|undefined, user: User, allowedFactor2: {[key:string]: any}} = {
-                    urlprefix: this.prefix, 
-                    csrfToken: request.csrfToken, 
-                    user: request.user,
-                    allowedFactor2: this.allowedFactor2Details(),
-                };
-                return reply.view(this.updateUserPage, data);
-            }
-        });
-
-        this.app.post(this.prefix+'updateuser', 
-            async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
-                reply: FastifyReply) => {
-                CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
-                    method: 'POST',
-                    url: this.prefix + 'updateuser',
-                    ip: request.ip,
-                    user: request.user?.username
-                }));
-                if (!this.canEditUser(request)) return FastifyServer.sendPageError(reply,
-                    401,
-                    this.errorPage);
-            try {
-                return await this.updateUser(request, reply, 
-                (reply, _user, emailVerificationRequired) => {
-                    const message = emailVerificationRequired 
-                        ? "Please click on the link in your email to verify your email address."
-                        : "Your details have been updated";
-                    return reply.view(this.updateUserPage, {
-                        csrfToken: request.csrfToken,
-                        message: message,
-                        urlprefix: this.prefix, 
-                        allowedFactor2: this.allowedFactor2Details(),
-                    });
-                });
-            } catch (e) {
-                const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.error(j({msg: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
-                CrossauthLogger.logger.debug(j({err: e}));
-                let extraFields : { [key : string] : any }= {};
-                for (let field in request.body) {
-                    if (field.startsWith("user_")) extraFields[field] = 
-                        request.body[field];
-                }
-                return this.handleError(e, request, reply, (reply, error) => {
-                    return reply.view(this.updateUserPage, {
-                        errorMessage: error.message,
-                        errorMessages: error.messages, 
-                        errorCode: error.code, 
-                        errorCodeName: ErrorCode[error.code], 
-                        csrfToken: request.csrfToken,
-                        urlprefix: this.prefix, 
-                        allowedFactor2: this.allowedFactor2Details(),
-                    });
-                });
-            }
-        });
-    }
-
     private addLogoutEndpoints() {
         this.app.post(this.prefix+'logout', 
             async (request: FastifyRequest<{ Body: LoginBodyType }>,
@@ -1630,48 +1571,6 @@ export class FastifySessionServer {
                             errorCode: ErrorCode[error.code]
                     });                    
                 });
-            }
-        });
-    }
-
-    private addApiUpdateUserEndpoints() {
-        this.app.post(this.prefix+'api/updateuser', 
-            async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
-                reply: FastifyReply) => {
-                CrossauthLogger.logger.info(j({
-                    msg: "API visit",
-                    method: 'POST',
-                    url: this.prefix + 'api/updateuser',
-                    ip: request.ip,
-                    user: request.user?.username
-                }));
-            if (!this.canEditUser(request)) return this.sendJsonError(reply, 401);
-            try {
-                return await this.updateUser(request, reply, 
-                (reply, _user, emailVerificationRequired) => 
-                    {return reply.header(...JSONHDR).send({
-                    ok: true,
-                    emailVerificationRequired: emailVerificationRequired,
-                })});
-            } catch (e) {
-                const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    msg: "Update user failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
-                }));
-                CrossauthLogger.logger.debug(j({err: e}));
-                return this.handleError(e, request, reply, (reply, error) => {
-                    reply.status(this.errorStatus(e)).header(...JSONHDR)
-                        .send({
-                            ok: false,
-                            errorMessage: error.message,
-                            errorMessages: error.messages,
-                            errorCode: error.code,
-                            errorCodeName: ErrorCode[error.code]
-                    });                    
-                }, true);
             }
         });
     }
@@ -2078,40 +1977,6 @@ export class FastifySessionServer {
 
             }
         }
-    }
-
-    private async updateUser(request : FastifyRequest<{ Body: UpdateUserBodyType }>, 
-        reply : FastifyReply, 
-        successFn : (res : FastifyReply, user : User, emailVerificationRequired : boolean)
-        => void) {
-
-        // can only call this if logged in and CSRF token is valid
-        if (!this.canEditUser(request) || !request.user) {
-            throw new CrossauthError(ErrorCode.Unauthorized);
-        }
-        //await this.validateCsrfToken(request);
-        if (this.isSessionUser(request) && !request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
-
-        // get new user fields from form, including from the 
-        // implementor-provided hook
-        let user : User = {
-            id: request.user.id,
-            username: request.user.username,
-            state: "active",
-        };
-        user = this.updateUserFn(user, request, this.userStorage.userEditableFields);
-
-        // validate the new user using the implementor-provided function
-        let errors = this.validateUserFn(user);
-        if (errors.length > 0) {
-            throw new CrossauthError(ErrorCode.FormEntry, errors);
-        }
-
-        // update the user
-        let emailVerificationNeeded = 
-            await this.sessionManager.updateUser(request.user, user);
-
-        return successFn(reply, request.user, emailVerificationNeeded);
     }
 
     private async logout(request : FastifyRequest, reply : FastifyReply, 
