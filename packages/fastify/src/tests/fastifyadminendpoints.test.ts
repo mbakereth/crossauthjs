@@ -96,7 +96,7 @@ async function login(server: FastifyServer,
     });
     expect(res.statusCode).toBe(302);
     const sessionCookie = getSession(res);
-    return {csrfCookie, csrfToken, sessionCookie};
+    return {csrfCookie, csrfToken, sessionCookie, status: res.statusCode};
 
 }
 
@@ -206,4 +206,38 @@ test('FastifyServer.admin.updateUser', async () => {
     expect(res.statusCode).toBe(200);
     const {user: editedUser} = await userStorage.getUserByUsername("bob");
     expect(editedUser.email).toBe("bob1@bob.com");
+});
+
+test('FastifyServer.admin.changePassword', async () => {
+    const {server, userStorage} = await makeAppWithOptions();
+    const {csrfCookie, csrfToken, sessionCookie} = await login(server);
+
+    let res;
+
+    const {user} = await userStorage.getUserByUsername("bob");
+    res = await server.app.inject({
+        method: "POST",
+        url: "/admin/changepassword/"+user.id,
+        cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie },
+        payload: {
+            new_password: "bobPass12",
+            repeat_password: "bobPass12",
+            csrfToken: csrfToken 
+        }
+    });
+    expect(res.statusCode).toBe(200);
+
+    let loginSucceeded = false;
+    try {
+        await login(server, "bob", "bobPass123");
+        loginSucceeded = true;
+    } catch {}
+    expect(loginSucceeded).toBe(false);
+
+    loginSucceeded = false;
+    try {
+        await login(server, "bob", "bobPass12");
+        loginSucceeded = true;
+    } catch {}
+    expect(loginSucceeded).toBe(true);
 });

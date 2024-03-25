@@ -82,7 +82,7 @@ app.get('/admin', async (request : FastifyRequest, reply : FastifyReply) =>  {
 });
 
 app.get('/admin/', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    if (!request.user) return reply.redirect(302, "/login?next=/protected");
+    if (!request.user) return reply.redirect(302, "/login?next=/admin/");
     if (!request.user.admin) return reply.status(401).send(new Error('Access denied'));
     return reply.view('admin/index.njk', {user: request.user});
 });

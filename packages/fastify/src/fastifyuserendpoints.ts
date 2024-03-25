@@ -1224,9 +1224,10 @@ export class FastifyUserEndpoints {
             }
             await this.sessionServer.sessionManager.changeSecrets(user.username,
                 1,
-                oldSecrets,
                 newSecrets,
-                repeatSecrets);
+                repeatSecrets,
+                oldSecrets
+            );
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: e}));

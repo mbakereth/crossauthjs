@@ -819,10 +819,16 @@ export class SessionManager {
         return await this.tokenEmailer.verifyPasswordResetToken(token);
     }
 
-    async changeSecrets(username : string, factorNumber : 1|2, oldParams: AuthenticationParameters, newParams : AuthenticationParameters, repeatParams? : AuthenticationParameters) : Promise<User> {
+    async changeSecrets(username: string,
+        factorNumber: 1 | 2,
+        newParams: AuthenticationParameters,
+        repeatParams?: AuthenticationParameters,
+        oldParams?: AuthenticationParameters) : Promise<User> {
         let {user, secrets} = await this.userStorage.getUserByUsername(username);
         const factor = factorNumber == 1 ? user.factor1 : user.factor2;
-        await this.authenticators[factor].authenticateUser(user, secrets, oldParams);
+        if (oldParams != undefined) {
+            await this.authenticators[factor].authenticateUser(user, secrets, oldParams);
+        }
         const newSecrets = await this.authenticators[user.factor1].createPersistentSecrets(user.username, newParams, repeatParams);
         await this.userStorage.updateUser({id: user.id}, 
             newSecrets,

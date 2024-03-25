@@ -203,6 +203,7 @@ export const SessionAdminPageEndpoints = [
     "admin/changepassword",
     "admin/selectuser",
     "admin/updateuser",
+    "admin/changepassword",
 ];
 
 /**
@@ -221,6 +222,7 @@ export const SessionAdminApiEndpoints = [
     "admin/api/createuser",
     "admin/api/changepassword",
     "admin/api/updateuser",
+    "admin/api/changepassword",
 ];
 
 /**
@@ -938,6 +940,12 @@ export class FastifySessionServer {
         }
         if (this.endpoints.includes("admin/api/updateuser")) {
             this.adminEndpoints.addApiUpdateUserEndpoints();
+        }
+        if (this.endpoints.includes("admin/changepassword")) {
+            this.adminEndpoints.addChangePasswordEndpoints();
+        }
+        if (this.endpoints.includes("admin/api/changepassword")) {
+            this.adminEndpoints.addApiChangePasswordEndpoints();
         }
 
 

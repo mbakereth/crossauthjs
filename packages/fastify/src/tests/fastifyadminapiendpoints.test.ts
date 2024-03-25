@@ -175,3 +175,39 @@ test('FastifyServer.adminapi.updateUser', async () => {
     const {user: editedUser} = await userStorage.getUserByUsername("bob");
     expect(editedUser.email).toBe("bob1@bob.com");
 });
+
+test('FastifyServer.adminapi.changePassword', async () => {
+
+    const {server, userStorage} = await makeAppWithOptions();
+    const {csrfCookie, csrfToken, sessionCookie} = await login(server);
+
+    let res;
+    let body;
+
+    const {user} = await userStorage.getUserByUsername("bob");
+    res = await server.app.inject({
+        method: "POST",
+        url: "/admin/api/changepassword/"+user.id,
+        cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie },
+        payload: {
+            new_password: "bobPass12",
+            csrfToken: csrfToken 
+        }
+    });
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+
+    let loginSucceeded = false;
+    try {
+        await login(server, "bob", "bobPass123");
+        loginSucceeded = true;
+    } catch {}
+    expect(loginSucceeded).toBe(false);
+
+    loginSucceeded = false;
+    try {
+        await login(server, "bob", "bobPass12");
+        loginSucceeded = true;
+    } catch {}
+    expect(loginSucceeded).toBe(true);
+});

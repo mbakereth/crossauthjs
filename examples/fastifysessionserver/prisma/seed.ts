@@ -34,6 +34,7 @@ async function main() {
     state: "active",
     factor1: "localpassword",
     email: "admin@admin.com",
+    admin: true,
 }, {
     password: await authenticator.createPasswordHash("adminPass123"), 
 });

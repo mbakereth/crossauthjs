@@ -71,17 +71,24 @@ interface UserParamType {
     id : string|number,
 }
 
-interface EditBodyType extends CsrfBodyType {
-    errorMessage?: string,
-    errorMessages?: string[], 
-    errorCode?: number, 
-    errorCodeName?: string, 
-}
-
-interface UpdateUserBodyType extends EditBodyType {
+interface UpdateUserBodyType {
     username : string,
     [key:string] : any,
 }
+
+interface ChangePasswordQueryType {
+    next? : string;
+    required?: boolean
+}
+
+interface ChangePasswordBodyType extends CsrfBodyType {
+    oldPassword: string,
+    newPassword: string,
+    repeatPassword?: string,
+    next? : string,
+    required?: boolean
+}
+
 const JSONHDR : [string,string] = 
     ['Content-Type', 'application/json; charset=utf-8'];
 
@@ -99,15 +106,17 @@ export class FastifyAdminEndpoints {
     private adminCreateUserPage = "admin/createuser.njk";
     private adminSelectUserPage = "admin/selectuser.njk";
     private adminUpdateUserPage = "admin/updateuser.njk";
+    private adminChangePasswordPage = "admin/changepassword.njk";
 
     constructor(sessionServer : FastifySessionServer,
         options: FastifySessionServerOptions = {}) {
 
         this.sessionServer = sessionServer;
         setParameter("adminPrefix", ParamType.String, this, options, "ADMIN_PREFIX");
-        setParameter("adminCreateUserPage", ParamType.Boolean, this, options, "ADMIN_CREATE_USER_PAGE");
-        setParameter("adminSelectUserPage", ParamType.Boolean, this, options, "ADMIN_SELECT_USER_PAGE");
-        setParameter("adminUpdateUserPage", ParamType.Boolean, this, options, "ADMIN_UPDATE_USER_PAGE");
+        setParameter("adminCreateUserPage", ParamType.String, this, options, "ADMIN_CREATE_USER_PAGE");
+        setParameter("adminSelectUserPage", ParamType.String, this, options, "ADMIN_SELECT_USER_PAGE");
+        setParameter("adminUpdateUserPage", ParamType.String, this, options, "ADMIN_UPDATE_USER_PAGE");
+        setParameter("adminChangePasswordPage", ParamType.String, this, options, "ADMIN_CHANGE_PASSWORD_PAGE");
         if (!this.adminPrefix.endsWith("/")) this.adminPrefix += "/";
         if (!this.adminPrefix.startsWith("/")) "/" + this.adminPrefix;
 
@@ -405,7 +414,7 @@ export class FastifyAdminEndpoints {
                     ip: request.ip,
                     user: request.user?.username
                 }));
-            if (!this.sessionServer.canEditUser(request)) {
+            if (!request.user || !FastifyServer.isAdmin(request.user)) {
                 return this.sessionServer.sendJsonError(reply, 401);
             }
             let user : User|undefined;
@@ -442,6 +451,147 @@ export class FastifyAdminEndpoints {
         });
     }
 
+
+    addChangePasswordEndpoints() {
+        this.sessionServer.app.get(this.adminPrefix+'changepassword/:id', 
+            async (request: FastifyRequest<{Params: UserParamType,  Querystring: ChangePasswordQueryType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'GET',
+                    url: this.adminPrefix + 'changepassword',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+
+                if (!request?.user || !FastifyServer.isAdmin(request.user)) {
+                    return this.accessDeniedPage(request, reply);                    
+                }
+                try {
+                    const {user} = 
+                        await this.sessionServer.userStorage.getUserById(request.params.id)
+                    let data: {
+                        urlprefix: string,
+                        csrfToken?: string,
+                        user : User,
+                    } = {
+                        urlprefix: this.adminPrefix,
+                        csrfToken: request.csrfToken,
+                        user: user,
+                    };
+                return reply.view(this.adminChangePasswordPage, data);
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.error(j({err: e}));
+                return FastifyServer.sendPageError(reply,
+                    ce.httpStatus,
+                    this.sessionServer.errorPage,
+                    ce.message, ce);
+
+            }
+                
+        });
+
+        this.sessionServer.app.post(this.adminPrefix+'changepassword/:id', 
+            async (request: FastifyRequest<{Params: UserParamType, Body: ChangePasswordBodyType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'POST',
+                    url: this.adminPrefix + 'changepassword',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+                let user : User|undefined;
+                try {
+                    const {user: user1} = await 
+                        this.sessionServer.userStorage.getUserById(request.params.id);
+                    user = user1;
+                    return await this.changePassword(user, request, reply, 
+                (reply, _user) => {
+                    if (request.body.next) {
+                        return reply.redirect(request.body.next);
+                    } 
+                    return reply.view(this.adminChangePasswordPage, {
+                        csrfToken: request.csrfToken,
+                        message: "User's password has been changed.",
+                        urlprefix: this.adminPrefix, 
+                        next: request.body.next,
+                        required: request.body.required,
+                        user: user,
+                    });
+                });
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.error(j({
+                    msg: "Change password failure",
+                    userId: request.params.id,
+                    errorCodeName: ce.codeName,
+                    errorCode: ce.code
+                }));
+                CrossauthLogger.logger.debug(j({err: e}));
+                return this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                    return reply.view(this.adminChangePasswordPage, {
+                        errorMessage: error.message,
+                        errorMessages: error.messages, 
+                        errorCode: error.code, 
+                        errorCodeName: ErrorCode[error.code], 
+                        csrfToken: request.csrfToken,
+                        urlprefix: this.adminPrefix, 
+                    });
+                });
+            }
+        });
+    }
+
+    addApiChangePasswordEndpoints() {
+        this.sessionServer.app.post(this.adminPrefix+'api/changepassword/:id', 
+            async (request: FastifyRequest<{Params: UserParamType, Body: ChangePasswordBodyType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "API visit",
+                    method: 'POST',
+                    url: this.adminPrefix + 'api/changepassword',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+
+                if (!request.user || !FastifyServer.isAdmin(request.user)) {
+                    return this.sessionServer.sendJsonError(reply, 401);
+                }
+                let user : User|undefined;
+                try {
+                    const {user: user1} = await 
+                        this.sessionServer.userStorage.getUserById(request.params.id);
+                    user = user1;
+                    return await this.changePassword(user, request, reply, 
+                    (reply, _user) => 
+                        {return reply.header(...JSONHDR).send({
+                        ok: true,
+                    })});
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e); 
+                    CrossauthLogger.logger.error(j({
+                        msg: "Update user failure",
+                        user: request.user?.username,
+                        errorCodeName: ce.codeName,
+                        errorCode: ce.code
+                    }));
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    return this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                        reply.status(this.sessionServer.errorStatus(e)).header(...JSONHDR)
+                            .send({
+                                ok: false,
+                                errorMessage: error.message,
+                                errorMessages: error.messages,
+                                errorCode: error.code,
+                                errorCodeName: ErrorCode[error.code]
+                        });                    
+                    }, true);
+                }
+    
+        });
+    }
 
     ///////////////////////////////////////////////////////////
     // Internal functions
@@ -534,7 +684,7 @@ export class FastifyAdminEndpoints {
         => void) {
 
         // can only call this if logged in and CSRF token is valid
-        if (!this.sessionServer.canEditUser(request) || !request.user) {
+        if (!request.user || !FastifyServer.isAdmin(request.user)) {
             throw new CrossauthError(ErrorCode.Unauthorized);
         }
         //await this.validateCsrfToken(request);
@@ -561,4 +711,53 @@ export class FastifyAdminEndpoints {
 
         return successFn(reply, request.user, emailVerificationNeeded);
     }
+
+    private async changePassword(user : User, request : FastifyRequest<{ Body: ChangePasswordBodyType }>, 
+        reply : FastifyReply, 
+        successFn : (res : FastifyReply, user? : User) => void) {
+
+        // can only call this if logged in and CSRF token is valid
+        if (!request.user || !FastifyServer.isAdmin(request.user)) {
+            throw new CrossauthError(ErrorCode.Unauthorized);
+        }
+        //await this.validateCsrfToken(request);
+        if (this.sessionServer.isSessionUser(request) && !request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
+
+        // get the authenticator for factor1 (passwords on factor2 are not supported)
+        const authenticator = this.sessionServer.authenticators[user.factor1];
+
+        // the form should contain old_{secret}, new_{secret} and repeat_{secret}
+        // extract them, making sure the secret is a valid one
+        const secretNames = authenticator.secretNames();
+        let newSecrets : AuthenticationParameters = {};
+        let repeatSecrets : AuthenticationParameters|undefined = {};
+        for (let field in request.body) {
+            if (field.startsWith("new_")) {
+                const name = field.replace(/^new_/, "");
+                // @ts-ignore as it complains about request.body[field]
+                if (secretNames.includes(name)) newSecrets[name] = request.body[field];
+            } else if (field.startsWith("repeat_")) {
+                const name = field.replace(/^repeat_/, "");
+                // @ts-ignore as it complains about request.body[field]
+                if (secretNames.includes(name)) repeatSecrets[name] = request.body[field];
+            }
+        }
+        if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
+
+        // validate the new secret - this is through an implementor-supplied function
+        let errors = authenticator.validateSecrets(newSecrets);
+        if (errors.length > 0) {
+            throw new CrossauthError(ErrorCode.PasswordFormat);
+        }
+
+        user.state = "active";
+        await this.sessionServer.userStorage.updateUser({id: user.id, state:user.state});
+        await this.sessionServer.sessionManager.changeSecrets(user.username,
+            1,
+            newSecrets,
+            repeatSecrets);
+        
+        return successFn(reply, undefined);
+    }
+
 }
