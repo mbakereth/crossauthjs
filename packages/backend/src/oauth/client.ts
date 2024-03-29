@@ -16,7 +16,7 @@ export interface OAuthClientOptions extends OAuthBackendTokenConsumerOptions {
     validFlows? : string,
 }
 
-export class OAuthClient extends OAuthClientBase {
+export class OAuthClientBackend extends OAuthClientBase {
     protected validFlows : string[] = [];
 
     constructor(authServerBaseUri : string, options : OAuthClientOptions) {

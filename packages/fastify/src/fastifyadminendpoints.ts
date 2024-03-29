@@ -67,7 +67,7 @@ interface SelectUserQueryType {
     havePrevious? : boolean,
 }
 
-interface UserParamType {
+export interface UserParamType {
     id : string|number,
 }
 
@@ -101,6 +101,7 @@ export class FastifyAdminEndpoints {
     private userSearchFn : 
         (searchTerm : string, userStorage : UserStorage) => Promise<User[]> =
         defaultUserSearchFn;
+    private enableOAuthClientManagement = false;
 
     // pages
     private adminCreateUserPage = "admin/createuser.njk";
@@ -117,8 +118,10 @@ export class FastifyAdminEndpoints {
         setParameter("adminSelectUserPage", ParamType.String, this, options, "ADMIN_SELECT_USER_PAGE");
         setParameter("adminUpdateUserPage", ParamType.String, this, options, "ADMIN_UPDATE_USER_PAGE");
         setParameter("adminChangePasswordPage", ParamType.String, this, options, "ADMIN_CHANGE_PASSWORD_PAGE");
+        setParameter("enableOAuthClientManagement", ParamType.Boolean, this, options, "ENABLE_OAUTH_CLIENT_MANAGEMENT");
         if (!this.adminPrefix.endsWith("/")) this.adminPrefix += "/";
         if (!this.adminPrefix.startsWith("/")) "/" + this.adminPrefix;
+        if (options.userSearchFn) this.userSearchFn = options.userSearchFn
 
     }
 
@@ -162,7 +165,7 @@ export class FastifyAdminEndpoints {
                     method: 'POST',
                     url: this.adminPrefix + 'createuser',
                     ip: request.ip,
-                    user: request.body.username
+                    user: request.user?.username
                 }));
                 let next = 
                 request.body.next && request.body.next.length > 0 ? 
@@ -217,7 +220,7 @@ export class FastifyAdminEndpoints {
                     method: 'POST',
                     url: this.adminPrefix + 'api/createuser',
                     ip: request.ip,
-                    user: request.body.username
+                    user: request.user?.username
                 }));
             try {
                 return await this.createUser(request, reply, 
@@ -328,10 +331,12 @@ export class FastifyAdminEndpoints {
                         urlprefix: string,
                         csrfToken?: string,
                         user : User,
+                        enableOAuthClientManagement : boolean,
                     } = {
                         urlprefix: this.adminPrefix,
                         csrfToken: request.csrfToken,
                         user: user,
+                        enableOAuthClientManagement: this.enableOAuthClientManagement,
                     };
                 return reply.view(this.adminUpdateUserPage, data);
             } catch (e) {

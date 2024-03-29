@@ -227,13 +227,26 @@ export abstract class OAuthClientStorage {
     
 
     /**
-     * Returns the matching clinet in the storage or throws an exception if it doesn't exist.
+     * Returns the matching client by its auto-generated id in the storage or 
+     * throws an exception if it doesn't exist.
      * 
      * @param clientId the clientId to look up
      * @returns The matching Key record.
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
-    abstract getClient(clientId : string) : Promise<OAuthClient>;
+    abstract getClientById(clientId : string) : Promise<OAuthClient>;
+
+    /**
+     * Returns the matching client in the storage by friendly name or 
+     * throws an exception if it doesn't exist.
+     * 
+     * @param name the client name to look up
+     * @returns The matching Key record.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
+     */
+    abstract getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]>;
+
+    abstract getClients(skip? : number, take? : number, userId? : string|number|null) : Promise<OAuthClient[]>;
 
     /**
      * Creates and returns a new client with random ID and optionally secret.

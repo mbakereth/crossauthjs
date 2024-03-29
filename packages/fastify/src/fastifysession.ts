@@ -10,10 +10,11 @@ import {
     j,
     UserState,
 } from '@crossauth/common';
-import type { User, Key, UserInputFields } from '@crossauth/common';
+import type { User, Key, UserInputFields, OAuthClient } from '@crossauth/common';
 import {
     UserStorage,
     KeyStorage,
+    OAuthClientStorage,
     Authenticator,
     Hasher,
     SessionManager,
@@ -21,10 +22,12 @@ import {
     ParamType } from '@crossauth/backend';
 import type {
     AuthenticationParameters,
-    SessionManagerOptions } from '@crossauth/backend';
+    SessionManagerOptions,
+    OAuthClientManagerOptions } from '@crossauth/backend';
 import { FastifyServer } from './fastifyserver';
 import { FastifyUserEndpoints, type UpdateUserBodyType } from './fastifyuserendpoints'
 import { FastifyAdminEndpoints } from './fastifyadminendpoints'
+import { FastifyAdminClientEndpoints } from './fastifyadminclientendpoints'
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 
@@ -39,7 +42,8 @@ const JSONHDR : [string,string] =
  * 
  * See {@link FastifyServer } constructor for description of parameters
  */
-export interface FastifySessionServerOptions extends SessionManagerOptions {
+export interface FastifySessionServerOptions 
+    extends SessionManagerOptions, OAuthClientManagerOptions {
 
     /** All endpoint URLs will be prefixed with this.  Default `/` */
     prefix? : string,
@@ -48,7 +52,7 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
     adminPrefix? : string,
 
     /** List of endpoints to add to the server ("login", "api/login", etc, 
-     *  prefixed by the `prefix` parameter.  Empty for all.  Default all. */
+     *  prefixed by the `prefix` parameter.  Empty for allMinusOAuth.  Default allMinusOAuth. */
     endpoints? : string,
 
     /** Page to redirect to after successful login, default "/" */
@@ -179,10 +183,15 @@ export interface FastifySessionServerOptions extends SessionManagerOptions {
     ///////////////////////////////////////////
     // Admin pages
 
+    enableAdminEndpoints? : boolean,
+    enableOAuthClientManagement? : boolean,
+
     adminCreateUserPage? : string,
     adminSelectUserPage? : string,
-
+    adminCreateClientPage? : string,
+    
     userSearchFn? : (searchTerm : string, userStorage : UserStorage) => Promise<User[]>;
+    clientSearchFn? : (searchTerm : string, userStorage : OAuthClientStorage, userId? : string|number|null) => Promise<OAuthClient[]>;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -206,6 +215,11 @@ export const SessionAdminPageEndpoints = [
     "admin/changepassword",
 ];
 
+export const SessionAdminClientPageEndpoints = [
+    "admin/selectclient",
+    "admin/createclient",
+];
+
 /**
  * API (JSON) endpoints that depend on sessions being enabled 
  */
@@ -223,6 +237,11 @@ export const SessionAdminApiEndpoints = [
     "admin/api/changepassword",
     "admin/api/updateuser",
     "admin/api/changepassword",
+];
+
+export const SessionAdminClientApiEndpoints = [
+    "admin/api/selectclient",
+    "admin/api/createclient",
 ];
 
 /**
@@ -292,9 +311,9 @@ export const Factor2PageEndpoints = [
 ]
 
 /**
- * These are all the endpoints created by default by this server-
+ * These are the endpoints created by default by this server-
  */
-export const AllEndpoints = [
+export const AllEndpointsMinusOAuth = [
     ...SignupPageEndpoints,
     ...SignupApiEndpoints,
     ...SessionPageEndpoints,
@@ -309,6 +328,25 @@ export const AllEndpoints = [
     ...Factor2ApiEndpoints,
 ];
 
+/**
+ * These are all the endpoints 
+ */
+export const AllEndpoints = [
+    ...SignupPageEndpoints,
+    ...SignupApiEndpoints,
+    ...SessionPageEndpoints,
+    ...SessionApiEndpoints,
+    ...SessionAdminPageEndpoints,
+    ...SessionAdminClientPageEndpoints,
+    ...SessionAdminApiEndpoints,
+    ...SessionAdminClientApiEndpoints,
+    ...EmailVerificationPageEndpoints,
+    ...EmailVerificationApiEndpoints,
+    ...PasswordResetPageEndpoints,
+    ...PasswordResetApiEndpoints,
+    ...Factor2PageEndpoints,
+    ...Factor2ApiEndpoints,
+];
 
 
 export interface CsrfBodyType {
@@ -500,11 +538,14 @@ export class FastifySessionServer {
     readonly sessionManager : SessionManager;
     private userEndpoints : FastifyUserEndpoints;
     private adminEndpoints : FastifyAdminEndpoints;
+    private adminClientEndpoints? : FastifyAdminClientEndpoints;
     readonly authenticators: {[key:string]: Authenticator}
     readonly allowedFactor2 : string[] = [];
 
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
+    private enableAdminEndpoints? : boolean = false;
+    private enableOAuthClientManagement? : boolean = false;
     private factor2ProtectedPageEndpoints : string[] = [
         "/requestpasswordreset",
         "/updateuser",
@@ -553,6 +594,8 @@ export class FastifySessionServer {
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
         setParameter("factor2ProtectedPageEndpoints", ParamType.StringArray, this, options, "FACTOR2_PROTECTED_PAGE_ENDPOINTS");
         setParameter("factor2ProtectedApiEndpoints", ParamType.StringArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
+        setParameter("enableAdminEndpoints", ParamType.Boolean, this, options, "ENABLE_ADMIN_ENDPOINTS");
+        setParameter("enableOAuthClientManagement", ParamType.Boolean, this, options, "ENABLE_OAUTH_CLIENT_MANAGEMENT");
 
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
@@ -563,11 +606,30 @@ export class FastifySessionServer {
 
         this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
         this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
-        this.endpoints = [...this.endpoints, ...SessionAdminPageEndpoints, ...SessionAdminApiEndpoints];
+        if (this.enableAdminEndpoints) this.endpoints = [...this.endpoints, ...SessionAdminPageEndpoints, ...SessionAdminApiEndpoints];
+        if (this.enableOAuthClientManagement) this.endpoints = [...this.endpoints, ...SessionAdminClientPageEndpoints, ...SessionAdminClientApiEndpoints];
         if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
         if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
+        if (options.endpoints) {
+            setParameter("endpoints", ParamType.StringArray, this, options, "SESSION_ENDPOINTS");
+            if (this.endpoints.length == 1 && this.endpoints[0] == "all") this.endpoints = AllEndpoints;
+            if (this.endpoints.length == 1 && this.endpoints[0] == "allMinusOAuth") this.endpoints = AllEndpointsMinusOAuth;
+        }
         if (this.allowedFactor2.length > 0) this.endpoints = [...this.endpoints, ...Factor2PageEndpoints, ...Factor2ApiEndpoints];
+        let addClientEndpoints = false;
+        for (let endpoint of this.endpoints) {
+            if (SessionAdminClientApiEndpoints.includes(endpoint) ||
+                SessionAdminClientPageEndpoints.includes(endpoint)) {
+                    addClientEndpoints = true;
+                    break;
+                }
+        }
+        if (addClientEndpoints) {
+            this.adminClientEndpoints = new FastifyAdminClientEndpoints(this, options);
+        }
+
         this.addEndpoints();
+
 
         setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
 
@@ -855,7 +917,7 @@ export class FastifySessionServer {
         }
 
         if (this.endpoints.includes("verifyemail")) {
-            if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification  must be enabled for /verifyemail");
+            if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification must be enabled for /verifyemail");
             this.userEndpoints.addVerifyEmailEndpoints(this.prefix, 
                 this.emailVerifiedPage);
         }
@@ -948,7 +1010,18 @@ export class FastifySessionServer {
             this.adminEndpoints.addApiChangePasswordEndpoints();
         }
 
-
+        // Admin Client endpoints
+        if (this.adminClientEndpoints) {
+            if (this.endpoints.includes("admin/selectclient")) {
+                this.adminClientEndpoints.addSelectClientEndpoints();
+            }
+                if (this.endpoints.includes("admin/createclient")) {
+                this.adminClientEndpoints.addCreateClientEndpoints();
+            }
+            if (this.endpoints.includes("admin/api/createclient")) {
+                this.adminClientEndpoints.addApiCreateClientEndpoints();
+            }
+        }
     }
 
     private addLoginEndpoints() {

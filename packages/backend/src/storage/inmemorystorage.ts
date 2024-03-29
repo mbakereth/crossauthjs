@@ -416,6 +416,7 @@ export class InMemoryKeyStorage extends KeyStorage {
  */
 export class InMemoryOAuthClientStorage extends OAuthClientStorage {
     private clients : { [clientId : string]: OAuthClient } = {};
+    private clientsByName : { [name : string]: OAuthClient[] } = {};
 
     /**
      * Constructor
@@ -425,12 +426,12 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
     }
 
     /**
-     * Returns the matching key recortd, with additional, or throws an exception.
+     * Returns the matching client record or throws an exception.
      * @param key the key to look up in the key storage.
      * @returns the matching Key record
      * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
-    async getClient(clientId : string) : Promise<OAuthClient> {
+    async getClientById(clientId : string) : Promise<OAuthClient> {
         if (this.clients && clientId in this.clients) {
             return this.clients[clientId];
         }
@@ -441,20 +442,54 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
     }
 
     /**
+     * Returns the matching client record or throws an exception.
+     * @param key the key to look up in the key storage.
+     * @returns the matching Key record
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
+     */
+    async getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]> {
+        if (this.clientsByName && name in this.clientsByName) {
+            const clients = this.clientsByName[name];
+            if (userId == undefined && !(userId === null)) return clients;
+            const ret : OAuthClient[] = [];
+            for (let client of clients) {
+                if (client.userId === userId) ret.push(client);
+            }
+            return ret;
+        }
+        return [];
+    }
+
+    /**
      * Saves a client in the client table.
      * 
      * @param client the client to save.
      */
     async createClient(client : OAuthClient) : Promise<OAuthClient> {
+        if (!("userId" in client )) client.userId = null;
+        if (!(client.clientName in this.clientsByName)) {
+            this.clientsByName[client.clientName] = [];
+        }
+        this.clientsByName[client.clientName].push(client);
         return this.clients[client.clientId] = client;
     }
 
     /**
      * 
-     * @param clinetId the client to delete
+     * @param clientId the client to delete
      */
     async deleteClient(clientId : string) : Promise<void> {
         if (clientId in this.clients) {
+            const name = this.clients[clientId].clientName;
+            if (name in this.clientsByName) {
+                let ar = this.clientsByName[name];
+                for (let i=0; i<ar.length; ++i) {
+                    if (ar[i].clientId == clientId) {
+                        ar.splice(i, 1);
+                        break;
+                    }
+                }
+            }
             delete this.clients[clientId];
         }
     }
@@ -479,6 +514,25 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
         }
     }
 
+    async getClients(skip? : number, take? : number, userId? : string|number|null) : Promise<OAuthClient[]> {
+        const keys = Object.keys(this.clients).sort();
+        let clients : OAuthClient[] = [];
+        if (!skip) skip = 0;
+        let last = take? take : keys.length;
+        if (last >= keys.length-skip) last = keys.length-skip;
+        for (let i=skip; i<last; ++i) {
+            if (userId === null) {
+                if (this.clients[keys[i]].userId == null) clients.push(this.clients[keys[i]]);
+            } else if (userId != undefined && userId != null) {
+                if (this.clients[keys[i]].userId == userId) clients.push(this.clients[keys[i]]);
+
+            } else {
+                clients.push(this.clients[keys[i]]);
+            }
+        }
+
+        return clients;
+    }
 }
 
 /**

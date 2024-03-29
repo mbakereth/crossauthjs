@@ -1,7 +1,7 @@
 import { test, expect, beforeAll } from 'vitest';
 import { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage, InMemoryOAuthAuthorizationStorage } from '../inmemorystorage';
-import { CrossauthError } from '@crossauth/common';
 import { getTestUserStorage }  from './inmemorytestdata';
+import { OAuthClient } from '@crossauth/common';
 
 export var userStorage : InMemoryUserStorage;
 export var secretUserStorage : InMemoryUserStorage;
@@ -197,12 +197,13 @@ test('InMemoryClientStorage.createGetAndDeleteClient', async () => {
         clientName: "Test",
         redirectUri: [],
         validFlow: [],
+        confidential: true,
     };
     await clientStorage.createClient(client);
-    const getClient = await clientStorage.getClient(client.clientId);
+    const getClient = await clientStorage.getClientById(client.clientId);
     expect(getClient.clientSecret).toBe(client.clientSecret);
     await clientStorage.deleteClient(client.clientId);
-    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError();
+    await expect(async () => {await clientStorage.getClientById(client.clientId)}).rejects.toThrowError();
 });
 
 test('InMemoryClientStorage.createAndUpdateValidFlows', async () => {
@@ -212,15 +213,16 @@ test('InMemoryClientStorage.createAndUpdateValidFlows', async () => {
         clientSecret: "DEF",
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
-        validFlow: ["AuthorizationCode", "AuthorizationCodeWithPKCE"],
+        validFlow: ["authorizationCode", "authorizationCodeWithPKCE"],
+        confidential: true,
     }
     await clientStorage.createClient(client);
-    const getClient1 = await clientStorage.getClient(client.clientId);
+    const getClient1 = await clientStorage.getClientById(client.clientId);
     expect(getClient1.validFlow.length).toBe(2);
-    await clientStorage.updateClient({clientId: client.clientId, validFlow: ["ClientCredentials"]});
-    const getClient2 = await clientStorage.getClient(client.clientId);
+    await clientStorage.updateClient({clientId: client.clientId, validFlow: ["clientCredentials"]});
+    const getClient2 = await clientStorage.getClientById(client.clientId);
     expect(getClient2.validFlow.length).toBe(1);
-    expect(getClient2.validFlow[0]).toBe("ClientCredentials");
+    expect(getClient2.validFlow[0]).toBe("clientCredentials");
 });
 
 test("InMemoryAuthorization.createAndGetForUser", async () => {
@@ -281,3 +283,58 @@ test("InMemoryAuthorization.createAndUpdateForUser", async () => {
     expect(["read", "delete"]).toContain(scopes[1]);
 });
 
+test('InMemoryClientStorage.getClientByName', async () => {
+    const clientStorage = new InMemoryOAuthClientStorage();
+    const client = {
+        clientId : "ABC",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: [],
+        validFlow: [],
+        confidential: true,
+    };
+    await clientStorage.createClient(client);
+    const getClients = await clientStorage.getClientByName(client.clientName);
+    expect(getClients[0].clientName).toBe(client.clientName);
+});
+
+test('InMemoryAuthorization.getClients', async () => {
+    const clientStorage = new InMemoryOAuthClientStorage();
+    let client : OAuthClient = {
+        clientId : "ABC1",
+        clientSecret: "DEF",
+        clientName: "Test1",
+        redirectUri: [],
+        validFlow: [],
+        confidential: true,
+    }
+    await clientStorage.createClient(client);
+
+    client = {
+        clientId : "ABC2",
+        clientSecret: "DEF",
+        clientName: "Test2",
+        redirectUri: [],
+        validFlow: [],
+        confidential: true,
+    }
+    await clientStorage.createClient(client);
+
+    client = {
+        clientId : "ABC3",
+        clientSecret: "DEF",
+        clientName: "Test3",
+        redirectUri: [],
+        validFlow: [],
+        confidential: true,
+        userId : 1,
+    }
+    await clientStorage.createClient(client);
+
+    let getClients = await clientStorage.getClients(undefined, undefined, undefined);
+    expect(getClients.length).toBe(3);
+    getClients = await clientStorage.getClients(undefined, undefined, null)
+    expect(getClients.length).toBe(2);
+    getClients = await clientStorage.getClients(undefined, undefined, 1)
+    expect(getClients.length).toBe(1);
+});

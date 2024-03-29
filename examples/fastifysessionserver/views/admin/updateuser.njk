@@ -45,6 +45,10 @@
                 </table>
                 <button type="submit">Update</button>
             </form>
+
+            {% if enableOAuthClientManagement %}
+                <p><a href="/admin/selectclient?userId={{ user.id }}">Manage clients...</a></p>
+            {% endif %}
         {% endif %}
 
         <p><a href="/admin/">Admin Home</a></p>

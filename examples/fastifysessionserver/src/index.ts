@@ -1,5 +1,11 @@
 import { PrismaClient } from '@prisma/client'
-import { PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from '@crossauth/backend';
+import {
+    PrismaKeyStorage,
+    PrismaUserStorage,
+    PrismaOAuthClientStorage,
+    LocalPasswordAuthenticator,
+    TotpAuthenticator,
+    EmailAuthenticator } from '@crossauth/backend';
 import { FastifyServer } from '@crossauth/fastify'
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
@@ -41,7 +47,7 @@ app.register(view, {
 const prisma = new PrismaClient();
 let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email"});
 let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
-
+let clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
 let totpAuthenticator = new TotpAuthenticator("FastifyTest");
 let emailAuthenticator = new EmailAuthenticator();
@@ -61,6 +67,9 @@ let server = new FastifyServer(userStorage, {
         allowedFactor2: "none, totp, email",
         enableEmailVerification: false,
         siteUrl: `http://localhost:${port}`,
+        clientStorage: clientStorage,
+        enableAdminEndpoints: true,
+        enableOAuthClientManagement: true,
 });
 
 // create our home page

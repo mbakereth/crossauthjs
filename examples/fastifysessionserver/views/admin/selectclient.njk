@@ -1,0 +1,94 @@
+<html>
+    <head>
+        <title>Select Client</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+        <script>
+            function previousPage() {
+                const skipEl = document.getElementById("skip");
+                const takeEl = document.getElementById("take");
+                let skip = Number(skipEl.value);
+                let take = Number(takeEl.value);
+                if (take > 0) {
+                    skip -= take;
+                    if (skip < 0) skip = 0;
+                } else {
+                    skip = 0;
+                }
+                skipEl.value = skip;
+                takeEl.value = take;
+                const form = document.getElementById("tableForm");
+                form.submit();
+            }
+            function nextPage() {
+                const skipEl = document.getElementById("skip");
+                const takeEl = document.getElementById("take");
+                let skip = Number(skipEl.value);
+                let take = Number(takeEl.value);
+                if (take > 0) {
+                    skip += take;
+                }
+                skipEl.value = skip;
+                takeEl.value = take;
+                const form = document.getElementById("tableForm");
+                form.submit();
+            }
+        </script>
+    </head>
+    <body>
+        {% if user %}
+            <h1>Select Client for {{ user.username }}</h1>
+        {% else %}
+            <h1>Select Client</h1>
+                <p>
+                    These are clients not associated with a user.  For clients
+                    that are associated with a user, select that user from the
+                    <a href="/admin/selectuser">users page</a>.
+                </p>
+        {% endif %}
+            <form>
+            <p>
+                <label for="search">Search</label><br>
+                <input type="text"id="search" name="search" size="20" value="{{ search }}" onkeyup="search()" />
+                <input type="hidden" name="next" value="{{ next }}"/>
+                <input type="hidden" id="userId" name="userId" value="{{ user.id }}"/>
+            </p>
+            </form>
+            <form id="tableForm">
+                <input type="hidden" name="next" value="{{ next }}"/>
+                <input type="hidden" id="skip" name="skip" value="{{ skip }}"/>
+                <input type="hidden" id="take" name="take" value="{{ take }}"/>
+                <input type="hidden" id="userId" name="userId" value="{{ user.id }}"/>
+
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Client ID</th>
+                        <th>Action</th>
+                    </tr>
+                {% for client in clients %}  
+                    <tr>
+                        <td>{{ client.clientName }}</th>
+                        <td>{{ client.clientId }}</th>
+                        {% if user %}
+                            <td><a href="updateclient/{{ user.id }}/{{ client.clientId }}">Edit...</a></th>
+                        {% else %}
+                            <td><a href="updateclient/{{ client.clientId }}">Edit...</a></th>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                <p>
+                    {% if havePrevious %}
+                        <button type="button" onclick="previousPage()">Previous</button>
+                    {% endif %}
+                    {% if haveNext %}
+                        <button type="button" onclick="nextPage()">Next</button>
+                    {% endif %}
+                    </p>
+                </table>
+            </form>
+
+        <p><a href="createclient{% if user %}?userId={{ user.id}}{% endif%}">Create client</a></p>
+        <p><a href="/admin/">Admin Home</a></p>
+    </body>
+</html>
+

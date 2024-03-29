@@ -10,7 +10,8 @@ import {
     setParameter,
     ParamType,
     Authenticator,
-    Hasher } from '@crossauth/backend';
+    Hasher, 
+    OAuthClientManager} from '@crossauth/backend';
 import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
 import {
     CrossauthError,
@@ -420,7 +421,7 @@ export class FastifyAuthorizationServer {
             }))
             try {
                 const client = 
-                    await this.clientStorage.getClient(query.client_id);
+                    await this.clientStorage.getClientById(query.client_id);
                 
                 return reply.view(this.oauthAuthorizePage, {
                     user: request.user,
@@ -536,7 +537,7 @@ export class FastifyAuthorizationServer {
                 errorCodeName: ce.codeName
             }));
             try {
-                OAuthAuthorizationServer.validateUri(redirectUri);
+                OAuthClientManager.validateUri(redirectUri);
                 return reply.redirect(redirectUri); 
             } catch (e) {
                 CrossauthLogger.logger.error(j({

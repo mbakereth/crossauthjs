@@ -1,5 +1,9 @@
 import jwt, { type Algorithm } from 'jsonwebtoken';
 import {
+    OAuthClientManager,
+    type OAuthClientManagerOptions
+} from './clientmanager';
+import {
     KeyStorage,
     UserStorage,
     OAuthClientStorage,
@@ -23,10 +27,6 @@ import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, type JsonWebKey } from 'crypto'
 import fs from 'node:fs';
 
-const CLIENT_ID_LENGTH = 16;
-const CLIENT_SECRET_LENGTH = 32;
-
-
 function algorithm(value : string) : Algorithm {
     switch (value) {
         case "HS256":
@@ -48,22 +48,13 @@ function algorithm(value : string) : Algorithm {
         "Invalid JWT signing algorithm " + value)
 }
 
-export interface OAuthAuthorizationServerOptions {
+export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptions {
 
     /** JWT issuer, eg https://yoursite.com.  Required (no default) */
     oauthIssuer? : string,
 
     /** JWT issuer, eg https://yoursite.com.  Required (no default) */
     resourceServers? : string,
-
-    /** PBKDF2 HMAC for hashing client secret */
-    oauthPbkdf2Digest? : string;
-
-    /** PBKDF2 iterations for hashing client secret */
-    oauthPbkdf2Iterations? : number;
-
-    /** PBKDF2 key length for hashing client secret */
-    oauthPbkdf2KeyLength? : number;
 
     /** If true, only redirect Uri's registered for the client will be 
      * accepted */
@@ -185,12 +176,10 @@ export class OAuthAuthorizationServer {
         private userStorage? : UserStorage;
         private authenticators : {[key:string] : Authenticator} = {};
         private authStorage? : OAuthAuthorizationStorage;
+        clientManager : OAuthClientManager;
 
         private oauthIssuer : string = "";
         private resourceServers : string[]|null = null;
-        private oauthPbkdf2Digest = "sha256";
-        private oauthPbkdf2Iterations = 40000;
-        private oauthPbkdf2KeyLength = 32;
         private requireRedirectUriRegistration = true;
         private requireClientSecretOrChallenge = true;
         private jwtAlgorithm = "RS256";
@@ -232,13 +221,11 @@ export class OAuthAuthorizationServer {
         if (authenticators) {
             this.authenticators = authenticators;
         }
+        this.clientManager = new OAuthClientManager({clientStorage, ...options});
 
         setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
         setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
         setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
-        setParameter("oauthPbkdf2Digest", ParamType.String, this, options, "OAUTH_PBKDF2_DIGEST");
-        setParameter("oauthPbkdf2KeyLength", ParamType.String, this, options, "OAUTH_PBKDF2_KEYLENGTH");
-        setParameter("requireRedirectUriRegistration", ParamType.Boolean, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
         setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
         setParameter("codeLength", ParamType.Number, this, options, "OAUTH_CODE_LENGTH");
@@ -379,7 +366,7 @@ export class OAuthAuthorizationServer {
         // validate client
         let client : OAuthClient;
         try {
-            client = await this.clientStorage.getClient(clientId);
+            client = await this.clientStorage.getClientById(clientId);
         }
         catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -570,7 +557,7 @@ export class OAuthAuthorizationServer {
 
     }
 
-    async getClient(clientId : string) : 
+    async getClientById(clientId : string) : 
         Promise<{
             client?: OAuthClient,
             error?: string,
@@ -578,7 +565,7 @@ export class OAuthAuthorizationServer {
     }> {
         let client : OAuthClient;
         try {
-            client = await this.clientStorage.getClient(clientId);
+            client = await this.clientStorage.getClientById(clientId);
             return {client};
         } catch (e) {
             return {
@@ -633,7 +620,7 @@ export class OAuthAuthorizationServer {
         }
 
         // get client
-        const clientResponse = await this.getClient(clientId);
+        const clientResponse = await this.getClientById(clientId);
         if (!clientResponse.client) return clientResponse;    
         const client = clientResponse.client;
 
@@ -1180,7 +1167,7 @@ export class OAuthAuthorizationServer {
         const flow = OAuthFlows.PasswordMfa;
 
         // get client
-        const clientResponse = await this.getClient(clientId);
+        const clientResponse = await this.getClientById(clientId);
         if (!clientResponse.client) return clientResponse;    
         const client = clientResponse.client;
 
@@ -1336,7 +1323,7 @@ export class OAuthAuthorizationServer {
 
         // validate redirect uri
         const decodedUri = redirectUri; 
-        OAuthAuthorizationServer.validateUri(decodedUri);
+        OAuthClientManager.validateUri(decodedUri);
         if (this.requireRedirectUriRegistration && 
             !client.redirectUri.includes(decodedUri)) {
             return {
@@ -1830,58 +1817,6 @@ export class OAuthAuthorizationServer {
 
     }
 
-    async createClient(name: string,
-        redirectUri: string[],
-        validFlow?: string[],
-        confidential = true) : Promise<OAuthClient> {
-        const clientId = OAuthAuthorizationServer.randomClientId();
-        let clientSecret : string|undefined = undefined;
-        if (confidential) {
-            const plaintext = OAuthAuthorizationServer.randomClientSecret();
-            clientSecret = await Hasher.passwordHash(plaintext, {
-                encode: true,
-                iterations: this.oauthPbkdf2Iterations,
-                keyLen: this.oauthPbkdf2KeyLength,
-                digest: this.oauthPbkdf2Digest,
-            });
-        }
-        redirectUri.forEach((uri) => {
-            OAuthAuthorizationServer.validateUri(uri);
-        });
-        if (!validFlow) {
-            validFlow = OAuthFlows.allFlows();
-        }
-        const client = {
-            clientId: clientId,
-            clientSecret: clientSecret,
-            clientName : name,
-            redirectUri : redirectUri,
-            confidential: confidential,
-            validFlow: validFlow,
-        }
-        return await this.clientStorage.createClient(client);
-    }
-
-    static validateUri(uri : string) {
-        let valid = false;
-        try {
-            const validUri = new URL(uri);
-            valid = validUri.hash.length == 0;
-        } catch (e) {
-            // test if its a valid relative url
-            try {
-                const validUri = new URL(uri);
-                valid = validUri.hash.length == 0;
-            } catch (e2) {
-                CrossauthLogger.logger.debug(j({err: e}));
-            }
-        }
-        if (!valid) {
-            throw CrossauthError.fromOAuthError("invalid_request", 
-            `Invalid redirect Uri ${uri}`);
-        }
-    }
-
     redirectUri(redirectUri : string, code : string, state : string) : string {
         const sep = redirectUri.includes("?") ? "&" : "?";
         return `${redirectUri}${sep}code=${code}&state=${state}`;
@@ -1973,20 +1908,6 @@ export class OAuthAuthorizationServer {
         if (!(/^[A-Za-z0-9_-]+$/.test(state))) {
             throw CrossauthError.fromOAuthError("invalid_request");
         }
-    }
-
-    /**
-     * Create a random OAuth client id
-     */
-    static randomClientId() : string {
-        return Hasher.randomValue(CLIENT_ID_LENGTH)
-    }
-
-     /**
-     * Create a random OAuth client secret
-     */
-    static randomClientSecret() : string {
-        return Hasher.randomValue(CLIENT_SECRET_LENGTH)
     }
 
     validateAuthorizeParameters({

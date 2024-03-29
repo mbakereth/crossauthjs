@@ -1,4 +1,4 @@
-import { OAuthClient } from '@crossauth/backend';
+import { OAuthClientBackend } from '@crossauth/backend';
 import { read } from 'read';
 
 import {
@@ -12,7 +12,7 @@ async function main() {
 
     CrossauthLogger.logger.level = CrossauthLogger.None;
 
-    const oauthClient = new OAuthClient(
+    const oauthClient = new OAuthClientBackend(
         process.env["AUTHORIZATION_SERVER"], { 
         clientId: process.env["CLIENT_ID"],
         clientSecret: process.env["CLIENT_SECRET"],

@@ -37,9 +37,11 @@ export type { PasswordHash } from './hasher';
 // OAuth
 export { OAuthAuthorizationServer } from './oauth/authserver';
 export type { OAuthAuthorizationServerOptions } from './oauth/authserver';
-export { OAuthClient } from './oauth/client';
+export { OAuthClientBackend } from './oauth/client';
 export type { OAuthClientOptions } from './oauth/client';
 export { OAuthResourceServer } from './oauth/resserver';
 export type{ OAuthResourceServerOptions } from './oauth/resserver';
 export { OAuthBackendTokenConsumer } from './oauth/tokenconsumer';
 export type { OAuthBackendTokenConsumerOptions } from './oauth/tokenconsumer';
+export { OAuthClientManager } from './oauth/clientmanager';
+export type { OAuthClientManagerOptions } from './oauth/clientmanager';

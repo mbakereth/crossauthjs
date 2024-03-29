@@ -24,6 +24,7 @@ model User {
     session             Key[]
     secrets             UserSecrets?
     authorization       OAuthAuthorization[]
+    oauthClients        OAuthClient[]
 
     @@index([id])
     @@index([username])
@@ -55,12 +56,15 @@ model OAuthClient {
     confidential   Boolean                   @default(true)
     clientName     String
     clientSecret   String?
+    user_id        Int?
 
     redirectUri    OAuthClientRedirectUri[]
     validFlow      OAuthClientValidFlow[]
     authorization  OAuthAuthorization[]
+    user           User?     @relation(references: [id], fields: [user_id], onDelete: Cascade)
 
     @@index([clientId])
+    @@index([user_id])
 }
 
 model OAuthClientRedirectUri {

@@ -326,28 +326,28 @@ export class PrismaUserStorage extends UserStorage {
 
    }
 
-async getUsers(skip? : number, take? : number) : Promise<User[]> {
-    let opts : {[key:string]:number} = {};
-    if (skip) opts.skip = skip;
-    if (take) opts.take = take;
+    async getUsers(skip? : number, take? : number) : Promise<User[]> {
+        let opts : {[key:string]:number} = {};
+        if (skip) opts.skip = skip;
+        if (take) opts.take = take;
 
-    try {
-        // @ts-ignore  (because types only exist when do prismaClient.table...)
-        return await this.prismaClient[this.userTable].findMany({
-            ...opts,
-            orderBy: [
-                {
-                    usernameNormalized: 'asc',
-                },
-            ],
-            include: this.includesObject,
-        });
-    }  catch (e) {
-        CrossauthLogger.logger.error(j({err: e}));
-        throw new CrossauthError(ErrorCode.Connection, "Couldn't select from user table")
+        try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            return await this.prismaClient[this.userTable].findMany({
+                ...opts,
+                orderBy: [
+                    {
+                        usernameNormalized: 'asc',
+                    },
+                ],
+                include: this.includesObject,
+            });
+        }  catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            throw new CrossauthError(ErrorCode.Connection, "Couldn't select from user table")
+        }
+        
     }
-      
-}
 
 
 }
@@ -720,8 +720,12 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         }
     }
 
-    async getClient(clientId : string) : Promise<OAuthClient> {
-        return await this.getClientWithTransaction(clientId, this.prismaClient);
+    async getClientById(clientId : string) : Promise<OAuthClient> {
+        return (await this.getClientWithTransaction("clientId", clientId, this.prismaClient, true, undefined))[0];
+    }
+
+    async getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]> {
+        return await this.getClientWithTransaction("clientName", name, this.prismaClient, false, userId);
     }
 
     /**
@@ -730,26 +734,52 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
      * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
-    private async getClientWithTransaction(clientId : string, tx : any) : Promise<OAuthClient> {
+    private async getClientWithTransaction(field : string, value : string, tx : any, unique : boolean, userId : string|number|null|undefined) : Promise<OAuthClient[]> {
+        const userWhere = (userId == undefined && !(userId === null)) ? {} : {user_id: userId};
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
-            let client = await tx[this.clientTable].findUniqueOrThrow({
-                where: {
-                    clientId: clientId
-                },
-                include: {redirectUri: true, validFlow: true},
-            });
-            const redirectUriObjects = client.redirectUri;
-            const validFlowObjects = client.validFlow;
-            return {
-                ...client, 
-                clientSecret: client.clientSecret??undefined, 
-                redirectUri: redirectUriObjects.map((x:{[key:string]:any}) => x.uri), 
-                validFlow: validFlowObjects.map((x:{[key:string]:any}) => x.flow)
-            };
+            if (unique) {
+                const client = await tx[this.clientTable].findUniqueOrThrow({
+                    where: {
+                        [field]: value,
+                        ...userWhere,
+                    },
+                    include: {redirectUri: true, validFlow: true},
+                });
+                const redirectUriObjects = client.redirectUri;
+                const validFlowObjects = client.validFlow;
+                let userId = client.user_id;
+                if (userId === null) userId = undefined;
+                return [{
+                    ...client, 
+                    userId : userId,
+                    clientSecret: client.clientSecret??undefined, 
+                    redirectUri: redirectUriObjects.map((x:{[key:string]:any}) => x.uri), 
+                    validFlow: validFlowObjects.map((x:{[key:string]:any}) => x.flow)
+                }];
+            } else {
+                const clients = await tx[this.clientTable].findMany({
+                    where: {
+                        [field]: value,
+                        ...userWhere,
+                    },
+                    include: {redirectUri: true, validFlow: true},
+                });
+                for (let client of clients) {
+                    const redirectUriObjects = client.redirectUri;
+                    const validFlowObjects = client.validFlow;
+                    let userId = client.user_id;
+                    if (userId == null) userId = undefined;    
+                    client.userId = userId;
+                    client.clientSecret = client.clientSecret??undefined;
+                    client.redirectUri = redirectUriObjects.map((x:{[key:string]:any}) => x.uri);
+                    client.validFlow = validFlowObjects.map((x:{[key:string]:any}) => x.flow)
+                }
+                return clients;
+                }
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({msg: "Invalid OAuth client id", clientId: clientId, cerr: e}))
+            CrossauthLogger.logger.error(j({msg: "Invalid OAuth client", [field]: value, cerr: e}))
             throw new CrossauthError(ErrorCode.InvalidClientId);
         }
     }
@@ -774,9 +804,9 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      */
     private async createClientWithTransaction(client : OAuthClient, tx : any) : Promise<OAuthClient> {
         const maxAttempts = 10;
-        const {redirectUri, validFlow, ...prismaClientData} = client;
+        const {redirectUri, validFlow, userId, ...prismaClientData} = client;
         let newClient : OAuthClient|undefined;
-
+        if (userId) prismaClientData.user_id = userId;
         // validate redirect uri
         for (let i=0; i<redirectUri.length; ++i) {
             if (redirectUri[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
@@ -790,7 +820,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
 
         // validate valid flows
         for (let i=0; i<validFlow.length; ++i) {
-            if (!OAuthFlows.isValidFlow(validFlow[0])) throw new CrossauthError(ErrorCode.InvalidOAuthFlow, "Redirect Uri's may not contain page fragments");
+            if (!OAuthFlows.isValidFlow(validFlow[i])) throw new CrossauthError(ErrorCode.InvalidOAuthFlow, "Invalid flow " + validFlow[i]);
         }
         
         
@@ -1014,6 +1044,49 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             }    
         }
 
+    }
+
+    async getClients(skip? : number, take? : number, userId? : string|number|null) : Promise<OAuthClient[]> {
+        let opts : {[key:string]:number} = {};
+        if (skip) opts.skip = skip;
+        if (take) opts.take = take;
+
+        try {
+            let clients : OAuthClient[] = [];
+            if (userId || userId === null) {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                clients = await this.prismaClient[this.clientTable].findMany({
+                    ...opts,
+                    where: {
+                        user_id: userId,
+                    },
+                    orderBy: [
+                        {
+                            clientName: 'asc',
+                        },
+                    ],
+                });
+            } else {
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                clients = await this.prismaClient[this.clientTable].findMany({
+                    ...opts,
+                    orderBy: [
+                        {
+                            clientName: 'asc',
+                        },
+                    ],
+                });
+            } 
+
+            clients.forEach((client) => {
+                client.userId = client.user_id===null ? undefined : client.user_id; 
+                return client});
+            return clients;
+        }  catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            throw new CrossauthError(ErrorCode.Connection, "Couldn't select from client table")
+        }
+        
     }
 }
 

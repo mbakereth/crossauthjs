@@ -1,8 +1,8 @@
 import { test, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage } from '../prismastorage';
-import { CrossauthError } from '@crossauth/common';
 import { PrismaClient } from '@prisma/client';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
+import { OAuthClient } from '@crossauth/common';
 
 //export var prismaClient : PrismaClient;
 export var userStorage : PrismaUserStorage;
@@ -202,21 +202,83 @@ test("PrismaStorage.deleteMatchingForUser", async() => {
 
 test('PrismaStorage.createGetAndDeleteClient', async () => {
     const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+
     const client = {
         clientId : "ABC1",
         clientSecret: "DEF",
         clientName: "Test",
         redirectUri: [],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
-    const getClient = await clientStorage.getClient(client.clientId);
+    const getClient = await clientStorage.getClientById(client.clientId);
     expect(getClient.clientSecret).toBe(client.clientSecret);
     await clientStorage.deleteClient(client.clientId);
-    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError();
+    await expect(async () => {await clientStorage.getClientById(client.clientId)}).rejects.toThrowError();
+});
+
+test('PrismaStorage.getClientByName', async () => {
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    const client = {
+        clientId : "ABC1",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: [],
+        validFlow: [],
+        confidential: true,
+    }
+    await clientStorage.createClient(client);
+    const getClients = await clientStorage.getClientByName(client.clientName);
+    expect(getClients[0].clientName).toBe(client.clientName);
+});
+
+test('PrismaStorage.getClients', async () => {
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    let client : OAuthClient = {
+        clientId : "ABC1",
+        clientSecret: "DEF",
+        clientName: "Test1",
+        redirectUri: [],
+        validFlow: [],
+        confidential: true,
+    }
+    await clientStorage.createClient(client);
+
+    client = {
+        clientId : "ABC2",
+        clientSecret: "DEF",
+        clientName: "Test2",
+        redirectUri: [],
+        validFlow: [],
+        confidential: true,
+    }
+    await clientStorage.createClient(client);
+
+    const {user} = await userStorage.getUserByUsername("bob");
+    client = {
+        clientId : "ABC3",
+        clientSecret: "DEF",
+        clientName: "Test3",
+        redirectUri: [],
+        validFlow: [],
+        confidential: true,
+        userId : user.id,
+    }
+    await clientStorage.createClient(client);
+
+    let getClients = await clientStorage.getClients();
+    expect(getClients.length).toBe(3);
+    getClients = await clientStorage.getClients(undefined, undefined, null)
+    expect(getClients.length).toBe(2);
+    getClients = await clientStorage.getClients(undefined, undefined, user.id)
+    expect(getClients.length).toBe(1);
 });
 
 test('PrismaStorage.createClientWithRedirectUris', async () => {
+    await prismaClient.oAuthClient.deleteMany({});
     const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
     const client = {
         clientId : "ABC2",
@@ -224,15 +286,16 @@ test('PrismaStorage.createClientWithRedirectUris', async () => {
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
-    const getClient = await clientStorage.getClient(client.clientId);
+    const getClient = await clientStorage.getClientById(client.clientId);
     expect(getClient.clientSecret).toBe(client.clientSecret);
     expect(getClient.redirectUri.length).toBe(2);
     expect(["http://client.com/uri1", "http://client.com/uri2"]).toContain(getClient.redirectUri[0]);
     expect(["http://client.com/uri1", "http://client.com/uri2"]).toContain(getClient.redirectUri[1]);
     await clientStorage.deleteClient(client.clientId);
-    await expect(async () => {await clientStorage.getClient(client.clientId)}).rejects.toThrowError();
+    await expect(async () => {await clientStorage.getClientById(client.clientId)}).rejects.toThrowError();
 });
 
 test('PrismaStorage.createAndUpdateClient', async () => {
@@ -243,10 +306,11 @@ test('PrismaStorage.createAndUpdateClient', async () => {
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
     await clientStorage.updateClient({clientId: client.clientId, redirectUri: ["http://client.com/uri3"]});
-    const getClient = await clientStorage.getClient(client.clientId);
+    const getClient = await clientStorage.getClientById(client.clientId);
     expect(getClient.redirectUri.length).toBe(1);
     expect(getClient.redirectUri[0]).toBe("http://client.com/uri3");
 });
@@ -258,15 +322,16 @@ test('PrismaStorage.createAndUpdateValidFlows', async () => {
         clientSecret: "DEF",
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
-        validFlow: ["AuthorizationCode", "AuthorizationCodeWithPKCE"],
+        validFlow: ["authorizationCode", "authorizationCodeWithPKCE"],
+        confidential: true,
     }
     await clientStorage.createClient(client);
-    const getClient1 = await clientStorage.getClient(client.clientId);
+    const getClient1 = await clientStorage.getClientById(client.clientId);
     expect(getClient1.validFlow.length).toBe(2);
-    await clientStorage.updateClient({clientId: client.clientId, validFlow: ["ClientCredentials"]});
-    const getClient2 = await clientStorage.getClient(client.clientId);
+    await clientStorage.updateClient({clientId: client.clientId, validFlow: ["clientCredentials"]});
+    const getClient2 = await clientStorage.getClientById(client.clientId);
     expect(getClient2.validFlow.length).toBe(1);
-    expect(getClient2.validFlow[0]).toBe("ClientCredentials");
+    expect(getClient2.validFlow[0]).toBe("clientCredentials");
 });
 
 test('PrismaStorage.createInvalidFlow', async () => {
@@ -276,7 +341,8 @@ test('PrismaStorage.createInvalidFlow', async () => {
         clientSecret: "DEF",
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
-        validFlow: ["AuthorizationCodeX"],
+        validFlow: ["authorizationCodeX"],
+        confidential: true,
     }
     await expect(async () => {await clientStorage.createClient(client)}).rejects.toThrowError();
 });
@@ -291,6 +357,7 @@ test("PrismaAuthorization.createAndGetForUser", async () => {
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
     const client2 = {
@@ -299,6 +366,7 @@ test("PrismaAuthorization.createAndGetForUser", async () => {
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client2);
     const {user: bob} = await userStorage.getUserByUsername("bob");
@@ -323,6 +391,7 @@ test("PrismaAuthorization.createAndGetWrongClient", async () => {
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
     const {user: bob} = await userStorage.getUserByUsername("bob");
@@ -342,6 +411,7 @@ test("PrismaAuthorization.createAndGetWrongUser", async () => {
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
     const {user: bob} = await userStorage.getUserByUsername("bob");
@@ -362,6 +432,7 @@ test("PrismaAuthorization.createAndGetForClient", async () => {
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
     const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient});
@@ -382,6 +453,7 @@ test("PrismaAuthorization.createAndGetForUserAndClientDontOverlap", async () => 
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
     const {user: bob} = await userStorage.getUserByUsername("bob");
@@ -410,6 +482,7 @@ test("PrismaAuthorization.createAndUpdateForUser", async () => {
         clientName: "Test",
         redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
         validFlow: [],
+        confidential: true,
     }
     await clientStorage.createClient(client);
     const {user: bob} = await userStorage.getUserByUsername("bob");

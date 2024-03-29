@@ -12,7 +12,7 @@ import {
     setParameter,
     ParamType,
     Hasher,
-    OAuthClient } from '@crossauth/backend';
+    OAuthClientBackend } from '@crossauth/backend';
 import type { OAuthClientOptions } from '@crossauth/backend';
 import { FastifyServer, type FastifyErrorFn } from './fastifyserver';
 import type { CsrfBodyType } from './fastifysession.ts';
@@ -391,7 +391,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
 ///////////////////////////////////////////////////////////////////////////////
 // CLASSES
 
-export class FastifyOAuthClient extends OAuthClient {
+export class FastifyOAuthClient extends OAuthClientBackend {
     server : FastifyServer;
     private siteUrl : string = "/";
     private prefix : string = "/";

@@ -1,0 +1,91 @@
+<html>
+    <head>
+        <title>Create an account</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+    </head>
+    <body>
+        <h1>Create an OAuth Client
+            {% if user %}
+            for {{ user.username}}
+            {% endif %}
+        </h1>
+        {% if message %}
+            <p class="success">{{ message }}</p>
+            {% if client %}
+            <table>
+                {% if userId %}
+                    <tr>
+                        <td>User ID</td><td>{{ client.user_id }}</td>
+                    </tr>
+                {% endif %}
+                <tr>
+                    <td>Client ID</td><td>{{ client.clientId }}</td>
+                </tr>
+                <tr>
+                    <td>Confidential</td><td>{{ client.confidential }}</td>
+                </tr>
+                <tr>
+                    <td>Client Secret</td><td>{{ client.clientSecret or "None Set" }}</td>
+                </tr>
+                <tr>
+                    <td>Redirect URIs</td>
+                    <td>
+                        {% for uri in client.redirectUri%}
+                            {{ uri }}<br>
+                        {%endfor %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Flows</td>
+                    <td>
+                        {% for flow in client.validFlow%}
+                            {{ flow }}<br>
+                        {%endfor %}
+                    </td>
+                </tr>
+            </table>
+            {% if client.clientSecret %}
+                <p>Make sure you write the client secret down.  If you lose it,
+                    you will have to reset it.</p>
+                {% endif %}
+            {% endif %}
+        {% else %}
+            {% if errorMessage %}
+                <p class="error">
+                    {{ errorMessage }}
+                </p>
+            {% endif %}
+            <form method="POST">
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                {% if user %}
+                    <input type="hidden" name="userId" value="{{ user.id }}"/>
+                {% endif %}
+                <p>
+                    <label for="clientName">Friendly name</label><br>
+                    <input type="text" name="clientName" size="20" value="{{ clientName }}" />
+                </p>
+                <p>
+                    <input type="checkbox" name="confidential" value="true" 
+                        {% if confidential %}checked{% endif %}/>
+                    <label for="password">Confidential</label>
+                    
+                </p>
+                <p>
+                    <label for="redirectUris">Redirect URIs (space separated)</label><br>
+                    <textarea name="redirectUris" rows="3" cols="40">{{ redirectUris }}</textarea>
+                </p>
+                <h3>Enabled Flows</h3>
+                {% for flow in validFlows %}
+                <input type="checkbox" name="{{ flow }}" value="true" 
+                    {% if flow == "true" %}checked{% endif %}> {{ flow }}</br>
+                {% endfor %}
+                <p><button type="submit">Create Client</button></p>
+            </form>
+        {% endif %}
+        {% if userId %}
+            <p><a href="/admin/selectuser">Back</a></p>
+        {% else %}
+            <p><a href="/admin/selectclient">Back</a></p>
+        {% endif %}
+    </body>
+</html>

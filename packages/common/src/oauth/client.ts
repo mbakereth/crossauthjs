@@ -8,14 +8,14 @@ import {
 
 export class OAuthFlows {
     static readonly All = "all";
-    static readonly AuthorizationCode = "AuthorizationCode";
-    static readonly AuthorizationCodeWithPKCE = "AuthorizationCodeWithPKCE";
-    static readonly ClientCredentials = "ClientCredentials";
-    static readonly RefreshToken = "RefreshToken";
-    static readonly DeviceCode = "DeviceCode";
-    static readonly Password = "Password";
-    static readonly PasswordMfa = "PasswordMfa";
-    static readonly OidcAuthorizationCode = "OidcAuthorizationCode";
+    static readonly AuthorizationCode = "authorizationCode";
+    static readonly AuthorizationCodeWithPKCE = "authorizationCodeWithPKCE";
+    static readonly ClientCredentials = "clientCredentials";
+    static readonly RefreshToken = "refreshToken";
+    static readonly DeviceCode = "deviceCode";
+    static readonly Password = "password";
+    static readonly PasswordMfa = "passwordMfa";
+    static readonly OidcAuthorizationCode = "oidcAuthorizationCode";
 
     static isValidFlow(flow : string) : boolean {
         return OAuthFlows.allFlows().includes(flow);

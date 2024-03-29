@@ -1,7 +1,7 @@
 import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, vi, beforeAll, afterAll } from 'vitest';
 import { getAccessToken } from './common';
-import { OAuthClient } from '../client'
+import { OAuthClientBackend } from '../client'
 import { OpenIdConfiguration } from '@crossauth/common';
 
 function get(name : string, url : string){
@@ -40,7 +40,7 @@ beforeAll(async () => {
 test('OAuthClient.startAuthorizationCodeFlow', async () => {
     const {code, access_token} = await getAccessToken();
     
-    const oauthClient = new OAuthClient("http://authserver.com", { 
+    const oauthClient = new OAuthClientBackend("http://authserver.com", { 
         clientId: "ABC",
         clientSecret: "DEF",
         redirectUri: "http://client.com/authzcode"
@@ -71,7 +71,7 @@ test('OAuthClient.startAuthorizationCodeFlow', async () => {
 
 test('OAuthClient.clientCredentialsFlow', async () => {
     
-    const oauthClient = new OAuthClient("http://authserver.com", { 
+    const oauthClient = new OAuthClientBackend("http://authserver.com", { 
         clientId: "ABC",
         clientSecret: "DEF",
         redirectUri: "http://client.com/authzcode"
@@ -99,7 +99,7 @@ test('OAuthClient.clientCredentialsFlow', async () => {
 
 test('OAuthClient.passwordFlow', async () => {
     
-    const oauthClient = new OAuthClient("http://authserver.com", { 
+    const oauthClient = new OAuthClientBackend("http://authserver.com", { 
         clientId: "ABC",
         clientSecret: "DEF",
         redirectUri: "http://client.com/authzcode"
