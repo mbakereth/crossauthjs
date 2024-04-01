@@ -1,0 +1,28 @@
+<html>
+    <head>
+        <title>Delete Client</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+    </head>
+    <body>
+        <div style="max-width: 640px; margin: auto;">
+        <h1>Delete Client</h1>
+        {% if message %}
+            <p class="success">{{ message }}</p>
+            <p><a href="{{ backUrl }}">OK</a></p>
+        {% elif errorMessage %}
+            <p class="error">{{ errorMessage }}</p>
+        {% else %}
+            <p>Do you really want to delete client {{ client.clientName }}?</p>
+            <form method="POST">
+                <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                <p>
+                    <button type="submit">Yes</button>
+                    <span style="min-width: 5ex">&nbsp;</span>
+                    <button type="button" onClick="window.location={{ backUrl }}">No</button>
+                </p>
+
+            </form>
+        {% endif %}
+        </div>
+    </body>
+</html>

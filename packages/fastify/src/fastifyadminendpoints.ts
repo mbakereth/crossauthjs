@@ -189,9 +189,9 @@ export class FastifyAdminEndpoints {
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
                     const ce = CrossauthError.asCrossauthError(e);
-                    const statusCode = 
-                        ce.httpStatus >= 400 && ce.httpStatus <= 499 ? 
-                            ce.httpStatus : 200;
+                    const statusCode = ce.httpStatus;
+                        /*ce.httpStatus >= 400 && ce.httpStatus <= 499 ? 
+                            ce.httpStatus : 200;*/
                     return reply.status(statusCode).view(this.adminCreateUserPage, {
                         errorMessage: error.message,
                         errorMessages: error.messages, 

@@ -124,6 +124,12 @@ export interface FastifySessionServerOptions
     /** Page to set up 2FA after sign up */
     configureFactor2Page? : string;
 
+    /** Confirm deleting a user */
+    deleteUserPage? : string,
+
+    /** Confirm deleting an OAuth client */
+    deleteClientPage? : string,
+
     /** Page to render error messages, including failed login. 
      * See the class documentation for {@link FastifyServer} for more info.  
      * Defaults to "error.njk".
@@ -218,6 +224,7 @@ export const SessionAdminPageEndpoints = [
 export const SessionAdminClientPageEndpoints = [
     "admin/selectclient",
     "admin/createclient",
+    "admin/deleteclient",
 ];
 
 /**
@@ -237,6 +244,7 @@ export const SessionAdminApiEndpoints = [
     "admin/api/changepassword",
     "admin/api/updateuser",
     "admin/api/changepassword",
+    "admin/api/deleteclient",
 ];
 
 export const SessionAdminClientApiEndpoints = [
@@ -1015,11 +1023,17 @@ export class FastifySessionServer {
             if (this.endpoints.includes("admin/selectclient")) {
                 this.adminClientEndpoints.addSelectClientEndpoints();
             }
-                if (this.endpoints.includes("admin/createclient")) {
+            if (this.endpoints.includes("admin/createclient")) {
                 this.adminClientEndpoints.addCreateClientEndpoints();
+            }
+            if (this.endpoints.includes("admin/deleteclient")) {
+                this.adminClientEndpoints.addDeleteClientEndpoints();
             }
             if (this.endpoints.includes("admin/api/createclient")) {
                 this.adminClientEndpoints.addApiCreateClientEndpoints();
+            }
+            if (this.endpoints.includes("admin/api/deleteclient")) {
+                this.adminClientEndpoints.addApiDeleteClientEndpoints();
             }
         }
     }

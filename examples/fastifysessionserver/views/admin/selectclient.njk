@@ -72,7 +72,10 @@
                         {% if user %}
                             <td><a href="updateclient/{{ user.id }}/{{ client.clientId }}">Edit...</a></th>
                         {% else %}
-                            <td><a href="updateclient/{{ client.clientId }}">Edit...</a></th>
+                            <td>
+                                <a href="updateclient/{{ client.clientId }}">Edit...</a>
+                                <a href="deleteclient/{{ client.clientId }}">Delete...</a>
+                            </td>
                         {% endif %}
                     </tr>
                 {% endfor %}

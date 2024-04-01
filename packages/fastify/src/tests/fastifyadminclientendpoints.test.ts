@@ -115,14 +115,104 @@ test('FastifyServer.admin.selectClientUser', async () => {
         confidential: true,
         redirectUri: ["http://example.com/redirect"],
         validFlow: OAuthFlows.allFlows(),
+        userId: user.id,
     };
     await clientStorage.createClient(client);
 
     res = await server.app.inject({
         method: "GET",
-        url: "/admin/selectclient?user="+user.id,
+        url: "/admin/selectclient?userId="+user.id,
         cookies: { SESSIONID: sessionCookie },
     });
     body = JSON.parse(res.body);
     expect(body.args.clients.length).toBe(1);
 });
+
+test('FastifyServer.admin.deleteClientNoUser', async () => {
+    const {server, clientStorage} = await makeAppWithOptions();
+    const {sessionCookie, csrfCookie, csrfToken} = await login(server);
+
+    let res;
+    let body;
+
+    const client = {
+        clientId : "ABC",
+        clientSecret: "DEF",
+        clientName: "Test",
+        confidential: true,
+        redirectUri: ["http://example.com/redirect"],
+        validFlow: OAuthFlows.allFlows(),
+    };
+    await clientStorage.createClient(client);
+
+    res = await server.app.inject({
+        method: "GET",
+        url: "/admin/deleteclient/ABC",
+        cookies: { SESSIONID: sessionCookie },
+    });
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("admin/deleteclient.njk");
+
+    res = await server.app.inject({
+        method: "POST",
+        url: "/admin/deleteclient/ABC",
+        cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie,  },
+        payload: { csrfToken: csrfToken },
+    });
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("admin/deleteclient.njk");
+    expect(body.args.message).toBe("Client deleted");
+
+    let clientStillExists = false;
+    try {
+        await clientStorage.getClientById("ABC");
+        clientStillExists = true;
+    } catch {}
+    expect(clientStillExists).toBe(false);
+});
+
+test('FastifyServer.admin.deleteClientUser', async () => {
+    const {server, clientStorage, userStorage} = await makeAppWithOptions();
+    const {sessionCookie, csrfCookie, csrfToken} = await login(server);
+
+    let res;
+    let body;
+
+    const {user} = await userStorage.getUserByUsername("bob");
+    const client = {
+        clientId : "ABC",
+        clientSecret: "DEF",
+        clientName: "Test",
+        confidential: true,
+        redirectUri: ["http://example.com/redirect"],
+        validFlow: OAuthFlows.allFlows(),
+        user_id: user.id,
+    };
+    await clientStorage.createClient(client);
+
+    res = await server.app.inject({
+        method: "GET",
+        url: "/admin/deleteclient/ABC",
+        cookies: { SESSIONID: sessionCookie },
+    });
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("admin/deleteclient.njk");
+
+    res = await server.app.inject({
+        method: "POST",
+        url: "/admin/deleteclient/ABC",
+        cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie,  },
+        payload: { csrfToken: csrfToken },
+    });
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("admin/deleteclient.njk");
+    expect(body.args.message).toBe("Client deleted");
+
+    let clientStillExists = false;
+    try {
+        await clientStorage.getClientById("ABC");
+        clientStillExists = true;
+    } catch {}
+    expect(clientStillExists).toBe(false);
+});
+

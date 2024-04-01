@@ -523,7 +523,7 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
         for (let i=skip; i<last; ++i) {
             if (userId === null) {
                 if (this.clients[keys[i]].userId == null) clients.push(this.clients[keys[i]]);
-            } else if (userId != undefined && userId != null) {
+            } else if (userId != undefined && userId !== null) {
                 if (this.clients[keys[i]].userId == userId) clients.push(this.clients[keys[i]]);
 
             } else {
