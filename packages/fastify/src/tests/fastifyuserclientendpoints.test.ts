@@ -43,7 +43,7 @@ test('FastifyServer.createClient', async () => {
     expect(body.args.client.clientId).toBeDefined();
     const newClient = await clientStorage.getClientById(body.args.client.clientId);
     expect(newClient.clientName).toBe("Test Client")
-    expect(newClient.user_id).toBe(user.id)
+    expect(newClient.userId).toBe(user.id)
 });
 
 test('FastifyServer.selectClientUser', async () => {
