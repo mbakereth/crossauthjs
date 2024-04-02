@@ -74,7 +74,7 @@ export class OAuthClientManager {
             redirectUri : redirectUri,
             confidential: confidential,
             validFlow: validFlow,
-            user_id: userId,
+            userId: userId,
         }
         return await this.clientStorage.createClient(client);
     }

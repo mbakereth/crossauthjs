@@ -28,6 +28,7 @@ import { FastifyServer } from './fastifyserver';
 import { FastifyUserEndpoints, type UpdateUserBodyType } from './fastifyuserendpoints'
 import { FastifyAdminEndpoints } from './fastifyadminendpoints'
 import { FastifyAdminClientEndpoints } from './fastifyadminclientendpoints'
+import { FastifyUserClientEndpoints } from './fastifyuserclientendpoints'
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 
@@ -227,6 +228,12 @@ export const SessionAdminClientPageEndpoints = [
     "admin/deleteclient",
 ];
 
+export const SessionClientPageEndpoints = [
+    "selectclient",
+    "createclient",
+    "deleteclient",
+];
+
 /**
  * API (JSON) endpoints that depend on sessions being enabled 
  */
@@ -244,12 +251,16 @@ export const SessionAdminApiEndpoints = [
     "admin/api/changepassword",
     "admin/api/updateuser",
     "admin/api/changepassword",
-    "admin/api/deleteclient",
 ];
 
 export const SessionAdminClientApiEndpoints = [
-    "admin/api/selectclient",
     "admin/api/createclient",
+    "admin/api/deleteclient",
+];
+
+export const SessionClientApiEndpoints = [
+    "api/deleteclient",
+    "api/createclient",
 ];
 
 /**
@@ -343,7 +354,9 @@ export const AllEndpoints = [
     ...SignupPageEndpoints,
     ...SignupApiEndpoints,
     ...SessionPageEndpoints,
+    ...SessionClientPageEndpoints,
     ...SessionApiEndpoints,
+    ...SessionClientApiEndpoints,
     ...SessionAdminPageEndpoints,
     ...SessionAdminClientPageEndpoints,
     ...SessionAdminApiEndpoints,
@@ -515,20 +528,15 @@ export class FastifySessionServer {
 
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
     readonly prefix : string = "/";
+    readonly loginUrl : string;
     private endpoints : string[] = [];
     loginRedirect = "/";
     logoutRedirect : string = "/";
     private signupPage : string = "signup.njk";
-    private configureFactor2Page : string = "configurefactor2.njk";
     private loginPage : string = "login.njk";
     private factor2Page : string = "factor2.njk";
+    private configureFactor2Page : string = "configurefactor2.njk";
     readonly errorPage : string = "error.njk";
-    private changePasswordPage : string = "changepassword.njk";
-    private changeFactor2Page : string = "changefactor2.njk";
-    private updateUserPage : string = "updateuser.njk";
-    private resetPasswordPage: string = "resetpassword.njk";
-    private requestPasswordResetPage: string = "requestpasswordreset.njk";
-    private emailVerifiedPage : string = "emailverified.njk";
     validateUserFn : (user : UserInputFields) 
         => string[] = defaultUserValidator;
     createUserFn: (request: FastifyRequest<{ Body: SignupBodyType }>,
@@ -547,6 +555,7 @@ export class FastifySessionServer {
     private userEndpoints : FastifyUserEndpoints;
     private adminEndpoints : FastifyAdminEndpoints;
     private adminClientEndpoints? : FastifyAdminClientEndpoints;
+    private userClientEndpoints? : FastifyUserClientEndpoints;
     readonly authenticators: {[key:string]: Authenticator}
     readonly allowedFactor2 : string[] = [];
 
@@ -584,17 +593,12 @@ export class FastifySessionServer {
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         if (!(this.prefix.endsWith("/"))) this.prefix += "/";
         if (!(this.prefix.startsWith("/"))) "/" + this.prefix;
+        this.loginUrl = this.prefix + "login";
         setParameter("signupPage", ParamType.String, this, options, "SIGNUP_PAGE");
-        setParameter("configureFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
         setParameter("loginPage", ParamType.String, this, options, "LOGIN_PAGE");
         setParameter("factor2Page", ParamType.String, this, options, "FACTOR2_PAGE");
+        setParameter("configureFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
-        setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
-        setParameter("changeFactor2Page", ParamType.String, this, options, "CHANGE_FACTOR2_PAGE");
-        setParameter("updateUser", ParamType.String, this, options, "UPDATE_USER_PAGE");
-        setParameter("resetPasswordPage", ParamType.String, this, options, "RESET_PASSWORD_PAGE");
-        setParameter("requestPasswordResetPage", ParamType.String, this, options, "REQUEST_PASSWORD_RESET_PAGE");
-        setParameter("emailVerifiedPage", ParamType.String, this, options, "EMAIL_VERIFIED_PAGE");
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
         setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
         setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
@@ -615,7 +619,7 @@ export class FastifySessionServer {
         this.endpoints = [...SignupPageEndpoints, ...SignupApiEndpoints];
         this.endpoints = [...this.endpoints, ...SessionPageEndpoints, ...SessionApiEndpoints];
         if (this.enableAdminEndpoints) this.endpoints = [...this.endpoints, ...SessionAdminPageEndpoints, ...SessionAdminApiEndpoints];
-        if (this.enableOAuthClientManagement) this.endpoints = [...this.endpoints, ...SessionAdminClientPageEndpoints, ...SessionAdminClientApiEndpoints];
+        if (this.enableOAuthClientManagement) this.endpoints = [...this.endpoints, ...SessionClientPageEndpoints, ...SessionClientApiEndpoints, ...SessionAdminClientPageEndpoints, ...SessionAdminClientApiEndpoints];
         if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
         if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
         if (options.endpoints) {
@@ -624,16 +628,29 @@ export class FastifySessionServer {
             if (this.endpoints.length == 1 && this.endpoints[0] == "allMinusOAuth") this.endpoints = AllEndpointsMinusOAuth;
         }
         if (this.allowedFactor2.length > 0) this.endpoints = [...this.endpoints, ...Factor2PageEndpoints, ...Factor2ApiEndpoints];
-        let addClientEndpoints = false;
+
+        let addAdminClientEndpoints = false;
         for (let endpoint of this.endpoints) {
             if (SessionAdminClientApiEndpoints.includes(endpoint) ||
                 SessionAdminClientPageEndpoints.includes(endpoint)) {
-                    addClientEndpoints = true;
+                    addAdminClientEndpoints = true;
                     break;
                 }
         }
-        if (addClientEndpoints) {
+        if (addAdminClientEndpoints) {
             this.adminClientEndpoints = new FastifyAdminClientEndpoints(this, options);
+        }
+
+        let addUserClientEndpoints = false;
+        for (let endpoint of this.endpoints) {
+            if (SessionClientApiEndpoints.includes(endpoint) ||
+                SessionClientPageEndpoints.includes(endpoint)) {
+                    addUserClientEndpoints = true;
+                    break;
+                }
+        }
+        if (addUserClientEndpoints) {
+            this.userClientEndpoints = new FastifyUserClientEndpoints(this, options);
         }
 
         this.addEndpoints();
@@ -893,41 +910,33 @@ export class FastifySessionServer {
         }
 
         if (this.endpoints.includes("configurefactor2")) {
-            this.userEndpoints.addConfigureFactor2Endpoints(this.prefix,
-                this.configureFactor2Page,
-                this.signupPage);
+            this.userEndpoints.addConfigureFactor2Endpoints();
         }
 
         if (this.endpoints.includes("changefactor2")) {
-            this.userEndpoints.addChangeFactor2Endpoints(this.prefix,
-                this.changeFactor2Page,
-                this.configureFactor2Page);
+            this.userEndpoints.addChangeFactor2Endpoints();
         }
 
         if (this.endpoints.includes("changepassword")) {
-            this.userEndpoints.addChangePasswordEndpoints(this.prefix,
-                this.changePasswordPage);
+            this.userEndpoints.addChangePasswordEndpoints();
         }
 
         if (this.endpoints.includes("updateuser")) {
-            this.userEndpoints.addUpdateUserEndpoints(this.prefix,
-                 this.updateUserPage);
+            this.userEndpoints.addUpdateUserEndpoints();
         }
 
         if (this.endpoints.includes("requestpasswordreset")) {
-            this.userEndpoints.addRequestPasswordResetEndpoints(this.prefix, 
-                this.requestPasswordResetPage);
+            this.userEndpoints.addRequestPasswordResetEndpoints();
         }
 
         if (this.endpoints.includes("resetpassword")) {
             if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /resetpassword");
-            this.userEndpoints.addResetPasswordEndpoints(this.prefix, this.resetPasswordPage);
+            this.userEndpoints.addResetPasswordEndpoints();
         }
 
         if (this.endpoints.includes("verifyemail")) {
             if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification must be enabled for /verifyemail");
-            this.userEndpoints.addVerifyEmailEndpoints(this.prefix, 
-                this.emailVerifiedPage);
+            this.userEndpoints.addVerifyEmailEndpoints();
         }
 
         if (this.endpoints.includes("logout")) {
@@ -959,30 +968,30 @@ export class FastifySessionServer {
         }
 
         if (this.endpoints.includes("api/changepassword")) {
-            this.userEndpoints.addApiChangePasswordEndpoints(this.prefix);
+            this.userEndpoints.addApiChangePasswordEndpoints();
         }
 
         if (this.endpoints.includes("api/changefactor2")) {
-            this.userEndpoints.addApiChangeFactor2Endpoints(this.prefix);
+            this.userEndpoints.addApiChangeFactor2Endpoints();
         }
 
         if (this.endpoints.includes("api/updateuser")) {
-            this.userEndpoints.addApiUpdateUserEndpoints(this.prefix);
+            this.userEndpoints.addApiUpdateUserEndpoints();
         }
 
         if (this.endpoints.includes("api/resetpassword")) {
             if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /api/resetpassword");
-            this.userEndpoints.addApiResetPasswordEndpoints(this.prefix);
+            this.userEndpoints.addApiResetPasswordEndpoints();
         }
 
         if (this.endpoints.includes("api/requestpasswordreset")) {
             if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /api/requestpasswordreset");
-            this.userEndpoints.addApiRequestPasswordResetEndpoints(this.prefix);
+            this.userEndpoints.addApiRequestPasswordResetEndpoints();
         }
 
         if (this.endpoints.includes("api/verifyemail")) {
             if (!this.enableEmailVerification) throw new CrossauthError(ErrorCode.Configuration, "Email verification must be enabled for /api/verifyemail");
-            this.userEndpoints.addApiVerifyEmailEndpoints(this.prefix);
+            this.userEndpoints.addApiVerifyEmailEndpoints();
         }
 
         if (this.endpoints.includes("api/userforsessionkey")) {
@@ -992,6 +1001,25 @@ export class FastifySessionServer {
         if (this.endpoints.includes("api/getcsrftoken")) {
             this.addApiGetCsrfTokenEndpoints();
     
+        }
+
+        // User client endpoints
+        if (this.userClientEndpoints) {
+            if (this.endpoints.includes("selectclient")) {
+                this.userClientEndpoints.addSelectClientEndpoints();
+            }
+            if (this.endpoints.includes("createclient")) {
+                this.userClientEndpoints.addCreateClientEndpoints();
+            }
+            if (this.endpoints.includes("deleteclient")) {
+                this.userClientEndpoints.addDeleteClientEndpoints();
+            }
+            if (this.endpoints.includes("api/createclient")) {
+                this.userClientEndpoints.addApiCreateClientEndpoints();
+            }
+            if (this.endpoints.includes("api/deleteclient")) {
+                this.userClientEndpoints.addApiDeleteClientEndpoints();
+            }
         }
 
         ///// Admin

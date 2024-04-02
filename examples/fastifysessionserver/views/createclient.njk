@@ -5,7 +5,7 @@
     </head>
     <body>
         <h1>Create an OAuth Client
-            {% if user %}
+            {% if user and isAdmin %}
             for {{ user.username}}
             {% endif %}
         </h1>
@@ -13,7 +13,7 @@
             <p class="success">{{ message }}</p>
             {% if client %}
             <table>
-                {% if userId %}
+                {% if userId and isAdmin %}
                     <tr>
                         <td>User ID</td><td>{{ client.user_id }}</td>
                     </tr>
@@ -57,6 +57,7 @@
             {% endif %}
             <form method="POST">
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                <input type="hidden" name="next" value="{{ next }}"/>
                 {% if user %}
                     <input type="hidden" name="userId" value="{{ user.id }}"/>
                 {% endif %}
@@ -82,10 +83,6 @@
                 <p><button type="submit">Create Client</button></p>
             </form>
         {% endif %}
-        {% if userId %}
-            <p><a href="/admin/selectuser">Back</a></p>
-        {% else %}
-            <p><a href="/admin/selectclient">Back</a></p>
-        {% endif %}
+        <p><a href="{{next}}">Back</a></p>
     </body>
 </html>

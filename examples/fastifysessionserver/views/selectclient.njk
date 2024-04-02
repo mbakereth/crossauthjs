@@ -36,7 +36,11 @@
     </head>
     <body>
         {% if user %}
-            <h1>Select Client for {{ user.username }}</h1>
+            {% if isAdmin %}
+                <h1>Select Client for {{ user.username }}</h1>
+            {% else %}
+                <h1>Select Client</h1>
+            {% endif %}
         {% else %}
             <h1>Select Client</h1>
                 <p>
@@ -69,14 +73,10 @@
                     <tr>
                         <td>{{ client.clientName }}</th>
                         <td>{{ client.clientId }}</th>
-                        {% if user %}
-                            <td><a href="updateclient/{{ user.id }}/{{ client.clientId }}">Edit...</a></th>
-                        {% else %}
-                            <td>
-                                <a href="updateclient/{{ client.clientId }}">Edit...</a>
-                                <a href="deleteclient/{{ client.clientId }}">Delete...</a>
-                            </td>
-                        {% endif %}
+                        <td>
+                            <a href="updateclient/{{ client.clientId }}?next={{ next }}">Edit...</a>
+                            <a href="deleteclient/{{ client.clientId }}?next={{ next }}">Delete...</a>
+                        </td>
                     </tr>
                 {% endfor %}
                 <p>
@@ -90,8 +90,13 @@
                 </table>
             </form>
 
-        <p><a href="createclient{% if user %}?userId={{ user.id}}{% endif%}">Create client</a></p>
-        <p><a href="/admin/">Admin Home</a></p>
+        {% if isAdmin %}
+            <p><a href="createclient?next={{next}}{% if user %}&userId={{ user.id}}{% endif%}">Create client</a></p>
+            <p><a href="/admin/">Admin Home</a></p>
+        {% else %}
+            <p><a href="createclient?next={{next}}">Create client</a></p>
+            <p><a href="/">Home</a></p>
+        {% endif %}
     </body>
 </html>
 

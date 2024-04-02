@@ -71,7 +71,7 @@ test('FastifyServer.admin.createClientWithUser', async () => {
     expect(body.args.client.clientId).toBeDefined();
     const newClient = await clientStorage.getClientById(body.args.client.clientId);
     expect(newClient.clientName).toBe("Test Client")
-    expect(newClient.user_id).toBe(user.id)
+    expect(newClient.userId).toBe(user.id)
 });
 
 test('FastifyServer.admin.selectClientNoUser', async () => {
@@ -151,7 +151,7 @@ test('FastifyServer.admin.deleteClientNoUser', async () => {
         cookies: { SESSIONID: sessionCookie },
     });
     body = JSON.parse(res.body);
-    expect(body.template).toBe("admin/deleteclient.njk");
+    expect(body.template).toBe("deleteclient.njk");
 
     res = await server.app.inject({
         method: "POST",
@@ -160,7 +160,7 @@ test('FastifyServer.admin.deleteClientNoUser', async () => {
         payload: { csrfToken: csrfToken },
     });
     body = JSON.parse(res.body);
-    expect(body.template).toBe("admin/deleteclient.njk");
+    expect(body.template).toBe("deleteclient.njk");
     expect(body.args.message).toBe("Client deleted");
 
     let clientStillExists = false;
@@ -186,7 +186,7 @@ test('FastifyServer.admin.deleteClientUser', async () => {
         confidential: true,
         redirectUri: ["http://example.com/redirect"],
         validFlow: OAuthFlows.allFlows(),
-        user_id: user.id,
+        userId: user.id,
     };
     await clientStorage.createClient(client);
 
@@ -196,7 +196,7 @@ test('FastifyServer.admin.deleteClientUser', async () => {
         cookies: { SESSIONID: sessionCookie },
     });
     body = JSON.parse(res.body);
-    expect(body.template).toBe("admin/deleteclient.njk");
+    expect(body.template).toBe("deleteclient.njk");
 
     res = await server.app.inject({
         method: "POST",
@@ -205,7 +205,7 @@ test('FastifyServer.admin.deleteClientUser', async () => {
         payload: { csrfToken: csrfToken },
     });
     body = JSON.parse(res.body);
-    expect(body.template).toBe("admin/deleteclient.njk");
+    expect(body.template).toBe("deleteclient.njk");
     expect(body.args.message).toBe("Client deleted");
 
     let clientStillExists = false;
@@ -215,4 +215,3 @@ test('FastifyServer.admin.deleteClientUser', async () => {
     } catch {}
     expect(clientStillExists).toBe(false);
 });
-

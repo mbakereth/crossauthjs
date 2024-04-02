@@ -1,25 +1,29 @@
 <html>
     <head>
-        <title>Delete Client</title>
+        <title>Delete User</title>
         <link rel="stylesheet" href="/public/style.css"/>
     </head>
     <body>
         <div style="max-width: 640px; margin: auto;">
-        <h1>Delete Client</h1>
+        <h1>Delete User</h1>
         {% if message %}
             <p class="success">{{ message }}</p>
-            <p><a href="{{ next }}">OK</a></p>
+            <p><a href="{{ backUrl }}">OK</a></p>
         {% elif errorMessage %}
             <p class="error">{{ errorMessage }}</p>
         {% else %}
-            <p>Do you really want to delete client {{ client.clientName }}?</p>
+            {% if isAdmin %}
+                <p>Do you really want to delete user {{ user.username }}?</p>
+            {% else %}
+                <p>Do you really want to delete your account?</p>
+                <p>All you data will be lost</p>
+            {% endif %}
             <form method="POST">
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
-                <input type="hidden" name="next" value="{{ next }}"/>
                 <p>
                     <button type="submit">Yes</button>
                     <span style="min-width: 5ex">&nbsp;</span>
-                    <button type="button" onClick="window.location={{ next }}">No</button>
+                    <button type="button" onClick="window.location={{ backUrl }}">No</button>
                 </p>
 
             </form>

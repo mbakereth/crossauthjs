@@ -12,83 +12,22 @@ import type { OAuthClient, User } from '@crossauth/common';
 import { FastifyServer } from './fastifyserver';
 import { FastifySessionServer } from './fastifysession';
 
-import type { FastifySessionServerOptions,
-    CsrfBodyType } from './fastifysession';
+import type { FastifySessionServerOptions, } from './fastifysession';
 import {
     setParameter,
     ParamType,
     OAuthClientManager,
     OAuthClientStorage } from '@crossauth/backend';
-
-export async function defaultClientSearchFn(searchTerm: string,
-    clientStorage: OAuthClientStorage, userId? : string|number|null) : Promise<OAuthClient[]> {
-        let clients : OAuthClient[] = [];
-    try {
-        const client = await clientStorage.getClientById(searchTerm)
-        clients.push(client);
-    } catch (e1) {
-        const ce1 = CrossauthError.asCrossauthError(e1);
-        if (ce1.code != ErrorCode.UserNotExist) {
-            CrossauthLogger.logger.debug(j({err: ce1}));
-            throw ce1;
-        }
-        try {
-            clients = 
-                await clientStorage.getClientByName(searchTerm, userId);
-            } catch (e2) {
-            const ce2 = CrossauthError.asCrossauthError(e2);
-            if (ce2.code != ErrorCode.UserNotExist) {
-                CrossauthLogger.logger.debug(j({err: ce2}));
-                throw ce1;
-            }
-        }
-    }
-    return clients;
-
-}
+import { defaultClientSearchFn } from './fastifyadminclientendpoints'
+import type {
+    SelectClientQueryType,
+    CreateClientQueryType,
+    CreateClientBodyType,
+    DeleteClientParamType,
+    DeleteClientQueryType } from './fastifyadminclientendpoints'
 
 /////////////////////////////////////////////////////////////////////
 // Fastify data types
-
-export interface SelectClientQueryType {
-    userId? : string|number,
-    next? : string,
-    search? : string,
-    user? : string|number,
-    skip? : number,
-    take? : number,
-    haveNext? : boolean,
-    havePrevious? : boolean,
-}
-
-export interface CreateClientQueryType {
-    next? : string;
-    userId? : string|number,
-}
-
-export interface CreateClientBodyType extends CsrfBodyType {
-    clientName : string,
-    confidential? : string,
-    userId? : string|number|null,
-    redirectUris : string,
-    authorizationCode? : string,
-    authorizationCodeWithPKCE? : string,
-    clientCredentials? : string,
-    refreshToken? : string,
-    deviceCode? : string,
-    password? : string,
-    passwordMfa? : string,
-    oidcAuthorizationCode? : string,
-    next? : string,
-}
-
-export interface DeleteClientParamType {
-    clientId : string
-}
-
-export interface DeleteClientQueryType {
-    next? : string
-}
 
 const JSONHDR : [string,string] = 
     ['Content-Type', 'application/json; charset=utf-8'];
@@ -96,11 +35,11 @@ const JSONHDR : [string,string] =
 ///////////////////////////////////////////////////////////////////////
 // Class
 
-export class FastifyAdminClientEndpoints {
+export class FastifyUserClientEndpoints {
     private sessionServer : FastifySessionServer;
     private clientStorage : OAuthClientStorage;
     private clientManager : OAuthClientManager;
-    private adminPrefix = "/admin/";
+    private prefix = "/";
     private clientSearchFn : 
         (searchTerm : string, clientStorage : OAuthClientStorage, userId? : string|number|null) => Promise<OAuthClient[]> =
         defaultClientSearchFn;
@@ -121,7 +60,7 @@ export class FastifyAdminClientEndpoints {
             "Must specify clientStorage if adding OAuth client endpoints");
         this.clientManager = new OAuthClientManager(options);
         this.clientStorage = options.clientStorage;
-        setParameter("adminPrefix", ParamType.String, this, options, "ADMIN_PREFIX");
+        setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("createClientPage", ParamType.String, this, options, "CREATE_CLIENT_PAGE");
         setParameter("selectClientPage", ParamType.String, this, options, "SELECT_CLIENT_PAGE");
         setParameter("deleteClientPage", ParamType.String, this, options, "DELETE_CLIENT_PAGE");
@@ -138,43 +77,37 @@ export class FastifyAdminClientEndpoints {
     // Endpoints
 
     addSelectClientEndpoints() {
-        this.sessionServer.app.get(this.adminPrefix+'selectclient', 
+        this.sessionServer.app.get(this.prefix+'selectclient', 
             async (request: FastifyRequest<{ Querystring: SelectClientQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: this.adminPrefix + 'selectclient',
+                    url: this.prefix + 'selectclient',
                     ip: request.ip
                 }));
-                if (!request?.user || !FastifyServer.isAdmin(request.user)) {
-                    return this.accessDeniedPage(request, reply);                    
+                if (!request?.user) {
+                    return reply.redirect(this.sessionServer.loginUrl + 
+                        "?next="+this.prefix+"selectclient");                 
                 }
-                const next = request.query.next ?? encodeURIComponent(request.url);
                 try {
                     let clients : OAuthClient[] = [];
                     let skip = Number(request.query.skip);
                     let take = Number(request.query.take);
                     if (!skip) skip = 0;
                     if (!take) take = 10;
-                    let userId : string|number|null = null;
-                    let user : User|undefined = undefined;
-                    if (request.query.userId) {
-                        const resp =
-                            await this.sessionServer.userStorage.getUserById(request.query.userId);
-                        user = resp.user;
-                        userId = user.id;
-                    }
                     if (request.query.search) {
                         clients = await this.clientSearchFn(request.query.search, 
-                            this.clientStorage, userId)
+                            this.clientStorage, request.user.id)
                     } else {
                         clients = 
                             await this.clientStorage.getClients(skip, 
-                                take, userId);
+                                take, request.user.id);
                     }
+                    const next = request.query.next ?? encodeURIComponent(request.url);
                     let data: {
                         urlprefix: string,
+                        next?: string,
                         user? : User,
                         skip: number,
                         take: number,
@@ -182,17 +115,16 @@ export class FastifyAdminClientEndpoints {
                         haveNext : boolean,
                         havePrevious : boolean,
                         isAdmin : boolean,
-                        next : string,
                     } = {
-                        urlprefix: this.adminPrefix,
-                        user : user,
+                        urlprefix: this.prefix,
+                        user : request.user,
                         skip: skip,
                         take: take,
                         clients: clients,
                         havePrevious: skip > 0,
                         haveNext : take != undefined && clients.length == take,
-                        isAdmin: true,
-                        next : next,
+                        isAdmin: false,
+                        next: next,
                     };
                 if (request.query.next) {
                     data["next"] = request.query.next;
@@ -212,86 +144,62 @@ export class FastifyAdminClientEndpoints {
 
     addCreateClientEndpoints() {
 
-        this.sessionServer.app.get(this.adminPrefix+'createclient', 
+        this.sessionServer.app.get(this.prefix+'createclient', 
             async (request: FastifyRequest<{ Querystring: CreateClientQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: this.adminPrefix + 'createclient',
+                    url: this.prefix + 'createclient',
                     ip: request.ip
                 }));
-                if (!request?.user || !FastifyServer.isAdmin(request.user)) {
-                    return this.accessDeniedPage(request, reply);                    
+                if (!request?.user) {
+                    return reply.redirect(this.sessionServer.loginUrl + 
+                        "?next="+this.prefix+"createclient");                 
                 }
-                let next = request.query.next;
-                if (!next) {
-                    if (request.query.userId) next = this.adminPrefix + "selectuser";
-                    else next = this.adminPrefix + "selectclient";
-                }
-                let user : User|undefined = undefined;
-                try {
-                    if (request.query.userId) {
-                        let resp = await this.sessionServer.userStorage.getUserById(request.query.userId);
-                        user = resp.user;
-                    }
-                } catch (e) {
-                    const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.debug(j({err: e}));
-                    return reply.status(ce.httpStatus).view(this.sessionServer.errorPage, {
-                        errorMessage: ce.message,
-                        errorMessages: ce.messages, 
-                        errorCode: ce.code, 
-                        errorCodeName: ErrorCode[ce.code], 
-                    });
-                }
+                const next = request.query.next ?? "/";
                 let data = {
-                    urlprefix: this.adminPrefix,
+                    urlprefix: this.prefix,
                     csrfToken: request.csrfToken,
                     validFlows: this.validFlows,
-                    user : user,
-                    isAdmin: true,
+                    user : request.user,
+                    isAdmin: false,
                     next: next,
                 };
             return reply.view(this.createClientPage, data);
         });
 
-        this.sessionServer.app.post(this.adminPrefix+'createclient', 
+        this.sessionServer.app.post(this.prefix+'createclient', 
             async (request: FastifyRequest<{ Body: CreateClientBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: this.adminPrefix + 'createclient',
+                    url: this.prefix + 'createclient',
                     ip: request.ip,
                     user: request.user?.username
                 }));
 
-                let next = request.body.next;
-                if (!next) {
-                    if (request.body.userId) next = this.adminPrefix + "selectuser";
-                    else next = this.adminPrefix + "selectclient";
+                if (!request?.user) {
+                    return reply.redirect(this.sessionServer.loginUrl + 
+                        "?next="+encodeURIComponent(request.url));                 
                 }
-                let user : User|undefined = undefined;
+                const next = request.body.next ?? "/";
                 try {
-                    if (request.body.userId) {
-                        let resp = await this.sessionServer.userStorage.getUserById(request.body.userId);
-                        user = resp.user;
-                    }
                     return await this.createClient(request, reply, 
                     (reply, client) => {
                         return reply.view(this.createClientPage, {
                             message: "Created client",
                             client: client,
                             csrfToken: request.csrfToken,
-                            urlprefix: this.adminPrefix, 
+                            urlprefix: this.prefix, 
                             validFlows: this.validFlows,
-                            user : user,
+                            user : request.user,
                             isAdmin: true,
                             next: next,
                             ...request.body,
                         });
-                    }, user);
+                    }, request.user);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
@@ -313,8 +221,8 @@ export class FastifyAdminClientEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.adminPrefix, 
-                            isAdmin: true,
+                            urlprefix: this.prefix, 
+                            isAdmin: false,
                             next: next,
                             ...request.body,
                         });
@@ -325,23 +233,73 @@ export class FastifyAdminClientEndpoints {
 
     }
 
+    addApiCreateClientEndpoints() {
+
+        this.sessionServer.app.post(this.prefix+'api/createclient', 
+            async (request: FastifyRequest<{ Body: CreateClientBodyType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "API visit",
+                    method: 'POST',
+                    url: this.prefix + 'api/createclient',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+            if (!request.user) {
+                return reply.status(401).header(...JSONHDR).send({ok: false});
+            }
+            try {
+                return await this.createClient(request, reply, 
+                (reply, client) => {
+                    return reply.header(...JSONHDR).send({
+                    ok: true,
+                    client : client,
+                })}, request.user);
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e); 
+                CrossauthLogger.logger.error(j({
+                    msg: "Create client failure",
+                    user: request.user?.username,
+                    errorCodeName: ce.codeName,
+                    errorCode: ce.code
+                }));
+                CrossauthLogger.logger.debug(j({err: e}));
+                this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                    reply.status(this.sessionServer.errorStatus(e)).header(...JSONHDR)
+                        .send({
+                            ok: false,
+                            errorMessage: error.message,
+                            errorMessages: error.messages,
+                            errorCode: ErrorCode[error.code]
+                    });                    
+                });
+            }
+        });
+
+    }
+
     addDeleteClientEndpoints() {
 
-        this.sessionServer.app.get(this.adminPrefix+'deleteclient/:clientId', 
+        this.sessionServer.app.get(this.prefix+'deleteclient/:clientId', 
             async (request: FastifyRequest<{ Params: DeleteClientParamType, Querystring: DeleteClientQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: this.adminPrefix + 'deleteclient',
+                    url: this.prefix + 'deleteclient',
                     ip: request.ip
                 }));
                 let client : OAuthClient;
-                if (!request?.user || !FastifyServer.isAdmin(request.user)) {
-                    return this.accessDeniedPage(request, reply);                    
+                if (!request.user) {
+                    return reply.redirect(this.sessionServer.loginUrl+"?next=" +
+                        this.prefix+"deleteclient/"+request.params.clientId);
                 }
                 try {
                     client = await this.clientStorage.getClientById(request.params.clientId);
+                    if (client.userId != request.user.id) {
+                        throw new CrossauthError(ErrorCode.InsufficientPriviledges,
+                            "You may not delete this client");
+                    }
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.debug(j({err: e}));
@@ -352,40 +310,45 @@ export class FastifyAdminClientEndpoints {
                         errorCodeName: ErrorCode[ce.code], 
                     });
                 }
-                const next = request.query.next ?? this.adminPrefix + "selectclient";
+                const next = request.query.next ?? "/";
                 let data = {
-                    urlprefix: this.adminPrefix,
+                    urlprefix: this.prefix,
                     csrfToken: request.csrfToken,
-                    next: next,
+                    backUrl: this.prefix + "selectclient",
                     client : client,
+                    next: next,
                 };
             return reply.view(this.deleteClientPage, data);
         });
 
-        this.sessionServer.app.post(this.adminPrefix+'deleteclient/:clientId', 
+        this.sessionServer.app.post(this.prefix+'deleteclient/:clientId', 
             async (request: FastifyRequest<{ Params: DeleteClientParamType, Body: DeleteClientQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: this.adminPrefix + 'deleteclient',
+                    url: this.prefix + 'deleteclient',
                     ip: request.ip,
                     user: request.user?.username
                 }));
 
-                const next = request.body.next ?? this.adminPrefix + "selectclient";
+                if (!request.user) {
+                    return reply.redirect(this.sessionServer.loginUrl+"?next=" +
+                        this.prefix+"deleteclient/"+request.params.clientId);
+                }
+                const next = this.prefix + "selectclient";
                 try {
                     return await this.deleteClient(request, reply, 
                     (reply) => {
                         return reply.view(this.deleteClientPage, {
                             message: "Client deleted",
                             csrfToken: request.csrfToken,
-                            urlprefix: this.adminPrefix, 
+                            urlprefix: this.prefix, 
                             validFlows: this.validFlows,
                             clientId : request.params.clientId,
                             next: next,
                         });
-                    });
+                    }, request.user);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
@@ -407,7 +370,7 @@ export class FastifyAdminClientEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.adminPrefix, 
+                            urlprefix: this.prefix, 
                             clientId : request.params.clientId,
                             next: next,
                         });
@@ -418,71 +381,28 @@ export class FastifyAdminClientEndpoints {
 
     }
 
-    addApiCreateClientEndpoints() {
-
-        this.sessionServer.app.post(this.adminPrefix+'api/createclient', 
-            async (request: FastifyRequest<{ Body: CreateClientBodyType }>,
-                reply: FastifyReply) => {
-                CrossauthLogger.logger.info(j({
-                    msg: "API visit",
-                    method: 'POST',
-                    url: this.adminPrefix + 'api/createclient',
-                    ip: request.ip,
-                    user: request.user?.username
-                }));
-            let user : User|undefined = undefined;
-            try {
-                if (request.body.userId) {
-                    let resp = await this.sessionServer.userStorage.getUserById(request.body.userId);
-                    user = resp.user;
-                }
-                return await this.createClient(request, reply, 
-                (reply, client) => {
-                    return reply.header(...JSONHDR).send({
-                    ok: true,
-                    client : client,
-                })}, user);
-            } catch (e) {
-                const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    msg: "Create client failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
-                }));
-                CrossauthLogger.logger.debug(j({err: e}));
-                this.sessionServer.handleError(e, request, reply, (reply, error) => {
-                    reply.status(this.sessionServer.errorStatus(e)).header(...JSONHDR)
-                        .send({
-                            ok: false,
-                            errorMessage: error.message,
-                            errorMessages: error.messages,
-                            errorCode: ErrorCode[error.code]
-                    });                    
-                });
-            }
-        });
-    }
-
     addApiDeleteClientEndpoints() {
 
-        this.sessionServer.app.post(this.adminPrefix+'api/deleteclient/:clientId', 
+        this.sessionServer.app.post(this.prefix+'api/deleteclient/:clientId', 
             async (request: FastifyRequest<{ Params: DeleteClientParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
                     method: 'POST',
-                    url: this.adminPrefix + 'api/deleteclient',
+                    url: this.prefix + 'api/deleteclient',
                     ip: request.ip,
                     user: request.user?.username
                 }));
+                if (!request.user) {
+                    return reply.status(401).header(...JSONHDR).send({ok: false});
+                }
                 try {
                     return await this.deleteClient(request, reply, 
                         (reply) => {
                         return reply.header(...JSONHDR).send({
                         ok: true,
                         clientId : request.params.clientId,
-                    })});
+                    })}, request.user);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
                     CrossauthLogger.logger.error(j({
@@ -508,20 +428,6 @@ export class FastifyAdminClientEndpoints {
     ///////////////////////////////////////////////////////////////////
     // Internal functions
 
-    private async accessDeniedPage(request : FastifyRequest, reply : FastifyReply) {
-        const ce = new CrossauthError(ErrorCode.InsufficientPriviledges);
-        return this.sessionServer.handleError(ce, request, reply, (reply, error) => {
-            return reply.status(ce.httpStatus).view(this.sessionServer.errorPage, {
-                errorMessage: error.message,
-                errorMessages: error.messages, 
-                errorCode: error.code, 
-                errorCodeName: ErrorCode[error.code], 
-                });
-            
-        });
-
-    } 
-
     private async createClient(request : FastifyRequest<{ Body: CreateClientBodyType }>, 
         reply : FastifyReply, 
         successFn : (res : FastifyReply, client : OAuthClient) => FastifyReply,
@@ -533,7 +439,7 @@ export class FastifyAdminClientEndpoints {
         }
 
         // throw an error if not an admin user
-        if (!request.user || !FastifyServer.isAdmin(request.user)) {
+        if (!request.user) {
             throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         }
 
@@ -580,7 +486,8 @@ export class FastifyAdminClientEndpoints {
 
     private async deleteClient(request : FastifyRequest<{ Params: DeleteClientParamType }>, 
         reply : FastifyReply, 
-        successFn : (res : FastifyReply) => FastifyReply) {
+        successFn : (res : FastifyReply) => FastifyReply,
+        user : User) {
             
         // throw an error if the CSRF token is invalid
         if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
@@ -588,12 +495,17 @@ export class FastifyAdminClientEndpoints {
         }
 
         // throw an error if not an admin user
-        if (!request.user || !FastifyServer.isAdmin(request.user)) {
+        if (!user) {
             throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         }
 
+        const client = await this.clientStorage.getClientById(request.params.clientId);
+        if (client.userId != user.id) {
+            throw new CrossauthError(ErrorCode.InsufficientPriviledges,
+                "You may not delete this client");
+        }
+        
         await this.clientStorage.deleteClient(request.params.clientId);
         return successFn(reply);
     }
 }
-

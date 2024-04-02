@@ -94,26 +94,46 @@ export class FastifyUserEndpoints {
     private sessionServer : FastifySessionServer;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
+    readonly prefix : string = "/";
+
+    // pages
+    private updateUserPage : string = "updateuser.njk";
+    private changeFactor2Page : string = "changefactor2.njk";
+    private configureFactor2Page : string = "configurefactor2.njk";
+    private changePasswordPage : string = "changepassword.njk";
+    private resetPasswordPage: string = "resetpassword.njk";
+    private requestPasswordResetPage: string = "requestpasswordreset.njk";
+    private emailVerifiedPage : string = "emailverified.njk";
+    private signupPage : string = "signup.njk";
 
     constructor(sessionServer : FastifySessionServer,
         options: FastifySessionServerOptions = {}) {
 
         this.sessionServer = sessionServer;
+        setParameter("prefix", ParamType.String, this, options, "PREFIX");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
+        setParameter("updateUserPage", ParamType.String, this, options, "UPDATE_USER_PAGE");
+        setParameter("changeFactor2Page", ParamType.String, this, options, "CHANGE_FACTOR2_PAGE");
+        setParameter("configureFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
+        setParameter("changePasswordPage", ParamType.String, this, options, "CHANGE_PASSWORD_PAGE");
+        setParameter("resetPasswordPage", ParamType.String, this, options, "RESET_PASSWORD_PAGE");
+        setParameter("requestPasswordResetPage", ParamType.String, this, options, "REQUEST_PASSWORD_RESET_PAGE");
+        setParameter("emailVerifiedPage", ParamType.String, this, options, "EMAIL_VERIFIED_PAGE");
+        setParameter("signupPage", ParamType.String, this, options, "SIGNUP_PAGE");
     }
 
     //////////////////////////////////////////////////////////////////
     // Endpoints
 
-    addUpdateUserEndpoints(prefix : string, updateUserPage : string) {
-        this.sessionServer.app.get(prefix+'updateuser', 
+    addUpdateUserEndpoints() {
+        this.sessionServer.app.get(this.prefix+'updateuser', 
             async (request: FastifyRequest,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: prefix + 'updateuser',
+                    url: this.prefix + 'updateuser',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -122,24 +142,24 @@ export class FastifyUserEndpoints {
                     401,
                     this.sessionServer.errorPage);
             }
-            if (updateUserPage)  { // if is redundant but VC Code complains without it
+            if (this.updateUserPage)  { // if is redundant but VC Code complains without it
                 let data : {urlprefix: string, csrfToken: string|undefined, user: User, allowedFactor2: {[key:string]: any}} = {
-                    urlprefix: prefix, 
+                    urlprefix: this.prefix, 
                     csrfToken: request.csrfToken, 
                     user: request.user,
                     allowedFactor2: this.sessionServer.allowedFactor2Details(),
                 };
-                return reply.view(updateUserPage, data);
+                return reply.view(this.updateUserPage, data);
             }
         });
 
-        this.sessionServer.app.post(prefix+'updateuser', 
+        this.sessionServer.app.post(this.prefix+'updateuser', 
             async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: prefix + 'updateuser',
+                    url: this.prefix + 'updateuser',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -157,10 +177,10 @@ export class FastifyUserEndpoints {
                         const message = emailVerificationRequired 
                             ? "Please click on the link in your email to verify your email address."
                             : "Your details have been updated";
-                        return reply.view(updateUserPage, {
+                        return reply.view(this.updateUserPage, {
                             csrfToken: request.csrfToken,
                             message: message,
-                            urlprefix: prefix, 
+                            urlprefix: this.prefix, 
                             allowedFactor2: this.sessionServer.allowedFactor2Details(),
                         });
                     });
@@ -174,14 +194,14 @@ export class FastifyUserEndpoints {
                             request.body[field];
                     }
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
-                        return reply.view(updateUserPage, {
+                        return reply.view(this.updateUserPage, {
                             user: request.user,
                             errorMessage: error.message,
                             errorMessages: error.messages, 
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: prefix, 
+                            urlprefix: this.prefix, 
                             allowedFactor2: this.sessionServer.allowedFactor2Details(),
                             ...extraFields,
                         });
@@ -190,14 +210,14 @@ export class FastifyUserEndpoints {
         });
     }
 
-    addApiUpdateUserEndpoints(prefix : string) {
-        this.sessionServer.app.post(prefix+'api/updateuser', 
+    addApiUpdateUserEndpoints() {
+        this.sessionServer.app.post(this.prefix+'api/updateuser', 
             async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
                     method: 'POST',
-                    url: prefix + 'api/updateuser',
+                    url: this.prefix + 'api/updateuser',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -234,16 +254,14 @@ export class FastifyUserEndpoints {
         });
     }
 
-    addChangeFactor2Endpoints(prefix: string,
-        changeFactor2Page: string,
-        configureFactor2Page: string) {
-        this.sessionServer.app.get(prefix+'changefactor2', 
+    addChangeFactor2Endpoints() {
+        this.sessionServer.app.get(this.prefix+'changefactor2', 
             async (request: FastifyRequest<{ Querystring: ChangeFactor2QueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: prefix + 'changefactor2',
+                    url: this.prefix + 'changefactor2',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -262,22 +280,22 @@ export class FastifyUserEndpoints {
                     }
                 }
                 let data = {
-                    urlprefix: prefix, 
+                    urlprefix: this.prefix, 
                     csrfToken: request.csrfToken,
                     next: request.query.next??this.sessionServer.loginRedirect,
                     allowedFactor2: this.sessionServer.allowedFactor2Details(),
                     factor2 : request.user?.factor2??"none",
                 };
-                return reply.view(changeFactor2Page, data);
+                return reply.view(this.changeFactor2Page, data);
         });
 
-        this.sessionServer.app.post(prefix+'changefactor2', 
+        this.sessionServer.app.post(this.prefix+'changefactor2', 
             async (request: FastifyRequest<{ Body: ChangeFactor2BodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: prefix + 'changefactor2',
+                    url: this.prefix + 'changefactor2',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -298,13 +316,13 @@ export class FastifyUserEndpoints {
                     return await this.changeFactor2(request, reply, 
                         (reply, data, _user) => {
                             if (data.factor2) {
-                                return reply.view(configureFactor2Page, {
+                                return reply.view(this.configureFactor2Page, {
                                     csrfToken: data.csrfToken,
                                     next: request.body.next ?? this.sessionServer.loginRedirect,
                                     ...data.userData
                                 });
                             } else {
-                                return reply.view(configureFactor2Page, {
+                                return reply.view(this.configureFactor2Page, {
                                     message: "Two factor authentication has been updated",
                                     next: request.body.next ?? this.sessionServer.loginRedirect,
                                     csrfToken: data.csrfToken,
@@ -321,13 +339,13 @@ export class FastifyUserEndpoints {
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
-                        return reply.view(changeFactor2Page, {
+                        return reply.view(this.changeFactor2Page, {
                             errorMessage: error.message,
                             errorMessages: error.messages, 
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: prefix, 
+                            urlprefix: this.prefix, 
                             allowedFactor2: this.sessionServer.allowedFactor2Details(),
                             factor2: request.user?.factor2??"none",
                             next: request.body.next??this.sessionServer.loginRedirect,
@@ -338,14 +356,14 @@ export class FastifyUserEndpoints {
         });
     }
 
-    addApiChangeFactor2Endpoints(prefix : string) {
-        this.sessionServer.app.post(prefix+'api/changefactor2', 
+    addApiChangeFactor2Endpoints() {
+        this.sessionServer.app.post(this.prefix+'api/changefactor2', 
             async (request: FastifyRequest<{ Body: ChangeFactor2BodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
                     method: 'POST',
-                    url: prefix + 'api/changefactor2',
+                    url: this.prefix + 'api/changefactor2',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -380,14 +398,14 @@ export class FastifyUserEndpoints {
         });
     }
 
-    addChangePasswordEndpoints(prefix : string, changePasswordPage : string) {
-        this.sessionServer.app.get(prefix+'changepassword', 
+    addChangePasswordEndpoints() {
+        this.sessionServer.app.get(this.prefix+'changepassword', 
             async (request: FastifyRequest<{ Querystring: ChangePasswordQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: prefix + 'changepassword',
+                    url: this.prefix + 'changepassword',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -412,21 +430,21 @@ export class FastifyUserEndpoints {
                     next: string | undefined,
                     required? : boolean | undefined,
                 } = {
-                    urlprefix: prefix,
+                    urlprefix: this.prefix,
                     csrfToken: request.csrfToken,
                     next : request.query.next,
                     required : request.query.required
                 };
-                return reply.view(changePasswordPage, data);
+                return reply.view(this.changePasswordPage, data);
         });
 
-        this.sessionServer.app.post(prefix+'changepassword', 
+        this.sessionServer.app.post(this.prefix+'changepassword', 
             async (request: FastifyRequest<{ Body: ChangePasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: prefix + 'changepassword',
+                    url: this.prefix + 'changepassword',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -436,10 +454,10 @@ export class FastifyUserEndpoints {
                     if (request.body.next) {
                         return reply.redirect(request.body.next);
                     } 
-                    return reply.view(changePasswordPage, {
+                    return reply.view(this.changePasswordPage, {
                         csrfToken: request.csrfToken,
                         message: "Your password has been changed.",
-                        urlprefix: prefix, 
+                        urlprefix: this.prefix, 
                         next: request.body.next,
                         required: request.body.required,
                     });
@@ -454,27 +472,27 @@ export class FastifyUserEndpoints {
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
-                    return reply.view(changePasswordPage, {
+                    return reply.view(this.changePasswordPage, {
                         errorMessage: error.message,
                         errorMessages: error.messages, 
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
-                        urlprefix: prefix, 
+                        urlprefix: this.prefix, 
                     });
                 });
             }
         });
     }
 
-    addApiChangePasswordEndpoints(prefix : string) {
-        this.sessionServer.app.post(prefix+'api/changepassword', 
+    addApiChangePasswordEndpoints() {
+        this.sessionServer.app.post(this.prefix+'api/changepassword', 
             async (request: FastifyRequest<{ Body: ChangePasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
                     method: 'POST',
-                    url: prefix + 'api/changepassword',
+                    url: this.prefix + 'api/changepassword',
                     ip: request.ip,
                     user: request.user?.username
                 }));
@@ -507,23 +525,21 @@ export class FastifyUserEndpoints {
         });
     }
 
-    addConfigureFactor2Endpoints(prefix: string,
-        configureFactor2Page: string,
-        signupPage: string) {
+    addConfigureFactor2Endpoints() {
 
-        this.sessionServer.app.get(prefix+'configurefactor2', 
+        this.sessionServer.app.get(this.prefix+'configurefactor2', 
             async (request: FastifyRequest<{ Querystring: ConfigureFactor2QueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: prefix + 'configurefactor2',
+                    url: this.prefix + 'configurefactor2',
                     ip: request.ip
                 }));
             try {
                 return await this.reconfigureFactor2(request, reply, 
                 (reply, data, _user) => {
-                    return reply.view(configureFactor2Page, { ...data, 
+                    return reply.view(this.configureFactor2Page, { ...data, 
                         next: request.query.next ?? this.sessionServer.loginRedirect});
                 });
             } catch (e) {
@@ -536,27 +552,27 @@ export class FastifyUserEndpoints {
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
-                    return reply.view(configureFactor2Page, {
+                    return reply.view(this.configureFactor2Page, {
                         errorMessage: error.message,
                         errorMessages: error.messages, 
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         next: request.query.next??this.sessionServer.loginRedirect, 
                         csrfToken: request.csrfToken,
-                        urlprefix: prefix, 
+                        urlprefix: this.prefix, 
                     });
                     
                 });
             }
         });
 
-        this.sessionServer.app.post(prefix+'configurefactor2', 
+        this.sessionServer.app.post(this.prefix+'configurefactor2', 
             async (request: FastifyRequest<{ Body: ConfigureFactor2BodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: prefix + 'configurefactor2',
+                    url: this.prefix + 'configurefactor2',
                     ip: request.ip
                 }));
                 let next = 
@@ -577,10 +593,10 @@ export class FastifyUserEndpoints {
                          (authenticator == undefined || 
                             authenticator.skipEmailVerificationOnSignup() != true)) {
                         // email verification has been sent - tell user
-                        return reply.view(signupPage, {
+                        return reply.view(this.signupPage, {
                             next: next, 
                             csrfToken: request.csrfToken,
-                            urlprefix: prefix, 
+                            urlprefix: this.prefix, 
                             message: "Please check your email to finish signing up."
                         });
                     } else {
@@ -589,9 +605,9 @@ export class FastifyUserEndpoints {
                             return reply.redirect(request.body.next??this.sessionServer.loginRedirect);
                         } else {
                             // we came here because the user asked to change 2FA - tell them it was successful
-                            return reply.view(configureFactor2Page, {
+                            return reply.view(this.configureFactor2Page, {
                                 message: "Two-factor authentication updated",
-                                urlprefix: prefix, 
+                                urlprefix: this.prefix, 
                                 next: next, 
                                 required: request.body.required,
                                 csrfToken: request.csrfToken,
@@ -620,12 +636,12 @@ export class FastifyUserEndpoints {
                     CrossauthLogger.logger.error(j({msg: "Signup two factor failure", user: data?.username, errorCodeName: ce.codeName, errorCode: ce.code}));
                     const { userData } = await this.sessionServer.sessionManager.repeatTwoFactorSignup(request.sessionId);
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
-                            return reply.view(configureFactor2Page, {
+                            return reply.view(this.configureFactor2Page, {
                             errorMessage: error.message,
                             errorMessages: error.messages, 
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
-                            urlprefix: prefix, 
+                            urlprefix: this.prefix, 
                             next: next, 
                             ...userData,
                             csrfToken: this.sessionServer.csrfToken(request, reply),
@@ -731,14 +747,13 @@ export class FastifyUserEndpoints {
         });
     }
 
-    addRequestPasswordResetEndpoints(prefix: string,
-        requestPasswordResetPage: string) {
-        this.sessionServer.app.get(prefix+'requestpasswordreset', 
+    addRequestPasswordResetEndpoints() {
+        this.sessionServer.app.get(this.prefix+'requestpasswordreset', 
         async (request : FastifyRequest<{Querystring: RequestPasswordResetQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({
                 msg: "Page visit",
                 method: 'GET',
-                url: prefix + 'requestpasswordreset',
+                url: this.prefix + 'requestpasswordreset',
                 ip: request.ip
             }));
             let data: {
@@ -749,10 +764,10 @@ export class FastifyUserEndpoints {
                 {csrfToken: request.csrfToken,
                 next: request.query.next,
                 required: request.query.required};
-            return reply.view(requestPasswordResetPage, data);
+            return reply.view(this.requestPasswordResetPage, data);
         });
 
-        this.sessionServer.app.post(prefix+'requestpasswordreset', 
+        this.sessionServer.app.post(this.prefix+'requestpasswordreset', 
             async (request: FastifyRequest<{ Body: RequestPasswordResetBodyType }>,
                 reply: FastifyReply) => {
             const message = "If a user with exists with the email you entered, a message with "
@@ -760,16 +775,16 @@ export class FastifyUserEndpoints {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: prefix + 'requestpasswordreset',
+                    url: this.prefix + 'requestpasswordreset',
                     ip: request.ip
                 }));
                 try {
                     return await this.requestPasswordReset(request, reply, 
                     (reply, _user) => {
-                        return reply.view(requestPasswordResetPage, {
+                        return reply.view(this.requestPasswordResetPage, {
                             csrfToken: request.csrfToken,
                             message: message,
-                            urlprefix: prefix, 
+                            urlprefix: this.prefix, 
                         });
                     });
             } catch (e) {
@@ -780,10 +795,10 @@ export class FastifyUserEndpoints {
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
                     if (error.code == ErrorCode.EmailNotExist) {
-                        return reply.view(requestPasswordResetPage, {
+                        return reply.view(this.requestPasswordResetPage, {
                             csrfToken: request.csrfToken,                                
                             message: message,
-                            urlprefix: prefix, 
+                            urlprefix: this.prefix, 
                             required: request.body.required,
                             next: request.body.next,
                         });
@@ -791,28 +806,28 @@ export class FastifyUserEndpoints {
                     if (request.body.next) {
                         return reply.redirect(request.body.next);
                     }
-                    return reply.view(requestPasswordResetPage, {
+                    return reply.view(this.requestPasswordResetPage, {
                         errorMessage: error.message,
                         errorMessages: error.messages, 
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         email: request.body.email,
                         csrfToken: request.csrfToken,
-                        urlprefix: prefix, 
+                        urlprefix: this.prefix, 
                     });
                 });
             }
         });
     }
 
-    addApiRequestPasswordResetEndpoints(prefix : string) {
-        this.sessionServer.app.post(prefix+'api/requestpasswordreset', 
+    addApiRequestPasswordResetEndpoints() {
+        this.sessionServer.app.post(this.prefix+'api/requestpasswordreset', 
             async (request: FastifyRequest<{ Body: RequestPasswordResetBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
                     method: 'POST',
-                    url: prefix + 'api/resetpasswordrequest',
+                    url: this.prefix + 'api/resetpasswordrequest',
                     ip: request.ip
                 }));
             try {
@@ -843,14 +858,14 @@ export class FastifyUserEndpoints {
         });
     }
 
-    addResetPasswordEndpoints(prefix : string, resetPasswordPage : string) {
-        this.sessionServer.app.get(prefix+'resetpassword/:token', 
+    addResetPasswordEndpoints() {
+        this.sessionServer.app.get(this.prefix+'resetpassword/:token', 
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: prefix + 'logresetpasswordin',
+                    url: this.prefix + 'logresetpasswordin',
                     ip: request.ip
                 }));
             try {
@@ -863,28 +878,28 @@ export class FastifyUserEndpoints {
                     errorCodeName: ce.codeName
                 });
             }
-            return reply.view(resetPasswordPage, {
+            return reply.view(this.resetPasswordPage, {
                 token: request.params.token,
                 csrfToken: request.csrfToken
             });
         });
 
-        this.sessionServer.app.post(prefix+'resetpassword', 
+        this.sessionServer.app.post(this.prefix+'resetpassword', 
             async (request: FastifyRequest<{ Body: ResetPasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: prefix + 'resetpassword',
+                    url: this.prefix + 'resetpassword',
                     ip: request.ip
                 }));
             try {
                 return await this.resetPassword(request, reply, 
                 (reply, _user) => {
-                    return reply.view(resetPasswordPage, {
+                    return reply.view(this.resetPasswordPage, {
                         csrfToken: request.csrfToken,
                         message: "Your password has been changed.",
-                        urlprefix: prefix, 
+                        urlprefix: this.prefix, 
                     });
                 });
             } catch (e) {
@@ -897,27 +912,27 @@ export class FastifyUserEndpoints {
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
-                    return reply.view(resetPasswordPage, {
+                    return reply.view(this.resetPasswordPage, {
                         errorMessage: error.message,
                         errorMessages: error.messages, 
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
-                        urlprefix: prefix, 
+                        urlprefix: this.prefix, 
                     });
                 });
             }
         });
     }
 
-    addApiResetPasswordEndpoints(prefix : string) {
-        this.sessionServer.app.post(prefix+'api/resetpassword', 
+    addApiResetPasswordEndpoints() {
+        this.sessionServer.app.post(this.prefix+'api/resetpassword', 
             async (request: FastifyRequest<{ Body: ResetPasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
                     method: 'POST',
-                    url: prefix + 'api/resetpassword',
+                    url: this.prefix + 'api/resetpassword',
                     ip: request.ip
                 }));
             try {
@@ -948,21 +963,21 @@ export class FastifyUserEndpoints {
         });
     }
 
-    addVerifyEmailEndpoints(prefix : string, emailVerifiedPage : string) {
-        this.sessionServer.app.get(prefix+'verifyemail/:token', 
+    addVerifyEmailEndpoints() {
+        this.sessionServer.app.get(this.prefix+'verifyemail/:token', 
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
-                    url: prefix + 'verifyemail',
+                    url: this.prefix + 'verifyemail',
                     ip: request.ip
                 }));
             try {
                 return await this.verifyEmail(request, reply, 
                 (reply, user) => {
-                    return reply.view(emailVerifiedPage, {
-                        urlprefix: prefix,
+                    return reply.view(this.emailVerifiedPage, {
+                        urlprefix: this.prefix,
                         user: user
                     });
                 });
@@ -981,21 +996,21 @@ export class FastifyUserEndpoints {
                         errorCodeName: ErrorCode[error.code], 
                         errorMessage: error.message,
                         errorMessages: error.messages,
-                        urlprefix: prefix, 
+                        urlprefix: this.prefix, 
                     });
                 });
             }
         });
     }
 
-    addApiVerifyEmailEndpoints(prefix : string) {
-        this.sessionServer.app.get(prefix+'api/verifyemail/:token', 
+    addApiVerifyEmailEndpoints() {
+        this.sessionServer.app.get(this.prefix+'api/verifyemail/:token', 
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
                     method: 'POST',
-                    url: prefix + 'api/verifyemail',
+                    url: this.prefix + 'api/verifyemail',
                     ip: request.ip
                 }));
             try {
