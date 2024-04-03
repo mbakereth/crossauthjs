@@ -79,6 +79,33 @@ export class OAuthClientManager {
         return await this.clientStorage.createClient(client);
     }
 
+    async updateClient(clientId: string,
+        client: Partial<OAuthClient>,
+        resetSecret : boolean = false) : Promise<{client: OAuthClient, newSecret: boolean}> {
+        let clientSecret : string|undefined = undefined;
+        const oldClient = await this.clientStorage.getClientById(clientId);
+        let newSecret = false;
+        if ((client.confidential && !oldClient.confidential) ||
+            (client.confidential && resetSecret)) {
+            const plaintext = OAuthClientManager.randomClientSecret();
+            clientSecret = await Hasher.passwordHash(plaintext, {
+                encode: true,
+                iterations: this.oauthPbkdf2Iterations,
+                keyLen: this.oauthPbkdf2KeyLength,
+                digest: this.oauthPbkdf2Digest,
+            });
+            newSecret = true;
+        }
+        if (client.redirectUri) {
+            client.redirectUri.forEach((uri) => {
+                OAuthClientManager.validateUri(uri);
+            });
+        }
+        client.clientId = clientId;
+        await this.clientStorage.updateClient(client);
+        return {client: await this.clientStorage.getClientById(clientId), newSecret: newSecret};
+    }
+
     /**
      * Create a random OAuth client id
      */

@@ -4,7 +4,7 @@
         <link rel="stylesheet" href="/public/style.css"/>
     </head>
     <body>
-        <h1>Create an OAuth Client
+        <h1>Update OAuth Client
             {% if user and isAdmin %}
             for {{ user.username}}
             {% endif %}
@@ -24,9 +24,15 @@
                 <tr>
                     <td>Confidential</td><td>{{ client.confidential }}</td>
                 </tr>
-                <tr>
-                    <td>Client Secret</td><td>{{ client.clientSecret or "None Set" }}</td>
-                </tr>
+                {% if newClientSecret %}
+                    <tr>
+                        <td>Client Secret</td><td>{{ client.clientSecret }}</td>
+                    </tr>
+                {% elif client.clientSecret %}
+                    <td>Client Secret</td><td>Unchanged</td>
+                {% else %}
+                    <td>Client Secret</td><td>None set</td>
+                {% endif %}
                 <tr>
                     <td>Redirect URIs</td>
                     <td>
@@ -44,7 +50,7 @@
                     </td>
                 </tr>
             </table>
-            {% if client.clientSecret %}
+            {% if client.clientSecret and newClientSecret %}
                 <p>Make sure you write the client secret down.  If you lose it,
                     you will have to reset it.</p>
                 {% endif %}
@@ -58,20 +64,36 @@
             <form method="POST">
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
                 <input type="hidden" name="next" value="{{ next }}"/>
+                <input type="hidden" name="clientId" value="{{ clientId }}"/>
                 {% if user %}
                     <input type="hidden" name="userId" value="{{ user.id }}"/>
+                    {% if isAdmin %}
+                        <p>
+                            <label >User ID</label><br>
+                            {{ userId }}
+                        </p>
+                    {% endif %}
                 {% endif %}
                 <p>
                     <label for="clientName">Friendly name</label><br>
                     <input type="text" name="clientName" size="20" value="{{ clientName }}" />
                 </p>
                 <p>
+                    <label >Client ID</label><br>
+                    {{ clientId }}
+                </p>
+                <p>
                     <input type="checkbox" name="confidential" value="true" 
                         {% if confidential %}checked{% endif %}/>
-                    <label for="                    <input type="checkbox" name="confidential" value="true" 
-">Confidential</label>
-                    
+                    <label for="confidential">Confidential</label>
                 </p>
+                {% if confidential %}
+                <p>
+                    <input type="checkbox" name="resetSecret" value="true" 
+                        {% if resetSecret %}checked{% endif %}/>
+                    <label for="resetSecret">Reset</label>
+                </p>
+                {% endif %}
                 <p>
                     <label for="redirectUris">Redirect URIs (space separated)</label><br>
                     <textarea name="redirectUris" rows="3" cols="40">{{ redirectUris }}</textarea>
@@ -81,7 +103,7 @@
                 <input type="checkbox" name="{{ flow }}" value="true" 
                     {% if flow == "true" %}checked{% endif %}> {{ flow }}</br>
                 {% endfor %}
-                <p><button type="submit">Create Client</button></p>
+                <p><button type="submit">Update Client</button></p>
             </form>
         {% endif %}
         <p><a href="{{next}}">Back</a></p>
