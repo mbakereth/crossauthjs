@@ -443,7 +443,7 @@ export class FastifyAdminClientEndpoints {
                     return await this.updateClient(request, reply, 
                     (reply, client, newSecret) => {
                         return reply.view(this.updateClientPage, {
-                            message: "Created client",
+                            message: "Updated client",
                             client: client,
                             csrfToken: request.csrfToken,
                             urlprefix: this.adminPrefix, 
@@ -702,7 +702,7 @@ export class FastifyAdminClientEndpoints {
 
         const confidential = request.body.confidential == "true";
         const clientName = request.body.clientName;
-        const redirectUris = request.body.redirectUris.split(/[ \t\n]+/);
+        const redirectUris = request.body.redirectUris.split(/,?[ \t\n]+/);
 
         // validate redirect uris
         let redirectUriErrors : string[] = [];
@@ -755,7 +755,7 @@ export class FastifyAdminClientEndpoints {
             throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         }
 
-        const redirectUris = request.body.redirectUris.split(/[ \t\n]+/);
+        const redirectUris = request.body.redirectUris.split(/,?[ \t\n]+/);
 
         // validate redirect uris
         let redirectUriErrors : string[] = [];
@@ -789,7 +789,7 @@ export class FastifyAdminClientEndpoints {
         clientUpdate.clientName = request.body.clientName;
         clientUpdate.confidential = request.body.confidential == "true";
         clientUpdate.validFlows = validFlows;
-        clientUpdate.redirectUri = redirectUriErrors;
+        clientUpdate.redirectUri = redirectUris;
         clientUpdate.userId = request.body.userId;
         const resetSecret = request.body.resetSecret == "true";
         

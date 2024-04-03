@@ -504,12 +504,8 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
         if (client.clientId && client.clientId in this.clients) {
             const oldClient = this.clients[client.clientId];
             this.clients[client.clientId] = {
+                ...oldClient,
                 ...client, 
-                clientName: client.clientName??oldClient.clientName, 
-                clientId: oldClient.clientId, 
-                redirectUri: client.redirectUri??oldClient.redirectUri,
-                validFlow: client.validFlow??oldClient.validFlow,
-                confidential: client.confidential??oldClient.confidential,
             }
         }
     }

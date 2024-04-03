@@ -445,7 +445,7 @@ export class FastifyUserClientEndpoints {
 
         const confidential = request.body.confidential == "true";
         const clientName = request.body.clientName;
-        const redirectUris = request.body.redirectUris.split(/[ \t\n]+/);
+        const redirectUris = request.body.redirectUris.split(/,?[ \t\n]+/);
 
         // validate redirect uris
         let redirectUriErrors : string[] = [];

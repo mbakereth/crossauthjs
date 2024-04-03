@@ -226,6 +226,7 @@ export const SessionAdminClientPageEndpoints = [
     "admin/selectclient",
     "admin/createclient",
     "admin/deleteclient",
+    "admin/updateclient",
 ];
 
 export const SessionClientPageEndpoints = [
@@ -256,6 +257,7 @@ export const SessionAdminApiEndpoints = [
 export const SessionAdminClientApiEndpoints = [
     "admin/api/createclient",
     "admin/api/deleteclient",
+    "admin/api/updateclient",
 ];
 
 export const SessionClientApiEndpoints = [
@@ -1057,12 +1059,18 @@ export class FastifySessionServer {
             if (this.endpoints.includes("admin/deleteclient")) {
                 this.adminClientEndpoints.addDeleteClientEndpoints();
             }
+            if (this.endpoints.includes("admin/updateclient")) {
+                this.adminClientEndpoints.addUpdateClientEndpoints();
+            }
             if (this.endpoints.includes("admin/api/createclient")) {
                 this.adminClientEndpoints.addApiCreateClientEndpoints();
             }
             if (this.endpoints.includes("admin/api/deleteclient")) {
                 this.adminClientEndpoints.addApiDeleteClientEndpoints();
             }
+            /*if (this.endpoints.includes("admin/api/updateclient")) {
+                this.adminClientEndpoints.addApiUpdateClientEndpoints();
+            }*/
         }
     }
 

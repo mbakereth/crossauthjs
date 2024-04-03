@@ -72,7 +72,7 @@ export interface OAuthClient {
     clientId : string,
     confidential : boolean,
     clientName : string,
-    clientSecret? : string,
+    clientSecret? : string|null,
     redirectUri : string[],
     validFlow : string[],
     userId? : string|number|null,
