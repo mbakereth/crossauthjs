@@ -653,23 +653,33 @@ export class PrismaKeyStorage extends KeyStorage {
      * See {@link KeyStorage}.
      */
     async updateData(keyName : string, dataName: string, value: any|undefined) : Promise<void> {
-        await this.prismaClient.$transaction(async (tx) =>{
-            const key = await this.getKeyWithTransaction(keyName, tx);
-            let data : {[key:string] : any};
-            if (!key.data || key.data == "") {
-                data = {}
-            } else {
-                try {
-                    data = JSON.parse(key.data);
-                } catch (e) {
-                    CrossauthLogger.logger.debug(j({err: e}));
-                    throw new CrossauthError(ErrorCode.DataFormat);
-                }
-            }   
-            data[dataName] = value;
-    
-            await this.updateKeyWithTransaction({value: key.value, data: JSON.stringify(data)}, tx)
-        }, {timeout: this.transactionTimeout});
+        try {
+
+            await this.prismaClient.$transaction(async (tx) =>{
+                const key = await this.getKeyWithTransaction(keyName, tx);
+                let data : {[key:string] : any};
+                if (!key.data || key.data == "") {
+                    data = {}
+                } else {
+                    try {
+                        data = JSON.parse(key.data);
+                    } catch (e) {
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        throw new CrossauthError(ErrorCode.DataFormat);
+                    }
+                }   
+                data[dataName] = value;
+        
+                await this.updateKeyWithTransaction({value: key.value, data: JSON.stringify(data)}, tx)
+            }, {timeout: this.transactionTimeout});
+        } catch (e) {
+            if (e && typeof e == "object" && !("isCrossauthError" in e)) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.Connection, "Failed updating session data");
+            }
+            throw e;
+        }
+
                   
     }
 }
@@ -694,7 +704,27 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
     /** A Prisma client to use.  If not provided, one will be created */
     prismaClient? : PrismaClient,
 
+    /** In milliseconds.. Default 5000 */
     transactionTimeout? : number,
+
+    /**
+     * This is to work around a Prisma bug.  SQLite returns an error
+     * when updating a client if inside a transaction.  
+     * - `Update` `OAuthClient` table is updated, `OAuthClientAuthorization`
+     *            and `OAuthValidFlow` are updared with a delete and insert.
+     *            Doesn't work with SQLite.
+     * - `DeleteAndInsert` updated to the `OAuthClient`, 
+     *                     `OAuthClientAuthorization` and `OAuthValidFlow` are
+     *                     all done as a delete then an insert.  Works for
+     *                     SQLite but if you have cascading dependencies on
+     *                     the `OAuthClient` table, dependent rows will be
+     *                     deleted.
+     * Our recommendation is to use `DeleteAndInsert` for SQLite and 
+     * `Update` otherwise.
+     * 
+     * Default `DeleteAndInsert`
+     */
+    updateMode? : "Update" | "DeleteAndInsert",
 }
 
 /**
@@ -707,6 +737,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private validFlowTable : string = "OAuthClientValidFlow";
     private prismaClient : PrismaClient;
     private transactionTimeout = 5_000;
+    private updateMode = "DeleteAndInsert";
 
     /**
      * Constructor with user storage object to use plus optional parameters.
@@ -720,6 +751,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         setParameter("redirectUriTable", ParamType.String, this, options, "OAUTH_REDIRECTURI_TABLE");
         setParameter("validFlowTable", ParamType.String, this, options, "OAUTH_VALID_FLOW_TABLE");
         setParameter("transactionTimeout", ParamType.Number, this, options, "TRANSACTION_TIMEOUT");
+        setParameter("updateMode", ParamType.String, this, options, "OAUTHCLIENT_UPDATE_MODE");
         if (options.prismaClient == undefined) {
             this.prismaClient = new PrismaClient();
         } else {
@@ -798,9 +830,17 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
      */
     async createClient(client : OAuthClient) : Promise<OAuthClient> {
-        return this.prismaClient.$transaction(async (tx) => {
-            return await this.createClientWithTransaction(client, tx);
-        }, {timeout: this.transactionTimeout});
+        try {
+            return this.prismaClient.$transaction(async (tx) => {
+                return await this.createClientWithTransaction(client, tx);
+            }, {timeout: this.transactionTimeout});
+        } catch (e) {
+            if (e && typeof e == "object" && !("isCrossauthError" in e)) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.Connection, "Failed creating client");
+            }
+            throw e;
+        }
     }
 
     /**
@@ -965,7 +1005,9 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         try {
             //return await this.updateClientWithTransaction(client, this.prismaClient);
                 return this.prismaClient.$transaction(async (tx) => {
-            return await this.updateClientWithTransaction(client, tx);
+            return this.updateMode == "Update" ? 
+                 await this.updateClientWithTransaction_update(client, tx) :
+                 await this.updateClientWithTransaction_deleteAndInsert(client, tx);
         }, {timeout: this.transactionTimeout});
         } catch (e) {
             if (e && typeof e == "object" && !("isCrossauthError" in e)) {
@@ -976,10 +1018,9 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         }
     }
 
-    /*
-    This gives a Rust error when used with a transaction on SQLlite
+    // This gives a Rust error when used with a transaction on SQLlite
 
-    private async updateClientWithTransaction(client : Partial<OAuthClient>, tx : any) : Promise<void> {
+    private async updateClientWithTransaction_update(client : Partial<OAuthClient>, tx : any) : Promise<void> {
         if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
         const redirectUris = client.redirectUri;
         const validFlows = client.validFlow;
@@ -1090,9 +1131,9 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             }    
         }
 
-    }*/
+    }
 
-    private async updateClientWithTransaction(client : Partial<OAuthClient>, tx : any) : Promise<void> {
+    private async updateClientWithTransaction_deleteAndInsert(client : Partial<OAuthClient>, tx : any) : Promise<void> {
         if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
         const existingClient = (await this.getClientWithTransaction("clientId", client.clientId, this.prismaClient, true, undefined))[0];
         const newClient = {...existingClient, ...client};

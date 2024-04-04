@@ -732,14 +732,9 @@ export class FastifyUserClientEndpoints {
 
         // get flows from booleans in body
         let validFlows = [];
-        if (request.body[OAuthFlows.AuthorizationCode]) validFlows.push(OAuthFlows.AuthorizationCode);
-        if (request.body[OAuthFlows.AuthorizationCodeWithPKCE]) validFlows.push(OAuthFlows.AuthorizationCodeWithPKCE);
-        if (request.body[OAuthFlows.ClientCredentials]) validFlows.push(OAuthFlows.ClientCredentials);
-        if (request.body[OAuthFlows.RefreshToken]) validFlows.push(OAuthFlows.RefreshToken);
-        if (request.body[OAuthFlows.DeviceCode]) validFlows.push(OAuthFlows.DeviceCode);
-        if (request.body[OAuthFlows.Password]) validFlows.push(OAuthFlows.Password);
-        if (request.body[OAuthFlows.PasswordMfa]) validFlows.push(OAuthFlows.PasswordMfa);
-        if (request.body[OAuthFlows.OidcAuthorizationCode]) validFlows.push(OAuthFlows.OidcAuthorizationCode);
+        for (let flow of this.validFlows) {
+            if (flow in request.body) validFlows.push(flow);
+        }
 
         const clientUpdate : Partial<OAuthClient> = {}
         clientUpdate.clientName = request.body.clientName;
