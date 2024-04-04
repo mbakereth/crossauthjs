@@ -4,7 +4,6 @@ import { PrismaUserStorage } from '@crossauth/backend';
 import { CrossauthLogger } from '@crossauth/common';
 
 const prisma = new PrismaClient();
-
 let userStorage = new PrismaUserStorage({prismaClient : prisma});
 
 async function main() {

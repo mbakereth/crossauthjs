@@ -10,7 +10,7 @@ import { LocalPasswordAuthenticator } from '../..';
 import { authenticator as gAuthenticator } from 'otplib';
 import { CrossauthError, ErrorCode, UserInputFields } from '@crossauth/common';
 import { OpenIdConfiguration } from '@crossauth/common';
-import { OAuthClient } from '../client'
+import { OAuthClientBackend } from '../client'
 
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -668,7 +668,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
         await createTotpAccount("bob", "bobPass123", userStorage);
 
     /// Make client
-    const oauthClient = new OAuthClient("http://authserver.com", { 
+    const oauthClient = new OAuthClientBackend("http://authserver.com", { 
         clientId: "ABC",
         clientSecret: "DEF",
         redirectUri: "http://client.com/authzcode"
@@ -780,7 +780,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
     await createEmailAccount("bob", "bobPass123", userStorage);
 
     /// Make client
-    const oauthClient = new OAuthClient("http://authserver.com", { 
+    const oauthClient = new OAuthClientBackend("http://authserver.com", { 
         clientId: "ABC",
         clientSecret: "DEF",
         redirectUri: "http://client.com/authzcode"

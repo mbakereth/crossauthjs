@@ -5,7 +5,8 @@ import {
     PrismaOAuthClientStorage,
     LocalPasswordAuthenticator,
     TotpAuthenticator,
-    EmailAuthenticator } from '@crossauth/backend';
+    EmailAuthenticator,
+    OAuthClientManager } from '@crossauth/backend';
 import { FastifyServer } from '@crossauth/fastify'
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import fastifystatic from '@fastify/static';
@@ -14,6 +15,7 @@ import nunjucks from "nunjucks";
 import path from 'path';
 import { CrossauthLogger } from '@crossauth/common';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
+
 
 CrossauthLogger.logger.level = CrossauthLogger.Debug;
 //CrossauthLogger.setLogger(Pino.pino({level: "debug"}), true);  // replace default logger with Pino
@@ -44,6 +46,7 @@ app.register(view, {
       })
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
+
 const prisma = new PrismaClient();
 let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email"});
 let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
@@ -71,6 +74,24 @@ let server = new FastifyServer(userStorage, {
         enableAdminEndpoints: true,
         enableOAuthClientManagement: true,
 });
+
+const clientManager = new OAuthClientManager({
+    clientStorage: clientStorage
+});
+async function init(clientManager : OAuthClientManager) {
+    /*await clientManager.updateClient("SHD1OQi5UIz-jEHELuqopg", {
+        clientName : "Test 2",
+        validFlow: [],
+    });*/
+}
+init(clientManager)
+  .then(async () => {
+  })
+  .catch(async (e) => {
+    console.error(e)
+    await prisma.$disconnect()
+    process.exit(1)
+  })
 
 // create our home page
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {

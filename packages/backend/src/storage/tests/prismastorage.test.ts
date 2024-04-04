@@ -495,6 +495,25 @@ test("PrismaAuthorization.createAndUpdateForUser", async () => {
     expect(["read", "delete"]).toContain(scopes[1]);
 });
 
+test("PrismaAuthorization.createAndUpdateClient", async () => {
+    await prismaClient.oAuthAuthorization.deleteMany({});
+    await prismaClient.oAuthClient.deleteMany({});
+    const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
+    const client = {
+        clientId : "Wk9TERQLq5utU71PRCMv5g",
+        clientSecret: "DEF",
+        clientName: "Test",
+        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
+        validFlow: [],
+        confidential: true,
+    }
+    await clientStorage.createClient(client);
+    await clientStorage.updateClient({
+        clientId: "Wk9TERQLq5utU71PRCMv5g",
+        redirectUri: ["http://client.com/uri1"],
+    })
+});
+
 afterAll(async () => {
     //await prismaClient.user.deleteMany({});
 });

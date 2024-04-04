@@ -262,7 +262,7 @@ test('FastifyServer.admin.updateClientNoUser', async () => {
     expect(newClient.clientName).toBe("Test1");
     expect(newClient.clientSecret).toBe(initialClient.clientSecret);
     expect(newClient.redirectUri.length).toBe(1);
-    expect(newClient.validFlows.length).toBe(1);
+    expect(newClient.validFlow.length).toBe(1);
 });
 
 test('FastifyServer.admin.updateClientNoUserNotConfidential', async () => {
@@ -406,6 +406,6 @@ test('FastifyServer.admin.updateClientUser', async () => {
     expect(newClient.clientName).toBe("Test1");
     expect(newClient.clientSecret).toBe(initialClient.clientSecret);
     expect(newClient.redirectUri.length).toBe(1);
-    expect(newClient.validFlows.length).toBe(1);
+    expect(newClient.validFlow.length).toBe(1);
     expect(newClient.userId).toBe(user.id);
 });

@@ -101,7 +101,7 @@
                 <h3>Enabled Flows</h3>
                 {% for flow in validFlows %}
                 <input type="checkbox" name="{{ flow }}" value="true" 
-                    {% if flow == "true" %}checked{% endif %}> {{ flow }}</br>
+                    {% if selectedFlows[flow] %}checked{% endif %}> {{ flowNames[flow] }}</br>
                 {% endfor %}
                 <p><button type="submit">Update Client</button></p>
             </form>

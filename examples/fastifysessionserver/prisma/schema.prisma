@@ -4,6 +4,7 @@
 generator client {
   provider = "prisma-client-js"
   //output = "../src/generated/client"
+
 }
 
 datasource db {
@@ -104,6 +105,7 @@ model OAuthClientRedirectUri {
     client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
 
     @@index([id])
+    @@index([client_id])
     @@unique([client_id, uri], name: "redirectUriUnique")
     //@@unique([redirect_uri], name: "redirectUriUnique") // use this to ensure only one client has any given redirect uri
 }
@@ -116,8 +118,8 @@ model OAuthClientValidFlow {
     client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
 
     @@index([id])
+    @@index([client_id])
     @@unique([client_id, flow], name: "flowUnique")
-    //@@unique([redirect_uri], name: "redirectUriUnique") // use this to ensure only one client has any given redirect uri
 }
 
 

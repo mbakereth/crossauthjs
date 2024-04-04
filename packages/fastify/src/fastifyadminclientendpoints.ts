@@ -276,6 +276,7 @@ export class FastifyAdminClientEndpoints {
                     urlprefix: this.adminPrefix,
                     csrfToken: request.csrfToken,
                     validFlows: this.validFlows,
+                    flowNames: OAuthFlows.flowNames(this.validFlows),
                     user : user,
                     isAdmin: true,
                     next: next,
@@ -313,6 +314,7 @@ export class FastifyAdminClientEndpoints {
                             csrfToken: request.csrfToken,
                             urlprefix: this.adminPrefix, 
                             validFlows: this.validFlows,
+                            flowNames: OAuthFlows.flowNames(this.validFlows),
                             user : user,
                             isAdmin: true,
                             next: next,
@@ -341,6 +343,8 @@ export class FastifyAdminClientEndpoints {
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                             urlprefix: this.adminPrefix, 
+                            validFlows: this.validFlows,
+                            flowNames: OAuthFlows.flowNames(this.validFlows),
                             isAdmin: true,
                             next: next,
                             ...request.body,
@@ -400,10 +404,18 @@ export class FastifyAdminClientEndpoints {
                         errorCodeName: ErrorCode[ce.code], 
                     });
                 }
+                let selectedFlows : {[key:string]:boolean} = {};
+                for (let flow of this.validFlows) {
+                    if (client.validFlow.includes(flow)) {
+                        selectedFlows[flow] = true;
+                    }
+                }
                 let data : {[key:string]:any} = {
                     urlprefix: this.adminPrefix,
                     csrfToken: request.csrfToken,
                     validFlows: this.validFlows,
+                    flowNames: OAuthFlows.flowNames(this.validFlows),
+                    selectedFlows: selectedFlows,
                     user : user,
                     clientId: client.clientId,
                     clientName: client.clientName,
@@ -412,9 +424,6 @@ export class FastifyAdminClientEndpoints {
                     isAdmin: true,
                     next: next,
                 };
-                for (let flow of client.validFlow) {
-                    data[flow] = true;
-                }
             return reply.view(this.updateClientPage, data);
         });
 
@@ -448,6 +457,7 @@ export class FastifyAdminClientEndpoints {
                             csrfToken: request.csrfToken,
                             urlprefix: this.adminPrefix, 
                             validFlows: this.validFlows,
+                            flowNames: OAuthFlows.flowNames(this.validFlows),
                             user : user,
                             isAdmin: true,
                             next: next,
@@ -468,9 +478,15 @@ export class FastifyAdminClientEndpoints {
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
                         const ce = CrossauthError.asCrossauthError(e);
                         const statusCode = ce.httpStatus;
-                            /*ce.httpStatus >= 400 && ce.httpStatus <= 499 ? 
-                                ce.httpStatus : 200;*/
-                        return reply.status(statusCode).view(this.createClientPage, {
+                        /*ce.httpStatus >= 400 && ce.httpStatus <= 499 ? 
+                            ce.httpStatus : 200;*/
+                        let selectedFlows : {[key:string]:boolean} = {};
+                        for (let flow of this.validFlows) {
+                            if (flow in request.body) {
+                                selectedFlows[flow] = true;
+                            }
+                        }
+                        return reply.status(statusCode).view(this.updateClientPage, {
                             errorMessage: error.message,
                             errorMessages: error.messages, 
                             errorCode: error.code, 
@@ -479,6 +495,9 @@ export class FastifyAdminClientEndpoints {
                             urlprefix: this.adminPrefix, 
                             isAdmin: true,
                             next: next,
+                            validFlows : this.validFlows,
+                            selectedFlows : selectedFlows,
+                            flowNames: OAuthFlows.flowNames(this.validFlows),
                             ...request.body,
                         });
                         
@@ -627,6 +646,58 @@ export class FastifyAdminClientEndpoints {
         });
     }
 
+    addApiUpdateClientEndpoints() {
+
+        this.sessionServer.app.post(this.adminPrefix+'api/updateclient/:clientId', 
+            async (request: FastifyRequest<{Params: UpdateClientParamType, Body: UpdateClientBodyType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'POST',
+                    url: this.adminPrefix + 'api/updateclient',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+
+                try {
+                    if (request.body.userId) {
+                        await this.sessionServer.userStorage.getUserById(request.body.userId);
+                    }
+                    return await this.updateClient(request, reply, 
+                    (reply, client, newSecret) => {
+                        return reply.header(...JSONHDR).send({
+                            ok: true,
+                            client: client,
+                            csrfToken: request.csrfToken,
+                            newSecret: newSecret,
+                        });
+                    });
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    CrossauthLogger.logger.error(j({
+                        msg: "Failed updating OAuth client",
+                        user: request.user?.username,
+                    
+                        errorCodeName: ce.codeName,
+                        errorCode: ce.code
+                    }));
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    return this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                        reply.status(this.sessionServer.errorStatus(e)).header(...JSONHDR)
+                        .send({
+                            ok: false,
+                            errorMessage: error.message,
+                            errorMessages: error.messages, 
+                            errorCode: error.code, 
+                            errorCodeName: ErrorCode[error.code], 
+                        });
+                        
+                    });
+                }
+        });
+
+    }
+
     addApiDeleteClientEndpoints() {
 
         this.sessionServer.app.post(this.adminPrefix+'api/deleteclient/:clientId', 
@@ -702,7 +773,8 @@ export class FastifyAdminClientEndpoints {
 
         const confidential = request.body.confidential == "true";
         const clientName = request.body.clientName;
-        const redirectUris = request.body.redirectUris.split(/,?[ \t\n]+/);
+        const redirectUris = request.body.redirectUris.trim().length == 0 ? 
+            [] : request.body.redirectUris.trim().split(/,?[ \t\n]+/);
 
         // validate redirect uris
         let redirectUriErrors : string[] = [];
@@ -744,7 +816,7 @@ export class FastifyAdminClientEndpoints {
     private async updateClient(request : FastifyRequest<{Params: UpdateClientParamType,  Body: UpdateClientBodyType }>, 
         reply : FastifyReply, 
         successFn : (res : FastifyReply, client : OAuthClient, newSecret: boolean) => FastifyReply) {
-            
+                    
         // throw an error if the CSRF token is invalid
         if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
             throw new CrossauthError(ErrorCode.InvalidCsrf);
@@ -755,7 +827,8 @@ export class FastifyAdminClientEndpoints {
             throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         }
 
-        const redirectUris = request.body.redirectUris.split(/,?[ \t\n]+/);
+        const redirectUris = request.body.redirectUris.trim().length == 0 ? 
+            [] : request.body.redirectUris.trim().split(/,?[ \t\n]+/);
 
         // validate redirect uris
         let redirectUriErrors : string[] = [];
@@ -788,9 +861,10 @@ export class FastifyAdminClientEndpoints {
         const clientUpdate : Partial<OAuthClient> = {}
         clientUpdate.clientName = request.body.clientName;
         clientUpdate.confidential = request.body.confidential == "true";
-        clientUpdate.validFlows = validFlows;
+        clientUpdate.validFlow = validFlows;
         clientUpdate.redirectUri = redirectUris;
         clientUpdate.userId = request.body.userId;
+        if (clientUpdate.userId == undefined) clientUpdate.userId = null;
         const resetSecret = request.body.resetSecret == "true";
         
         const {client, newSecret} = 

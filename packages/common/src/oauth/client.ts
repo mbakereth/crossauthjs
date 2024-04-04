@@ -17,6 +17,24 @@ export class OAuthFlows {
     static readonly PasswordMfa = "passwordMfa";
     static readonly OidcAuthorizationCode = "oidcAuthorizationCode";
 
+    static readonly flowName : {[key:string]:string} = {
+        [OAuthFlows.AuthorizationCode] : "Authorization Code",
+        [OAuthFlows.AuthorizationCodeWithPKCE] : "Authorization Code with PKCE",
+        [OAuthFlows.ClientCredentials] : "Client Credentials",
+        [OAuthFlows.RefreshToken] : "Refresh Token",
+        [OAuthFlows.DeviceCode] : "Device Code",
+        [OAuthFlows.Password] : "Password",
+        [OAuthFlows.PasswordMfa] : "Password MFA",
+        [OAuthFlows.OidcAuthorizationCode] : "OIDC Authorization Code",
+    }
+    static flowNames(flows : string[]) : {[key:string]:string} {
+        let ret : {[key:string]:string} = {};
+        flows.forEach((flow) => {
+            if (flow in OAuthFlows.flowName) ret[flow] = OAuthFlows.flowName[flow];
+        });
+        return ret;
+    }
+    
     static isValidFlow(flow : string) : boolean {
         return OAuthFlows.allFlows().includes(flow);
     }
