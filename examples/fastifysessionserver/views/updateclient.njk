@@ -24,7 +24,7 @@
                 <tr>
                     <td>Confidential</td><td>{{ client.confidential }}</td>
                 </tr>
-                {% if newClientSecret %}
+                {% if newSecret %}
                     <tr>
                         <td>Client Secret</td><td>{{ client.clientSecret }}</td>
                     </tr>
@@ -50,7 +50,7 @@
                     </td>
                 </tr>
             </table>
-            {% if client.clientSecret and newClientSecret %}
+            {% if client.clientSecret and newSecret %}
                 <p>Make sure you write the client secret down.  If you lose it,
                     you will have to reset it.</p>
                 {% endif %}
@@ -91,7 +91,7 @@
                 <p>
                     <input type="checkbox" name="resetSecret" value="true" 
                         {% if resetSecret %}checked{% endif %}/>
-                    <label for="resetSecret">Reset</label>
+                    <label for="resetSecret">Reset Secret</label>
                 </p>
                 {% endif %}
                 <p>

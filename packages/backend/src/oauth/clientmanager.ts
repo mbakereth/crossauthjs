@@ -84,9 +84,10 @@ export class OAuthClientManager {
         resetSecret : boolean = false) : Promise<{client: OAuthClient, newSecret: boolean}> {
         const oldClient = await this.clientStorage.getClientById(clientId);
         let newSecret = false;
-        if ((client.confidential && !oldClient.confidential) ||
-            (client.confidential && resetSecret)) {
-            const plaintext = OAuthClientManager.randomClientSecret();
+        let plaintext : string|undefined = undefined;
+        if ((client.confidential === true && !oldClient.confidential) ||
+            (client.confidential === true && resetSecret)) {
+            plaintext = OAuthClientManager.randomClientSecret();
             client.clientSecret = await Hasher.passwordHash(plaintext, {
                 encode: true,
                 iterations: this.oauthPbkdf2Iterations,
@@ -95,7 +96,7 @@ export class OAuthClientManager {
             });
             newSecret = true;
         }
-        else if (!client.confidential) {
+        else if (client.confidential === false) {
             client.clientSecret = null;
         }
         if (client.redirectUri) {
@@ -105,7 +106,9 @@ export class OAuthClientManager {
         }
         client.clientId = clientId;
         await this.clientStorage.updateClient(client);
-        return {client: await this.clientStorage.getClientById(clientId), newSecret: newSecret};
+        const newClient = await this.clientStorage.getClientById(clientId);
+        if (plaintext) newClient.clientSecret = plaintext;
+        return {client: newClient, newSecret: newSecret};
     }
 
     /**
