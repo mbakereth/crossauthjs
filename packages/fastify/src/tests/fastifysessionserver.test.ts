@@ -504,3 +504,45 @@ test('FastifyServer.passwordReset', async () => {
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "newPass123", csrfToken: csrfToken} })
     expect(res.statusCode).toBe(302);
 });
+
+test('FastifyServer.deleteUser', async () => {
+
+    let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: false});
+
+    let res;
+    let body;
+
+    // get login page for CSRF token
+    res = await server.app.inject({ method: "GET", url: "/login" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("login.njk");
+    const {csrfCookie, csrfToken} = getCsrf(res);
+
+    // login
+    res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "bobPass123", csrfToken: csrfToken} })
+    expect(res.statusCode).toBe(302);
+    const sessionCookie = getSession(res);
+
+    // Right page served 
+    res = await server.app.inject({ method: "GET", url: "/deleteuser", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie} })
+    body = JSON.parse(res.body)
+    expect(body.template).toBe("deleteuser.njk");
+    
+    // delete user
+    res = await server.app.inject({ method: "POST", url: "/deleteuser", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+    } });
+    body = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    expect(body.args.errorCodeName).toBeUndefined();
+
+    // check user is deleted
+    let userStillExists = false;
+    try {
+        await userStorage.getUserByUsername("bob");
+        userStillExists = true;
+    } catch {}
+    expect(userStillExists).toBe(false);
+    
+});
+

@@ -202,6 +202,13 @@ export class InMemoryUserStorage extends UserStorage {
         }
     }
     
+    /**
+     * Deletes the given user
+     * @param id id of user to delete
+     */
+    async deleteUserById(id: string|number): Promise<void> {
+        return await this.deleteUserByUsername(String(id));
+    }
     
     async getUsers(skip? : number, take? : number) : Promise<User[]> {
         const keys = Object.keys(this.usersByUsername).sort();

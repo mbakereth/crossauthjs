@@ -107,6 +107,12 @@ export abstract class UserStorage {
      */
     abstract deleteUserByUsername(username : string) : Promise<void>;
 
+    /**
+     * If your storage supports this, delete the user with the given id from storage.
+     * @param id id of user to delete
+     */
+    abstract deleteUserById(id : string|number) : Promise<void>;
+
     abstract getUsers(skip? : number, take? : number) : Promise<User[]>;
 
     /**

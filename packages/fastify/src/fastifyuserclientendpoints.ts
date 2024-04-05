@@ -583,6 +583,7 @@ export class FastifyUserClientEndpoints {
                             csrfToken: request.csrfToken,
                             urlprefix: this.prefix, 
                             clientId : request.params.clientId,
+                            validFlows: this.validFlows,
                             next: next,
                         });
                         

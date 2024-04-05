@@ -89,6 +89,14 @@ interface ChangePasswordBodyType extends CsrfBodyType {
     required?: boolean
 }
 
+export interface DeleteUserParamType {
+    id : string|number
+}
+
+export interface DeleteUserQueryType {
+    next? : string
+}
+
 const JSONHDR : [string,string] = 
     ['Content-Type', 'application/json; charset=utf-8'];
 
@@ -108,6 +116,7 @@ export class FastifyAdminEndpoints {
     private adminSelectUserPage = "admin/selectuser.njk";
     private adminUpdateUserPage = "admin/updateuser.njk";
     private adminChangePasswordPage = "admin/changepassword.njk";
+    private deleteUserPage = "deleteuser.njk";
 
     constructor(sessionServer : FastifySessionServer,
         options: FastifySessionServerOptions = {}) {
@@ -119,6 +128,7 @@ export class FastifyAdminEndpoints {
         setParameter("adminUpdateUserPage", ParamType.String, this, options, "ADMIN_UPDATE_USER_PAGE");
         setParameter("adminChangePasswordPage", ParamType.String, this, options, "ADMIN_CHANGE_PASSWORD_PAGE");
         setParameter("enableOAuthClientManagement", ParamType.Boolean, this, options, "ENABLE_OAUTH_CLIENT_MANAGEMENT");
+        setParameter("deleteUserPage", ParamType.String, this, options, "DELETE_USER_PAGE");
         if (!this.adminPrefix.endsWith("/")) this.adminPrefix += "/";
         if (!this.adminPrefix.startsWith("/")) "/" + this.adminPrefix;
         if (options.userSearchFn) this.userSearchFn = options.userSearchFn
@@ -408,6 +418,102 @@ export class FastifyAdminEndpoints {
         });
     };
 
+    addDeleteUserEndpoints() {
+
+        this.sessionServer.app.get(this.adminPrefix+'deleteuser/:id', 
+            async (request: FastifyRequest<{ Params: DeleteUserParamType, Querystring: DeleteUserQueryType }>,
+                reply: FastifyReply)  => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'GET',
+                    url: this.adminPrefix + 'deleteclient',
+                    ip: request.ip
+                }));
+                let user : User;
+                if (!request?.user || !FastifyServer.isAdmin(request.user)) {
+                    return this.accessDeniedPage(request, reply);                    
+                }
+                try {
+                    const resp = await this.sessionServer.userStorage.getUserById(request.params.id);
+                    user = resp.user;
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    return reply.status(ce.httpStatus).view(this.sessionServer.errorPage, {
+                        errorMessage: ce.message,
+                        errorMessages: ce.messages, 
+                        errorCode: ce.code, 
+                        errorCodeName: ErrorCode[ce.code], 
+                    });
+                }
+                const next = request.query.next ?? this.adminPrefix + "selectuser";
+                let data = {
+                    urlprefix: this.adminPrefix,
+                    csrfToken: request.csrfToken,
+                    next: next,
+                    isAdmin: true,
+                    user : user,
+                };
+            return reply.view(this.deleteUserPage, data);
+        });
+
+        this.sessionServer.app.post(this.adminPrefix+'deleteuser/:id', 
+            async (request: FastifyRequest<{ Params: DeleteUserParamType, Body: DeleteUserQueryType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'POST',
+                    url: this.adminPrefix + 'deleteuser',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+
+                const next = request.body.next ?? this.adminPrefix + "selectuser";
+                try {
+                    return await this.deleteUser(request, reply, 
+                    (reply) => {
+                        return reply.view(this.deleteUserPage, {
+                            message: "User deleted",
+                            csrfToken: request.csrfToken,
+                            urlprefix: this.adminPrefix, 
+                            userId : request.params.id,
+                            isAdmin: true,
+                            next: next,
+                        });
+                    });
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    CrossauthLogger.logger.error(j({
+                        msg: "Failed deleting user",
+                        user: request.user?.username,
+                    
+                        errorCodeName: ce.codeName,
+                        errorCode: ce.code
+                    }));
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    return this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                        const ce = CrossauthError.asCrossauthError(e);
+                        const statusCode = ce.httpStatus;
+                            /*ce.httpStatus >= 400 && ce.httpStatus <= 499 ? 
+                                ce.httpStatus : 200;*/
+                        return reply.status(statusCode).view(this.deleteUserPage, {
+                            errorMessage: error.message,
+                            errorMessages: error.messages, 
+                            errorCode: error.code, 
+                            errorCodeName: ErrorCode[error.code], 
+                            csrfToken: request.csrfToken,
+                            urlprefix: this.adminPrefix, 
+                            userId : request.params.id,
+                            isAdmin: true,
+                            next: next,
+                        });
+                        
+                    });
+                }
+        });
+
+    }
+
     addApiUpdateUserEndpoints() {
         this.sessionServer.app.post(this.adminPrefix+'api/updateuser/:id', 
             async (request: FastifyRequest<{Params: UserParamType, Body: UpdateUserBodyType }>,
@@ -598,6 +704,47 @@ export class FastifyAdminEndpoints {
         });
     }
 
+    addApiDeleteUserEndpoints() {
+
+        this.sessionServer.app.post(this.adminPrefix+'api/deleteuser/:id', 
+            async (request: FastifyRequest<{ Params: DeleteUserParamType }>,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "API visit",
+                    method: 'POST',
+                    url: this.adminPrefix + 'api/deleteuser',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+                try {
+                    return await this.deleteUser(request, reply, 
+                        (reply) => {
+                        return reply.header(...JSONHDR).send({
+                        ok: true,
+                        clientId : request.params.id,
+                    })});
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e); 
+                    CrossauthLogger.logger.error(j({
+                        msg: "Delete user failure",
+                        user: request.user?.username,
+                        errorCodeName: ce.codeName,
+                        errorCode: ce.code
+                    }));
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    this.sessionServer.handleError(e, request, reply, (reply, error) => {
+                        reply.status(this.sessionServer.errorStatus(e)).header(...JSONHDR)
+                            .send({
+                                ok: false,
+                                errorMessage: error.message,
+                                errorMessages: error.messages,
+                                errorCode: ErrorCode[error.code]
+                        });                    
+                    });
+                }
+        });
+    }
+
     ///////////////////////////////////////////////////////////
     // Internal functions
 
@@ -765,4 +912,21 @@ export class FastifyAdminEndpoints {
         return successFn(reply, undefined);
     }
 
+    private async deleteUser(request : FastifyRequest<{ Params: DeleteUserParamType }>, 
+        reply : FastifyReply, 
+        successFn : (res : FastifyReply) => FastifyReply) {
+            
+        // throw an error if the CSRF token is invalid
+        if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
+            throw new CrossauthError(ErrorCode.InvalidCsrf);
+        }
+
+        // throw an error if not an admin user
+        if (!request.user || !FastifyServer.isAdmin(request.user)) {
+            throw new CrossauthError(ErrorCode.InsufficientPriviledges);
+        }
+
+        await this.sessionServer.userStorage.deleteUserById(request.params.id);
+        return successFn(reply);
+    }
 }

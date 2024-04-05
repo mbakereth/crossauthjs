@@ -591,6 +591,7 @@ export class FastifyAdminClientEndpoints {
                             csrfToken: request.csrfToken,
                             urlprefix: this.adminPrefix, 
                             clientId : request.params.clientId,
+                            validFlows: this.validFlows,
                             next: next,
                         });
                         

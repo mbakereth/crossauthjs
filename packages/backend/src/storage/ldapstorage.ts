@@ -127,7 +127,11 @@ export class LdapUserStorage extends UserStorage {
         email : string | number, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
             return await this.getUserByEmail(email, options);
-        }
+    }
+
+    async getUsers(skip? : number, take? : number) : Promise<User[]> {
+        return await this.localStorage.getUsers(skip, take);
+    }
 
     /**
      * Updates a user in local storage.  Does not do an LDAP update.
@@ -145,6 +149,14 @@ export class LdapUserStorage extends UserStorage {
      */
     async deleteUserByUsername(username : string) : Promise<void> {
         await this.localStorage.deleteUserByUsername(username);
+    }
+
+    /**
+     * Deletes a user from local storage (not from LDAP)
+     * @param username username to delete
+     */
+    async deleteUserById(id : string|number) : Promise<void> {
+        await this.localStorage.deleteUserById(id);
     }
 
     /**

@@ -154,3 +154,39 @@ test('FastifyServer.admin.changePassword', async () => {
     } catch {}
     expect(loginSucceeded).toBe(true);
 });
+
+test('FastifyServer.admin.deleteUser', async () => {
+    const {server, userStorage} = await makeAppWithOptions();
+    const {sessionCookie, csrfCookie, csrfToken} = await login(server);
+
+    let res;
+    let body;
+
+    const {user} = await userStorage.getUserByUsername("bob");
+
+    res = await server.app.inject({
+        method: "GET",
+        url: "/admin/deleteuser/" + user.id,
+        cookies: { SESSIONID: sessionCookie },
+    });
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("deleteuser.njk");
+
+    res = await server.app.inject({
+        method: "POST",
+        url: "/admin/deleteuser/" + user.id,
+        cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie,  },
+        payload: { csrfToken: csrfToken },
+    });
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("deleteuser.njk");
+    expect(body.args.message).toBe("User deleted");
+
+    let userStillExists = false;
+    try {
+        await userStorage.getUserByUsername(user.username);
+        userStillExists = true;
+    } catch {}
+    expect(userStillExists).toBe(false);
+});
+

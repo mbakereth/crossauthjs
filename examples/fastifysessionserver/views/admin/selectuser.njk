@@ -62,7 +62,10 @@
                         <td>{{ user.id }}</th>
                         <td>{{ user.username }}</th>
                         <td>{{ user.email}}</th>
-                        <td><a href="updateuser/{{user.id}}">Edit...</a></th>
+                        <td>
+                            <a href="updateuser/{{user.id}}">Edit...</a>
+                            <a href="deleteuser/{{user.id}}">Delete...</a>
+                        </td>
                     </tr>
                 {% endfor %}
                 <p>

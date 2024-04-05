@@ -8,7 +8,7 @@
         <h1>Delete User</h1>
         {% if message %}
             <p class="success">{{ message }}</p>
-            <p><a href="{{ backUrl }}">OK</a></p>
+            <p><a href="{{ next }}">OK</a></p>
         {% elif errorMessage %}
             <p class="error">{{ errorMessage }}</p>
         {% else %}
@@ -23,7 +23,7 @@
                 <p>
                     <button type="submit">Yes</button>
                     <span style="min-width: 5ex">&nbsp;</span>
-                    <button type="button" onClick="window.location={{ backUrl }}">No</button>
+                    <button type="button" onClick="window.location='{{ next }}'">No</button>
                 </p>
 
             </form>

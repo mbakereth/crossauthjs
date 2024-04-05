@@ -320,7 +320,35 @@ export class PrismaUserStorage extends UserStorage {
     });
     } catch (e) {
         CrossauthLogger.logger.debug(j({err: e}));
-        error = new CrossauthError(ErrorCode.Connection, "Error deleting key");
+        error = new CrossauthError(ErrorCode.Connection, "Error deleting user");
+    } 
+    if (error) throw error;
+
+   }
+
+   async deleteUserById(id : string|number) : Promise<void>  {
+        if (this.forceIdToNumber && typeof(id) == "string" && id.match(/^[+-]?[0-9]+$/)) {
+            try {
+                return await this.deleteUserById_internal(Number(id));
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({msg: "Failed forcing id to number when deleting user"}));
+            }
+        }
+        return await this.deleteUserById_internal(id);
+    }
+
+   private async deleteUserById_internal(id : string|number) : Promise<void>  {
+    let error : CrossauthError;
+    try {
+        // @ts-ignore  (because types only exist when do prismaClient.table...)
+        return /*await*/ this.prismaClient[this.userTable].delete({
+        where: {
+            id: id
+        }
+    });
+    } catch (e) {
+        CrossauthLogger.logger.debug(j({err: e}));
+        error = new CrossauthError(ErrorCode.Connection, "Error deleting user");
     } 
     if (error) throw error;
 

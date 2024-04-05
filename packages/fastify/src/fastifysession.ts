@@ -212,6 +212,7 @@ export const SessionPageEndpoints = [
     "logout",
     "changepassword",
     "updateuser",
+    "deleteuser",
 ];
 
 export const SessionAdminPageEndpoints = [
@@ -220,6 +221,7 @@ export const SessionAdminPageEndpoints = [
     "admin/selectuser",
     "admin/updateuser",
     "admin/changepassword",
+    "admin/deleteuser",
 ];
 
 export const SessionAdminClientPageEndpoints = [
@@ -246,6 +248,7 @@ export const SessionApiEndpoints = [
     "api/userforsessionkey",
     "api/getcsrftoken",
     "api/updateuser",
+    "api/deleteuser",
 ];
 
 export const SessionAdminApiEndpoints = [
@@ -253,6 +256,7 @@ export const SessionAdminApiEndpoints = [
     "admin/api/changepassword",
     "admin/api/updateuser",
     "admin/api/changepassword",
+    "admin/api/deleteuser",
 ];
 
 export const SessionAdminClientApiEndpoints = [
@@ -933,6 +937,10 @@ export class FastifySessionServer {
             this.userEndpoints.addRequestPasswordResetEndpoints();
         }
 
+        if (this.endpoints.includes("deleteuser")) {
+            this.userEndpoints.addDeleteUserEndpoints();
+        }
+
         if (this.endpoints.includes("resetpassword")) {
             if (!this.enablePasswordReset) throw new CrossauthError(ErrorCode.Configuration, "Password reset must be enabled for /resetpassword");
             this.userEndpoints.addResetPasswordEndpoints();
@@ -1007,6 +1015,10 @@ export class FastifySessionServer {
     
         }
 
+        if (this.endpoints.includes("api/deleteuser")) {
+            this.userEndpoints.addApiDeleteUserEndpoints();
+        }
+
         // User client endpoints
         if (this.userClientEndpoints) {
             if (this.endpoints.includes("selectclient")) {
@@ -1054,6 +1066,12 @@ export class FastifySessionServer {
         }
         if (this.endpoints.includes("admin/api/changepassword")) {
             this.adminEndpoints.addApiChangePasswordEndpoints();
+        }
+        if (this.endpoints.includes("admin/deleteuser")) {
+            this.adminEndpoints.addDeleteUserEndpoints();
+        }
+        if (this.endpoints.includes("admin/api/deleteuser")) {
+            this.adminEndpoints.addApiDeleteUserEndpoints();
         }
 
         // Admin Client endpoints
