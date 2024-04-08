@@ -6,6 +6,10 @@ export type GrantType = "authorization_code" | "implicit" | "client_credentials"
 export type SubjectType = "pairwise" | "public";
 export type ClaimType = "normal" | "aggregated" | "distributed";
 
+/** This class encapsulate the data returned by the `oidc-configuration`
+ * well-known endpoint.  For further details, see the OpenID Connect
+ * specification.
+ */
 export interface OpenIdConfiguration {
     issuer : string,
     authorization_endpoint: string,
@@ -50,6 +54,10 @@ export interface Jwks {
     keys: JsonWebKey[],
 }
 
+/**
+ * This is the detault configuration for 
+ * {@link @crossauth/backend!OAuthAuthorizationServer}.
+ */
 export const DEFAULT_OIDCCONFIG : OpenIdConfiguration = {
     issuer: "",
     authorization_endpoint: "",

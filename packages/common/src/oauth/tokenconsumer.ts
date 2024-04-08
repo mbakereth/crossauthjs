@@ -6,29 +6,45 @@ import { type OpenIdConfiguration, DEFAULT_OIDCCONFIG } from './wellknown';
 
 export type Key = jose.KeyLike | Uint8Array;
 
+/**
+ * Options that can be passed to {@link OAuthTokenConsumerBase}.
+ */
 export interface OAuthTokenConsumerOptions {
 
-    /** Secret key if using a symmetric cipher for signing the JWT.  Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
+    /** Secret key if using a symmetric cipher for signing the JWT.  
+     * Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
     jwtKeyType? : string,
 
-    /** Secret key if using a symmetric cipher for signing the JWT.  Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
+    /** Secret key if using a symmetric cipher for signing the JWT.  
+     * Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
     jwtSecretKey? : string,
 
-    /** The public key if using a public key cipher for signing the JWT.  Either this or `jwtP
-     * ublicKeyFile` is required when using this kind of cipher.  privateKey or privateKeyFile is also required. */
+    /** The public key if using a public key cipher for signing the JWT.  
+     * Either this or `jwtPublicKeyFile` is required when using this kind of 
+     * cipher.  privateKey or privateKeyFile is also required. */
     jwtPublicKey? : string,
 
     /** Number of seconds tolerance when checking expiration.  Default 10 */
     clockTolerance? : number,
 
-    /** Set this to restrict the issuers (as set in {@link OAuthAuthorizationServer}) that will be valid in the JWT.  Required */
+    /** Set this to restrict the issuers (as set in 
+     * {@link @crossauth/backend!OAuthAuthorizationServer}) that will be valid in the JWT.  Required */
     oauthIssuers? : string,
 
+    /** The base URL for OAuth API calls to the authorization server (the URL 
+     * is the `issuer` field of a JWT) */
     authServerBaseUri? : string;
 
+    /**
+     * For initializing the token consumer with a static OpenID Connect 
+     * configuration.
+     */
     oidcConfig? : (OpenIdConfiguration&{[key:string]:any})|undefined;
 }
 
+/**
+ * This abstract class is for validating OAuth JWTs.  
+ */
 export abstract class OAuthTokenConsumerBase {
     
     protected consumerName : string;
@@ -39,9 +55,27 @@ export abstract class OAuthTokenConsumerBase {
     protected oauthIssuers : string[]|undefined = undefined;
     protected authServerBaseUri = "";
 
+    /**
+     * The OpenID Connect configuration for the authorization server,
+     * either passed to the constructor or fetched from the authorization
+     * server.
+     */
     oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
+
+    /**
+     * The RSA public keys or symmetric keys for the authorization server,
+     * either passed to the constructor or fetched from the authorization
+     * server.
+     */
     keys : {[key:string]: Key} = {};
 
+    /**
+     * Constrctor
+     * 
+     * @param consumerName : this is the value expected in the `aud` field
+     *        of the JWT.  The token is rejected if it doesn't match.
+     * @param options See {@link OAuthTokenConsumerOptions}.
+     */
     constructor(consumerName : string, options : OAuthTokenConsumerOptions = {}) {
 
         this.consumerName = consumerName;
@@ -60,6 +94,14 @@ export abstract class OAuthTokenConsumerBase {
         }
     }
 
+    /**
+     * This loads keys either from the ones passed in the constructor
+     * or by fetching from the authorization server.
+     * 
+     * Note that even if you pass the keys to the constructor, you must
+     * still call this function.  This is because key loading is
+     * asynchronous, and constructors may not be async.
+     */
     async loadKeys() {
 
         try {
@@ -94,7 +136,16 @@ export abstract class OAuthTokenConsumerBase {
         }
     }
 
-    async loadConfig(oidcConfig? : OpenIdConfiguration) {
+    /**
+     * Loads OpenID Connect configuration, or fetches it from the 
+     * authorization server (using the well-known enpoint appended
+     * to `authServerBaseUri` )
+     * @param oidcConfig the configuration, or undefined to load it from
+     *        the authorization server
+     * @throws a {@link CrossauthError} object with {@link ErrorCode} of
+     *   - `Connection` if the fetch to the authorization server failed.
+     */
+    async loadConfig(oidcConfig? : OpenIdConfiguration) : Promise<void> {
         if (oidcConfig) {
             this.oidcConfig = oidcConfig;
             return;
@@ -126,6 +177,15 @@ export abstract class OAuthTokenConsumerBase {
         
     }
 
+    /**
+     * Loads the JWT signature validation keys, or fetches them from the 
+     * authorization server (using the URL in the OIDC configuration).
+     * @param jwks the keys to load, or undefined to fetch them from
+     *        the authorization server.
+     * @throws a {@link CrossauthError} object with {@link ErrorCode} of
+     *   - `Connection` if the fetch to the authorization server failed,
+     *     the OIDC configuration wasn't set or the keys could not be parsed.
+     */
     async loadJwks(jwks? : {keys: jose.JWK[]}) {
         if (jwks) {
             this.keys = {};
@@ -171,6 +231,17 @@ export abstract class OAuthTokenConsumerBase {
 
     }
 
+    /**
+     * Returns JWT payload if the token is valid, undefined otherwise.
+     * 
+     * Doesn't throw exceptions.
+     * 
+     * @param token the token to validate
+     * @param tokenType either `access`, `refresh` or `id`.  If the
+     *        `type` field in the JWT payload doesn't match this, validation
+     *        fails.
+     * @returns the JWT payload if the token is valid, `undefined` otherwise.
+     */
     async tokenAuthorized(token: string,
         tokenType: "access" | "refresh" | "id") : Promise<{[key:string]: any}|undefined> {
         if (!this.keys || Object.keys(this.keys).length == 0) {

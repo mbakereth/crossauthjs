@@ -1,6 +1,10 @@
 import { CrossauthError, ErrorCode } from ".";
 import { CrossauthLogger, j } from '.';
 
+/**
+ * Encapsulates the payload of a JWT, with both the token and
+ * decoded JSON payload.
+ */
 export class JWT {
 
     /** The string representation of the JWT */
@@ -9,6 +13,12 @@ export class JWT {
     /** The decoded payload from the token */
     payload : {[key:string]: any};
 
+    /**
+     * Constructor.  Pass either `token` or `payload`.
+     * @param token the string JWT token - the payload will be parsed from it
+     * @param payload the JSON payload.  The payload will be set but not
+     *        the string `token`.
+     */
     constructor({token, payload} : {
         token? : string,
         payload? : {[key:string]: any},

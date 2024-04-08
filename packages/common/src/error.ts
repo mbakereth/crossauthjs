@@ -1,5 +1,5 @@
 /**
- * Indicates the type of error reported by {@link @crossauth/common!CrossauthError}
+ * Indicates the type of error reported by {@link CrossauthError}
  */
 export enum ErrorCode {
 
@@ -140,6 +140,9 @@ export enum ErrorCode {
  */
 export class CrossauthError extends Error {
 
+    /** `typeof` won't work on this class.  To determine if the 
+     * object is a `CrossauthError`, check for presence of this member.
+     */
     isCrossauthError = true;
 
     /** The best HTTP status to report */
@@ -300,6 +303,14 @@ export class CrossauthError extends Error {
 	Object.setPrototypeOf(this, CrossauthError.prototype);
     }
 
+    /**
+     * OAuth defines certain error types.  To convert the error in an OAuth
+     * response into a CrossauthError object, call this function.
+     * 
+     * @param error as returned by an OAuth call (converted to an {@link ErrorCode}).
+     * @param error_description as returned by an OAuth call (put in the `message`)
+     * @returns a `CrossauthError` instance.
+     */
     static fromOAuthError(error : string, error_description?: string) : CrossauthError {
         let code : ErrorCode;
         switch (error) {
@@ -319,6 +330,14 @@ export class CrossauthError extends Error {
             
     }
 
+    /**
+     * If the passed object is a `CrossauthError` instance, simply returns
+     * it.  Otherwise creates a `CrossauthError` object with {@link ErrorCode}
+     * of `Unknown` from it, setting the `message` if possible.
+     * 
+     * @param e the error to convert.
+     * @returns  a `CrossauthError` instance.
+     */
     static asCrossauthError(e: any) : CrossauthError { 
         if (e instanceof Error) {
             if ("isCrossauthError" in e) {
@@ -330,12 +349,23 @@ export class CrossauthError extends Error {
     }
 }
 
+/**
+ * Returns the friendly name for an HTTP response code.  
+ * 
+ * If it is not a recognized one, returns the friendly name for 500.
+ * @param status the HTTP response code, which, while being numeric,
+ *        can be in a string or number.
+ * @returns the string version of the response code.
+ */
 export function httpStatus(status: string|number) : string {
     if (typeof status == "number") status = ""+status;
     if (status in FriendlyHttpStatus) return FriendlyHttpStatus[status];
     return FriendlyHttpStatus['500'];
 }
 
+/**
+ * Name for a numeric response code, as defined by the HTTP specification.
+ */
 const FriendlyHttpStatus : {[key:string]:string} = {
     '200': 'OK',
     '201': 'Created',

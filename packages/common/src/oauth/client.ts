@@ -6,17 +6,45 @@ import {
     DEFAULT_OIDCCONFIG,
     type GrantType } from '..';
 
+/**
+ * Crossauth allows you to define which flows are valid for a given client.
+ */
 export class OAuthFlows {
+
+    /** All flows are allowed */
     static readonly All = "all";
+
+    /** OAuth authorization code flow (without PKCE) */
     static readonly AuthorizationCode = "authorizationCode";
+
+    /** OAuth authorization code flow with PKCE */
     static readonly AuthorizationCodeWithPKCE = "authorizationCodeWithPKCE";
+
+    /** Auth client credentials flow */
     static readonly ClientCredentials = "clientCredentials";
+
+    /** OAuth refresh token flow */
     static readonly RefreshToken = "refreshToken";
+
+    /** OAuth device code flow */
     static readonly DeviceCode = "deviceCode";
+
+    /** OAuth password flow */
     static readonly Password = "password";
+
+    /** The Auth0 password MFA extension to the password flow */
     static readonly PasswordMfa = "passwordMfa";
+
+    /** The OpenID Connect authorization code flow, with or without
+     * PKCE.
+     */
     static readonly OidcAuthorizationCode = "oidcAuthorizationCode";
 
+    /** A user friendly name for the given flow ID
+     * 
+     * For example, if you pass "authorizationCode" 
+     * (`OAuthFlows.AuthorizationCode`) you will get `"Authorization Code"`.
+     */
     static readonly flowName : {[key:string]:string} = {
         [OAuthFlows.AuthorizationCode] : "Authorization Code",
         [OAuthFlows.AuthorizationCodeWithPKCE] : "Authorization Code with PKCE",
@@ -27,6 +55,14 @@ export class OAuthFlows {
         [OAuthFlows.PasswordMfa] : "Password MFA",
         [OAuthFlows.OidcAuthorizationCode] : "OIDC Authorization Code",
     }
+
+    /**
+     * Returns a user-friendly name for the given flow strings.
+     * 
+     * The value returned is the one in `flowName`.
+     * @param flows the flows to return the names of
+     * @returns an array of strings
+     */
     static flowNames(flows : string[]) : {[key:string]:string} {
         let ret : {[key:string]:string} = {};
         flows.forEach((flow) => {
@@ -35,10 +71,20 @@ export class OAuthFlows {
         return ret;
     }
     
+    /**
+     * Returns true if the given string is a valid flow name.
+     * @param flow the flow to check
+     * @returns true or false.
+     */
     static isValidFlow(flow : string) : boolean {
         return OAuthFlows.allFlows().includes(flow);
     }
 
+    /**
+     * Returns true only if all given strings are valid flows
+     * @param flows the flows to check
+     * @returns true or false.
+     */
     static areAllValidFlows(flows : string[]) : boolean {
         let valid = true;
         flows.forEach((flow) => {
@@ -59,6 +105,12 @@ export class OAuthFlows {
         ];
     }
 
+    /**
+     * Returns the OAuth grant types that are valid for a given flow, or 
+     * `undefined` if it is not a valid flow.
+     * @param oauthFlow the flow to get the grant type for.
+     * @returns a {@link GrantType} value
+     */
     static grantType(oauthFlow : string) : GrantType[]|undefined {
         switch (oauthFlow) {
             case OAuthFlows.AuthorizationCode:
@@ -80,6 +132,10 @@ export class OAuthFlows {
     }
 } 
 
+/**
+ * These are the fields that can be returned in the JSON from an OAuth
+ * call.
+ */
 export interface OAuthTokenResponse {
     access_token?: string,
     refresh_token? : string, 
@@ -92,6 +148,9 @@ export interface OAuthTokenResponse {
     mfa_token? : string,
 }
 
+/**
+ * An abstract base class for OAuth clients.
+ */
 export abstract class OAuthClientBase {
     protected authServerBaseUri = "";
     protected clientId : string|undefined;
@@ -107,6 +166,25 @@ export abstract class OAuthClientBase {
     protected oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
     protected tokenConsumer : OAuthTokenConsumerBase;
 
+    /**
+     * Constructor.
+     * 
+     * @param param0 options:
+     *      - `authServerBaseUri` the base URI for OAuth calls.  This is
+     *        the value in the isser field of a JWT.  The client will
+     *        reject any JWTs that are not from this issuer.
+     *      - `clientId` the client ID for this client.
+     *      - `redriectUri` when making OAuth calls, this value is put
+     *        in the redirectUri field.
+     *      - `number` of characters (before base64-url-encoding) for generating
+     *        state values in OAuth calls.
+     *      - `verifierLength` of characters (before base64-url-encoding) for
+     *        generating PKCE values in OAuth calls.
+     *      - `tokenConsumer` to keep this class independent of frontend 
+     *        and backend specific funtionality (eg classes not available
+     *        in browsers), the token consumer, which determines if a token
+     *        is valid or not, is abstracted out.
+     */
     constructor({authServerBaseUri,
         clientId,
         clientSecret,
@@ -136,7 +214,18 @@ export abstract class OAuthClientBase {
         this.authServerBaseUri = authServerBaseUri;
     }
 
-    async loadConfig(oidcConfig? : OpenIdConfiguration) {
+    /**
+     * Loads OpenID Connect configuration so that the client can determine
+     * the URLs it can call and the features the authorization server provides.
+     * 
+     * @param oidcConfig if defined, loadsa the config from this object.
+     *        Otherwise, performs a fetch by appending
+     *        `/.well-known/openid-configuration` to the 
+     *        `authServerBaseUri`.
+     * @throws {@link CrossauthError} with the following {@link ErrorCode}s
+     *   - `Connection` if data from the URL could not be fetched or parsed.
+     */
+    async loadConfig(oidcConfig? : OpenIdConfiguration) : Promise<void> {
         if (oidcConfig) {
             CrossauthLogger.logger.debug(j({msg: "Reading OIDC config locally"}))
             this.oidcConfig = oidcConfig;
@@ -319,6 +408,15 @@ export abstract class OAuthClientBase {
         //return {url: url, params: params};
     }
 
+    /** Initiates the Password Flow.
+     * 
+     * Does not throw exceptions.
+     * 
+     * @param username the username
+     * @param password the user's password
+     * @returns An {@link OAuthTokenResponse} which may contain data or
+     * the OAuth error fields.
+     */
     async passwordFlow(username: string,
         password: string,
         scope?: string) : 
@@ -361,6 +459,19 @@ export abstract class OAuthClientBase {
     }
 
 
+    /** Request valid authenticators using the Password MFDA flow, 
+     * after the Password flow has been initiated.
+     * 
+     * Does not throw exceptions.
+     * 
+     * @param mfaToken the MFA token that was returned by the authorization
+     *        server in the response from the Password Flow.
+     * @returns Either
+     *   - authenticators an array of {@link MfaAuthenticatorResponse} objects,
+     *     as per Auth0's Password MFA documentation
+     *   - an `error` and `error_description`, also as per Auth0's Password MFA 
+     *     documentation
+     */
     async mfaAuthenticators(mfaToken : string) : 
         Promise<{
             authenticators?: MfaAuthenticatorResponse[],
@@ -413,6 +524,18 @@ export abstract class OAuthClientBase {
 
     }
 
+    /** 
+     * This is part of the Auth0 Password MFA flow.  Once the client has
+     * received a list of valid authenticators, if it wishes to initiate
+     * OTP, call this function
+     * 
+     * Does not throw exceptions.
+     * 
+     * @param mfaToken the MFA token that was returned by the authorization
+     *        server in the response from the Password Flow.
+     * @param authenticatorId the authenticator ID, as returned in the response
+     * from the `mfaAuthenticators` request.
+     */
     async mfaOtpRequest(mfaToken: string,
         authenticatorId: string) : 
         Promise<{
@@ -451,6 +574,23 @@ export abstract class OAuthClientBase {
         return resp;
     }
 
+    /**
+     * Completes the Password MFA OTP flow.
+     * @param mfaToken the MFA token that was returned by the authorization
+     *        server in the response from the Password Flow.
+     * @param otp the OTP entered by the user
+     * @returns an object with some of the following fields, depending on
+     *          authorization server configuration and whether there were
+     *          errors:
+     *   - `access_token` an OAuth access token
+     *   - `refresh_token` an OAuth access token
+     *   - `id_token` an OpenID Connect ID token
+     *   - `expires_in` number of seconds when the access token expires
+     *   - `scope` the scopes the user authorized
+     *   - `token_type` the OAuth token type
+     *   - `error` as per Auth0 Password MFA documentation
+     *   - `error_description` friendly error message
+     */
     async mfaOtpComplete(
         mfaToken: string,
         otp: string) : 
@@ -498,6 +638,24 @@ export abstract class OAuthClientBase {
 
     }
 
+    /** 
+     * This is part of the Auth0 Password MFA flow.  Once the client has
+     * received a list of valid authenticators, if it wishes to initiate
+     * OOB (out of band) login, call this function
+     * 
+     * Does not throw exceptions.
+     * 
+     * @param mfaToken the MFA token that was returned by the authorization
+     *        server in the response from the Password Flow.
+     * @param authenticatorId the authenticator ID, as returned in the response
+     * from the `mfaAuthenticators` request.
+     * @returns an object with one or more of the following defined:
+     *   - `challenge_type` as per the Auth0 MFA documentation
+     *   - `oob_code` as per the Auth0 MFA documentation
+     *   - `binding_method` as per the Auth0 MFA documentation
+     *   - `error` as per Auth0 Password MFA documentation
+     *   - `error_description` friendly error message
+     */
     async mfaOobRequest(mfaToken : string, 
         authenticatorId : string, ) : Promise<{
         challenge_type? : string, 
@@ -541,6 +699,17 @@ export abstract class OAuthClientBase {
 
     }
 
+    /**
+     * Completes the Password MFA OTP flow.
+     * 
+     * Does not throw exceptions.
+     * 
+     * @param mfaToken the MFA token that was returned by the authorization
+     *        server in the response from the Password Flow.
+     * @param oobCode the code entered by the user
+     * @returns an {@link OAuthTokenResponse} object, which may contain
+     *          an error instead of the response fields.
+     */
     async mfaOobComplete(mfaToken: string,
         oobCode: string,
         bindingCode: string) : Promise<OAuthTokenResponse> {
@@ -656,6 +825,13 @@ export abstract class OAuthClientBase {
         }
     }
 
+    /**
+     * Validatesd a token using the token consumer.
+     * 
+     * @param idToken the token to validate
+     * @returns the parsed JSON of the payload, or undefinedf if it is not
+     * valid.
+     */
     async idTokenAuthorized(idToken: string) 
         : Promise<{[key:string]: any}|undefined> {
             try {
@@ -667,6 +843,12 @@ export abstract class OAuthClientBase {
         }
 }
 
+/**
+ * Fields that canb be returned by the `mfaAuthenticators` function call
+ * if {@link OAuthClientBase}.
+ * 
+ * See Auth0's documentation for the password MFA flow.
+ */
 export interface MfaAuthenticatorResponse {
     authenticator_type: string,
     id : string,

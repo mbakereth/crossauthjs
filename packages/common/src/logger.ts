@@ -1,5 +1,9 @@
 import { CrossauthError } from ".";
 
+/**
+ * You can implement your own logger.  Crossauth only needs these functions
+ * and variables to be present.
+ */
 export interface CrossauthLoggerInterface {
     error(output: any) : void;
     warn(output: any) : void;
@@ -134,14 +138,26 @@ export class CrossauthLogger {
         this.log(CrossauthLogger.Error, output);
     }
 
+    /**
+     * Report an warning
+     * @param output object to output
+     */
     warn(output: any) {
         this.log(CrossauthLogger.Warn, output);
     }
 
+    /**
+     * Report information
+     * @param output object to output
+     */
     info(output: any) {
         this.log(CrossauthLogger.Info, output);
     }
 
+    /**
+     * Print a debugging message
+     * @param output object to output
+     */
     debug(output: any) {
         this.log(CrossauthLogger.Debug, output);
     }
@@ -162,6 +178,24 @@ export class CrossauthLogger {
     }
 }
 
+/**
+ * This is a helper function to allow you to use logger that either do or
+ * do not accept.  
+ * 
+ * If your logger does accept JSON (as defined in 
+ * `globalThis.crossauthLoggerAcceptsJson`), this will return the object
+ * that was passed, including the stack trace in `stack` if the object
+ * passed in `err` is an exception.  Otherwise, it returns a stringified
+ * version.
+ * 
+ * All Crossauth error calls are made with this helper.
+ * 
+ * @param arg put the key/value pairs you want to log in here.  `err` will
+ *        be treated as an `Error` instance if it is one, and a stack trace
+ *        will be placed in `stack`.
+ * @returns either an object or a stringified JSON, depending on
+ *          `globalThis.crossauthLoggerAcceptsJson`.
+ */
 export function j(arg : {[key: string]: any}|string) : string|{[key: string]: any} {
     let stack;
     if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object")) {
@@ -179,5 +213,19 @@ declare global {
     var crossauthLoggerAcceptsJson : boolean;
 };
 
+/** Initialized with an instance of {@link CrossauthLogger} 
+ * but you can override it with any class implementing
+ * {@link CrossauthLoggerInterface}.
+ * 
+ * Rather than setting this directly, call
+ * {@link CrossauthLogger.setLogger()}.
+ */
 globalThis.crossauthLogger = new CrossauthLogger(CrossauthLogger.None);
+
+/**
+ * If your logger object accepts JSON input, set this to true.
+ * 
+ * Rather than setting this directly, call
+ * {@link CrossauthLogger.setLogger()}.
+ */
 globalThis.crossauthLoggerAcceptsJson = true;
