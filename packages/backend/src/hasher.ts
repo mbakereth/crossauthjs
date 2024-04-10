@@ -45,6 +45,9 @@ export interface HashOptions {
     digest? : string,
 }
 
+/**
+ * Provides cryptographic functions
+ */
 export class Hasher {
 
     /**
@@ -71,9 +74,19 @@ export class Hasher {
         return timingSafeEqual(Buffer.from(newHash), Buffer.from(hash.hashedPassword));
     }
 
+    /**
+     * Decodes a string from base64 to UTF-89
+     * @param encoded base64-encoded text
+     * @returns URF-8 text
+     */
     static base64Decode(encoded : string) : string {
         return Buffer.from(encoded, 'base64').toString('utf-8');
     }
+    /**
+     * Base64-encodes UTF-8 text
+     * @param text UTF-8 text
+     * @returns Base64 text
+     */
     static base64Encode(text : string) : string {
         return Buffer.from(text, 'utf-8').toString('base64');
     }
@@ -87,7 +100,7 @@ export class Hasher {
      * ```
      * The hashed password part is the Base64 encoding of the PBKDF2 password.
      * @param hash the hassed password to decode.  See above for format
-     * @returns 
+     * @returns {@link PasswordHash} object containing the deecoded hash components
      */
     static decodePasswordHash(hash : string) : PasswordHash {
         const parts = hash.split(':');
@@ -180,12 +193,14 @@ export class Hasher {
     /**
      * Hashes a password and returns it as a base64 or base64url encoded string
      * @param plaintext password to hash
-     * @param options salt: salt to use.  Make a random one if not passed
-     *               secret: optional application secret password to apply as a pepper
-     *               encode: if true, returns the full string as it should be stored in the database.
+     * @param options 
+     *        - `salt`: salt to use.  Make a random one if not passed
+     *        - `secret`: optional application secret password to apply as a pepper
+     *        - `encode`: if true, returns the full string as it should be stored in the database.
      * @returns the string containing the hash and the values to decode it
      */
-    static async passwordHash(plaintext : string, options : HashOptions = {}) {
+    static async passwordHash(plaintext : string, options : HashOptions = {}) 
+        : Promise<string> {
         let { salt, secret, encode} = {...options};
         if (!salt) salt = Hasher.randomSalt();
         let useSecret = secret != undefined;
@@ -206,12 +221,31 @@ export class Hasher {
         return passwordHash;
     }
 
+    /**
+     * For creating non-JWT tokens (eg password reset tokens.)  The
+     * hash is of a JSON containing the payload, timestamp and optionally
+     * a salt.
+     * @param payload the payload to hash
+     * @param salt optional salt (use if the payload is small)
+     * @param timestamp time the token will expire
+     * @returns a Base64-URL-encoded string that can be hashed.
+     */
     static signableToken(payload : {[key:string]: any}, salt? : string, timestamp? : number) : string {
         if (salt == undefined) salt = Hasher.randomSalt();
         if (!timestamp) timestamp = (new Date()).getTime();
         return Buffer.from(JSON.stringify({...payload, t: timestamp, s: salt})).toString('base64url');
     }
 
+    /**
+     * Signs a JSON payload by creating a hash, using a secret and 
+     * optionally also a salt and timestamp
+     * 
+     * @param payload object to sign (will be stringified as a JSON)
+     * @param secret secret key, which must be a string
+     * @param salt optionally, a salt to concatenate with the payload (must be a string)
+     * @param timestamp optionally, a timestamp to include in the signed date as a Unix date
+     * @returns Base64-url encoded hash
+     */
     static sign(payload : {[key:string]: any}|string, secret: string, salt? : string, timestamp? : number) : string {
         if (typeof payload != "string") {
             payload = Hasher.signableToken(payload, salt, timestamp);
@@ -221,6 +255,16 @@ export class Hasher {
 
     }
 
+    /**
+     * Validates a signature and, if valid, return the unstringified payload
+     * @param signedMessage signed message (base64-url encoded)
+     * @param secret secret key, which must be a string
+     * @param expiry if set, validation will fail if the timestamp in the payload is after this date
+     * @returns if signature is valid, the payload as an object
+     * @throws {@link @crossauth/common!CrossauthError} with 
+     *         {@link @crossauth/common!ErrorCode} of `InvalidKey` if signature
+     *         is invalid or has expired.  
+     */
     static unsign(signedMessage : string, secret : string, expiry?: number) : {[key:string] : any} {
         const parts = signedMessage.split(".");
         if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidKey);
@@ -255,6 +299,13 @@ export class Hasher {
       
     }
 
+    /**
+     * Symmetric encryption using a key that must be a string
+     * 
+     * @param plaintext Text to encrypt
+     * @param keyString the symmetric key
+     * @returns Encrypted text Base64-url encoded.
+     */
     static symmetricEncrypt(plaintext : string, keyString : string) {
         const iv = randomBytes(16);
         let key = Buffer.from(keyString, 'base64url');
@@ -264,6 +315,13 @@ export class Hasher {
         return iv.toString('base64url') + "." + encrypted.toString('base64url');
     }
 
+    /**
+     * Symmetric decryption using a key that must be a string
+     * 
+     * @param ciphertext Base64-url encoded ciphertext
+     * @param keyString the symmetric key
+     * @returns Decrypted text
+     */
     static symmetricDecrypt(ciphertext : string, keyString : string) {
         let key = Buffer.from(keyString, 'base64url');
         const parts = ciphertext.split(".");

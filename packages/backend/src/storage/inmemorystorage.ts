@@ -72,7 +72,7 @@ export class InMemoryUserStorage extends UserStorage {
      * 
      * @param username the username to look up
      * @returns a {@link User } and {@link UserSecrets }instance
-     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist`.
      */
     async getUserByUsername(
         username : string, 
@@ -119,7 +119,7 @@ export class InMemoryUserStorage extends UserStorage {
      * 
      * @param email the emaila ddress to look up
      * @returns a {@link User } and {@link UserSecrets } instance, ie including the password hash.
-     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist`.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist`.
      */
     async getUserByEmail(email : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
@@ -147,8 +147,10 @@ export class InMemoryUserStorage extends UserStorage {
     /**
      * Same as {@link getUserByUsername } - userId is the username in this model,
      * @param id the user ID to match 
-     * @returns a {@link UserWithPassword } instance, ie including the password hash.
-     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
+     * @returns a {@link @@crossauth/common!User} and 
+     *          {@link @@crossauth/common!UserSecrets}instance, ie including 
+     *          the password hash.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
@@ -243,7 +245,7 @@ export class InMemoryKeyStorage extends KeyStorage {
      * Returns the matching key recortd, with additional, or throws an exception.
      * @param key the key to look up in the key storage.
      * @returns the matching Key record
-     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
     async getKey(key : string) : Promise<Key> {
         if (this.keys && key in this.keys) {
@@ -436,7 +438,7 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
      * Returns the matching client record or throws an exception.
      * @param key the key to look up in the key storage.
      * @returns the matching Key record
-     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
     async getClientById(clientId : string) : Promise<OAuthClient> {
         if (this.clients && clientId in this.clients) {
@@ -452,7 +454,7 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
      * Returns the matching client record or throws an exception.
      * @param key the key to look up in the key storage.
      * @returns the matching Key record
-     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
     async getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]> {
         if (this.clientsByName && name in this.clientsByName) {
@@ -505,7 +507,7 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
      * If the given client exists in the database, update it with the passed values.  
      * 
      * @param client the fields to update.  This must include `clientId` for search purposes, but this field is not updated.
-     * @throws {@link @crossauth/common!Crossauth} with `InvalidClientId` if the client id doesn't exist}
+     * @throws {@link @crossauth/common!CrossauthError} with `InvalidClientId` if the client id doesn't exist}
      */
     async updateClient(client : Partial<OAuthClient>) : Promise<void> {
         if (client.clientId && client.clientId in this.clients) {

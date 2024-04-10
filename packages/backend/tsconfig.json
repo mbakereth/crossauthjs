@@ -7,6 +7,8 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     /*"types": ["vitest/globals"],*/
+    "declarationMap": true,
+    "declaration": true,
 
     /* Bundler mode */
     "moduleResolution": "bundler",

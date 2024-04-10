@@ -4,7 +4,8 @@ import { CrossauthError, ErrorCode } from '../error';
 //import { createPublicKey, type JsonWebKey, KeyObject } from 'crypto'
 import { type OpenIdConfiguration, DEFAULT_OIDCCONFIG } from './wellknown';
 
-export type Key = jose.KeyLike | Uint8Array;
+/** Allows passing either a Jose KeyLike object or a key as a binary array */
+export type EncryptionKey = jose.KeyLike | Uint8Array;
 
 /**
  * Options that can be passed to {@link OAuthTokenConsumerBase}.
@@ -67,7 +68,7 @@ export abstract class OAuthTokenConsumerBase {
      * either passed to the constructor or fetched from the authorization
      * server.
      */
-    keys : {[key:string]: Key} = {};
+    keys : {[key:string]: EncryptionKey} = {};
 
     /**
      * Constrctor
@@ -285,7 +286,7 @@ export abstract class OAuthTokenConsumerBase {
         }
 
         // find key matching header KID and validate signature (and expiry)
-        let key : Key|undefined = undefined;
+        let key : EncryptionKey|undefined = undefined;
         if ("_default" in this.keys) key = this.keys["_default"];
         for (let loadedKid in this.keys) {
             if (kid == loadedKid) {

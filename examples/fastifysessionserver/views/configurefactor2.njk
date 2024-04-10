@@ -48,10 +48,19 @@
                     <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
                 </p>
                 <p><button type="submit">Submit</button></p>
+            {% elif factor2 == "sms" %}
+                <p>Please check your phone and enter the code sent to you.</p>
+                <p>
+                    <input type="hidden" name="next" value="{{ next }}"/>
+                    <label for="otp">Code</label>
+                    <input type="password" name="otp"/>
+                    <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+                </p>
+                <p><button type="submit">Submit</button></p>
             {% else %}
-            <p class="error">Unknown two-factor authentication type.  please
-                <a href="signup">try to sign up again</a>.
-            </p>
+                <p class="error">Unknown two-factor authentication type.  Please
+                    <a href="signup">try to sign up again</a>.
+                </p>
             {% endif%}
         </form>
     {% endif %}

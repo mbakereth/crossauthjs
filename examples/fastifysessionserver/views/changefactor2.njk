@@ -22,7 +22,7 @@
                 {% if allowedFactor2|length > 1 %}
                     {% for item in allowedFactor2 %}
                             <p>
-                                <input type="radio" id="factor2_{{item.name}}", name="factor2" value="{{ item.name }}" {% if factor2 == item.name %}checked{% endif %}> <label for="factor2_{{item.name}}">{{ item.friendlyName }}</label>
+                                <input type="radio" id="factor2_{{item.name}}", name="factor2" value="{{ item.name }}" {% if factor2 == item.name or (item.name == "none" and not factor2)%}checked{% endif %}> <label for="factor2_{{item.name}}">{{ item.friendlyName }}</label>
                                 {% if factor2 == item.name and item.hasSecrets %}
                                     &nbsp;<a href="configurefactor2?next={{next or '/'}}">Reconfigure...</a>
                                 {% endif %}

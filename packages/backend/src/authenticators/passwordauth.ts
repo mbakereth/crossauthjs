@@ -94,7 +94,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      * @param user the `username` field should contain the username
      * @param secrets from the `UserSecrets` table.  `password` is expected to be present
      * @param params the user input.  `password` is expected to be present
-     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
      */
     async authenticateUser(user : UserInputFields, secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");

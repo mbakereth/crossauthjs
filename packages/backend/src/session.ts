@@ -142,7 +142,7 @@ export class SessionManager {
      *             The 2FA step is also skipped
      * @returns the user, user secrets, and session cookie and CSRF cookie and token.
      *          if a 2fa step is needed, it will be an anonymouos session, otherwise bound to the user
-     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`, `UserNotValid`, 
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`, `UserNotValid`, 
      *         `PasswordNotMatch`.
      */
     async login(username: string,
@@ -240,7 +240,7 @@ export class SessionManager {
      * 
      * Removes the given session ID from the session storage.
      * @param sessionKey the session ID to remove.
-     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`
      */
     async logout(sessionId : string) : Promise<void> {
         const key = await this.session.getSessionKey(sessionId);
@@ -252,7 +252,7 @@ export class SessionManager {
      * 
      * Removes the given session ID from the session storage.
      * @param except Don't log out from the matching session.
-     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`
      */
     async logoutFromAll(userId : string | number, except? : string|undefined) : Promise<void> {
         /*await*/ return this.session.deleteAllForUser(userId, except);
@@ -265,7 +265,7 @@ export class SessionManager {
      * 
      * @param sessionId the session key to look up in session storage
      * @returns the {@link User} (without password hash) matching the  session key
-     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
     async userForSessionId(sessionId : string) : Promise<{key: Key, user: User|undefined}> {
@@ -280,7 +280,7 @@ export class SessionManager {
      * 
      * @param sessionKey the session key to look up in session storage
      * @returns a string from the data field
-     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
     async dataStringForSessionId(sessionId : string) : Promise<string|undefined> {
@@ -307,7 +307,7 @@ export class SessionManager {
      * 
      * @param sessionKey the session key to look up in session storage
      * @returns a string from the data field
-     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`,  `InvalidSessionId`
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`,  `InvalidSessionId`
      *         `UserNotExist` or `Expired`.
      */
     async dataForSessionId(sessionId : string) : Promise<{[key:string]:any}> {
@@ -895,7 +895,7 @@ export class SessionManager {
      * @param repeatParams optionally, repeat of the secrets.  If passed, 
      *                     an exception will be thrown if they do not match
      * @returns the new user object
-     * @throws {@link CrossauthError} if the repeatParams don't match params,
+     * @throws {@link @crossauth/common!CrossauthError} if the repeatParams don't match params,
      * the token is invalid or the user storage cannot be updated.
      */
     async resetSecret(token : string, factorNumber : 1|2, params : AuthenticationParameters, repeatParams? : AuthenticationParameters) : Promise<User> {

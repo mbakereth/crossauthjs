@@ -6,8 +6,7 @@
   "scripts": {
     "test": "echo 'No tests defined'",
     "test-all": "pnpm -r run testonce",
-    "docs": "typedoc",
-    "docs-all": "pnpm run docs"
+    "doc": "typedoc --entryPoints packages/common packages/backend"
   },
   "author": "Matthew Baker",
   "license": "MIT",

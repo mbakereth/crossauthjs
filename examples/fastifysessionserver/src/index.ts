@@ -6,6 +6,7 @@ import {
     LocalPasswordAuthenticator,
     TotpAuthenticator,
     EmailAuthenticator,
+    TwilioAuthenticator,
     OAuthClientManager } from '@crossauth/backend';
 import { FastifyServer } from '@crossauth/fastify'
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
@@ -48,12 +49,13 @@ app.register(view, {
 // our user table and session key table will be served by Prisma (in a SQLite database)
 
 const prisma = new PrismaClient();
-let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email"});
+let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email, phone"});
 let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
 let clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
 let totpAuthenticator = new TotpAuthenticator("FastifyTest");
 let emailAuthenticator = new EmailAuthenticator();
+let twilioAuthenticator = new TwilioAuthenticator();
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyServer(userStorage, {
@@ -61,13 +63,14 @@ let server = new FastifyServer(userStorage, {
         localpassword: lpAuthenticator,
         totp: totpAuthenticator,
         email: emailAuthenticator,
+        sms: twilioAuthenticator,
     },
     session: {
         keyStorage: keyStorage,
     }}, {
         app: app,
         views: path.join(__dirname, '../views'),
-        allowedFactor2: "none, totp, email",
+        allowedFactor2: "none, totp, email, sms",
         enableEmailVerification: false,
         siteUrl: `http://localhost:${port}`,
         clientStorage: clientStorage,

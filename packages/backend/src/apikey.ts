@@ -28,13 +28,18 @@ export interface ApiKeyManagerOptions {
 /**
  * Manager API keys.
  * 
- * The caller must pass a {@link KeyStorage} object.  This must provide a string field called `name` in the returned {@link Key}
+ * The caller must pass a {@link KeyStorage} object.  This must provide a 
+ * string field called `name` in the returned {@link @crossauth/common!Key}
  * objects (in other words, the databsae table behind it must have a `name` field).
  * 
- * Api keys have three forms in their value.  The {@link Key} object's `value` field is a base64-url-encoded random number.
- * When the key is in a header, it is expected to be folled by a dot and a signature to protect against injection attacks.
- * When stored in the key storage, only the unsigned part is used (before the dot), it is hashed and preceded by
- * `prefix`.  The signature part is dropped for storage economy.  This does not compromise security so long as the
+ * Api keys have three forms in their value.  The {@link @crossauth/common!Key} 
+ * object's `value` field is a base64-url-encoded random number.
+ * When the key is in a header, it is expected to be folled by a dot and a 
+ * signature to protect against injection attacks.
+ * When stored in the key storage, only the unsigned part is used (before the 
+ * dot), it is hashed and preceded by
+ * `prefix`.  The signature part is dropped for storage economy.  This does 
+ * not compromise security so long as the
  * signature is always validated before comparing with the database.
  */
 export class ApiKeyManager {
@@ -79,7 +84,7 @@ export class ApiKeyManager {
      *              manipulation functions (eg change password)}
      * @param expiry expiry as a number of seconds from now
      * @param extraFields any extra fields to save in key storage, and pass 
-     *                    back in the {@link Key} object.
+     *                    back in the {@link @crossauth/common!Key} object.
      * @returns the new key as a {@link ApiKey} object, plus the token for the 
      *          Authorization header (with the signature appended.)
      */

@@ -148,7 +148,7 @@ export class PrismaUserStorage extends UserStorage {
      * Returns a {@link UserWithPassword } instance matching the given username, or throws an Exception.
      * @param username the username to look up
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
-     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserByUsername(
         username : string, 
@@ -164,7 +164,7 @@ export class PrismaUserStorage extends UserStorage {
      * 
      * @param email the email address to look up
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
-     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserByEmail(
         email : string, 
@@ -177,7 +177,7 @@ export class PrismaUserStorage extends UserStorage {
      * Same as {@link getUserByUsername } but matching user ID,
      * @param id the user ID to match 
      * @returns a {@link UserWithPassword } instance, ie including the password hash.
-     * @throws {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to either `UserNotExist` or `Connection`.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string | number, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
@@ -441,7 +441,7 @@ export class PrismaKeyStorage extends KeyStorage {
      * Returns the matching Key record, or throws an exception if it doesn't exist
      * @param key the session key to look up in the session storage.
      * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
-     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
     private async getKeyWithTransaction(key : string, tx : any) : Promise<Key> {
         let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
@@ -799,7 +799,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      * Returns the matching Key record, or throws an exception if it doesn't exist
      * @param key the session key to look up in the session storage.
      * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
-     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
     private async getClientWithTransaction(field : string, value : string, tx : any, unique : boolean, userId : string|number|null|undefined) : Promise<OAuthClient[]> {
         const userWhere = (userId == undefined && !(userId === null)) ? {} : {user_id: userId};

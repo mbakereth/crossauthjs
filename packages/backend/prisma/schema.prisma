@@ -17,6 +17,7 @@ model User {
     usernameNormalized  String      @unique
     email               String      @unique
     emailNormalized     String      @unique
+    phone               String?
     state               String      @default("active")
     factor1             String      @default("password")
     factor2             String      @default("")

@@ -40,7 +40,7 @@ export class LdapAuthenticator extends PasswordAuthenticator {
      *             If `ldapAutoCreateAccount` is true, these attributes as used for user creation (see {@link LdapUserStorage.createUser}).
      * @param _secrets Ignored as secrets are stored in LDAP
      * @param params the `password` field is expected to contain the LDAP password.
-     * @throws {@link @crossauth/common!CrossauthError} with {@link ErrorCode} of `Connection`, `UsernameOrPasswordInvalid`.
+     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`, `UsernameOrPasswordInvalid`.
      */
     async authenticateUser(user : UserInputFields, _secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");

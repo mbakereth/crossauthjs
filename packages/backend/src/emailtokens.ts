@@ -10,33 +10,6 @@ import { KeyPrefix, UserState } from '@crossauth/common';
 
 const TOKEN_LENGTH = 16; // in bytes, before base64url
 
-/**
- * Options for TokenEmailer.  
- * 
- * @param views Directory to find the nunjucks files for the email body.  If not set, a generic email will be sent
- * @param emailVerificationTextBody nunjucks file containing the email text body template. 
- *         If neither this nor emailVerificationHtmlBody is set, a generic body will be set.
- *         You can set both emailVerificationTextBody and emailVerificationHtmlBody
- * @param emailVerificationHtmlBody nunjucks file containing the email HTML body template.  
- *        If neither this nor emailVerificationHtmlBody is set, a generic body will be set.
- *         You can set both emailVerificationTextBody and emailVerificationHtmlBody
- * @param emailVerificationSubject subject in email verification messages,  Defaults to "Please verify your email".
- * @param passwordResetTextBody nunjucks file containing the email text body template. 
- *         If neither this nor passwordResetHtmlBody is set, a generic body will be set.
- *         You can set both passwordResetTextBody and passwordResetHtmlBody
- * @param passwordResetHtmlBody nunjucks file containing the email HTML body template.  
- *        If neither this nor passwordResetTextBody is set, a generic body will be set.
- *         You can set both passwordResetTextBody and passwordResetHtmlBody
- * @param passwordResetSubject subject in email verification messages,  Defaults to "Please verify your email".
- * @param emailFrom From address for email messages.  Must be set.
- * @param smtpHost SMTP hostname for sending emails  Must be set.
- * @param smtpPort SMTP hostname for sending emails  Default is 587.
- * @param smtpUseTls whether to use TLS when connecting to SMTP server.  Default true.
- * @param smtpUsername username for authenticated SMTP.  Default is no authentication
- * @param smtpPassword password for authenticated SMTP.  Default is no authentication
- * @param passwordResetExpires token will expire after this number of seconds. Default 24 hours
- * @param verifyEmailExpires token will expire after this number of seconds.  Default 24 hours
- */
 export interface TokenEmailerOptions {
 
     /** The site url, used to create a link, eg "https://mysite.com:3000".  No default - required parameter */
@@ -73,7 +46,6 @@ export interface TokenEmailerOptions {
     smtpHost? : string,
 
     /** Port the SMTP server is running on.  Default 25 */
-
     smtpPort? : number,
 
     /** Whether or not TLS is used by the SMTP server.  Default false */
@@ -90,6 +62,9 @@ export interface TokenEmailerOptions {
 
     /** Number of seconds befire password reset tokens should expire.  Default 1 day */
     passwordResetExpires? : number,
+
+    /** if passed, use this instead of the default nunjucks renderer */
+    render? : (template : string, data : {[key:string]:any}) => string;
 }
 
 export class TokenEmailer {
@@ -112,14 +87,13 @@ export class TokenEmailer {
     private smtpPassword? : string;
     private verifyEmailExpires : number = 60*60*24;
     private passwordResetExpires : number = 60*60*24;
-
-    static Activate = 0;
-    static Change = 1;
-
+    private render? : (template : string, data : {[key:string]:any}) => 
+        string = undefined;
     /**
      * Construct a new EmailVerifier.
      * 
      * This emails tokens for email verification and password reset
+     * 
      * @param userStorage : where to retrieve and update user details
      * @param keyStorage : where to store email verification tokens
      * @param options see {@link TokenEmailerOptions}
@@ -146,8 +120,12 @@ export class TokenEmailer {
         setParameter("smtpUseTls", ParamType.Boolean, this, options, "SMTP_USE_TLS");
         setParameter("verifyEmailExpires", ParamType.Boolean, this, options, "VERIFY_EMAIL_EXPIRES");
         setParameter("passwordResetExpires", ParamType.String, this, options, "PASSWORD_RESET_EXPIRES");
-
-        nunjucks.configure(this.views, { autoescape: true });
+    
+        if (options.render) {
+            this.render = options.render;
+        } else {
+            nunjucks.configure(this.views, { autoescape: true });
+        }
 
     }
 
@@ -163,10 +141,18 @@ export class TokenEmailer {
           });
     }
 
+    /**
+     * Produces a hash of the given email verification token with the
+     * correct prefix for inserting into storage.
+     */
     static hashEmailVerificationToken(token : string) : string {
         return KeyPrefix.emailVerificationToken + Hasher.hash(token);
     }
 
+    /**
+     * Produces a hash of the given password reset token with the
+     * correct prefix for inserting into storage.
+     */
     static hashPasswordResetToken(token : string) : string {
         return KeyPrefix.passwordResetToken + Hasher.hash(token);
     }
@@ -209,10 +195,14 @@ export class TokenEmailer {
         let data = {token: token, siteUrl: this.siteUrl, prefix: this.prefix};
         if (extraData) data = {...data, ...extraData};
         if (this.emailVerificationTextBody) {
-            mail.text = nunjucks.render(this.emailVerificationTextBody, data)
+            mail.text = this.render ? 
+                this.render(this.emailVerificationTextBody, data) :
+                nunjucks.render(this.emailVerificationTextBody, data)
         }
         if (this.emailVerificationHtmlBody) {
-            mail.html = nunjucks.render(this.emailVerificationHtmlBody, data)
+            mail.html = this.render ? 
+                this.render(this.emailVerificationHtmlBody, data) :
+                nunjucks.render(this.emailVerificationHtmlBody, data)
         }
         const transporter = this.createEmailer();
         return (await transporter.sendMail(mail)).messageId;
@@ -222,14 +212,19 @@ export class TokenEmailer {
     /**
      * Send an email verification email using the Nunjucks templates.
      * 
-     * The email address to send it to will be taken from the user's record in user storage.  It will 
-     * first be validated, throwing a {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of
+     * The email address to send it to will be taken from the user's record in 
+     * user storage.  It will 
+     * first be validated, throwing a {@link @crossauth/common!CrossauthError} 
+     * with {@link @crossauth/common!ErrorCode} of
      * `InvalidEmail` if it is not valid..
      * 
      * @param userId userId to send it for
-     * @param newEmail if this is a token to verify email for account activation, leave this empty.
-     *                 If it is for changing an email, this will be the field it is being changed do.
-     * @param extraData : these extra variables will be passed to the Nunjucks templates
+     * @param newEmail if this is a token to verify email for account 
+     *        activation, leave this empty.
+     *        If it is for changing an email, this will be the field it is 
+     *        being changed do.
+     * @param extraData : these extra variables will be passed to the Nunjucks 
+     *        templates
      */
     async sendEmailVerificationToken(userId : string | number,
                                      newEmail : string="",
@@ -273,8 +268,11 @@ export class TokenEmailer {
      * 
      * Looks the token up in key storage and verifies it matches and has not expired.
      * @param token the token to validate
+     * @returns the userId of the user the token is for and the email
+     *          address the user is validating
      */
-    async verifyEmailVerificationToken(token : string) : Promise<{userId: string|number, newEmail: string}> {
+    async verifyEmailVerificationToken(token : string) : 
+        Promise<{userId: string|number, newEmail: string}> {
 
         const hash = TokenEmailer.hashEmailVerificationToken(token);
         let storedToken = await this.keyStorage.getKey(hash);
@@ -334,6 +332,7 @@ export class TokenEmailer {
      * Looks the token up in key storage and verifies it matches and has not expired.  Also verifies
      * the user exists and password has not changed in the meantime.
      * @param token the token to validate
+     * @returns the user that the token is for
      */
     async verifyPasswordResetToken(token : string) : Promise<User> {
         const hash = TokenEmailer.hashPasswordResetToken(token);
@@ -371,10 +370,14 @@ export class TokenEmailer {
         let data = {token: token, siteUrl: this.siteUrl, prefix: this.prefix};
         if (extraData) data = {...data, ...extraData};
         if (this.passwordResetTextBody) {
-            mail.text = nunjucks.render(this.passwordResetTextBody, data)
+            mail.text = this.render ? 
+                this.render(this.passwordResetTextBody, data) :
+                nunjucks.render(this.passwordResetTextBody, data)
         }
         if (this.passwordResetHtmlBody) {
-            mail.html = nunjucks.render(this.passwordResetHtmlBody, data)
+            mail.html =  this.render ? 
+                this.render(this.passwordResetHtmlBody, data) :
+                nunjucks.render(this.passwordResetHtmlBody, data)
         }
         const transporter = this.createEmailer();
         return (await transporter.sendMail(mail)).messageId;
@@ -384,8 +387,8 @@ export class TokenEmailer {
     /**
      * Send a password reset token email using the Nunjucks templates
      * @param userId userId to send it for
-     * @param to address to send it to
-     * @param extraData : these extra variables will be passed to the Nunjucks templates
+     * @param extraData : these extra variables will be passed to the Nunjucks 
+     *        templates
      */
     async sendPasswordResetToken(userId : string | number,
         extraData : {[key:string]:any} = {}) : Promise<void> {
@@ -428,8 +431,9 @@ export class TokenEmailer {
     }
 
     /**
-     * Returns if the given email has a valid format.  Throws a {@link CrossauthError} with 
-     * {@link ErrorCode} `InvalidEmail` otherwise.
+     * Returns if the given email has a valid format.  Throws a 
+     * {@link @crossauth/common!CrossauthError} with 
+     * {@link @crossauth/common!ErrorCode} `InvalidEmail` otherwise.
      * 
      * @param email the email to validate
      */

@@ -1,5 +1,5 @@
 /**
- * Indicates the type of error reported by {@link CrossauthError}
+ * Indicates the type of error reported by {@link @crossauth/common!CrossauthError}
  */
 export enum ErrorCode {
 
@@ -100,6 +100,9 @@ export enum ErrorCode {
 
     /** Thrown if an email address in invalid */
     InvalidEmail,
+
+    /** Thrown if a phone number in invalid */
+    InvalidPhoneNumber,
 
     /** Thrown if an email address in invalid */
     InvalidUserame,
@@ -205,6 +208,9 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.InvalidEmail) {
             _message = "Email is not in an allowed format"
             _httpStatus = 400;
+        } else if (code == ErrorCode.InvalidPhoneNumber) {
+            _message = "Phone number is not in an allowed format"
+            _httpStatus = 400;
         } else if (code == ErrorCode.EmailNotVerified) {
             _message = "Email address has not been verified"
             _httpStatus = 403;
@@ -307,7 +313,7 @@ export class CrossauthError extends Error {
      * OAuth defines certain error types.  To convert the error in an OAuth
      * response into a CrossauthError object, call this function.
      * 
-     * @param error as returned by an OAuth call (converted to an {@link ErrorCode}).
+     * @param error as returned by an OAuth call (converted to an {@link @crossauth/common!ErrorCode}).
      * @param error_description as returned by an OAuth call (put in the `message`)
      * @returns a `CrossauthError` instance.
      */
@@ -332,7 +338,7 @@ export class CrossauthError extends Error {
 
     /**
      * If the passed object is a `CrossauthError` instance, simply returns
-     * it.  Otherwise creates a `CrossauthError` object with {@link ErrorCode}
+     * it.  Otherwise creates a `CrossauthError` object with {@link @crossauth/common!ErrorCode}
      * of `Unknown` from it, setting the `message` if possible.
      * 
      * @param e the error to convert.

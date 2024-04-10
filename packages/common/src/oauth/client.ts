@@ -222,7 +222,7 @@ export abstract class OAuthClientBase {
      *        Otherwise, performs a fetch by appending
      *        `/.well-known/openid-configuration` to the 
      *        `authServerBaseUri`.
-     * @throws {@link CrossauthError} with the following {@link ErrorCode}s
+     * @throws {@link @crossauth/common!CrossauthError} with the following {@link @crossauth/common!ErrorCode}s
      *   - `Connection` if data from the URL could not be fetched or parsed.
      */
     async loadConfig(oidcConfig? : OpenIdConfiguration) : Promise<void> {

@@ -469,7 +469,7 @@ export class SessionCookie {
      * @param cookieValue the value in the session cookie
      * @returns a {@link @crossauth/common!User } object, with the password hash removed, and the {@link @crossauth/common!Key } with the unhashed
      *          sessionId
-     * @throws a {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId` or `Expired`.
+     * @throws a {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to `InvalidSessionId` or `Expired`.
      */
     async getUserForSessionId(sessionId: string, options? : UserStorageGetOptions) : Promise<{user: User|undefined, key : Key}> {
         const key = await this.getSessionKey(sessionId);
@@ -490,7 +490,7 @@ export class SessionCookie {
      * 
      * @param sessionId the unsigned value of the session cookie
      * @returns a {@link User } object, with the password hash removed.
-     * @throws a {@link @crossauth/common!CrossauthError } with {@link ErrorCode } set to `InvalidSessionId`, `Expired` or `UserNotExist`.
+     * @throws a {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to `InvalidSessionId`, `Expired` or `UserNotExist`.
      */
     async getSessionKey(sessionId: string) : Promise<Key> {
         //const sessionId = this.unsignCookie(cookieValue);

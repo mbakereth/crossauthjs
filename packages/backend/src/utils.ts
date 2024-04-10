@@ -1,5 +1,9 @@
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 
+/**
+ * Type of parameter that can be parsed from an option value or 
+ * environment variable
+ */
 export enum ParamType {
     String = 0,
     Number,
@@ -62,7 +66,32 @@ function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvF
         }
 }
 
-
+/**
+ * Sets an instance variable in the passed object from the passed options
+ * object and environment variable.
+ * 
+ * If the named parameter exists in the options object, that the instance
+ * variable is set to that value.  Otherwise if the named environment
+ * variable exists, it is set from that.  Otherwise, the instance variable
+ * is not updarted.
+ * 
+ * @param param the name of the parameter in the options variable and the
+ *        name of the variable in the instance
+ * @param type The type of variable.  If the value is `StringArray` or `Json`,
+ *         both the option and the environment variable value should be a
+ *         string, which will be parsed.
+ * @param instance options present in the `options` or environment variables
+ *        will be set oin a corresponding instance variable in this
+ *        class or object.
+ * @param options object containing options as key/value pairs
+ * @param envName name of environment variable
+ * @param required if true, an exception will be thrown if the variable is 
+ *        not present in `options` or the environment variable
+ * @throws {@link @crossauth/common!CrossauthError} with 
+ *         {@link @crossauth/common!ErrorCode} `Configuration` if `required`
+ *         is set but the option was not present, or if there was a parsing
+ *         error.
+ */
 export function setParameter(param : string,
                              type : ParamType,
                              instance : any, 

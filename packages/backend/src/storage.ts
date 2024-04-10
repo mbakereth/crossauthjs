@@ -31,17 +31,22 @@ export interface UserStorageOptions {
 }
 
 /**
- * Base class for place where user details are stired,
+ * Base class for place where user details are stored,
  * 
- * This class is subclasses for various types of user storage,  Eg {@link PrismaUserStorage } is for storing
+ * This class is subclasses for various types of user storage,  
+ * eg {@link PrismaUserStorage } is for storing
  * username and password in a database table, managed by the Prisma ORM.
  * 
- * Username and email searches should be case insensitive, as should their unique constraints.  id searches
- * need not be case insensitive .
+ * Username and email searches should be case insensitive, as should their 
+ * unique constraints.  ID searches need not be case insensitive.
  */
 export abstract class UserStorage {
     readonly userEditableFields : string[] = [];
 
+    /**
+     * Constructor
+     * @param options See {@link UserStorageOptions}
+     */
     constructor(options : UserStorageOptions = {}) {
         setParameter("userEditableFields", ParamType.StringArray, this, options, "USER_EDITABLE_FIELDS");
     }
@@ -66,7 +71,8 @@ export abstract class UserStorage {
      * 
      * @param id the user id to return the user of
      * @param options optionally turn off checks.  Used internally
-     * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
+     * @throws {@link @crossauth/common!CrossauthException} with 
+     * {@link @crossauth/common!ErrorCode} either `UserNotExist` or `Connection`
      */
     abstract getUserById(
         id : string|number, 
@@ -80,14 +86,19 @@ export abstract class UserStorage {
      * 
      * @param email the email address to return the user of
      * @param options optionally turn off checks.  Used internally
-     * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
+     * @throws {@link @crossauth/common!CrossauthError} with 
+     * {@link @crossauth/common!ErrorCode} either `UserNotExist` or `Connection`
      */
     abstract getUserByEmail(
         email : string | number, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}>;
 
     /**
-     * If you enable signup, you will need to implement this method if creating a USerStorage subclass
+     * Creates a user with the given details and secrets.
+     * 
+     * @param _user will be put in the User table
+     * @param _secrets will be put in the UserSecrets table
+     * @returns the new user as a {@link @crossauth/common!User} object.
      */
     createUser(_user : UserInputFields, _secrets : UserSecretsInputFields) 
         : Promise<User> {
@@ -95,28 +106,49 @@ export abstract class UserStorage {
     }
 
     /**
-     * If the given user exists in the database, update it with the passed values.  If it doesn't
-     * exist, throw a CrossauthError with InvalidKey.
-     * @param user  The id field must be set, but all others are optional 
+     * Updates an existing user with the given details and secrets.
+     *
+     * If the given user exists in the database, update it with the passed values. 
+     * If it doesn't exist, throw a
+     * {@link @crossauth/common!CrossauthError} with 
+     * {@link @crossauth/common!ErrorCode} `InvalidKey`.
+     * 
+     * @param user  The `id` field must be set, but all others are optional.
+     *              Any parameter not set (or undefined) will not be updated.
+     *              If you want to set somethign to `null` in the database, pass
+     *              the value as `null` not undefined.
      */
     abstract updateUser(user : Partial<User>, secrets? : Partial<UserSecrets>) : Promise<void>;
 
     /**
-     * If your storage supports this, delete the named user from storage.
+     * If the storage supports this, delete the named user from storage.
+     * 
      * @param username username to delete
      */
     abstract deleteUserByUsername(username : string) : Promise<void>;
 
     /**
-     * If your storage supports this, delete the user with the given id from storage.
+     * If the storage supports this, delete the user with the given ID from 
+     * storage.
+     * 
      * @param id id of user to delete
      */
     abstract deleteUserById(id : string|number) : Promise<void>;
 
+    /**
+     * Returns all users in the storage, in a a fixed order defined by 
+     * the storage (eg alphabetical by username)
+     * @param skip skip this number of records from the start of the set
+     * @param take only return at most this number of records
+     * 
+     * @returns an array of {@link @crossauth/common/User} objects.
+     */
     abstract getUsers(skip? : number, take? : number) : Promise<User[]>;
 
     /**
-     * Usernames and emails are stored in lowercase, normalized format.  This function returns that normalization
+     * Usernames and emails are stored in lowercase, normalized format.  
+     * This function returns that normalization.
+     * 
      * @param str the string to normalize
      * @returns the normalized string, in lowercase with diacritics removed
      */
@@ -128,32 +160,35 @@ export abstract class UserStorage {
 /**
  * Base class for storing session and API keys.
  *
- * This class is subclasses for various types of session key storage,  Eg {@link PrismaKeyStorage } is for storing
+ * This class is subclasses for various types of session key storage,  Eg
+ * {@link PrismaKeyStorage } is for storing
  * session in a database table, managed by the Prisma ORM.
  */
 export abstract class KeyStorage {
-    // throws InvalidSessionId
 
     /**
      * Returns the matching key in the session storage or throws an exception if it doesn't exist.
      * 
-     * @param key the key to look up, as it will appear in this storage (typically unsigned, hashed)
+     * @param key the key to look up, as it will appear in this storage 
+     *            (typically unsigned, hashed)
      * @returns The matching Key record.
-     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
     abstract getKey(key : string) : Promise<Key>;
 
     /**
      * Saves a session key in the session storage (eg database).
      * 
-     * @param userId the ID of the user.  This matches the primary key in the {@link UserStorage } implementation.
-     * @param key the key key to store.
+     * @param userId the ID of the user.  This matches the primary key in the 
+     *               {@link UserStorage } implementation.
+     * @param value the key value to store.
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
-     * @param data an optional value, specific to the type of key, eg new email for email change tokens
+     * @param data an optional value, specific to the type of key, eg new 
+     *             email for email change tokens
+     * @param extraFields these will also be saved in the key record
      */
     abstract saveKey(userId : string | number | undefined, 
-                         key : string, 
+                         value : string, 
                          dateCreated : Date, 
                          expires : Date | undefined, 
                          data? : string,
@@ -161,45 +196,64 @@ export abstract class KeyStorage {
 
 
     /**
-     * If the given session key exists in the database, update it with the passed values.  If it doesn't
-     * exist, throw a CrossauthError with InvalidKey.
-     * @param key 
+     * If the given session key exists in the database, update it with the 
+     * passed values.  If it doesn't exist, throw a 
+     * {@link @crossauth/common!CrossauthError} with 
+     * {@link @crossauth/common!ErrorCode} `InvalidKey`.
+     * @param key the fields defined in this will be updated.  `id` must
+     *            be present and it will not be updated.
      */
     abstract updateKey(key : Partial<Key>) : Promise<void>;
 
     /**
      * Deletes a key from storage (eg the database).
      * 
-     * @param key the key to delete
+     * @param value the key to delete
      */
-    abstract deleteKey(key : string) : Promise<void>;
+    abstract deleteKey(value : string) : Promise<void>;
 
     /**
      * Deletes all keys from storage for the given user ID
      * 
      * @param userId : user ID to delete keys for
+     * @param prefix only keys starting with this prefix will be
+     *               deleted
+     * @param except if defined, the key with this value will not be deleted
      */
-    abstract deleteAllForUser(userId : string | number | undefined, prefix : string, except? : string) : Promise<void>;
+    abstract deleteAllForUser(userId : string | number | undefined, 
+        prefix : string, except? : string) : Promise<void>;
 
     /**
      * Deletes all matching the given specs
      * 
-     * @param userId : user ID to delete keys for
+     * @param key : any key matching all defined values in this object will
+     *              be deleted
      */
     abstract deleteMatching(key : Partial<Key>) : Promise<void>;
 
+    /**
+     * Return all keys matching the given user ID
+     * @param userId user to return keys for
+     * @returns an array of keys
+     */
     abstract getAllForUser(userId : string|number|undefined) : Promise<Key[]>;
 
     /**
-     * The `data` field in a key entry is a JSON string.  This class should atomically update a field in it.
+     * The `data` field in a key entry is a JSON string.  This class should
+     * atomically update a field in it.
      * @param keyName the name of they to update, as it appears in the table.
      * @param dataName the field name to update
-     * @param value the new value
+     * @param value the new value.
      */
-    abstract updateData(keyName : string, dataName : string, value: any|undefined) : Promise<void>;
+    abstract updateData(keyName: string,
+        dataName: string,
+        value: any | undefined) : Promise<void>;
 
     /**
      * Returns an object decoded from the data field as a JSON string
+     * @param data the JSON string to decode
+     * @returns the parse JSON object
+     * @throws an exception is data is not a valid JSON string
      */
     static decodeData(data : string|undefined) : {[key:string]: any} {
         if (data == undefined || data == "") {
@@ -209,7 +263,9 @@ export abstract class KeyStorage {
     }
 
     /**
-     * Returns an object decoded from the data field as a JSON string
+     * Returns a JSON string encoded from the given object
+     * @param data the object to encode
+     * @returns a JSON string
      */
     static encodeData(data? : {[key:string]: any}) : string {
         if (!data) return "{}";
@@ -217,6 +273,9 @@ export abstract class KeyStorage {
     }
 }
 
+/**
+ * Options for constructing an {@link OAuthClientStorage} object.
+ */
 export interface OAuthClientStorageOptions {
 }
 
@@ -228,6 +287,10 @@ export interface OAuthClientStorageOptions {
  */
 export abstract class OAuthClientStorage {
 
+    /**
+     * Constructor
+     * @param _options see {@link OAuthClientStorageOptions}
+     */
     constructor(_options : OAuthClientStorageOptions = {} ) {
     }
     
@@ -237,8 +300,7 @@ export abstract class OAuthClientStorage {
      * throws an exception if it doesn't exist.
      * 
      * @param clientId the clientId to look up
-     * @returns The matching Key record.
-     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
+     * @returns The matching {@link @crossauth/common!OAuthClient} object.
      */
     abstract getClientById(clientId : string) : Promise<OAuthClient>;
 
@@ -247,49 +309,75 @@ export abstract class OAuthClientStorage {
      * throws an exception if it doesn't exist.
      * 
      * @param name the client name to look up
-     * @returns The matching Key record.
+     * @param userId if defined, only return clients belonging to this user.
+     *               if `null`, return only clients with a null userId.  
+     *               if undefined, return all clients with this name.
+     * @returns An array of {@link @crossauth/common!OAuthClient} objects.
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
     abstract getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]>;
 
+    /**
+     * Returns all clients in alphabetical order of client name.
+     * @param skip skip this number of records from the start in alphabetical
+     *             order
+     * @param take return at most this number of records
+     * @param userId if defined, only return clients belonging to this user.
+     *               if `null`, return only clients with a null userId.  
+     *               if undefined, return all clients.
+     * @returns An array of {@link @crossauth/common!OAuthClient} objects.
+     */
     abstract getClients(skip? : number, take? : number, userId? : string|number|null) : Promise<OAuthClient[]>;
 
     /**
      * Creates and returns a new client with random ID and optionally secret.
      * 
-     * Saves in the database
+     * Saves in the database.
      * 
-     * @param redirectUri an array of redirect uri's, which may be empty if checking redirect uri is not mandatory
+     * @param client the client to save.
+     * @returns the new client.
      * 
      */
     abstract createClient(client : OAuthClient) : Promise<OAuthClient>;
 
     /**
-     * If the given session key exists in the database, update it with the passed values.  If it doesn't
-     * exist, throw a CrossauthError with InvalidKey.
-     * @param client all fields to update (clientId will not be updated, however) 
+     * If the given session key exists in the database, update it with the 
+     * passed values.  If it doesn't
+     * exist, throw a {@link @crossauth/common!CrossauthError} with 
+     * `InvalidClient`.
+     * @param client all fields to update (clientId must be set but will not
+     *        be updated) 
      */
     abstract updateClient(client : Partial<OAuthClient>) : Promise<void>;
 
     /**
-     * Deletes a key from storage (eg the database).
+     * Deletes a key from storage .
      * 
-     * @param clientId the key to delete
+     * @param clientId the client to delete
      */
     abstract deleteClient(clientId : string) : Promise<void>;
 }
 
+/**
+ * Options for creating an {@link OAuthAuthorizationStorage} object
+ */
 export interface OAuthAuthorizationStorageOptions {
 }
 
 /**
- * Base class for storing scopes that have been authorized by a user (or for client credentials, for a client).
+ * Base class for storing scopes that have been authorized by a user 
+ * (or for client credentials, for a client).
  *
- * This class is subclassed for various types of storage,  Eg {@link PrismaOAuthAuthorizationStorage } is for storing
+ * This class is subclassed for various types of storage,  Eg 
+ * {@link PrismaOAuthAuthorizationStorage } is for storing
  * in a database table, managed by the Prisma ORM.
  */
 export abstract class OAuthAuthorizationStorage {
 
+    /**
+     * Constructor
+     * @param _options see {@link OAuthAuthorizationStorageOptions}
+     */
     constructor(_options : OAuthAuthorizationStorageOptions = {} ) {
     }
     
@@ -298,22 +386,25 @@ export abstract class OAuthAuthorizationStorage {
      * 
      * @param clientId the clientId to look up
      * @param userId the userId to look up, undefined for a client authorization not user authorization
-     * @returns The matching Key record.
-     * 
-     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
+     * @returns The authorized scopes as an array.
      */
-    abstract getAuthorizations(clientId : string, userId : string|number|undefined) : Promise<(string|null)[]>;
+    abstract getAuthorizations(clientId: string,
+        userId: string | number | undefined) : Promise<(string|null)[]>;
 
     /**
-     * Saves a new set of authorizations for the given client and optionally user.
+     * Saves a new set of authorizations for the given client and optionally 
+     * user.
      * 
-     * Deletes the old ones
+     * Deletes the old ones.
      * 
      * @param clientId the clientId to look up
-     * @param userId the userId to look up, undefined for a client authorization not user authorization
-     * @param scopes new set of scopes, which may be empty
+     * @param userId the userId to look up, undefined for a client 
+     *               authorization not user authorization
+     * @param authorizations new set of authorized scopes, which may be empty
      * 
      */
-    abstract updateAuthorizations(clientId : string, userId : string|number|undefined, authorizations : (string|null)[]) : Promise<void>;
+    abstract updateAuthorizations(clientId: string,
+        userId: string | number | undefined,
+        authorizations: (string | null)[]) : Promise<void>;
 }
 

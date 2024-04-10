@@ -81,16 +81,16 @@ export class EmailAuthenticator extends Authenticator {
     constructor(options : EmailAuthenticatorOptions = {}) {
         super({friendlyName : "Email otp", ...options});
         setParameter("views", ParamType.String, this, options, "VIEWS");
-        setParameter("emailAuthenticatorTextBody", ParamType.String, this, options, "EMAIL_VERIFICATION_TEXT_BODY");
-        setParameter("emailAuthenticatorHtmlBody", ParamType.String, this, options, "EMAIL_VERIFICATION_HTML_BODY");
-        setParameter("emailAuthenticatorSubject", ParamType.String, this, options, "EMAIL_VERIFICATION_SUBJECT");
+        setParameter("emailAuthenticatorTextBody", ParamType.String, this, options, "EMAIL_AUTHENTICATOR_TEXT_BODY");
+        setParameter("emailAuthenticatorHtmlBody", ParamType.String, this, options, "EMAIL_AUTHENTICATOR_HTML_BODY");
+        setParameter("emailAuthenticatorSubject", ParamType.String, this, options, "EMAIL_AUTHENTICATOR_SUBJECT");
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM", true);
         setParameter("smtpHost", ParamType.String, this, options, "SMTP_HOST", true);
         setParameter("smtpPort", ParamType.Number, this, options, "SMTP_PORT");
         setParameter("smtpUsername", ParamType.String, this, options, "SMTP_USERNAME");
         setParameter("smtpPassword", ParamType.String, this, options, "SMTP_PASSWORD");
         setParameter("smtpUseTls", ParamType.Boolean, this, options, "SMTP_USE_TLS");
-        setParameter("emailAuthenticatorTokenExpires", ParamType.Number, this, options, "HASHER_SECRET");
+        setParameter("emailAuthenticatorTokenExpires", ParamType.Number, this, options, "EMAIL_AUTHENTICATOR_TOKEN_EXPIRES");
 
         nunjucks.configure(this.views, { autoescape: true });
     }

@@ -113,7 +113,7 @@ export interface UserInputFields {
     /**
      * This is included as any other fields in your user table will 
      * automatically be added to the user object if they are included in 
-     * `extraFields` in {@link crossauth/backend!UserStorage}.
+     * `extraFields` in {@link @crossauth/backend!UserStorage}.
      */
     [ key : string ] : any,
 }
