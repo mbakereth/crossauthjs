@@ -9,9 +9,9 @@ import { PasswordAuthenticator, type AuthenticationParameters , type Authenticat
 /**
  * Default password validator.
  * 
- * Passwords must be at leat 8 characters, contain at least one lowercase character, at least one uppercase
- * chracter and at least one digit.
- * @param password The password to validate
+ * Passwords must be at leat 8 characters, contain at least one lowercase
+ * character, at least one uppercase chracter and at least one digit.
+ * @param params contains the password to validate in `password`
  * @returns an array of errors.  If there were no errors, returns an empty array
  */
 function defaultPasswordValidator(params : AuthenticationParameters) : string[] {
@@ -28,8 +28,10 @@ function defaultPasswordValidator(params : AuthenticationParameters) : string[] 
 }
 
 
-/** Optional parameters to pass to {@link export class LocalPasswordAuthenticator extends Authenticator {
-} constructor. */
+/** 
+ * Optional parameters to pass to {@link LocalPasswordAuthenticator} 
+ * constructor. 
+ */
 export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions {
 
     /** Application secret.  If defined, it is used as the secret in PBKDF2 to hash passwords */
@@ -38,15 +40,21 @@ export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions
     /** If true, the `secret` will be concatenated to the salt when generating a hash for storing the password */
     enableSecretForPasswordHash? : boolean;
 
+    /** Digest method for PBKDF2 hasher.. Default `sha256` */
     pbkdf2Digest? : string,
 
+    /** Number of PBKDF2 iterations.  Default 600_000 */
     pbkdf2Iterations? : number,
 
+    /** Number of characters for salt, before base64-enoding.  Default 16 */
     pbkdf2SaltLength? : number,
 
+    /** Length the PBKDF2 key to generate, before bsae64-url encoding.  Default 32 */
     pbkdf2KeyLength? : number,
 
-    /** Function that throws a {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `PasswordFormat` if the password doesn't confirm to local rules (eg number of charafters)  */
+    /** Function that throws a {@link @crossauth/common!CrossauthError} with 
+     *  {@link @crossauth/common!ErrorCode} `PasswordFormat` if the password 
+     *  doesn't confirm to local rules (eg number of charafters)  */
     validatePasswordFn? : (params : AuthenticationParameters) => string[];
 }
 
@@ -56,20 +64,32 @@ export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions
 export class LocalPasswordAuthenticator extends PasswordAuthenticator {
 
     private secret : string|undefined = undefined;
+
+    /** If true, the secret key will be added to the salt when hashing.  Default false */
     enableSecretForPasswords : boolean = false;
+
+    /** See {@link LocalPasswordAuthenticatorOptions.pbkdf2Digest}  */
     pbkdf2Digest? : string = "sha256";
+
+    /** See {@link LocalPasswordAuthenticatorOptions.pbkdf2Iterations}  */
     pbkdf2Iterations? : number = 600_000;
+
+    /** See {@link LocalPasswordAuthenticatorOptions.pbkdf2SaltLength}  */
     pbkdf2SaltLength? : number = 16;
+
+    /** See {@link LocalPasswordAuthenticatorOptions.pbkdf2KeyLength}  */
     pbkdf2KeyLength? : number = 32;
 
-    validatePasswordFn : (params : AuthenticationParameters) => string[] = defaultPasswordValidator;
+    /** See {@link LocalPasswordAuthenticatorOptions.validatePasswordFn}  */
+    validatePasswordFn : (params : AuthenticationParameters) => string[] = 
+        defaultPasswordValidator;
 
     /**
      * Create a new authenticator.
      * 
      * See crypto.pbkdf2 for more information on the optional parameters.
      * 
-     * @param userStorage an object that can getch usernames and hashed passwords from wherever they are stored, eg a database table
+     * @param _userStorage ignored
      * @param options see {@link LocalPasswordAuthenticatorOptions}
      */
     constructor(_userStorage : UserStorage,
@@ -94,7 +114,10 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      * @param user the `username` field should contain the username
      * @param secrets from the `UserSecrets` table.  `password` is expected to be present
      * @param params the user input.  `password` is expected to be present
-     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `Connection`, `UserNotExist`or `PasswordNotMatch`.
+     * @throws {@link @crossauth/common!CrossauthError} with
+     *         {@link @crossauth/common!ErrorCode} of `Connection`, 
+     *         `UserNotExist`or `PasswordInvalid`, `TwoFactorIncomplete`,
+     *         `EmailNotVerified` or `UserNotActive`.
      */
     async authenticateUser(user : UserInputFields, secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");
@@ -111,9 +134,10 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
     /**
      * Calls the implementor-provided `validatePasswordFn` 
      * 
-     * This function is called to apply local password policy (password length, uppercase/lowercase etc)
-     * @param params 
-     * @returns 
+     * This function is called to apply local password policy (password length,
+     * uppercase/lowercase etc)
+     * @param params the password should be in `password`
+     * @returns an array of errors
      */
     validateSecrets(params : AuthenticationParameters) : string[] {
         return this.validatePasswordFn(params);
@@ -147,6 +171,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
     /**
      * Just calls createPasswordHash with encode set to true
      * @param password the password to hash
+     * @returns a string for storing in storage
      */
     async createPasswordForStorage(password : string) : Promise<string> {
         return this.createPasswordHash(password);
@@ -155,7 +180,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
     /**
      * A static version of the password hasher, provided for convenience
      * @param password : unhashed password
-     * @param password : hashed password
+     * @param passwordHash : hashed password
      * @param secret secret, if used when hashing passwords, or undefined if not
      * @returns true if match, false otherwise
      */
@@ -167,7 +192,8 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      * This will return p hash of the passed password.
      * @param _username ignored
      * @param params expected to contain `password`
-     * @param repeatParams if defined, this is expected to also contain `password` and is checked to match the one in `params`
+     * @param repeatParams if defined, this is expected to also contain 
+     *        `password` and is checked to match the one in `params`
      * @returns the newly created password in the `password` field.
      */
     async createPersistentSecrets(_username : string, params: AuthenticationParameters, repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {

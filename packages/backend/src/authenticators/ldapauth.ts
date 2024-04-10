@@ -12,7 +12,7 @@ export interface LdapAuthenticatorOptions extends AuthenticationOptions {
 /**
  * Authenticates a user against LDAP.
  * 
- * Users are expected to be in local storage as well, as defined by `ldapStorage`.
+ * Users are expected to be in a local storage as well, as defined by `ldapStorage`.
  * This class can optionally auto-create a user that is not already there.
  */
 export class LdapAuthenticator extends PasswordAuthenticator {

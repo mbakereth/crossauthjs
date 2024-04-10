@@ -48,6 +48,9 @@ function algorithm(value : string) : Algorithm {
         "Invalid JWT signing algorithm " + value)
 }
 
+/**
+ * Options for {@link OAuthAuthorizationServerOptions}.
+ */
 export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptions {
 
     /** JWT issuer, eg https://yoursite.com.  Required (no default) */
@@ -165,51 +168,74 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
      */
     idTokenClaims? : string;
 
+    /**
+     * The 2FA factors that are allowed for the Password MFA flow.
+     */
     allowedFactor2? : string,
 
 }
 
+/**
+ * OAuth authorization server.
+ */
 export class OAuthAuthorizationServer {
 
-        private clientStorage : OAuthClientStorage;
-        private keyStorage : KeyStorage;
-        private userStorage? : UserStorage;
-        private authenticators : {[key:string] : Authenticator} = {};
-        private authStorage? : OAuthAuthorizationStorage;
-        clientManager : OAuthClientManager;
+    private clientStorage : OAuthClientStorage;
+    private keyStorage : KeyStorage;
+    private userStorage? : UserStorage;
+    private authenticators : {[key:string] : Authenticator} = {};
+    private authStorage? : OAuthAuthorizationStorage;
 
-        private oauthIssuer : string = "";
-        private resourceServers : string[]|null = null;
-        private requireRedirectUriRegistration = true;
-        private requireClientSecretOrChallenge = true;
-        private jwtAlgorithm = "RS256";
-        private jwtAlgorithmChecked : Algorithm = "RS256";
-        private codeLength = 32;
-        private jwtKeyType = "";
-        private jwtSecretKey = "";
-        private jwtPublicKey = "";
-        private jwtPrivateKey = "";
-        private jwtSecretKeyFile = "";
-        private jwtPublicKeyFile = "";
-        private jwtPrivateKeyFile = "";
-        private secretOrPrivateKey = "";
-        private secretOrPublicKey = "";
-        private persistAccessToken = false;
-        private issueRefreshToken = false;
-        private opaqueAccessToken = false;
-        private accessTokenExpiry : number|null = 60*60;
-        private refreshTokenExpiry : number|null = 60*60;
-        private rollingRefreshToken : boolean = true;
-        private authorizationCodeExpiry : number|null = 60*5;
-        private mfaTokenExpiry : number|null = 60*5;
-        private clockTolerance : number = 10;
-        private emptyScopeIsValid : boolean = true;
-        private validateScopes : boolean = false;
-        private validScopes : string[] = [];
-        private idTokenClaims : {[key:string] : any} = {};
-        validFlows : string[] = ["all"];
-        allowedFactor2 : string[] = [];
+    /** For validating redirect URIs. */
+    clientManager : OAuthClientManager;
 
+    private oauthIssuer : string = "";
+    private resourceServers : string[]|null = null;
+    private requireRedirectUriRegistration = true;
+    private requireClientSecretOrChallenge = true;
+    private jwtAlgorithm = "RS256";
+    private jwtAlgorithmChecked : Algorithm = "RS256";
+    private codeLength = 32;
+    private jwtKeyType = "";
+    private jwtSecretKey = "";
+    private jwtPublicKey = "";
+    private jwtPrivateKey = "";
+    private jwtSecretKeyFile = "";
+    private jwtPublicKeyFile = "";
+    private jwtPrivateKeyFile = "";
+    private secretOrPrivateKey = "";
+    private secretOrPublicKey = "";
+    private persistAccessToken = false;
+    private issueRefreshToken = false;
+    private opaqueAccessToken = false;
+    private accessTokenExpiry : number|null = 60*60;
+    private refreshTokenExpiry : number|null = 60*60;
+    private rollingRefreshToken : boolean = true;
+    private authorizationCodeExpiry : number|null = 60*5;
+    private mfaTokenExpiry : number|null = 60*5;
+    private clockTolerance : number = 10;
+    private emptyScopeIsValid : boolean = true;
+    private validateScopes : boolean = false;
+    private validScopes : string[] = [];
+    private idTokenClaims : {[key:string] : any} = {};
+
+    /** Set from options.  See {@link OAuthAuthorizationServerOptions.validFlows} */
+    validFlows : string[] = ["all"];
+
+    /** Set from options.  See {@link OAuthAuthorizationServerOptions.allowedFactor2} */
+    allowedFactor2 : string[] = [];
+
+    /**
+     * Constructor
+     * 
+     * @param clientStorage where OAuth clients are stored
+     * @param keyStorage  where session IDs are stored
+     * @param authenticators set of authenticators for validating users
+     *        with Password and Password MFA flows
+     *        (all factor 1 authenticators users may have plus factor 2
+     *         authenticators for the Password MFA flow)
+     * @param options See {@link OAuthAuthorizationServerOptions }
+     */
     constructor(clientStorage: OAuthClientStorage,
         keyStorage: KeyStorage,
         authenticators? : {[key:string] : Authenticator},
@@ -328,6 +354,11 @@ export class OAuthAuthorizationServer {
      * strings and have be URL-decoded.
      * 
      * For arguments and return parameters, see OAuth2 documentation.
+     * @param param0 object whose values correspond to the OAuth `authorize`
+     *        endpoint, plus `user` if one is logged in at the authorization
+     *        server.
+     * @returns Values that correspond to the OAuth `authorize` endpoint
+     *          JSON response. 
      */
     async authorizeGetEndpoint({
             responseType, 
@@ -429,6 +460,15 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * Returns whether or not the user has authorized all the passed scopes
+     * for the given client.
+     * 
+     * @param clientId the client ID
+     * @param user the user logged in at the authorization server.
+     * @param requestedScopes the scopes that have been requested
+     * @returns true or false.
+     */
     async hasAllScopes(clientId: string,
         user: User | undefined,
         requestedScopes: (string | null)[]) : Promise<boolean> {
@@ -446,7 +486,7 @@ export class OAuthAuthorizationServer {
             scopes?: string[] | undefined,
             error?: string,
             error_description?: string
-}> {
+        }> {
         // validate scopes
         let scopes : string[]|undefined;
         let scopesIncludingNull : (string|null)[]|undefined;
@@ -557,6 +597,11 @@ export class OAuthAuthorizationServer {
 
     }
 
+    /**
+     * Returns the matching client or an error if it does nto exist
+     * @param clientId 
+     * @returns the clientId, or an error or `access_denied`.
+     */
     async getClientById(clientId : string) : 
         Promise<{
             client?: OAuthClient,
@@ -581,6 +626,10 @@ export class OAuthAuthorizationServer {
      * strings and have be URL-decoded.
      * 
      * For arguments and return parameters, see OAuth2 documentation.
+     * @param param0 these arguments correspond to the OAuth `token`
+     *        endpoint inputs.
+     * @return the return object's fields correspond to the OAuth `token`
+     *         endpoint JSON output.
      */
     async tokenEndpoint({
         grantType, 
@@ -1151,6 +1200,15 @@ export class OAuthAuthorizationServer {
         return {authenticators: [authenticatorResponse]};
     }
 
+    /**
+     * The OAuth Password MFA `challenge` endpoint
+     * @param mfaToken as defined by the Password MFA spec
+     * @param clientId as defined by the Password MFA spec
+     * @param clientSecret as defined by the Password MFA spec
+     * @param challengeType as defined by the Password MFA spec
+     * @param authenticatorId as defined by the Password MFA spec
+     * @returns respond as defined by the Password MFA spec
+     */
     async mfaChallengeEndpoint(mfaToken: string,
         clientId : string,
         clientSecret : string|undefined,
@@ -1233,6 +1291,14 @@ export class OAuthAuthorizationServer {
 
     }
 
+    /**
+     * Returns the OAuth flow type that corresonds to the given 
+     * response type, scope and value for `code_challenge`
+     * @param responseType OAuth `response_type`
+     * @param scope Requested scopes (checks if it included `openid`)
+     * @param codeChallenge the OAuth code challenge (checks if it is defined)
+     * @returns returns the flow key from {@link @crossauth/common!OAuthFlows}
+     */
     inferFlowFromGet(
         responseType : string, 
         scope : string[],
@@ -1272,6 +1338,13 @@ export class OAuthAuthorizationServer {
         return undefined;
     }
 
+    /**
+     * Returns the OAuth flow type that corresonds to the given 
+     * grant type and `code_verifier`
+     * @param grantType OAuth `grant_type`
+     * @param codeVerifier the OAuth code verifier (checks if it is defined)
+     * @returns returns the flow key from {@link @crossauth/common!OAuthFlows}
+     */
     inferFlowFromPost(
         grantType : string, 
         codeVerifier? : string) : string|undefined {
@@ -1686,6 +1759,12 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * Returns whether the given authorization code is valid (in the database)
+     * 
+     * @param code the authorization code to look up
+     * @returns true or false
+     */
     async validAuthorizationCode(code : string) : 
         Promise<boolean> {
         try {
@@ -1698,6 +1777,12 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * Returns whether the given refresh token is valid (in the database)
+     * 
+     * @param token the refresh token to look up
+     * @returns true or false
+     */
     async validRefreshToken(token : string) : 
         Promise<boolean> {
         try {
@@ -1710,6 +1795,12 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * Gets the data associated with the refresh token from the database.
+     * @param token the refresh token to fetch
+     * @returns the object parsed from the stored JSON data for the token,
+     *          or undefined if there was an error
+     */
     async getRefreshTokenData(token? : string) : 
         Promise<{[key:string]:any}|undefined> {
         if (!token) return undefined;
@@ -1723,6 +1814,13 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * Validates a JWT token, returning its payload or undefined if it
+     * is invalid.
+     * 
+     * @param token the token to validate
+     * @returns the payload or undefinedf if there was an error
+     */
     async validIdToken(token : string) : 
         Promise<{[key:string]: any}|undefined> {
         try {
@@ -1734,6 +1832,14 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * Validates a JWT access token, returning its payload or undefined if it
+     * is invalid.
+     * 
+     * @param token the token to validate
+     * @returns the payload or undefinedf if there was an error ir the 
+     * `type` field in the payload is not `access`.
+     */
     async validAccessToken(token : string) : 
         Promise<{[key:string]: any}|undefined> {
         try {
@@ -1817,11 +1923,22 @@ export class OAuthAuthorizationServer {
 
     }
 
+    /**
+     * Appends the scope and state to the redirect URI
+     * @param redirectUri the redirect URI, whicvh may already contain
+     *        query parameters
+     * @param code the authorization code to append
+     * @param state the state to append
+     * @returns the new URL as a string.
+     */
     redirectUri(redirectUri : string, code : string, state : string) : string {
         const sep = redirectUri.includes("?") ? "&" : "?";
         return `${redirectUri}${sep}code=${code}&state=${state}`;
     }
 
+    /**
+     * @returns all the response types that are supported.
+     */
     responseTypesSupported() : string[] {
         let response_types_supported = [];
         if (this.validFlows.includes(OAuthFlows.AuthorizationCode) || 
@@ -1832,6 +1949,19 @@ export class OAuthAuthorizationServer {
         // Not supporting other OIDC flows yet
         return response_types_supported;
     }
+
+    /**
+     * Returns an OIDC configuration object based on this authorization
+     * server's configuration
+     * @param param0 
+     *        - `authorizeEndpoint` the URL for the `authorize` endpoint
+     *        - `tokenEndpoint` the URL for the `token` endpoint
+     *        - `jwksUri` the URL for the `jwks` endpoint
+     *        - `additionalClaims` additional claims that can be returned
+     *          in an ID token ("iss", "sub", "aud", "jti", "iat", "type"
+     *          are always included)
+     * @returns the OIDC configuration
+     */
     oidcConfiguration({
         authorizeEndpoint, 
         tokenEndpoint,
@@ -1890,6 +2020,12 @@ export class OAuthAuthorizationServer {
         };
     }
 
+    /**
+     * Returns the public key for validating JWT signatures.
+     * 
+     * If there isn't one, returns an empty array.
+     * @returns an array of keys with exactly one or zero entries.
+     */
     jwks() : Jwks {
         let keys : JsonWebKey[] = [];
         if (this.jwtPublicKey) {
@@ -1910,6 +2046,15 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * Validates the parameters passed to the `authorize` endpoint
+     * 
+     * This doesn't query a user or look anything up in the database.
+     * It just checks that they have valid syntax.
+     * 
+     * @param param0 these parameters correspond to the OAuth specification
+     * @returns an empty object or an error if the parameters were not valid
+     */
     validateAuthorizeParameters({
         response_type, 
         client_id, 

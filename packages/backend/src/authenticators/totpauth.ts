@@ -15,7 +15,8 @@ import {
 import { KeyStorage } from '../storage.ts';
 
 /**
- * Authenticator for Time-Based One-Time Passwords (TOTP), eg Google Authenticator
+ * Authenticator for Time-Based One-Time Passwords (TOTP), eg 
+ * Google Authenticator
  */
 export class TotpAuthenticator extends Authenticator {
 
@@ -37,6 +38,9 @@ export class TotpAuthenticator extends Authenticator {
      */
     mfaType() : "none" | "oob" | "otp" { return "otp"; }
 
+    /**
+     * Used by the OAuth password_mfa grant type.
+     */
     mfaChannel() : "none" | "email" | "sms" { return "none"; }
 
     private async createSecret(username : string, secret? : string) : 
@@ -118,7 +122,9 @@ export class TotpAuthenticator extends Authenticator {
      * @param username user to return this for
      * @param sessionKey the session key, which should cantain the 
      *                   `sessionData` from `prepareConfiguration`, 
-     * @returns 
+     * @returns `userData` containing `totpSecret`, `factor2` and `qr`.
+     *          `secrets` containing `totpSecret`.
+     *          `newSessionData` containing the same except `qr`.
      */
     async reprepareConfiguration(username : string, sessionKey : Key) : 
         Promise<{

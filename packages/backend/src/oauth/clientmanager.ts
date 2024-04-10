@@ -16,6 +16,9 @@ import {
 const CLIENT_ID_LENGTH = 16;
 const CLIENT_SECRET_LENGTH = 32;
 
+/**
+ * Options for {@link OAuthClientManager}
+ */
 export interface OAuthClientManagerOptions {
     /** PBKDF2 HMAC for hashing client secret */
     oauthPbkdf2Digest? : string;
@@ -29,12 +32,20 @@ export interface OAuthClientManagerOptions {
     clientStorage? : OAuthClientStorage;
 }
 
+/**
+ * Functionality for creating and updating clients, and validating 
+ * redirect URIs.
+ */
 export class OAuthClientManager {
     private oauthPbkdf2Digest = "sha256";
     private oauthPbkdf2Iterations = 40000;
     private oauthPbkdf2KeyLength = 32;
     private clientStorage : OAuthClientStorage;
 
+    /**
+     * Constructor
+     * @param options See  {@link OAuthClientManagerOptions}
+     */
     constructor(options: OAuthClientManagerOptions = {}) {
         if (!options.clientStorage) throw new CrossauthError(ErrorCode.Configuration,
             "Must specify clientStorage when adding a client manager");
@@ -45,6 +56,18 @@ export class OAuthClientManager {
         setParameter("requireRedirectUriRegistration", ParamType.Boolean, this, options, "OAUTH_REQUIRE_REDIRECT_URI_REGISTRATION");
     }
 
+    /**
+     * Creates a client and puts it in the storage
+     * @param clientName friendly name for the client
+     * @param redirectUri set of valid redirect URIs (may be empty)
+     * @param validFlow set of OAuth flows this client is allowed to initiate
+     *        (may be empty)
+     * @param confidential if true, client can keep secrets confidential
+     *        and a clientSecret will be created
+     * @param userId user id who owns the client, or undefined for no user
+     * @returns the new client.  `clientId` and `clientSecret` (plaintext)
+     *          will be populated.
+     */
     async createClient(clientName: string,
         redirectUri: string[],
         validFlow?: string[],
@@ -79,6 +102,15 @@ export class OAuthClientManager {
         return await this.clientStorage.createClient(client);
     }
 
+    /**
+     * Updates a client
+     * @param clientId the clientId to update.
+     * @param client the fields to update.  Anything not in here (or undefined)
+     *        will remain unchanged
+     * @param resetSecret if true, generate a new client secret
+     * @returns the updated client.  If it has a secret. it will be in
+     *          `clientSecret` as plaintext.
+     */
     async updateClient(clientId: string,
         client: Partial<OAuthClient>,
         resetSecret : boolean = false) : Promise<{client: OAuthClient, newSecret: boolean}> {
@@ -125,6 +157,13 @@ export class OAuthClientManager {
         return Hasher.randomValue(CLIENT_SECRET_LENGTH)
     }
 
+    /** If the passed redirect URI is not in the set of valid ones,
+     * throw {@link @crossauth/common!CrossauthError} with
+     *  {@link @crossauth/common!CrossauthError} `BadRequest`.
+     * @param uri the redirect URI to validate
+     * @throws {@link @crossauth/common!CrossauthError} with
+     *  {@link @crossauth/common!CrossauthError} `BadRequest`.
+     */
     static validateUri(uri : string) {
         let valid = false;
         try {
