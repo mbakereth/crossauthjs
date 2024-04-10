@@ -1,6 +1,5 @@
 //import { getJsonData } from '../../interfaces.ts';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
-import nunjucks from "nunjucks";
 import { SmsAuthenticator, type SmsAuthenticatorOptions } from './smsauth';
 import twilio from 'twilio';
 
@@ -15,7 +14,13 @@ export class TwilioAuthenticator extends SmsAuthenticator {
 
     /**
      * Constructor
+     * 
+     * To call this, you must have `TWILIO_ACCOUNT_SID` and
+     * `TWILIO_AUTH_TOKEN` environment variables set.
+     * 
      * @param options see {@link TwilioAuthenticatorOptions}
+     * @throws {@link @crossauth/common!CrossauthError} with
+     *         {@link @crossauth/common!ErrorCode} of `Configuration`.
      */
     constructor(options : SmsAuthenticatorOptions = {}) {
         super(options);
@@ -27,9 +32,14 @@ export class TwilioAuthenticator extends SmsAuthenticator {
         this.authToken = process.env.TWILIO_AUTH_TOKEN;
     }
 
-    protected async sendToken(to : string, otp : string) : Promise<string> {
+    /**
+     * Uses Twilio to send an SMS
+     * @param to number to send SMS to (starting with `+`)
+     * @param body text to send
+     * @returns the send message ID
+     */
+    protected async sendSms(to : string, body : string) : Promise<string> {
         TwilioAuthenticator.validatePhone(to);
-        let data = {otp: otp};
         let sms: {
             from: string,
             to: string,
@@ -37,7 +47,7 @@ export class TwilioAuthenticator extends SmsAuthenticator {
         } = {
             from: this.smsAuthenticatorFrom, 
             to: to,
-            body: nunjucks.render(this.smsAuthenticatorBody, data)
+            body: body,
         };
 
         const sender = twilio(this.accountSid, this.authToken);

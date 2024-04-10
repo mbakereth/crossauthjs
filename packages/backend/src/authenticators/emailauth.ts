@@ -55,6 +55,9 @@ export interface EmailAuthenticatorOptions extends AuthenticationOptions {
 
     /** Number of seconds before otps should expire.  Default 5 minutes */
     emailAuthenticatorTokenExpires? : number,
+
+    /** if passed, use this instead of the default nunjucks renderer */
+    render? : (template : string, data : {[key:string]:any}) => string;
 }
 
 /**
@@ -73,9 +76,12 @@ export class EmailAuthenticator extends Authenticator {
     private smtpUsername? : string;
     private smtpPassword? : string;
     private emailAuthenticatorTokenExpires : number = 60*5;
+    private render? : (template : string, data : {[key:string]:any}) => 
+        string = undefined;
 
     /**
      * Constructor
+     * 
      * @param options see {@link EmailAuthenticatorOptions}
      */
     constructor(options : EmailAuthenticatorOptions = {}) {
@@ -92,7 +98,11 @@ export class EmailAuthenticator extends Authenticator {
         setParameter("smtpUseTls", ParamType.Boolean, this, options, "SMTP_USE_TLS");
         setParameter("emailAuthenticatorTokenExpires", ParamType.Number, this, options, "EMAIL_AUTHENTICATOR_TOKEN_EXPIRES");
 
-        nunjucks.configure(this.views, { autoescape: true });
+        if (options.render) {
+            this.render = options.render;
+        } else {
+            nunjucks.configure(this.views, { autoescape: true });
+        }
     }
 
     /**
@@ -100,6 +110,9 @@ export class EmailAuthenticator extends Authenticator {
      */
     mfaType() : "none" | "oob" | "otp" { return "oob"; }
 
+    /**
+     * Used by the OAuth password_mfa grant type.
+     */
     mfaChannel() : "none" | "email" | "sms" { return "email"; }
 
     private createEmailer() {
@@ -133,10 +146,14 @@ export class EmailAuthenticator extends Authenticator {
 
         let data = {otp: otp};
         if (this.emailAuthenticatorTextBody) {
-            mail.text = nunjucks.render(this.emailAuthenticatorTextBody, data)
+            mail.text = this.render ? 
+                this.render(this.emailAuthenticatorTextBody, data) :
+                nunjucks.render(this.emailAuthenticatorTextBody, data)
         }
         if (this.emailAuthenticatorHtmlBody) {
-            mail.html = nunjucks.render(this.emailAuthenticatorHtmlBody, data)
+            mail.html = this.render ? 
+                this.render(this.emailAuthenticatorHtmlBody, data) :
+                nunjucks.render(this.emailAuthenticatorHtmlBody, data)
         }
         const transporter = this.createEmailer();
         return (await transporter.sendMail(mail)).messageId;

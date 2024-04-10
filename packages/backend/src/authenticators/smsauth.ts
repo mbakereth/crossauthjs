@@ -32,6 +32,9 @@ export interface SmsAuthenticatorOptions extends AuthenticationOptions {
 
     /** Number of seconds before otps should expire.  Default 5 minutes */
     smsAuthenticatorTokenExpires? : number,
+
+    /** if passed, use this instead of the default nunjucks renderer */
+    render? : (template : string, data : {[key:string]:any}) => string;
 }
 
 /**
@@ -44,6 +47,8 @@ export abstract class SmsAuthenticator extends Authenticator {
     protected smsAuthenticatorBody : string = "smsauthenticationbody.njk";
     protected smsAuthenticatorFrom : string = "";
     protected smsAuthenticatorTokenExpires : number = 60*5;
+    private render? : (template : string, data : {[key:string]:any}) => 
+        string = undefined;
 
     /**
      * Constructor
@@ -56,7 +61,11 @@ export abstract class SmsAuthenticator extends Authenticator {
         setParameter("smsAuthenticatorFrom", ParamType.String, this, options, "SMS_AUTHENTICATOR_FROM", true);
         setParameter("smsAuthenticatorTokenExpires", ParamType.Number, this, options, "SMS_AUTHENTICATOR_TOKEN_EXPIRES");
 
-        nunjucks.configure(this.views, { autoescape: true });
+        if (options.render) {
+            this.render = options.render;
+        } else {
+            nunjucks.configure(this.views, { autoescape: true });
+        }
     }
 
     /**
@@ -64,9 +73,19 @@ export abstract class SmsAuthenticator extends Authenticator {
      */
     mfaType() : "none" | "oob" | "otp" { return "oob"; }
 
+    /**
+     * Used by the OAuth password_mfa grant type.
+     */
     mfaChannel() : "none" | "email" | "sms" { return "sms"; }
 
-    protected abstract sendToken(to : string, otp : string) : Promise<string>;
+    /**
+     * Send an SMS 
+     * 
+     * @param to number to send SMS to (starting with `+`)
+     * @param body text to send
+     * @returns the send message ID
+     */
+    protected abstract sendSms(to : string, body : string) : Promise<string>;
 
     /**
      * Creates and sends the one-time code
@@ -103,7 +122,11 @@ export abstract class SmsAuthenticator extends Authenticator {
             expiry: expiry,
             otp: otp
         }
-        const messageId = this.sendToken(number, otp);
+        let data = {otp: otp};
+        const body = this.render ? 
+            this.render(this.smsAuthenticatorBody, data) :
+            nunjucks.render(this.smsAuthenticatorBody, data);
+        const messageId = this.sendSms(number, body);
         CrossauthLogger.logger.info(j({
             msg: "Sent factor otp sms",
             smsMessageId: messageId,
@@ -131,7 +154,7 @@ export abstract class SmsAuthenticator extends Authenticator {
         const expiry = 
             new Date(now.getTime() + 
                 1000*this.smsAuthenticatorTokenExpires).getTime();
-        const messageId = this.sendToken(data.phone, otp);
+        const messageId = this.sendSms(data.phone, otp);
         CrossauthLogger.logger.info(j({
             msg: "Sent factor otp sms",
             smsMessageId: messageId,
@@ -194,7 +217,7 @@ export abstract class SmsAuthenticator extends Authenticator {
             new Date(now.getTime() + 
                 1000*this.smsAuthenticatorTokenExpires).getTime();
         const phone = user.phone;
-        const messageId = this.sendToken(phone, otp);
+        const messageId = this.sendSms(phone, otp);
         CrossauthLogger.logger.info(j({
             msg: "Sent factor otp sms",
             smsMessageId: messageId,

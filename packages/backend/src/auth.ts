@@ -129,9 +129,20 @@ export abstract class Authenticator {
     }
 }
 
+/**
+ * Base class for authenticators that check a username and password.
+ */
 export abstract class PasswordAuthenticator extends Authenticator {
+
+    /** @returns `password` */
     secretNames() {return ["password"];}
+
+    /** @returns an empty array */
     transientSecretNames() {return [];}
+
+    /** @returns `none` */
     mfaType() : "none" | "oob" | "otp" { return "none"; }
+
+    /** @returns `none` */
     mfaChannel() : "none" | "email" | "sms" { return "none"; }
 }

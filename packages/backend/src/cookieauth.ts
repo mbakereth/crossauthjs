@@ -272,12 +272,17 @@ export class SessionCookie {
 
     private userStorage : UserStorage;
     private keyStorage : KeyStorage;
+
+    /** This is set from input options.  Number of seconds before an
+     * idle session will time out
+     */
     readonly idleTimeout : number = 0;
+
     private persist : boolean = true;
     private filterFunction? : (sessionKey : Key) => boolean;
 
     // cookie settings
-    /** Name of the CSRF Cookie */
+    /** Name of the CSRF Cookie, set from input options */
     readonly cookieName : string = "SESSIONID";
     private maxAge : number = 60*60*24*4; // 4 weeks
     private domain : string | undefined = undefined;
@@ -292,6 +297,8 @@ export class SessionCookie {
     /**
      * Constructor.
      * 
+     * @param userStorage where to find users
+     * @param keyStorage where to put session IDs
      * @param options configurable options.  See {@link SessionCookieOptions}.  The 
      *                expires option is ignored (cookies are session-only).
      */
@@ -330,6 +337,12 @@ export class SessionCookie {
 
     ///// Session IDs
 
+    /**
+     * Returns a hash of a session ID, with the session ID prefix for storing
+     * in the storage table.
+     * @param sessionId the session ID to hash
+     * @returns a base64-url-encoded string that can go into the storage
+     */
     static hashSessionId(sessionId : string) : string {
         return KeyPrefix.session + Hasher.hash(sessionId);
     }
@@ -343,12 +356,15 @@ export class SessionCookie {
      * an error with ErrorCode.KeyExists
      * 
      * @param userId the user ID to store with the session key.
-     * @param existingSessionId if passed, this will be used instead of a random one.  The expiry will be renewed
-     * @returns the session key, date created and expiry.
-     * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} `KeyExists` if maximum
+     * @param extraFields Any fields in here will also be added to the session
+     *        record
+     * @returns the new session key
+     * @throws {@link @crossauth/common!CrossauthError} with 
+     *         {@link @crossauth/common!ErrorCode} `KeyExists` if maximum
      *          attempts exceeded trying to create a unique session id
      */
-    async createSessionKey(userId : string | number | undefined, extraFields: {[key: string] : any} = {}) : Promise<Key> {
+    async createSessionKey(userId: string | number | undefined,
+        extraFields: { [key: string]: any } = {}) : Promise<Key> {
         const maxTries = 10;
         let numTries = 0;
         let sessionId = Hasher.randomValue(SESSIONID_LENGTH);
@@ -424,7 +440,8 @@ export class SessionCookie {
     }
 
     /**
-     * Takes a session ID and creates a string representation of the cookie (value of the HTTP `Cookie` header).
+     * Takes a session ID and creates a string representation of the cookie
+     * (value of the HTTP `Cookie` header).
      * 
      * @param sessionKey the session key to put in the cookie
      * @returns a string representation of the cookie and options.
@@ -449,12 +466,26 @@ export class SessionCookie {
         return cookieString;
     }
     
+    /**
+     * Updates a session record in storage
+     * @param sessionKey the fields to update.  `value` must be set, and
+     *        will not be updated.  All other defined fields will be updated.
+     * @throws {@link @crossauth/common!CrossauthError} if the session does
+     *         not exist. 
+     */
     async updateSessionKey(sessionKey : Partial<Key>) : Promise<void> {
         if (!sessionKey.value) throw new CrossauthError(ErrorCode.InvalidKey, "No session when updating activity");
         sessionKey.value = SessionCookie.hashSessionId(sessionKey.value);
         this.keyStorage.updateKey(sessionKey);
     }
 
+    /**
+     * Unsigns a cookie and returns the original value.
+     * @param cookieValue the signed cookie value
+     * @returns the unsigned value
+     * @throws {@link @crossauth/common!CrossauthError} if the signature
+     *         is invalid. 
+     */
     unsignCookie(cookieValue : string) : string {
         return Hasher.unsign(cookieValue, this.secret).v;
     }
@@ -490,7 +521,9 @@ export class SessionCookie {
      * 
      * @param sessionId the unsigned value of the session cookie
      * @returns a {@link User } object, with the password hash removed.
-     * @throws a {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to `InvalidSessionId`, `Expired` or `UserNotExist`.
+     * @throws a {@link @crossauth/common!CrossauthError } with 
+     *         {@link @crossauth/common!ErrorCode } set to `InvalidSessionId`,
+     *         `Expired` or `UserNotExist`.
      */
     async getSessionKey(sessionId: string) : Promise<Key> {
         //const sessionId = this.unsignCookie(cookieValue);

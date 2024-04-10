@@ -88,8 +88,12 @@ export class ApiKeyManager {
      * @returns the new key as a {@link ApiKey} object, plus the token for the 
      *          Authorization header (with the signature appended.)
      */
-    async createKey(name : string, userId : string|number|undefined, data? : {[key:string]: any}, expiry? : number,
-        extraFields?: {[key:string]: any}) : Promise<{key: ApiKey, token: string}> {
+    async createKey(name: string,
+        userId: string | number | undefined,
+        data?: { [key: string]: any },
+        expiry?: number,
+        extraFields?: { [key: string]: any }) : 
+            Promise<{key: ApiKey, token: string}> {
         const value = Hasher.randomValue(this.keyLength);
         const created = new Date();
         const expires = expiry ? new Date(created.getTime()+expiry*1000) : undefined;
@@ -115,11 +119,6 @@ export class ApiKeyManager {
         return {key, token};
     }
 
-    /**
-     * Returns the hashed value of the unsigned key,
-     * @param unsignedValue 
-     * @returns 
-     */
     private static hashApiKeyValue(unsignedValue : string) {
         return Hasher.hash(unsignedValue);
     }
