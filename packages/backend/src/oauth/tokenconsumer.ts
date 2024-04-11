@@ -86,23 +86,29 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
 
         if (this.jwtSecretKey || this.jwtSecretKeyFile) {
             if (this.jwtPublicKey || this.jwtPublicKeyFile) {
-                throw new CrossauthError(ErrorCode.Configuration, "Cannot specify symmetric and public/private JWT keys")
+                throw new CrossauthError(ErrorCode.Configuration, 
+                    "Cannot specify symmetric and public/private JWT keys")
             }
             if (this.jwtSecretKey && this.jwtSecretKeyFile) {
-                throw new CrossauthError(ErrorCode.Configuration, "Cannot specify symmetric key and file")
+                throw new CrossauthError(ErrorCode.Configuration, 
+                    "Cannot specify symmetric key and file")
             }
             if (this.jwtSecretKeyFile) {
-                this.jwtSecretKey = fs.readFileSync(this.jwtSecretKeyFile, 'utf8');
+                this.jwtSecretKey = 
+                    fs.readFileSync(this.jwtSecretKeyFile, 'utf8');
             }
         } else if ((this.jwtPublicKey || this.jwtPublicKeyFile)) {
             if (this.jwtPublicKeyFile && this.jwtPublicKey) {
-                throw new CrossauthError(ErrorCode.Configuration, "Cannot specify both public key and public key file");
+                throw new CrossauthError(ErrorCode.Configuration, 
+                    "Cannot specify both public key and public key file");
             }
             if (this.jwtPublicKeyFile) {
-                this.jwtPublicKey = fs.readFileSync(this.jwtPublicKeyFile, 'utf8');
+                this.jwtPublicKey = 
+                    fs.readFileSync(this.jwtPublicKeyFile, 'utf8');
             }
         } /*else {
-            throw new CrossauthError(ErrorCode.Configuration, "Must specify either a JWT secret key or a public key");
+            throw new CrossauthError(ErrorCode.Configuration, 
+                "Must specify either a JWT secret key or a public key");
         }*/
     }
 
@@ -132,7 +138,8 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
      * @returns 
      */
     async tokenAuthorized(token: string,
-        tokenType: "access" | "refresh" | "id") : Promise<{[key:string]: any}|undefined> {
+        tokenType: "access" | "refresh" | "id") : 
+        Promise<{[key:string]: any}|undefined> {
         const payload = await super.tokenAuthorized(token, tokenType);
         if (payload) {
             if (tokenType == "access" && this.persistAccessToken && 
@@ -141,7 +148,8 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
                     const key = KeyPrefix.accessToken + Hasher.hash(payload.jti);
                     const tokenInStorage = await this.keyStorage.getKey(key);
                     const now = new Date();
-                    if (tokenInStorage.expires && tokenInStorage.expires?.getTime() < now.getTime()) {
+                    if (tokenInStorage.expires && 
+                        tokenInStorage.expires?.getTime() < now.getTime()) {
                         CrossauthLogger.logger.error("Access token expired in storage but not in JWT");
                         return undefined;
                     }
