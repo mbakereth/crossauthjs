@@ -177,6 +177,15 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
 
 /**
  * OAuth authorization server.
+ * 
+ * This provides framework-independent functionality for the
+ * authorization server.  It supports the Authorization Code Flow
+ * with and without PKCE, the Password Flow. Refresh Token Flow,
+ * Client Credentials Flow and the Password MFA flow.  For the later, see
+ * {@link https://auth0.com/docs/secure/multi-factor-authentication/multi-factor-authentication-factors}.
+ * 
+ * It also supports the OpenID Connect Authorization Code Flow, with and 
+ * without PKCE.
  */
 export class OAuthAuthorizationServer {
 

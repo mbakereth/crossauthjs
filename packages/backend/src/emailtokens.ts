@@ -67,6 +67,9 @@ export interface TokenEmailerOptions {
     render? : (template : string, data : {[key:string]:any}) => string;
 }
 
+/**
+ * Sends password reset and email verification tokens to an email addredss
+ */
 export class TokenEmailer {
     private userStorage : UserStorage;
     private keyStorage : KeyStorage;

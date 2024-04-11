@@ -150,6 +150,20 @@ export interface OAuthTokenResponse {
 
 /**
  * An abstract base class for OAuth clients.
+ * 
+ * Crossauth provides OAuth clients that work in the browser as well as in
+ * Node.  This base class contains all the non-interpreter specific 
+ * functionality.  What is missing is the cryptography which is included
+ * in derived Node-only and Browser-only classes.  
+ * See {@link crossauth/backend!OAuthClientBackend}.
+ * 
+ * Flows supported are Authorization Code Flow with and without PKCE,
+ * Client Credentials, Refresh Token, Password and Password MFA.  The
+ * latter is defined at
+ * {@link https://auth0.com/docs/secure/multi-factor-authentication/multi-factor-authentication-factors}.
+ * 
+ * It also supports the OpenID Connect Authorization Code Flow, with and 
+ * without PKCE.
  */
 export abstract class OAuthClientBase {
     protected authServerBaseUri = "";
@@ -258,9 +272,38 @@ export abstract class OAuthClientBase {
         }
     }
 
+    /**
+     * Produce a random Base64-url-encoded string, whose length before 
+     * base64-url-encoding is the given length,
+     * @param length the length of the random array before base64-url-encoding.
+     * @returns the random value as a Base64-url-encoded srting
+     */
     protected abstract randomValue(length : number) : string;
+
+    /**
+     * SHA256 and Base64-url-encodes the given test
+     * @param plaintext the text to encode
+     * @returns the SHA256 hash, Base64-url-encode
+     */
     protected abstract sha256(plaintext :string) : string;
 
+    /**
+     * Starts the authorizatuin code flow, optionally with PKCE.
+     * 
+     * Doesn't actually call the endpoint but rather returns its URL
+     * 
+     * @param scope optionally specify the scopes to ask the user to
+     *        authorize (space separated, non URL-encoded)
+     * @param pkce if true, initiate the Authorization Code Flow with PKCE,
+     *        otherwiswe without PKCE.
+     * @returns an object with
+     *          - `url` - the full `authorize` URL to fetch, if there was no
+     *            error, undefined otherwise
+     *          - `error` OAuth error if there was an error, undefined
+     *            otherwise.  See OAuth specification for authorize endpoint
+     *          - `error_description` friendly error message or undefined
+     *            if no error
+     */
     protected async startAuthorizationCodeFlow(scope?: string,
         pkce: boolean = false) : 
         Promise<{
@@ -315,6 +358,24 @@ export abstract class OAuthClientBase {
         return {url: url};
     }
 
+    /**
+     * This implements the functionality behind the redirect URI
+     * 
+     * Does not throw exceptions.
+     *
+     * Makes a POST request to the `token` endpoint with the
+     * authorization code to get an access token, etc.
+     * 
+     * @param code the authorization code
+     * @param state the random state variable
+     * @param error if defined, it will be returned as an error.  This is
+     *              for cascading errors from previous requests.
+     * @param errorDescription if error is defined, this text is returned
+     *        as the `error_description`  It is set to `Unknown error` 
+     *        otherwise
+     * @returns The {@link OAuthTokenResponse} from the `token` endpoint
+     *          request, or `error` and `error_description`.
+     */
     protected async redirectEndpoint(code?: string,
         state?: string,
         error?: string,
@@ -367,7 +428,20 @@ export abstract class OAuthClientBase {
         }
     }
 
-    protected async clientCredentialsFlow(scope? : string) : Promise<{[key:string]:any}> {
+    /**
+     * Performs the client credentials flow.
+     * 
+     * Does not throw exceptions.
+     * 
+     * Makes a POST request to the `token` endpoint with the
+     * authorization code to get an access token, etc.
+     * 
+     * @param scope the scopes to authorize for the client (optional)
+     * @returns The {@link OAuthTokenResponse} from the `token` endpoint
+     *          request, or `error` and `error_description`.
+     */
+    protected async clientCredentialsFlow(scope? : string) : 
+        Promise<OAuthTokenResponse> {
         CrossauthLogger.logger.debug(j({msg: "Starting client credentials flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("client_credentials")) {
@@ -414,8 +488,12 @@ export abstract class OAuthClientBase {
      * 
      * @param username the username
      * @param password the user's password
+     * @param scope the scopes to authorize (optional)
      * @returns An {@link OAuthTokenResponse} which may contain data or
-     * the OAuth error fields.
+     * the OAuth error fields.  If 2FA is enabled for this user on the
+     * authorization server, the Password MFA flow is followed.  See
+     * {@link https://auth0.com/docs/secure/multi-factor-authentication/multi-factor-authentication-factors}.
+     * 
      */
     async passwordFlow(username: string,
         password: string,
@@ -784,6 +862,14 @@ export abstract class OAuthClientBase {
         //return {url: url, params: params};
     }
 
+    /**
+     * Makes a POST request to the given URL using `fetch()`.
+     * 
+     * @param url the URL to fetch
+     * @param params the body parameters, which are passed as JSON.
+     * @returns the parsed JSON response as an object.
+     * @throws any exception raised by `fetch()`
+     */
     protected async post(url : string, params : {[key:string]:any}) : 
         Promise<{[key:string]:any}>{
         CrossauthLogger.logger.debug(j({
@@ -802,6 +888,14 @@ export abstract class OAuthClientBase {
         return await resp.json();
     }
 
+    /**
+     * Makes a GET request to the given URL using `fetch()`.
+     * 
+     * @param url the URL to fetch
+     * @param headers any headers to add to the request
+     * @returns the parsed JSON response as an object.
+     * @throws any exception raised by `fetch()`
+     */
     protected async get(url : string, headers : {[key:string]:any}) : 
         Promise<{[key:string]:any}|{[key:string]:any}[]>{
         CrossauthLogger.logger.debug(j({msg: "Fetch GET", url: url}));
@@ -816,6 +910,15 @@ export abstract class OAuthClientBase {
         return await resp.json();
     }
 
+    /**
+     * Validates an OpenID ID token, returning undefined if it is invalid.
+     * 
+     * Does not raise exceptions.
+     * 
+     * @param token the token to validate.  To be valid, the signature must
+     *        be valid and the `type` claim in the payload must be set to `id`.
+     * @returns the parsed payload or undefined if the token is invalid.
+     */
     async validateIdToken(token : string) : 
         Promise<{[key:string]:any}|undefined>{
         try {
