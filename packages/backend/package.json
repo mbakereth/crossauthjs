@@ -52,6 +52,7 @@
     "dotenv-cli": "^7.3.0",
     "events": "^3.3.0",
     "http-request-mock": "^1.8.18",
+    "install": "^0.13.0",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "ldap-async": "^2.1.1",

@@ -764,7 +764,8 @@ export class SessionManager {
         const newSecrets : {[key:string] : any} = {};
         const secretNames = authenticator.secretNames();
         for (let secret in secrets) {
-            if (secretNames.includes(secret)) newSecrets[secret] = data[secret];
+            //if (secretNames.includes(secret)) newSecrets[secret] = data[secret];
+            if (secretNames.includes(secret) && secret in secrets) newSecrets[secret] = secrets[secret];
         }
         await authenticator.authenticateUser(undefined, {...newSecrets, ...data.pre2fa.secrets}, params);
         await this.keyStorage.updateData(SessionCookie.hashSessionId(key.value), "pre2fa", undefined);

@@ -39,9 +39,7 @@ const JSONHDR : [string,string] =
 // OPTIONS
 
 /**
- * Options for {@link FastifyServer }.
- * 
- * See {@link FastifyServer } constructor for description of parameters
+ * Options for {@link FastifySessionServer }.
  */
 export interface FastifySessionServerOptions 
     extends SessionManagerOptions, OAuthClientManagerOptions {
@@ -182,30 +180,124 @@ export interface FastifySessionServerOptions
      */
     emailVerifiedPage? : string,
 
+    /**
+     * These page endpoints need the second factor to be entered.  Visiting
+     * the page redirects the user to the factor2 page.
+     * 
+     * You probably want to do this for things like changing password.  The
+     * default is
+     *   `/requestpasswordreset`,
+     *   `/updateuser`,
+     *   `/changepassword`,
+     *   `/resetpassword`,
+     *   `/changefactor2`,
+     */
     factor2ProtectedPageEndpoints?: string,
+
+    /**
+     * These page endpoints need the second factor to be entered.  Making
+     * a call to these endpoints results in a response of 
+     * `{"ok": true, "factor2Required": true `}.  The user should then
+     * make a call to `/api/factor2`.   If the credetials are correct, the
+     * response will be that of the original request.
+     * 
+     * You probably want to do this for things like changing password.  The
+     * default is
+     *   `/api/requestpasswordreset`,
+     *   `/api/updateuser`,
+     *   `/api/changepassword`,
+     *   `/api/resetpassword`,
+     *   `/api/changefactor2`,
+     */
     factor2ProtectedApiEndpoints?: string,
 
+    /**
+     * This parameter affects users who are not logged in with a session ID
+     * but with an OAuth access token.  Such users can only update their user
+     * record if the scoped named in this variable has been authorized by
+     * that user for the client.
+     * 
+     * By default, no scopes are authorized to edit the user.
+     */
     editUserScope? : string,
 
     ///////////////////////////////////////////
     // Admin pages
 
+    /**
+     * If true, all administrator endpoints will be enabled.
+     * 
+     * If you explicitly name which endpoints to enable with the `endpoints`
+     * option, this is ignored.
+     * 
+     * Default false.
+     * 
+     */
     enableAdminEndpoints? : boolean,
+
+    /**
+     * If true, all endpoints for managing OAuth clients (including 
+     * the admin ones if `enableAdminEndpoints` is also true).
+     * 
+     * If you explicitly name which endpoints to enable with the `endpoints`
+     * option, this is ignored.
+     * 
+     * Default false
+     */
     enableOAuthClientManagement? : boolean,
 
+    /**
+     * The temaplte file for the admin create user page.
+     * 
+     * Default `admin/createuser.njk`
+     */
     adminCreateUserPage? : string,
+
+    /**
+     * The temaplte file for the admin selecting a user.
+     * 
+     * Default `admin/selectuser.njk`
+     */
     adminSelectUserPage? : string,
+
+    /**
+     * The temaplte file for the admin creating a user.
+     * 
+     * Default `admin/createuser.njk`
+     */
     adminCreateClientPage? : string,
     
+    /**
+     * Admin pages provide functionality for searching for users.  By
+     * default the search string must exactly match a username or
+     * email address (depending on the storage, after normalizing
+     * and lowercasing).  Override this behaviour with this function
+     * @param searchTerm the search term 
+     * @param userStorage the user storage to search
+     * @returns array of matching users
+     */
     userSearchFn? : (searchTerm : string, userStorage : UserStorage) => Promise<User[]>;
-    clientSearchFn? : (searchTerm : string, userStorage : OAuthClientStorage, userId? : string|number|null) => Promise<OAuthClient[]>;
+
+    /**
+     * Admin pages provide functionality for searching for OAuth clients.  By
+     * default the search string must exactly match the `clientName`.
+     * Override this behaviour with this function
+     * @param searchTerm the search term 
+     * @param clientStorage the client storage to search
+     * @param userId if defined and non null, only clients owned by that
+     *        user ID will be returned.  If `null`, only clients not owned
+     *        by a user will be returned.  If undefined, all matching clients
+     *        will be returned
+     * @returns array of matching clients
+     */
+    clientSearchFn? : (searchTerm : string, clientStorage : OAuthClientStorage, userId? : string|number|null) => Promise<OAuthClient[]>;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // ENDPOINTS
 
 /**
- * Endpoints that depend on sessions being enabled and display HTML
+ * When not overriding which endpoints to enable, all of these will be.
  */
 export const SessionPageEndpoints = [
     "login",
@@ -215,6 +307,10 @@ export const SessionPageEndpoints = [
     "deleteuser",
 ];
 
+/**
+ * When not overriding which endpoints to enable, 
+ * and with `enableAdminEndpoints` enabled, all of these will be.
+ */
 export const SessionAdminPageEndpoints = [
     "admin/createuser",
     "admin/changepassword",
@@ -224,6 +320,11 @@ export const SessionAdminPageEndpoints = [
     "admin/deleteuser",
 ];
 
+/**
+ * When not overriding which endpoints to enable, and with
+ * both `enableAdminEndpoints` and `enableAdminClientManagement` enabled,
+ * all these will be.
+ */
 export const SessionAdminClientPageEndpoints = [
     "admin/selectclient",
     "admin/createclient",
@@ -231,6 +332,11 @@ export const SessionAdminClientPageEndpoints = [
     "admin/updateclient",
 ];
 
+/**
+ * When not overriding which endpoints to enable, and with
+ * `enableAdminClientManagement` enabled,
+ * all these will be.
+ */
 export const SessionClientPageEndpoints = [
     "selectclient",
     "createclient",
@@ -239,7 +345,7 @@ export const SessionClientPageEndpoints = [
 ];
 
 /**
- * API (JSON) endpoints that depend on sessions being enabled 
+ * When not overriding which endpoints to enable, all of these will be.
  */
 export const SessionApiEndpoints = [
     "api/login",
@@ -251,6 +357,10 @@ export const SessionApiEndpoints = [
     "api/deleteuser",
 ];
 
+/**
+ * When not overriding which endpoints to enable, 
+ * and with `enableAdminEndpoints` enabled, all of these will be.
+ */
 export const SessionAdminApiEndpoints = [
     "admin/api/createuser",
     "admin/api/changepassword",
@@ -259,12 +369,22 @@ export const SessionAdminApiEndpoints = [
     "admin/api/deleteuser",
 ];
 
+/**
+ * When not overriding which endpoints to enable, and with
+ * both `enableAdminEndpoints` and `enableAdminClientManagement` enabled,
+ * all these will be.
+ */
 export const SessionAdminClientApiEndpoints = [
     "admin/api/createclient",
     "admin/api/deleteclient",
     "admin/api/updateclient",
 ];
 
+/**
+ * When not overriding which endpoints to enable, and with
+ * `enableAdminClientManagement` enabled,
+ * all these will be.
+ */
 export const SessionClientApiEndpoints = [
     "api/deleteclient",
     "api/updateclient",
@@ -272,7 +392,10 @@ export const SessionClientApiEndpoints = [
 ];
 
 /**
- * API (JSON) endpoints that depend on 2FA being enabled 
+ * API (JSON) endpoints that depend on 2FA being enabled.
+ * 
+ * If not overriding which endpoints to enable with `endpoints`,
+ * and if any 2FA factors are enabled, then this endpoints will be added.
  */
 export const Factor2ApiEndpoints = [
     "api/configurefactor2",
@@ -283,7 +406,10 @@ export const Factor2ApiEndpoints = [
 ];
 
 /**
- * Endpoints that depend on email verification being enabled and display HTML
+ * Page endpoints that depend on email verification being enabled.
+ * 
+ * If not overriding which endpoints to enable with `endpoints`,
+ * and if email verification is enabled, then this endpoints will be added.
  */
 export const EmailVerificationPageEndpoints = [
     "verifyemail",
@@ -291,14 +417,20 @@ export const EmailVerificationPageEndpoints = [
 ];
 
 /**
- * API (JSON) endpoints that depend on email verification being enabled 
+ * API (JSON) endpoints that depend on email verification.
+ * 
+ * If not overriding which endpoints to enable with `endpoints`,
+ * and if email verification is enabled, then this endpoints will be added.
  */
 export const EmailVerificationApiEndpoints = [
     "api/verifyemail",
 ];
 
 /**
- * Endpoints that depend on password reset being enabled and display HTML
+ * Page endpoints that depend on password reset being enabled
+ * 
+ * If not overriding which endpoints to enable with `endpoints`,
+ * and if password reset is enabled, then this endpoints will be added.
  */
 export const PasswordResetPageEndpoints = [
     "requestpasswordreset",
@@ -307,6 +439,9 @@ export const PasswordResetPageEndpoints = [
 
 /**
  * API (JSON) endpoints that depend on password reset being enabled 
+ * 
+ * If not overriding which endpoints to enable with `endpoints`,
+ * and if password reset is enabled, then this endpoints will be added.
  */
 export const PasswordResetApiEndpoints = [
     "api/requestpasswordreset",
@@ -315,6 +450,8 @@ export const PasswordResetApiEndpoints = [
 
 /**
  * Endpoints for signing a user up that display HTML
+ * 
+ * When not overriding which endpoints to enable, all of these will be.
  */
 export const SignupPageEndpoints = [
     "signup",
@@ -322,6 +459,8 @@ export const SignupPageEndpoints = [
 
 /**
  * API (JSON) endpoints for signing a user up that display HTML
+ * 
+ * When not overriding which endpoints to enable, all of these will be.
  */
 export const SignupApiEndpoints = [
     "api/signup",
@@ -338,7 +477,7 @@ export const Factor2PageEndpoints = [
 ]
 
 /**
- * These are the endpoints created by default by this server-
+ * These are the endpoints created ig `endpoints` is set to `allMinusOAuth`
  */
 export const AllEndpointsMinusOAuth = [
     ...SignupPageEndpoints,
@@ -377,11 +516,16 @@ export const AllEndpoints = [
     ...Factor2ApiEndpoints,
 ];
 
-
+/**
+ * Fastify body type for optionally passing a CSRF token in the body.
+ */
 export interface CsrfBodyType {
     csrfToken?: string;
 }
 
+/**
+ * Fastify body type for passing any body parameter
+ */
 export interface ArbitraryBodyType {
     [key:string]: string;
 }
@@ -403,6 +547,9 @@ interface LoginFactor2BodyType extends CsrfBodyType {
     token? : string,
 }
 
+/**
+ * Fastidy body type for users signing up
+ */
 export interface SignupBodyType extends LoginBodyType {
     repeatPassword?: string,
     email? : string,
@@ -410,14 +557,23 @@ export interface SignupBodyType extends LoginBodyType {
     [key : string]: string|number|Date|boolean|undefined, // for extensible user object fields
 }
 
+/**
+ * Fastidy query type for users logging in (just a parameter for next page to load)
+ */
 export interface LoginQueryType {
     next? : string;
 }
 
+/**
+ * Fastidy query type for entering second factor (just a am optional error parameter)
+ */
 interface Factor2QueryType {
     error? : string;
 }
 
+/**
+ * For passing authenticator details to page templates.
+ */
 export interface AuthenticatorDetails {
     name: string,
     friendlyName : string,
@@ -443,6 +599,16 @@ function defaultUserValidator(user : UserInputFields) : string[] {
     return errors;
 }
 
+/**
+ * Default function for creating users.  Can be overridden.
+ * 
+ * Takes any field beginning with `user_` and that is also in
+ * `userEditableFields` (without the `user_` prefix).
+ * 
+ * @param request the fastify request
+ * @param userEditableFields the fields a user may edit
+ * @returns the new user
+ */
 function defaultCreateUser(request: FastifyRequest<{ Body: SignupBodyType }>,
     userEditableFields: string[]) : UserInputFields {
     let state = "active";
@@ -464,6 +630,17 @@ function defaultCreateUser(request: FastifyRequest<{ Body: SignupBodyType }>,
 
 }
 
+/**
+ * Default function for creating users.  Can be overridden.
+ * 
+ * Takes any field beginning with `user_` and that is also in
+ * `userEditableFields` (without the `user_` prefix).
+ * 
+ * @param user the user to update
+ * @param request the fastify request
+ * @param userEditableFields the fields a user may edit
+ * @returns the new user
+ */
 function defaultUpdateUser(user: User,
     request: FastifyRequest<{ Body: UpdateUserBodyType }>,
     userEditableFields: string[]) : User {
@@ -483,38 +660,83 @@ function defaultUpdateUser(user: User,
 // CLASSES
 
 /**
- * This class the session management for the fastify server
+ * This class adds user endpoints to the Fastidfy session server.
  * 
- * **Endpoints that can be activated provided**
+ * You shouldn't have create create this directly - it is created by
+ * {@link FastifyServer}.
  * 
- * All POST methods are passed user, csrfToken, errorCode, errorCodeName,
- *  error and errors.
+ * **Endpoints that can be activated**
  * 
- * | METHOD | ENDPOINT                   | PATH PARAMS | GET/BODY PARAMS                          | VARIABLES PASSED         | FILE               |
- * | ------ | -------------------------- | ----------- | ---------------------------------------- | ------------------------ | ------------------ |
- * | GET    | /login                     |             | next                                     |                          | loginPage          | 
- * | POST   | /login                     |             | next, username, password                 | request params, message  | loginPage          | 
- * | POST   | /api/login                 |             | next, username, password                 |                          |                    | 
- * | POST   | /logout                    |             | next                                     |                          |                    | 
- * | POST   | /api/logout                |             | next                                     |                          |                    | 
- * | GET    | /signup                    |             | next                                     |                          | signupPage         |
- * | POST   | /signup                    |             | next, username, password, user/*         | request params, message  | signupPage         | 
- * | GET    | /changepassword            |             |                                          |                          | changePasswordPage | 
- * | POST   | /changepassword            |             | oldPassword, newPassword, repeatPassword | request params, message  | changePasswordPage | 
- * | POST   | /api/changepassword        |             | oldPassword, newPassword                 |                          |                    | 
- * | GET    | /updateuser                |             |                                          |                          | changePasswordPage | 
- * | POST   | /updateuser                |             | user_*                                   | request params, message  | changePasswordPage | 
- * | POST   | /api/updateuser            |             | user_*                                   |                          |                    | 
- * | GET    | /requestpasswordreset      |             |                                          |                          | changePasswordPage | 
- * | POST   | /requestpasswordreset      |             | email                                    | email, message           | changePasswordPage | 
- * | POST   | /api/requestpasswordreset  |             | password                                 |                          |                    | 
- * | GET    | /resetpassword             | token       |                                          |                          | changePasswordPage | 
- * | POST   | /resetpassword             |             | token, password, repeatPassword          | request params, message  | changePasswordPage | 
- * | POST   | /api/resetpassword         |             | token, password                          |                          |                    | 
- * | GET    | /verifyemail               |  token      |                                          |                          | emailVerifiedPage  | 
- * | GET    | /verifyemail               |  token      |                                          |                          | emailVerifiedPage  | 
- * | GET    | /api/userforsessionkey     |             |                                          |                          |                    | 
- * | GET    | /api/getcsrctoken          |             |                                          |                          |                    | 
+ * All page POST methods are passed user, csrfToken, errorCode, errorCodeName, errorMessage, errorMessages, urlPrefix,
+ * errorMessages is an array, errorMessage is a single value or concatenation of errorMessages.
+ * 
+ * All JSON responses have ok, errorMessage, errorMEssages, errorCode, errorCodeName, other than OAuth endpoints.
+ * 
+ * | METHOD | ENDPOINT                   | PATH PARAMS | GET/BODY PARAMS                                                      | VARIABLES PASSED/RESPONSE JSON                                                                         | FILE                     |
+ * | ------ | -------------------------- | ----------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ |
+ * | GET    | /login                     |             | next                                                                 | next                                                                                                   | loginPage                | 
+ * | POST   | /login                     |             | next, username, password                                             | request params, next, persist, username | loginPage                                                    | loginPage                |
+ * | POST   | /api/login                 |             | username, password                                                   |                                                                                                        |                          | 
+ * | POST   | /logout                    |             | next                                                                 |                                                                                                        |                          | 
+ * | POST   | /api/logout                |             |                                                                      |                                                                                                        |                          | 
+ * | GET    | /signup                    |             | next                                                                 |                                                                                                        | signupPage               |
+ * | POST   | /signup                    |             | next, persist, username, password, repeat_password, factor2, user_*  | message, next, persist, username, factor2, allowedFactor2                                              | signupPage               | 
+ * | POST   | /api/signup                |             | username, password, repeat_password, factor2, user_*                 | message, next, persist, username, factor2, allowedFactor2                                              | signupPage               | 
+ * | GET    | /changepassword            |             | next, required                                                       | next, required                                                                                         | changePasswordPage       | 
+ * | POST   | /changepassword            |             | next, required, old_password, new_password, repeat_password          | message, next, required                                                                                | changePasswordPage       | 
+ * | POST   | /api/changepassword        |             | old_password, new_password, repeat_password                          |                                                                                                        |                          | 
+ * | GET    | /changefactor2             |             | next, required, factor2                                              | next, required, allowedFactor2                                                                         | changeFactor2Page        | 
+ * | POST   | /changefactor2             |             | next, required, factor2                                              | next, required, allowedFactor2                                                                         | changeFactor2Page        | 
+ * | POST   | /api/changefactor2         |             | factor2                                                              |                                                                                                        |                          | 
+ * | GET    | /configurefactor2          |             | next                                                                 | next, (userData from authenticator)                                                                    | configureFactor2Page     | 
+ * | POST   | /configurefactor2          |             | next, otp, token, (any)                                              | next, (userData from authenticator)                                                                    | configureFactor2Page     | 
+ * | GET    | /api/configurefactor2      |             |                                                                      | (userData from authenticator)                                                                          |                          | 
+ * | POST   | /api/configurefactor2      |             | otp, token, (any)                                                    | emailVerificationNeeded                                                                                |                          | 
+ * | GET    | /updateuser                |             |                                                                      | user, allowedFactor2                                                                                   | updatePasswordPage       | 
+ * | POST   | /updateuser                |             | user_*                                                               | message, user_*, allowedFactor2                                                                        | updatePasswordPage       | 
+ * | POST   | /api/updateuser            |             | user_*                                                               | emailVerificationRequired                                                                              |                          | 
+ * | GET    | /deleteuser                |             | next                                                                 | next, isAdmin, user                                                                                    | deleteUserPAge           | 
+ * | POST   | /deleteuser                |             | next                                                                 | message, next, isAdmin, userId                                                                         | deleteUserPAge           | 
+ * | POST   | /api/deleteuser            |             |                                                                      |                                                                                                        |                          | 
+ * | GET    | /requestpasswordreset      |             | next, required                                                       | next, required                                                                                         | requestPasswordResetPage | 
+ * | POST   | /requestpasswordreset      |             | email, next, required                                                | next, required, email, message                                                                         | requestPasswordResetPage | 
+ * | POST   | /api/requestpasswordreset  |             | email                                                                |                                                                                                        |                          | 
+ * | GET    | /resetpassword             | token       |                                                                      | token                                                                                                  | resetPasswordPage        | 
+ * | POST   | /resetpassword             |             | token                                                                | token, message                                                                                         | resetPasswordPage        | 
+ * | POST   | /api/resetpassword         |             | token                                                                |                                                                                                        |                          | 
+ * | GET    | /verifyemail               | token       | user                                                                 |                                                                                                        | emailVerifiedPage        | 
+ * | GET    | /api/verifyemail           | token       |                                                                      |                                                                                                        |                          | 
+ * | GET    | /api/userforsessionkey     |             |                                                                      |                                                                                                        |                          | 
+ * | GET    | /api/getcsrftoken          |             |                                                                      |                                                                                                        |                          | 
+ * | GET    | /selectclient              |             | next, search, skip, take, haveNext, havePrevious                     | next, search, skip, take, haveNext, havePrevious, user, clients, isAdmin                               | selectClient             |
+ * | GET    | /createclient              |             | next                                                                 | next, validFLows, flowNames, user, isAdmin                                                             | createClientPage         |
+ * | POST   | /createclient              |             | next, clientName, confidential, redirectUris, (flows)                | message, client, next, validFLows, flowNames, user, isAdmin                                            | createClientPage         |
+ * | POST   | /api/createclient          |             | clientName, confidential, redirectUris, (flows)                      | client                                                                                                 |                          |
+ * | GET    | /updateclient              | clientId    | next                                                                 | next, validFLows, flowNames, selectedFlows, redirectUris, clientId, clientName, user, isAdmin          | updateClientPage         |
+ * | POST   | /updateclient              | clientId    | next, clientName, confidential, redirectUris, (flows), resetSecret   | message, next, validFLows, flowNames, selectedFlows, redirectUris, clientId, clientName, user, isAdmin | updateClientPage         |
+ * | POST   | /api/updateclient          | clientId    | clientName, confidential, redirectUris, (flows), resetSecret         | client, newSecret                                                                                      |                          |
+ * | GET    | /deleteclient              | clientId    | next, backUrl                                                        | next, backUrl, client                                                                                  | deleteClientPage         | 
+ * | POST   | /deleteclient              | clientId    | next                                                                 | message, next, clientId                                                                                | deleteClientPage         | 
+ * | POST   | /api/deleteclient          | clientId    |                                                                      |                                                                                                        |                          | 
+ * 
+ * ** Admin Endpoints **
+ * 
+ * For administrator endpoints, see {@link FastifyAdminEndpoints}
+ * 
+ * ** Endpoints requiring 2FA **
+ * 
+ * Endpoints listed in `factor2ProtectedPageEndpoints` and
+ * `factor2ProtectedApiEndpoints` require the second factor to be entered again,
+ * if 2FA is enabled for the user.  For page endpoints, the user will 
+ * be redirected to the page for entering the second factor.
+ * 
+ * For API endpoints., the response will be
+ * `{"ok": true, "factor2Reqiored': true}`.  The user should then make a POST
+ * request to the same endpoint but with the 2FA field in the body instead
+ * of the original request body, eg `{"otp": 123456}`.  If the factor is
+ * valid, the JSON data from the original post will be submittd.
+ * 
+ * ** Creating and updating users **
  * 
  * If you have fields other than `id`, `username` and `password` in your user
  * table, add them in 
@@ -534,38 +756,110 @@ function defaultUpdateUser(user: User,
  */
 export class FastifySessionServer {
 
+    /**
+     * The Fastify app taken from constructor args.
+     * See {@link FastifySessionServer.constructor}.
+     */
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
+
+    /**
+     * The prefix taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
     readonly prefix : string = "/";
+
+    /**
+     * THe URL for the login page.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
     readonly loginUrl : string;
-    private endpoints : string[] = [];
+
+    /**
+     * THe default URL to redirect to after login.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
     loginRedirect = "/";
+
+    /**
+     * THe default URL to redirect to after logout.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
     logoutRedirect : string = "/";
+
+    /**
+     * The page to show on error.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
+    readonly errorPage : string = "error.njk";
+
+    /**
+     * Funtion to validate users upon creation.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
+    validateUserFn : (user : UserInputFields) 
+        => string[] = defaultUserValidator;
+
+    /**
+     * Funtion to create a user record from form fields.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
+    createUserFn: (request: FastifyRequest<{ Body: SignupBodyType }>,
+        userEditableFields: string[]) => UserInputFields = defaultCreateUser;
+
+    /**
+     * Funtion to update a user record from form fields.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
+    updateUserFn: (user: User,
+        request: FastifyRequest<{ Body: UpdateUserBodyType }>,
+        userEditableFields: string[]) => User = defaultUpdateUser;
+
+    /**
+     * User storage taken from constructor args.
+     * See {@link FastifySessionServer.constructor}.
+     */
+    readonly userStorage : UserStorage;
+
+    /**
+     * The set of authenticators taken from constructor args.
+     * See {@link FastifySessionServer.constructor}.
+     */
+    readonly authenticators: {[key:string]: Authenticator}
+
+    /**
+     * The set of allowed authenticators taken from the options during 
+     * construction.
+     */
+    readonly allowedFactor2 : string[] = [];
+
+    /**
+     * Session manager that was created from options during construction.
+     */
+    readonly sessionManager : SessionManager;
+
+    private endpoints : string[] = [];
     private signupPage : string = "signup.njk";
     private loginPage : string = "login.njk";
     private factor2Page : string = "factor2.njk";
     private configureFactor2Page : string = "configurefactor2.njk";
-    readonly errorPage : string = "error.njk";
-    validateUserFn : (user : UserInputFields) 
-        => string[] = defaultUserValidator;
-    createUserFn: (request: FastifyRequest<{ Body: SignupBodyType }>,
-        userEditableFields: string[]) => UserInputFields = defaultCreateUser;
-    updateUserFn: (user: User,
-        request: FastifyRequest<{ Body: UpdateUserBodyType }>,
-        userEditableFields: string[]) => User = defaultUpdateUser;
     private addToSession? : (request : FastifyRequest) => 
         {[key: string] : string|number|boolean|Date|undefined};
     private validateSession?: (session: Key,
         user: User | undefined,
         request: FastifyRequest) => void;
 
-    readonly userStorage : UserStorage;
-    readonly sessionManager : SessionManager;
     private userEndpoints : FastifyUserEndpoints;
     private adminEndpoints : FastifyAdminEndpoints;
     private adminClientEndpoints? : FastifyAdminClientEndpoints;
     private userClientEndpoints? : FastifyUserClientEndpoints;
-    readonly authenticators: {[key:string]: Authenticator}
-    readonly allowedFactor2 : string[] = [];
 
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
@@ -583,10 +877,19 @@ export class FastifySessionServer {
         "/api/updateuser",
         "/api/changepassword",
         "/api/resetpassword",
-        "/api/changefactor1",
+        "/api/changefactor2",
     ]
     private editUserScope? : string;
 
+    /**
+     * Constructor
+     * 
+     * @param app the Fastify app
+     * @param userStorage where user records are stored
+     * @param keyStorage where session IDs are stored
+     * @param authenticators list of authenticators
+     * @param options See {@link FastifySessionServerOptions}.
+     */
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
         userStorage: UserStorage, 
@@ -798,8 +1101,9 @@ export class FastifySessionServer {
 
                         // get secrets from the request body 
                         const authenticator = this.authenticators[sessionData.pre2fa.factor2];
-                        const secretNames = [...authenticator.secretNames(), 
-                            ...authenticator.transientSecretNames()];
+                        /*const secretNames = [...authenticator.secretNames(), 
+                            ...authenticator.transientSecretNames()];*/
+                        const secretNames = [...authenticator.transientSecretNames()];
                         let secrets : {[key:string]:string} = {};
                         for (let field in request.body) {
                             if (secretNames.includes(field)) secrets[field] = 
@@ -900,6 +1204,9 @@ export class FastifySessionServer {
     //////////////////
     // page endpoints
 
+    /**
+     * Adds all endpoints enabled in the options passed to the constructor.
+     */
     addEndpoints() {
         if (this.endpoints.includes("login")) {
             this.addLoginEndpoints();
@@ -1115,11 +1422,11 @@ export class FastifySessionServer {
                 .redirect(request.query.next??this.loginRedirect); // already logged in
 
                 let data: {
-                    urlprefix: string,
+                    urlPrefix: string,
                     next?: any,
                     csrfToken: string | undefined
                 } = {
-                    urlprefix: this.prefix,
+                    urlPrefix: this.prefix,
                     csrfToken: request.csrfToken
                 };
             if (request.query.next) {
@@ -1159,7 +1466,7 @@ export class FastifySessionServer {
                                     persist: request.body.persist,
                                     username: request.body.username,
                                     csrfToken: request.csrfToken,
-                                    urlprefix: this.prefix, 
+                                    urlPrefix: this.prefix, 
                                 });                      
                             });
                         }
@@ -1180,7 +1487,7 @@ export class FastifySessionServer {
                                     persist: request.body.persist,
                                     username: request.body.username,
                                     csrfToken: request.csrfToken,
-                                    urlprefix: this.prefix, 
+                                    urlPrefix: this.prefix, 
                                 });                      
                             });
                         }
@@ -1205,7 +1512,7 @@ export class FastifySessionServer {
                                     persist: request.body.persist,
                                     username: request.body.username,
                                     csrfToken: request.csrfToken,
-                                    urlprefix: this.prefix, 
+                                    urlPrefix: this.prefix, 
                                 });                      
                             });
                         }
@@ -1219,7 +1526,7 @@ export class FastifySessionServer {
                             csrfToken: request.csrfToken,
                             next: request.body.next??this.loginRedirect,
                             persist: request.body.persist ? "on" : "",
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             factor2: user.factor2,
                             action: "loginfactor2",
                         };
@@ -1238,7 +1545,7 @@ export class FastifySessionServer {
                         persist: request.body.persist,
                         username: request.body.username,
                         csrfToken: request.csrfToken,
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
                     });                      
                 });
             }
@@ -1282,7 +1589,7 @@ export class FastifySessionServer {
                             next: request.body.next, 
                             persist: request.body.persist ? "on" : "",
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             factor2 : factor2,
                             action: "loginfactor2",
                         });                      
@@ -1297,7 +1604,7 @@ export class FastifySessionServer {
                             next: request.body.next, 
                             persist: request.body.persist ? "on" : "",
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                         });                      
                     });
     
@@ -1326,7 +1633,7 @@ export class FastifySessionServer {
             if (!sessionData?.pre2fa) throw new CrossauthError(ErrorCode.Unauthorized, 
                 "2FA not initiated");
             let data = {
-                urlprefix: this.prefix, 
+                urlPrefix: this.prefix, 
                 csrfToken: request.csrfToken, 
                 action: sessionData.pre2fa.url, 
                 errorCodeName: request.query.error,
@@ -1347,12 +1654,12 @@ export class FastifySessionServer {
                     ip: request.ip
                 }));
                 let data: {
-                    urlprefix: string,
+                    urlPrefix: string,
                     next?: any,
                     csrfToken: string | undefined,
                     allowedFactor2: AuthenticatorDetails[]
                 } = {
-                    urlprefix: this.prefix,
+                    urlPrefix: this.prefix,
                     csrfToken: request.csrfToken,
                     allowedFactor2: this.allowedFactor2Details()
                 };
@@ -1395,7 +1702,7 @@ export class FastifySessionServer {
                             csrfToken: request.csrfToken,
                             message: "Please check your email to finish signing up.",
                             allowedFactor2: this.allowedFactor2Details(),
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             factor2: request.body.factor2,
                             ...data.userData,
                         });
@@ -1428,7 +1735,7 @@ export class FastifySessionServer {
                         csrfToken: request.csrfToken,
                         factor2: request.body.factor2,
                         allowedFactor2: this.allowedFactor2Details(),
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
                         ...extraFields,
                         });
                     
@@ -1463,7 +1770,7 @@ export class FastifySessionServer {
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, request, reply, (reply, error) => {
                     return reply.view(this.errorPage, {
-                        urlprefix: this.prefix,
+                        urlPrefix: this.prefix,
                         errorMessage: error.message,
                         errorMessages: error.messages,
                         errorCode: error.code,
@@ -2165,6 +2472,19 @@ export class FastifySessionServer {
 
     }
 
+    /**
+     * Creates an anonymous session, setting the `Set-Cookue` headers
+     * in the reply.
+     * 
+     * An anonymous sessiin is a session cookie that is not associated
+     * with a user (`userId` is undefined).  It can be used to persist
+     * data between sessions just like a regular user session ID.
+     * 
+     * @param request the Fastify request
+     * @param reply the Fastify reply
+     * @param data session data to save
+     * @returns the session cookie value
+     */
     async createAnonymousSession(request : FastifyRequest, 
         reply : FastifyReply, data? : {[key:string]:any}) : Promise<string> {
         CrossauthLogger.logger.debug(j({msg: "Creating session ID"}));
@@ -2186,11 +2506,24 @@ export class FastifySessionServer {
         return sessionCookie.value;
     };
 
-    // sanitise errors - user's should not be shown anything too revealing about it
+    /**
+     * Called by each endpoint on error.  
+     * 
+     * Sanitises errors to not give too much away to the user.  Logs
+     * the error (`error` level) and the stack trace (`debug` level).
+     * 
+     * @param e the exceptioin that was thrown
+     * @param request the Fastify request
+     * @param reply the Fastify reply
+     * @param errorFn the error function to call to send the output to the client
+     * @param passwordInvalidOk if true, can report that the password is
+     *        incorrect.  If false, report that the username or password is
+     *        incorrect.  Default false.
+     */
     handleError(e : any, request: FastifyRequest, 
         reply : FastifyReply, 
         errorFn : (reply : FastifyReply, error : CrossauthError) => void, 
-        passwordInvalidOk? : boolean) {
+        passwordInvalidOk : boolean = false) {
         try {
         let ce = CrossauthError.asCrossauthError(e);
         if (!passwordInvalidOk) {
@@ -2220,6 +2553,11 @@ export class FastifySessionServer {
     //////////////
     // Helpers
 
+    /**
+     * Returns the session ID cookie value from the request
+     * @param request the Fastify request
+     * @returns the session cookie value
+     */
     getSessionCookieValue(request : FastifyRequest) : string|undefined{
         if (request.cookies && 
             this.sessionManager.sessionCookieName in request.cookies) {       
@@ -2228,6 +2566,11 @@ export class FastifySessionServer {
         return undefined;
     }
 
+    /**
+     * Returns the CSRF token cookie value from the request
+     * @param request the Fastify request
+     * @returns the CSRF token cookie value
+     */
     getCsrfCookieValue(request : FastifyRequest) : string|undefined{
         if (request.cookies && 
             this.sessionManager.csrfCookieName in request.cookies) {       
@@ -2236,6 +2579,12 @@ export class FastifySessionServer {
         return undefined;
     }
 
+    /**
+     * Returns a hash of the session ID.  Used for logging (for security,
+     * the actual session ID is not logged)
+     * @param request the Fastify request
+     * @returns hash of the session ID
+     */
     getHashOfSessionId(request : FastifyRequest) : string {
         if (!request.sessionId) return "";
         try {
@@ -2244,6 +2593,12 @@ export class FastifySessionServer {
         return "";
     }
 
+    /**
+     * Returns a hash of the CSRF token cookie value.  Used for logging (for security,
+     * the actual CSRF token is not logged)
+     * @param request the Fastify request
+     * @returns hash of the CSRF token
+     */
     getHashOfCsrfCookie(request : FastifyRequest) : string {
         const cookieValue = this.getCsrfCookieValue(request);
         if (!cookieValue) return "";
@@ -2253,6 +2608,15 @@ export class FastifySessionServer {
         return "";
     }
 
+    /**
+     * Returns an error if the CSRF token in the request's cookie and
+     * either the `csrfToken` form field or `X-CROSSAUTH-CSRF` header
+     * is invalid (ie, the two do not match or the signature on the
+     * cookie is invalid).
+     * @param request the Fastify request
+     * @returns the CSRF token cookie value if valid, undefined
+     *          otherwise.
+     */
     validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) 
         : string|undefined {
 
@@ -2260,6 +2624,17 @@ export class FastifySessionServer {
         return this.getCsrfCookieValue(request);
     }
 
+    /**
+     * Creates and returns a new CSRF token, setting it in the reply both
+     * as a cookue and as a `X-CROSSAUTH-CSRF` header.
+     * 
+     * To mitigate against the BREACH attack, a new CSRF token is created
+     * with every request by masking it with a random value.
+     * 
+     * @param request the Fastify request
+     * @param reply the Fastify reply
+     * @returns the Fastiy reply
+     */
     csrfToken(request : FastifyRequest<{Body: CsrfBodyType}>, 
         reply : FastifyReply) {
         let token : string|undefined = undefined;
@@ -2298,7 +2673,14 @@ export class FastifySessionServer {
         return token;
     }
 
-
+    /**
+     * Sends a JSON error message
+     * @param reply the Fastify reply
+     * @param status the HTTP status to return
+     * @param error the error string to report (overrides `e`)
+     * @param e the exception that was raised
+     * @returns the Fastify reply
+     */
     sendJsonError(reply: FastifyReply,
         status: number,
         error?: string,
@@ -2322,11 +2704,24 @@ export class FastifySessionServer {
             });
     }
 
+    /**
+     * Returns an appropriate HTTP status from an exception.
+     * 
+     * If the exception is of type {@link @crossauth/common!CrossauthError}
+     * then the status is taken from it.  Otherwise 500 is returned.
+     * @param e the exception to try to take the status from
+     * @returns the HTTP status
+     */
     errorStatus(e : any) {
         if (typeof e == "object" && "httpStatus" in e) return e.httpStatus??500;
         return 500;
     }
 
+    /**
+     * For each of the authenticators passed to the constructor, retruns
+     * some details about it
+     * @returns a vector of {@link AuthenticatorDetails} objects.
+     */
     allowedFactor2Details() : AuthenticatorDetails[] {
         let ret : AuthenticatorDetails[] = [];
         this.allowedFactor2.forEach((authenticatorName) => {
@@ -2345,6 +2740,15 @@ export class FastifySessionServer {
         return ret;
     }
 
+    /**
+     * Updates a field in the sessiin data in the key storage record,
+     * 
+     * The `data` field is assumed to be JSON.  Just the field with the given
+     * name is updated and the rest is unchanged.
+     * @param request the Fastifdy request
+     * @param name the field within `data` to update
+     * @param value the value to set it to
+     */
     async updateSessionData(request : FastifyRequest, name : string, value : {[key:string]:any}) {
         if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
         await this.sessionManager.updateSessionData(request.sessionId, name, value);

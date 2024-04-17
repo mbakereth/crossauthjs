@@ -386,8 +386,26 @@ test('FastifyServer.api.turnOffTotp', async () => {
         csrfToken: csrfToken2,
         factor2: "none",
     } });
-    body = JSON.parse(res.body)
+    body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
+    expect(body.factor2Required).toBe(true);
+
+    // send factor 2
+    // try twice as the code may be near expiry
+    for (let tryNum=0; tryNum<2; ++tryNum) {
+        const code = gAuthenticator.generate(secrets.totpSecret??"");
+        res = await server.app.inject({ method: "POST", url: "/api/changefactor2", cookies: {CSRFTOKEN: csrfCookie2, SESSIONID: sessionCookie2}, payload: {
+            csrfToken: csrfToken2,
+            otp: code,
+        } })
+        body = JSON.parse(res.body)
+        if (body.ok == true) break;
+    }
+    expect(body.ok).toBe(true);
+
+    expect(body.factor2Required).toBeUndefined();
+
+
     const {user: changedUser} = await userStorage.getUserByUsername("mary");
     expect(changedUser.factor2).toBe("");
 });
@@ -585,7 +603,7 @@ test('FastifyServer.api.turnOffEmail', async () => {
     expect(body.ok).toBe(true);
 
     const sessionCookie = getSession(res);
-    const otp = emailTokenData.otp;
+    let otp = emailTokenData.otp;
     res = await server.app.inject({ method: "POST", url: "/api/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
         otp: otp
@@ -603,6 +621,21 @@ test('FastifyServer.api.turnOffEmail', async () => {
     } });
     body = JSON.parse(res.body)
     expect(body.ok).toBe(true);
+    expect(body.factor2Required).toBe(true);
+    otp = emailTokenData.otp;
+
+    // send factor 2
+    // try twice as the code may be near expiry
+    for (let tryNum=0; tryNum<2; ++tryNum) {
+        res = await server.app.inject({ method: "POST", url: "/api/changefactor2", cookies: {CSRFTOKEN: csrfCookie2, SESSIONID: sessionCookie2}, payload: {
+            csrfToken: csrfToken2,
+            otp: otp,
+        } })
+        body = JSON.parse(res.body)
+        if (body.ok == true) break;
+    }
+    expect(body.ok).toBe(true);
+
     const {user: changedUser} = await userStorage.getUserByUsername("mary");
     expect(changedUser.factor2).toBe("");
 });

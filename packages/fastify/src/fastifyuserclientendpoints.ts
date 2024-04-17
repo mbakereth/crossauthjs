@@ -110,7 +110,7 @@ export class FastifyUserClientEndpoints {
                     }
                     const next = request.query.next ?? encodeURIComponent(request.url);
                     let data: {
-                        urlprefix: string,
+                        urlPrefix: string,
                         next?: string,
                         user? : User,
                         skip: number,
@@ -120,7 +120,7 @@ export class FastifyUserClientEndpoints {
                         havePrevious : boolean,
                         isAdmin : boolean,
                     } = {
-                        urlprefix: this.prefix,
+                        urlPrefix: this.prefix,
                         user : request.user,
                         skip: skip,
                         take: take,
@@ -163,7 +163,7 @@ export class FastifyUserClientEndpoints {
                 }
                 const next = request.query.next ?? "/";
                 let data = {
-                    urlprefix: this.prefix,
+                    urlPrefix: this.prefix,
                     csrfToken: request.csrfToken,
                     validFlows: this.validFlows,
                     flowNames: OAuthFlows.flowNames(this.validFlows),
@@ -197,7 +197,7 @@ export class FastifyUserClientEndpoints {
                             message: "Created client",
                             client: client,
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             validFlows: this.validFlows,
                             flowNames: OAuthFlows.flowNames(this.validFlows),
                             user : request.user,
@@ -227,7 +227,7 @@ export class FastifyUserClientEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             validFlows: this.validFlows,
                             flowNames: OAuthFlows.flowNames(this.validFlows),
                             isAdmin: false,
@@ -342,7 +342,7 @@ export class FastifyUserClientEndpoints {
                     }
                 }
                 let data : {[key:string]:any} = {
-                    urlprefix: this.prefix,
+                    urlPrefix: this.prefix,
                     csrfToken: request.csrfToken,
                     validFlows: this.validFlows,
                     flowNames: OAuthFlows.flowNames(this.validFlows),
@@ -385,7 +385,7 @@ export class FastifyUserClientEndpoints {
                             message: "Updated client",
                             client: client,
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             validFlows: this.validFlows,
                             flowNames: OAuthFlows.flowNames(this.validFlows),
                             user : user,
@@ -422,7 +422,7 @@ export class FastifyUserClientEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             validFlows : this.validFlows,
                             selectedFlows : selectedFlows,
                             flowNames: OAuthFlows.flowNames(this.validFlows),
@@ -523,7 +523,7 @@ export class FastifyUserClientEndpoints {
                 }
                 const next = request.query.next ?? "/";
                 let data = {
-                    urlprefix: this.prefix,
+                    urlPrefix: this.prefix,
                     csrfToken: request.csrfToken,
                     backUrl: this.prefix + "selectclient",
                     client : client,
@@ -554,8 +554,7 @@ export class FastifyUserClientEndpoints {
                         return reply.view(this.deleteClientPage, {
                             message: "Client deleted",
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
-                            validFlows: this.validFlows,
+                            urlPrefix: this.prefix, 
                             clientId : request.params.clientId,
                             next: next,
                         });
@@ -581,7 +580,7 @@ export class FastifyUserClientEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             clientId : request.params.clientId,
                             validFlows: this.validFlows,
                             next: next,

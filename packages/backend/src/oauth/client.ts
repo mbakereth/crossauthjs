@@ -24,7 +24,7 @@ export interface OAuthClientOptions extends OAuthTokenConsumerBackendOptions {
     /**
      * Client ID for this client
      */
-    clientId : string,
+    clientId? : string,
 
     /**
      * Client secret for this client (can be undefined for no secret)

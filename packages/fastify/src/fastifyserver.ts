@@ -21,8 +21,7 @@ import {
     OAuthClientStorage,
     Authenticator,
     setParameter,
-    ParamType,
-    ApiKeyManager } from '@crossauth/backend';
+    ParamType } from '@crossauth/backend';
 import { FastifySessionServer } from './fastifysession';
 import type {
     FastifySessionServerOptions,
@@ -102,11 +101,26 @@ export interface FastifyServerOptions extends
     isAdminFn?: (user : User) => boolean;
 };
 
+/**
+ * Type for the function that is called to pass an error back to the user
+ * 
+ * The function is passed this instance, the request that generated the
+ * error, the response object for sending the respons to and the
+ * exception that was raised.
+ */
 export type FastifyErrorFn = (server: FastifyServer,
     request: FastifyRequest,
     reply: FastifyReply,
     ce: CrossauthError) => Promise<FastifyReply>;
 
+/**
+ * The function to determine if a user has admin rights can be set
+ * externally.  This is the default function if none other is set.
+ * It returns true iff the `admin` field in the passed user is set to true.
+ * 
+ * @param user the user to test
+ * @returns true or false
+ */
 function defaultIsAdminFn(user : User) : boolean {
     return user.admin == true;
 }
@@ -126,29 +140,109 @@ function defaultIsAdminFn(user : User) : boolean {
  * server is started in.  This can be overwritten by setting the `views` option.
  * 
  * Note that `views`, and the Nunjucls pages are not used by the API 
- * endpoints (those starting in /api).
+ * endpoints (those starting in /api).  These just return JSON.
  * 
- *  **Using your own Fastify app**
+ * **Component Servers**
  * 
- * If you are serving other endpoints, or you want to use something other than 
- * Nunjucks, you can create
- * and pass in your own Fastify app.
+ * This class contains a number of servers which don't all have to be
+ * created, depending on what authentication you want to support.  If
+ * instantiated, they can work together.
  * 
- * For session management, see {@link FastifySession}.
- * For API key management, see {@link ApiKeyManager}
+ * - `sessionServer`   Session cookie management server.  Uses sesion ID
+ *                     and CSRF cookies.  See {@link FastifySessionServer}.
+ * - `oAuthAuthServer` OAuth authorization server.  See 
+ *                     {@link FastifyAuthorizationServer}
+ * - `oAuthClient`     OAuth client.  See {@link FastifyOAuthClient}.
+ * - `oAUthResServer`  OAuth resource server.  See 
+ *                     {@link FastifyOAuthResourceServer}.
+ * 
+ * There is also an API key server which is not available as a variable as
+ * it has no functions other than the hook it registers.
+ * See {@link FastifyApiKeyServer}.
+ * 
+ * For a list of user-level URLs that can be enabled, and their input and output 
+ * requirements, see {@link FastifySessionServer}.  FOr a list of
+ * admin endpoints that can be enabled, see {@link FastifyAdminEndpoints}.
+ * 
+ * **Authenticators**
+ * 
+ * One and two factor authentication is supported.  Authentication is provided
+ * by classes implementing {@link Authenticator}.  They are passed as an 
+ * object to this class, keyed on the name that appears in the user record
+ * as `factor1` or `factor2`.  
+ * 
+ * For example, if you have passwords in your user database, you can use
+ * {@link LocalPasswordAuthenticator}.  If this method of authentication
+ * is called `password` in the `factor1` field of the user record,
+ * pass it in the `authenticators` parameter in the constructor with a key
+ * of `password`.
+ * 
  */
 export class FastifyServer {
-    readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
     private views : string = "views";
-    readonly sessionServer? : FastifySessionServer; 
-    readonly oAuthAuthServer? : FastifyAuthorizationServer;
-    readonly oAuthClient? : FastifyOAuthClient;
-    readonly oAuthResServer? : FastifyOAuthResourceServer;
     private static isAdminFn: (user : User) => boolean = defaultIsAdminFn;
+
+    /** The Fastify app, which was either passed in the constructor or
+     *  created if none was passed in.
+     */
+    readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
+
+    /** See class comment */
+    readonly sessionServer? : FastifySessionServer; 
+
+    /** See class comment */
+    readonly oAuthAuthServer? : FastifyAuthorizationServer;
+
+    /** See class comment */
+    readonly oAuthClient? : FastifyOAuthClient;
+
+    /** See class comment */
+    readonly oAuthResServer? : FastifyOAuthResourceServer;
+
 
     /**
      * Integrates fastify session, API key and OAuth servers
-     * @param options see {@link FastifyServerOptions}
+     * @param userStorage where to store users
+     * @param param0 object with entries as follow:
+     *     - `authenticators` pass in all supported authenticators, both for
+     *       factor 1 and factor 2, keyed on the value that appears in
+     *       the user record.  See the class documentation for more details.
+     *     - `session` if passed, instantiate the session server (see class
+     *       documentation).  The value is an object with a `keyStorage` field
+     *       which must be present and should be the {@link KeyStorage} instance
+     *       where session IDs are stored.  A field called `options` whose
+     *       value is an {@link FastifySessionServerOptions} may also be
+     *       provided.
+     *     - `apiKey` if passed, instantiate the session server (see class
+     *       documentation).  The value is an object with a `keyStorage` field
+     *       which must be present and should be the {@link KeyStorage} instance
+     *       where API keys are stored.  A field called `options` whose
+     *       value is an {@link FastifyApiKeyServerOptions} may also be
+     *       provided.
+     *     - `oAuthAuthServer` if passed, instantiate the session server (see class
+     *       documentation).  The value is an object with a `keyStorage` field
+     *       which must be present and should be the {@link KeyStorage} instance
+     *       where authorization codes are stored.  This may be the same as
+     *       the table storing session IDs or may be different.  A field
+     *       called `clientStorage` with a value of type {@link OAuthClientStorage}
+     *       must be provided and is where OAuth client details are stored.
+     *       A field called `options` whose
+     *       value is an {@link FastifyAuthorizationServerOptions} may also be
+     *       provided.
+     *     - `oAuthClient` if present, an OAuth client will be created.
+     *       There must be a field called `authServerBaseUri` and is the 
+     *       bsae URL for the authorization server.  When validating access
+     *       tokens, the `iss` claim must match this.
+     *     - `oAuthResServer` if present. an OAuth resource server will be
+     *       created.  It has one optional field: `protectedEndpoints`.  The
+     *       value is an object whose key is a URL (relative to the base
+     *       URL of the application).  The value is an object that contains
+     *       one optional parameter: `scope`, a string.  The client/user calling
+     *       the endpoint must have authorized this scope to call this endpoint,
+     *       otherwise an access denied error is returned. 
+     *     - `options` application-wide options of type
+     *       {@link FastifyServerOptions}.
+     *
      */
     constructor(userStorage: UserStorage,
         { authenticators, session, apiKey, oAuthAuthServer, oAuthClient, oAuthResServer } : {
@@ -260,6 +354,13 @@ export class FastifyServer {
         }
     }
 
+    /**
+     * This is a convenience function that just wraps
+     * {@link FastifySessionServer.validateCsrfToken}.
+     * @param request the fastify request
+     * @returns a string of the CSRF cookie value or undefined if it
+     * is not valid. 
+     */
     validateCsrfToken(request : FastifyRequest<{ Body: CsrfBodyType }>) 
     : string|undefined {
         if (!this.sessionServer) {
@@ -269,6 +370,19 @@ export class FastifyServer {
         return this.sessionServer.validateCsrfToken(request);
     }
 
+    /**
+     * Calls the passed error function passed if the CSRF
+     * token in the request is invalid.  
+     * 
+     * Use this to require a CSRF token in your endpoints.
+     * 
+     * @param request the Fastify request
+     * @param reply the Fastify reply object
+     * @param errorFn the error function to call if the CSRF token is invalid
+     * @returns if no error, returns an object with `error` set to false and
+     * `reply` set to the passed reply object.  Otherwise returns the reply
+     * from calling `errorFn`.
+     */
     async errorIfCsrfInvalid(request: FastifyRequest<{ Body: CsrfBodyType }>,
         reply: FastifyReply,
         errorFn?: FastifyErrorFn)
@@ -304,6 +418,18 @@ export class FastifyServer {
         }
     }
 
+    /**
+     * Calls the passed error function passed if the user is not logged in.
+     * 
+     * Use this to password protect endpoints. 
+     * 
+     * @param request the Fastify request
+     * @param reply the Fastify reply object
+     * @param errorFn the error function to call if the user is not logged in.
+     * @returns if no error, returns an object with `error` set to false and
+     * `reply` set to the passed reply object.  Otherwise returns the reply
+     * from calling `errorFn`.
+     */
     async errorIfNotLoggedIn(request: FastifyRequest<{ Body: CsrfBodyType }>,
         reply: FastifyReply,
         errorFn?: FastifyErrorFn) : Promise<FastifyReply|undefined> {
@@ -330,13 +456,33 @@ export class FastifyServer {
                 CrossauthLogger.logger.error(j({
                     cerr: e2,
                     hashedSessionCookie: this.sessionServer?.getHashOfSessionId(request)
-}))
+                }));
                 return reply.status(401).send(ERROR_401);                
             }
             return reply.status(401).send(ERROR_401);
         }
     }
 
+    /**
+     * Sends a reply by rendering the `errorPage` if present, or a standard
+     * error page if it isn't.
+     * 
+     * The renderer configured for the reply object is called (Nunjucks
+     * by default) with the following data parameters:
+     * - `errorCode` See {@link @crossauth/common!ErrorCode}.
+     * - `errorCodeName` the text version of `errorCode`.
+     * - `msg` the error message
+     * - `httpStatus` the HTTP status code.
+     * 
+     * @param reply the Fastify reply object
+     * @param status the HTTP status code to return
+     * @param errorPage the error page to render.
+     * @param error an error message string.  Ignored if `e` is defined.
+     * @param e optionall, an exception.  This will be logged and the message
+     *          will be sent to the error page.
+     * @returns the reply from rendering the error page.
+     * 
+     */
     static sendPageError(reply: FastifyReply,
         status: number,
         errorPage?: string,
@@ -405,6 +551,15 @@ export class FastifyServer {
         }
     }
 
+    /**
+     * Updates or sets the given field in the session `data` field.
+     * 
+     * The `data` field in the session record is assumed to be JSON
+     * 
+     * @param request the Fastify request
+     * @param name the name of the field to set
+     * @param value the value to set it to.
+     */
     async updateSessionData(request : FastifyRequest, 
         name : string, 
         value : {[key:string]:any}) {
@@ -413,6 +568,16 @@ export class FastifyServer {
         await this.sessionServer.updateSessionData(request, name, value);
     }
 
+    /**
+     * Returns the field with the given name from the `data` field in the
+     * session record.
+     * 
+     * The `data` field is assumed to be JSON
+     * 
+     * @param request the Fastify request
+     * @param name the field to return
+     * @returns the parsed value or undefined if it was not set.
+     */
     async getSessionData(request : FastifyRequest, name : string, ) 
     : Promise<{[key:string]:any}|undefined> {
         if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
@@ -420,18 +585,38 @@ export class FastifyServer {
        return  await this.sessionServer.getSessionData(request, name);
     }
 
+    /**
+     * Gets the sessin key from the request or undefined if there isn't one.
+     * @param request the Fastify request
+     * @returns the session key or undefined
+     */
     async getSessionKey(request : FastifyRequest) : Promise<Key|undefined> {
         if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
             "Cannot update session data if sessions not enabled");
        return  await this.sessionServer.getSessionKey(request);
     }
 
+    /**
+     * Returns the value odf the CSRF cookie.
+     * 
+     * Throws an exception if sessions are not enabled.
+     */
     getSessionCookieValue(request : FastifyRequest) : string|undefined {
         if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
             "Cannot update session data if sessions not enabled");
         return  this.sessionServer.getSessionCookieValue(request);
     }
 
+    /**
+     * Creates a session ID but not associated with a user in the database.
+     * 
+     * This is useful for tracking data between requests before a user
+     * has logged in
+     * @param request the Fastify request
+     * @param reply the Fastify reply
+     * @param data data to put in the sesion's `data` field.
+     * @returns the new session cookie value.
+     */
     async createAnonymousSession(request: FastifyRequest,
         reply: FastifyReply,
         data?: { [key: string]: any }) : Promise<string>  {
@@ -441,6 +626,11 @@ export class FastifyServer {
         return await this.sessionServer.createAnonymousSession(request, reply, data);
     }
 
+    /**
+     * Calls the `isAdminFn` passed during construction.
+     * @param user the user to check
+     * @returns true if the passed user is an admin, false otherwise.
+     */
     static isAdmin(user : User) { return FastifyServer.isAdminFn(user); }
 
     /**

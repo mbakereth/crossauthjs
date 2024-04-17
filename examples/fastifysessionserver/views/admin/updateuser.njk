@@ -37,15 +37,22 @@
                         <td><label for="user_phone">Phone (prefix with <tt>+</tt>)</label></td>
                         <td><input type="text" name="user_phone" value="{{ user_phone or user.phone }}"></td>
                     </tr>
-                    {% if allowedFactor2 and allowedFactor2|length > 0 %}
-                        <tr>
-                            <td>Two-factor authentication</td>
-                            <td>
-                                {{ user.factor2 or "none" }}
-                                &nbsp;<a href="changefactor2?next=updateuser">Change...</a>
-                            </td>
-                        </tr>
-                    {% endif %}
+                <p>
+                    <label for="state">Status</label><br>
+                    <input type="radio" id="state_active", name="state" value="active" checked> <label for="state_active">Active</label>
+                    <input type="radio" id="state_factor2ResetNeeded", name="state" value="factor2ResetNeeded"> <label for="state_factor2ResetNeeded">Factor 2 Reset Needed</label>
+                    <input type="radio" id="state_passwordResetNeeded", name="state" value="passwordResetNeeded"> <label for="state_passwordResetNeeded">Password Reset Needed</label>
+                    <input type="radio" id="state_passwordChangeNeeded", name="state" value="passwordChangeNeeded"> <label for="state_passwordChangeNeeded">Password Change Needed</label>
+                    <input type="radio" id="state_inactive", name="state" value="inactive"> <label for="state_state_inactive">Inactive</label>
+                </p>
+                {% if allowedFactor2|length > 1 %}
+                <p>
+                    <label for="factor2">Two Factor Authentication</label><br>
+                    {% for item in allowedFactor2 %}
+                            <input type="radio" id="factor2_{{item.name}}", name="factor2" value="{{ item.name }}" {% if (item.name == user.factor2 or (item.name == "none" and user.factor2 == "")) %}checked{% endif %}> <label for="factor2_{{item.name}}">{{ item.friendlyName }}</label>
+                    {% endfor %}
+                </p>
+                {% endif %}
                 </table>
                 <button type="submit">Update</button>
             </form>

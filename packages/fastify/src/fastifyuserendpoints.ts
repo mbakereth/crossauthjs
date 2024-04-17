@@ -59,7 +59,6 @@ interface ConfigureFactor2QueryType {
 
 interface ConfigureFactor2BodyType extends CsrfBodyType {
     next? : string,
-    persist? : boolean,
     otp? : string,
     token? : string,
     [key:string] : any,
@@ -148,8 +147,8 @@ export class FastifyUserEndpoints {
                     this.sessionServer.errorPage);
             }
             if (this.updateUserPage)  { // if is redundant but VC Code complains without it
-                let data : {urlprefix: string, csrfToken: string|undefined, user: User, allowedFactor2: {[key:string]: any}} = {
-                    urlprefix: this.prefix, 
+                let data : {urlPrefix: string, csrfToken: string|undefined, user: User, allowedFactor2: {[key:string]: any}} = {
+                    urlPrefix: this.prefix, 
                     csrfToken: request.csrfToken, 
                     user: request.user,
                     allowedFactor2: this.sessionServer.allowedFactor2Details(),
@@ -185,7 +184,7 @@ export class FastifyUserEndpoints {
                         return reply.view(this.updateUserPage, {
                             csrfToken: request.csrfToken,
                             message: message,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             allowedFactor2: this.sessionServer.allowedFactor2Details(),
                         });
                     });
@@ -206,7 +205,7 @@ export class FastifyUserEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             allowedFactor2: this.sessionServer.allowedFactor2Details(),
                             ...extraFields,
                         });
@@ -285,11 +284,12 @@ export class FastifyUserEndpoints {
                     }
                 }
                 let data = {
-                    urlprefix: this.prefix, 
+                    urlPrefix: this.prefix, 
                     csrfToken: request.csrfToken,
                     next: request.query.next??this.sessionServer.loginRedirect,
                     allowedFactor2: this.sessionServer.allowedFactor2Details(),
                     factor2 : request.user?.factor2??"none",
+                    required: request.query.required ?? false,
                 };
                 return reply.view(this.changeFactor2Page, data);
         });
@@ -350,7 +350,7 @@ export class FastifyUserEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             allowedFactor2: this.sessionServer.allowedFactor2Details(),
                             factor2: request.user?.factor2??"none",
                             next: request.body.next??this.sessionServer.loginRedirect,
@@ -430,12 +430,12 @@ export class FastifyUserEndpoints {
                 }
             
                 let data: {
-                    urlprefix: string,
+                    urlPrefix: string,
                     csrfToken: string | undefined
                     next: string | undefined,
                     required? : boolean | undefined,
                 } = {
-                    urlprefix: this.prefix,
+                    urlPrefix: this.prefix,
                     csrfToken: request.csrfToken,
                     next : request.query.next,
                     required : request.query.required
@@ -462,7 +462,7 @@ export class FastifyUserEndpoints {
                     return reply.view(this.changePasswordPage, {
                         csrfToken: request.csrfToken,
                         message: "Your password has been changed.",
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
                         next: request.body.next,
                         required: request.body.required,
                     });
@@ -483,7 +483,9 @@ export class FastifyUserEndpoints {
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
+                        next : request.body.next,
+                        required: request.body.required,
                     });
                 });
             }
@@ -564,7 +566,7 @@ export class FastifyUserEndpoints {
                         errorCodeName: ErrorCode[error.code], 
                         next: request.query.next??this.sessionServer.loginRedirect, 
                         csrfToken: request.csrfToken,
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
                     });
                     
                 });
@@ -601,7 +603,7 @@ export class FastifyUserEndpoints {
                         return reply.view(this.signupPage, {
                             next: next, 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             message: "Please check your email to finish signing up."
                         });
                     } else {
@@ -612,7 +614,7 @@ export class FastifyUserEndpoints {
                             // we came here because the user asked to change 2FA - tell them it was successful
                             return reply.view(this.configureFactor2Page, {
                                 message: "Two-factor authentication updated",
-                                urlprefix: this.prefix, 
+                                urlPrefix: this.prefix, 
                                 next: next, 
                                 required: request.body.required,
                                 csrfToken: request.csrfToken,
@@ -646,7 +648,7 @@ export class FastifyUserEndpoints {
                             errorMessages: error.messages, 
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             next: next, 
                             ...userData,
                             csrfToken: this.sessionServer.csrfToken(request, reply),
@@ -789,7 +791,7 @@ export class FastifyUserEndpoints {
                         return reply.view(this.requestPasswordResetPage, {
                             csrfToken: request.csrfToken,
                             message: message,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                         });
                     });
             } catch (e) {
@@ -803,7 +805,7 @@ export class FastifyUserEndpoints {
                         return reply.view(this.requestPasswordResetPage, {
                             csrfToken: request.csrfToken,                                
                             message: message,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             required: request.body.required,
                             next: request.body.next,
                         });
@@ -818,7 +820,7 @@ export class FastifyUserEndpoints {
                         errorCodeName: ErrorCode[error.code], 
                         email: request.body.email,
                         csrfToken: request.csrfToken,
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
                     });
                 });
             }
@@ -870,7 +872,7 @@ export class FastifyUserEndpoints {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
-                    url: this.prefix + 'logresetpasswordin',
+                    url: this.prefix + 'resetpassword',
                     ip: request.ip
                 }));
             try {
@@ -904,7 +906,7 @@ export class FastifyUserEndpoints {
                     return reply.view(this.resetPasswordPage, {
                         csrfToken: request.csrfToken,
                         message: "Your password has been changed.",
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
                     });
                 });
             } catch (e) {
@@ -923,7 +925,8 @@ export class FastifyUserEndpoints {
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
+                        token: request.body.token,
                     });
                 });
             }
@@ -982,7 +985,7 @@ export class FastifyUserEndpoints {
                 return await this.verifyEmail(request, reply, 
                 (reply, user) => {
                     return reply.view(this.emailVerifiedPage, {
-                        urlprefix: this.prefix,
+                        urlPrefix: this.prefix,
                         user: user
                     });
                 });
@@ -1001,7 +1004,7 @@ export class FastifyUserEndpoints {
                         errorCodeName: ErrorCode[error.code], 
                         errorMessage: error.message,
                         errorMessages: error.messages,
-                        urlprefix: this.prefix, 
+                        urlPrefix: this.prefix, 
                     });
                 });
             }
@@ -1078,7 +1081,7 @@ export class FastifyUserEndpoints {
                 }
                 const next = request.query.next ?? this.prefix;
                 let data = {
-                    urlprefix: this.prefix,
+                    urlPrefix: this.prefix,
                     csrfToken: request.csrfToken,
                     next: next,
                     isAdmin: false,
@@ -1110,7 +1113,7 @@ export class FastifyUserEndpoints {
                         return reply.view(this.deleteUserPage, {
                             message: "User deleted",
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             userId : request.user?.id,
                             isAdmin: false,
                             next: next,
@@ -1137,7 +1140,7 @@ export class FastifyUserEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.prefix, 
+                            urlPrefix: this.prefix, 
                             userId : request.user?.id,
                             isAdmin: false,
                             next: next,

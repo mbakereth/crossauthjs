@@ -145,6 +145,7 @@ export interface UserSecretsInputFields {
     totpSecret? : string,
     otp?: string,
     expiry?: number,
+    [key:string] : any,
 }
 
 /**

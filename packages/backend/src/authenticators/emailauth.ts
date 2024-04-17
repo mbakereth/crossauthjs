@@ -132,6 +132,7 @@ export class EmailAuthenticator extends Authenticator {
         let auth : {user? : string, pass? : string}= {};
         if (this.smtpUsername) auth.user = this.smtpUsername;
         if (this.smtpPassword) auth.pass = this.smtpPassword;
+        console.log("Email from", this.emailFrom)
         let mail: {
             from: string,
             to: string,

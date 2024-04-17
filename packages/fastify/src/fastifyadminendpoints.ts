@@ -103,6 +103,43 @@ const JSONHDR : [string,string] =
 ///////////////////////////////////////////////////////////////////////
 // Class
 
+/**
+ * This class adds admin endpoints to the Fastidfy session server
+ * 
+ * **Endpoints that can be activated**
+ * 
+ * All page POST methods are passed user, csrfToken, errorCode, errorCodeName, errorMessage, errorMessages, urlPrefix,
+ * errorMessages is an array, errorMessage is a single value or concatenation of errorMessages.
+ * 
+ * All JSON responses have ok, errorMessage, errorMEssages, errorCode, errorCodeName, other than OAuth endpoints.
+ * 
+ * | METHOD | ENDPOINT                   | PATH PARAMS | GET/BODY PARAMS                                                      | VARIABLES PASSED/RESPONSE JSON                                                                         | FILE                     |
+ * | ------ | -------------------------- | ----------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ |
+ * | GET    | /admin/createuser          |             | next                                                                 | next, allowedFactor2                                                                                   | adminCreateUserPage      |
+ * | POST   | /admin/createuser          |             | next, persist, username, password, repeat_password, factor2, user_*  | message, next, username, factor2, allowedFactor2                                                       | adminCreateUserPage      | 
+ * | POST   | /admin/api/createuser      |             | next, persist, username, password, repeat_password, factor2, user_*  | message, next, username, factor2, allowedFactor2                                                       | adminCreateUserPage      | 
+ * | GET    | /admin/selectuser          |             | next, search, skip, take, haveNext, havePrevious                     | next, search, skip, take, haveNext, havePrevious                                                       | adminSelectUserPage      |
+ * | GET    | /admin/changepassword      | id          | next, required                                                       | next, required, user                                                                                   | adminChangePasswordPage  | 
+ * | POST   | /admin//changepassword     | id          | next, required, old_password, new_password, repeat_password          | next, required, user, message                                                                          | adminChangePasswordPage  | 
+ * | POST   | /admin//api/changepassword | id          | old_password, new_password, repeat_password                          |                                                                                                        |                          | 
+ * | GET    | /admin/updateuser          | id          |                                                                      | user, allowedFactor2, enableOAuthClientManagement                                                      | updatePasswordPage       | 
+ * | POST   | /admin/updateuser          | id          | user_*, factor2, status                                              | message, user_*, allowedFactor2, enableOAuthClientManagement                                           | updatePasswordPage       | 
+ * | POST   | /admin/api/updateuser      |             | user_*                                                               | emailVerificationRequired                                                                              |                          | 
+ * | GET    | /admin/deleteuser          | id          | next                                                                 | next, isAdmin, user                                                                                    | deleteUserPAge           | 
+ * | POST   | /admin/deleteuser          | id          | next                                                                 | message, next isAdmin, userId                                                                          | deleteUserPAge           | 
+ * | POST   | /admin/api/deleteuser      | id          |                                                                      |                                                                                                        |                          | 
+ * | GET    | /selectclient              |             | next, search, skip, take, haveNext, havePrevious, userId             | next, search, skip, take, haveNext, havePrevious, user, clients, isAdmin                               | selectClient             |
+ * | GET    | /createclient              |             | next, userId                                                         | next, validFLows, flowNames, user, isAdmin                                                             | createClientPage         |
+ * | POST   | /createclient              |             | next, clientName, confidential, redirectUris, (flows), userId        | message, client, next, validFLows, flowNames, user, isAdmin                                            | createClientPage         |
+ * | POST   | /api/createclient          |             | clientName, confidential, redirectUris, (flows), userId              | client                                                                                                 |                          |
+ * | GET    | /updateclient              | clientId    | next                                                                 | next, validFLows, flowNames, selectedFlows, redirectUris, clientId, clientName, user, isAdmin          | updateClientPage         |
+ * | POST   | /updateclient              | clientId    | next, clientName, confidential, redirectUris, (flows), resetSecret   | message, next, validFLows, flowNames, selectedFlows, redirectUris, clientId, clientName, user, isAdmin | updateClientPage         |
+ * | POST   | /api/updateclient          | clientId    | clientName, confidential, redirectUris, (flows), resetSecret         | client, newSecret                                                                                      |                          |
+ * | GET    | /deleteclient              | clientId    | next, backUrl                                                        | next, backUrl, client                                                                                  | deleteClientPage         | 
+ * | POST   | /deleteclient              | clientId    | next                                                                 | message, next, clientId                                                                                | deleteClientPage         | 
+ * | POST   | /api/deleteclient          | clientId    |                                                                      |                                                                                                        |                          | 
+ *  
+*/
 export class FastifyAdminEndpoints {
     private sessionServer : FastifySessionServer;
     private adminPrefix = "/admin/";
@@ -152,12 +189,12 @@ export class FastifyAdminEndpoints {
                     return this.accessDeniedPage(request, reply);                    
                 }
                 let data: {
-                    urlprefix: string,
+                    urlPrefix: string,
                     next?: any,
                     csrfToken: string | undefined,
                     allowedFactor2: AuthenticatorDetails[]
                 } = {
-                    urlprefix: this.adminPrefix,
+                    urlPrefix: this.adminPrefix,
                     csrfToken: request.csrfToken,
                     allowedFactor2: this.sessionServer.allowedFactor2Details()
                 };
@@ -212,7 +249,7 @@ export class FastifyAdminEndpoints {
                         csrfToken: request.csrfToken,
                         factor2: request.body.factor2,
                         allowedFactor2: this.sessionServer.allowedFactor2Details(),
-                        urlprefix: this.adminPrefix, 
+                        urlPrefix: this.adminPrefix, 
                         ...request.body,
                         });
                     
@@ -290,7 +327,7 @@ export class FastifyAdminEndpoints {
                                 take);
                     }
                     let data: {
-                        urlprefix: string,
+                        urlPrefix: string,
                         next?: any,
                         skip: number,
                         take: number,
@@ -298,7 +335,7 @@ export class FastifyAdminEndpoints {
                         haveNext : boolean,
                         havePrevious : boolean,
                     } = {
-                        urlprefix: this.adminPrefix,
+                        urlPrefix: this.adminPrefix,
                         skip: skip,
                         take: take,
                         users: users,
@@ -337,15 +374,11 @@ export class FastifyAdminEndpoints {
                 try {
                     const {user} = 
                         await this.sessionServer.userStorage.getUserById(request.params.id)
-                    let data: {
-                        urlprefix: string,
-                        csrfToken?: string,
-                        user : User,
-                        enableOAuthClientManagement : boolean,
-                    } = {
-                        urlprefix: this.adminPrefix,
+                    let data = {
+                        urlPrefix: this.adminPrefix,
                         csrfToken: request.csrfToken,
                         user: user,
+                        allowedFactor2: this.sessionServer.allowedFactor2Details(),
                         enableOAuthClientManagement: this.enableOAuthClientManagement,
                     };
                 return reply.view(this.adminUpdateUserPage, data);
@@ -386,7 +419,7 @@ export class FastifyAdminEndpoints {
                     return reply.view(this.adminUpdateUserPage, {
                         csrfToken: request.csrfToken,
                         message: message,
-                        urlprefix: this.adminPrefix, 
+                        urlPrefix: this.adminPrefix, 
                         allowedFactor2: this.sessionServer.allowedFactor2Details(),
                     });
                 });
@@ -409,7 +442,7 @@ export class FastifyAdminEndpoints {
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
-                        urlprefix: this.adminPrefix, 
+                        urlPrefix: this.adminPrefix, 
                         allowedFactor2: this.sessionServer.allowedFactor2Details(),
                         ...request.body,
                     });
@@ -448,7 +481,7 @@ export class FastifyAdminEndpoints {
                 }
                 const next = request.query.next ?? this.adminPrefix + "selectuser";
                 let data = {
-                    urlprefix: this.adminPrefix,
+                    urlPrefix: this.adminPrefix,
                     csrfToken: request.csrfToken,
                     next: next,
                     isAdmin: true,
@@ -475,7 +508,7 @@ export class FastifyAdminEndpoints {
                         return reply.view(this.deleteUserPage, {
                             message: "User deleted",
                             csrfToken: request.csrfToken,
-                            urlprefix: this.adminPrefix, 
+                            urlPrefix: this.adminPrefix, 
                             userId : request.params.id,
                             isAdmin: true,
                             next: next,
@@ -502,7 +535,7 @@ export class FastifyAdminEndpoints {
                             errorCode: error.code, 
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
-                            urlprefix: this.adminPrefix, 
+                            urlPrefix: this.adminPrefix, 
                             userId : request.params.id,
                             isAdmin: true,
                             next: next,
@@ -582,11 +615,11 @@ export class FastifyAdminEndpoints {
                     const {user} = 
                         await this.sessionServer.userStorage.getUserById(request.params.id)
                     let data: {
-                        urlprefix: string,
+                        urlPrefix: string,
                         csrfToken?: string,
                         user : User,
                     } = {
-                        urlprefix: this.adminPrefix,
+                        urlPrefix: this.adminPrefix,
                         csrfToken: request.csrfToken,
                         user: user,
                     };
@@ -626,7 +659,7 @@ export class FastifyAdminEndpoints {
                     return reply.view(this.adminChangePasswordPage, {
                         csrfToken: request.csrfToken,
                         message: "User's password has been changed.",
-                        urlprefix: this.adminPrefix, 
+                        urlPrefix: this.adminPrefix, 
                         next: request.body.next,
                         required: request.body.required,
                         user: user,
@@ -648,7 +681,7 @@ export class FastifyAdminEndpoints {
                         errorCode: error.code, 
                         errorCodeName: ErrorCode[error.code], 
                         csrfToken: request.csrfToken,
-                        urlprefix: this.adminPrefix, 
+                        urlPrefix: this.adminPrefix, 
                     });
                 });
             }
@@ -842,10 +875,17 @@ export class FastifyAdminEndpoints {
         //await this.validateCsrfToken(request);
         if (this.sessionServer.isSessionUser(request) && !request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
+        const oldFactor2 = user.factor2;
+        const oldState = user.state;
+        user.state = request.body.state;
         user = this.sessionServer.updateUserFn(user,
             request,
             this.sessionServer.userStorage.userEditableFields);
-        if (user.factor2 && user.factor2 != "none") {
+        const factor2ResetNeeded = user.factor2 && user.factor2 != "none" && user.factor2 != oldFactor2;
+        if (factor2ResetNeeded && !(user.state == oldState || user.state == "factor2ResetNeeded")) {
+            throw new CrossauthError(ErrorCode.BadRequest, "Cannot change both factor2 and state at the same time");
+        }
+        if (factor2ResetNeeded) {
             user.state = UserState.factor2ResetNeeded;
             CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.factor2ResetNeeded}`, 
             username: user.username}));
