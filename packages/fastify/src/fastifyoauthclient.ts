@@ -11,7 +11,7 @@ import {
 import {
     setParameter,
     ParamType,
-    Hasher,
+    Crypto,
     OAuthClientBackend } from '@crossauth/backend';
 import type { OAuthClientOptions } from '@crossauth/backend';
 import { FastifyServer, type FastifyErrorFn } from './fastifyserver';
@@ -154,7 +154,7 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
     let payload : {[key:string]: any}|undefined = undefined;
     if (token) {
         try {
-            payload = JSON.parse(Hasher.base64Decode(token.split(".")[1]))
+            payload = JSON.parse(Crypto.base64Decode(token.split(".")[1]))
         } catch (e) {
             CrossauthLogger.logger.error(j({msg: "Couldn't decode id token"}));
         }
@@ -178,7 +178,7 @@ function logTokens(oauthResponse: OAuthTokenResponse) {
         try {
             if (oauthResponse.access_token) {
                 const jti = jwtDecode(oauthResponse.access_token)?.jti;
-                const hash = jti ? Hasher.hash(jti) : undefined;
+                const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got access token", 
                     accessTokenHash: hash}));
             }
@@ -190,7 +190,7 @@ function logTokens(oauthResponse: OAuthTokenResponse) {
         try {
             if (oauthResponse.id_token) {
                 const jti = jwtDecode(oauthResponse.id_token)?.jti;
-                const hash = jti ? Hasher.hash(jti) : undefined;
+                const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got id token", 
                     idTokenHash: hash}));
             }
@@ -202,7 +202,7 @@ function logTokens(oauthResponse: OAuthTokenResponse) {
         try {
             if (oauthResponse.refresh_token) {
                 const jti = jwtDecode(oauthResponse.refresh_token)?.jti;
-                const hash = jti ? Hasher.hash(jti) : undefined;
+                const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got refresh token", 
                     refreshTokenHash: hash}));
             }
@@ -1225,7 +1225,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 msg: "Error completing MFA",
                 cerr: ce,
                 user: request.user?.user,
-                hashedMfaToken: Hasher.hash(request.body.mfa_token),
+                hashedMfaToken: Crypto.hash(request.body.mfa_token),
             }));
             CrossauthLogger.logger.debug(j({err: ce}));
             if (isApi) return await this.errorFn(this.server,
@@ -1261,7 +1261,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 msg: "Error completing MFA",
                 cerr: ce,
                 user: request.user?.user,
-                hashedMfaToken: Hasher.hash(request.body.mfa_token),
+                hashedMfaToken: Crypto.hash(request.body.mfa_token),
             }));
             CrossauthLogger.logger.debug(j({err: ce}));
             if (isApi) return await this.errorFn(this.server,

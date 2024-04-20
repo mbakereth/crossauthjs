@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import nunjucks from "nunjucks";
 import { UserStorage, KeyStorage } from './storage';
-import { Hasher } from './hasher';
+import { Crypto } from './crypto';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from './utils';
@@ -149,7 +149,7 @@ export class TokenEmailer {
      * correct prefix for inserting into storage.
      */
     static hashEmailVerificationToken(token : string) : string {
-        return KeyPrefix.emailVerificationToken + Hasher.hash(token);
+        return KeyPrefix.emailVerificationToken + Crypto.hash(token);
     }
 
     /**
@@ -157,7 +157,7 @@ export class TokenEmailer {
      * correct prefix for inserting into storage.
      */
     static hashPasswordResetToken(token : string) : string {
-        return KeyPrefix.passwordResetToken + Hasher.hash(token);
+        return KeyPrefix.passwordResetToken + Crypto.hash(token);
     }
 
     private async createAndSaveEmailVerificationToken(userId : string | number, 
@@ -167,13 +167,13 @@ export class TokenEmailer {
         const now = new Date();
         const expiry = new Date(now.getTime() + 1000*this.verifyEmailExpires);
         while (tryNum < maxTries) {
-            let token = Hasher.randomValue(TOKEN_LENGTH);
+            let token = Crypto.randomValue(TOKEN_LENGTH);
             let hash = TokenEmailer.hashEmailVerificationToken(token);
             try {
                 await this.keyStorage.saveKey(userId, hash, now, expiry, newEmail);
                 return token;
             } catch (e) {
-                token = Hasher.randomValue(TOKEN_LENGTH);
+                token = Crypto.randomValue(TOKEN_LENGTH);
                 hash = TokenEmailer.hashEmailVerificationToken(token);
                 tryNum++;
             }
@@ -297,7 +297,7 @@ export class TokenEmailer {
             try {
                 await this.keyStorage.deleteKey(hash);
             } catch {
-                CrossauthLogger.logger.error("Couldn't delete email verification hash " + Hasher.hash(hash));
+                CrossauthLogger.logger.error("Couldn't delete email verification hash " + Crypto.hash(hash));
             }
 
         }
@@ -309,13 +309,13 @@ export class TokenEmailer {
         const now = new Date();
         const expiry = new Date(now.getTime() + 1000*this.passwordResetExpires);
         while (tryNum < maxTries) {
-            let token = Hasher.randomValue(TOKEN_LENGTH);
+            let token = Crypto.randomValue(TOKEN_LENGTH);
             let hash = TokenEmailer.hashPasswordResetToken(token);
             try {
                 await this.keyStorage.saveKey(userId, hash, now, expiry);
                 return token;
             } catch {
-                token = Hasher.randomValue(TOKEN_LENGTH);
+                token = Crypto.randomValue(TOKEN_LENGTH);
                 hash = TokenEmailer.hashPasswordResetToken(token);
                 tryNum++;
             }

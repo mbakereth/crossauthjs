@@ -2,7 +2,7 @@ import {
     OAuthClientStorage
 } from '../storage';
 import { setParameter, ParamType } from '../utils';
-import { Hasher } from '../hasher';
+import { Crypto } from '../crypto';
 import { OAuthFlows } from '@crossauth/common';
 import type {
     OAuthClient,
@@ -77,7 +77,7 @@ export class OAuthClientManager {
         let clientSecret : string|undefined = undefined;
         if (confidential) {
             const plaintext = OAuthClientManager.randomClientSecret();
-            clientSecret = await Hasher.passwordHash(plaintext, {
+            clientSecret = await Crypto.passwordHash(plaintext, {
                 encode: true,
                 iterations: this.oauthPbkdf2Iterations,
                 keyLen: this.oauthPbkdf2KeyLength,
@@ -120,7 +120,7 @@ export class OAuthClientManager {
         if ((client.confidential === true && !oldClient.confidential) ||
             (client.confidential === true && resetSecret)) {
             plaintext = OAuthClientManager.randomClientSecret();
-            client.clientSecret = await Hasher.passwordHash(plaintext, {
+            client.clientSecret = await Crypto.passwordHash(plaintext, {
                 encode: true,
                 iterations: this.oauthPbkdf2Iterations,
                 keyLen: this.oauthPbkdf2KeyLength,
@@ -147,14 +147,14 @@ export class OAuthClientManager {
      * Create a random OAuth client id
      */
     static randomClientId() : string {
-        return Hasher.randomValue(CLIENT_ID_LENGTH)
+        return Crypto.randomValue(CLIENT_ID_LENGTH)
     }
 
      /**
      * Create a random OAuth client secret
      */
     static randomClientSecret() : string {
-        return Hasher.randomValue(CLIENT_SECRET_LENGTH)
+        return Crypto.randomValue(CLIENT_SECRET_LENGTH)
     }
 
     /** If the passed redirect URI is not in the set of valid ones,

@@ -1,4 +1,4 @@
-import { KeyStorage, UserStorage, SessionManager, Authenticator, Hasher, DoubleSubmitCsrfToken, setParameter, ParamType } from '@crossauth/backend';
+import { KeyStorage, UserStorage, SessionManager, Authenticator, Crypto, DoubleSubmitCsrfToken, setParameter, ParamType } from '@crossauth/backend';
 import type { Cookie, SessionManagerOptions } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus } from '@crossauth/common';
 import type { Key, User } from '@crossauth/common';
@@ -126,7 +126,8 @@ export class SvelteKitSessionServer {
             CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
             if (sessionCookieValue) {
                 try {
-                    let {key, user} = await this.sessionManager.userForSessionCookieValue(sessionCookieValue)
+                    const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
+                    let {key, user} = await this.sessionManager.userForSessionId(sessionId)
                     if (this.validateSession) this.validateSession(key, user, event);
     
                     event.locals.user = user;
@@ -145,7 +146,8 @@ export class SvelteKitSessionServer {
             const sessionCookieValue = this.getSessionCookieValue(event);
             if (sessionCookieValue && event.locals.user?.factor2 && (this.factor2ProtectedEndpoints.includes(event.request.url))) {
                 if (!(["GET", "OPTIONS", "HEAD"].includes(event.request.method))) {
-                    const sessionData = await this.sessionManager.dataForSessionKey(sessionCookieValue);
+                    const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
+                    const sessionData = await this.sessionManager.dataForSessionId(sessionId);
                     if (("pre2fa") in sessionData) {
                         // 2FA has started - validate it
                         CrossauthLogger.logger.debug("Completing 2FA");
@@ -240,7 +242,8 @@ export class SvelteKitSessionServer {
                     // if we have a get request to one of the protected urls, cancel any pending 2FA
                     const sessionCookieValue = this.getSessionCookieValue(event);
                     if (sessionCookieValue) {
-                        const sessionData = await this.sessionManager.dataForSessionKey(sessionCookieValue);
+                        const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
+                        const sessionData = await this.sessionManager.dataForSessionId(sessionId);
                         if (("pre2fa") in sessionData) {
                             CrossauthLogger.logger.debug("Cancelling 2FA");
                             try {
@@ -297,7 +300,7 @@ export class SvelteKitSessionServer {
         const cookieValue = this.getSessionCookieValue(event);
         if (!cookieValue) return "";
         try {
-            return Hasher.hash(cookieValue);
+            return Crypto.hash(cookieValue);
         } catch (e) {}
         return "";
     }
@@ -306,7 +309,7 @@ export class SvelteKitSessionServer {
         const cookieValue = this.getCsrfCookieValue(event);
         if (!cookieValue) return "";
         try {
-            return Hasher.hash(cookieValue);
+            return Crypto.hash(cookieValue);
         } catch (e) {}
         return "";
     }

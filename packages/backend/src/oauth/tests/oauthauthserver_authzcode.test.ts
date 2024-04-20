@@ -3,7 +3,7 @@ import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '
 import fs from 'node:fs';
 import { createClient, getAuthorizationCode } from './common';
 import { InMemoryKeyStorage, InMemoryOAuthAuthorizationStorage } from '../../storage/inmemorystorage';
-import { Hasher } from '../../hasher';
+import { Crypto } from '../../crypto';
 import { KeyStorage } from '../../storage';
 import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
 import { LocalPasswordAuthenticator } from '../..';
@@ -41,7 +41,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code??""));
+    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -83,7 +83,7 @@ test('AuthorizationServer.AuthzCodeFlow.scopePersistence', async () => {
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code??""));
+    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -194,7 +194,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code??""));
+    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -232,7 +232,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyPr
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code??""));
+    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -270,7 +270,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKeyFi
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code??""));
+    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);
@@ -307,7 +307,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKey',
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
     expect(state).toBe(inputState);
-    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code??""));
+    const key = await keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code??""));
     const data = KeyStorage.decodeData(key.data);
     expect(data.scope.length).toBe(2);
     expect(["read", "write"]).toContain(data.scope[0]);

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { LocalPasswordAuthenticator } from '@crossauth/backend';
-import { PrismaUserStorage, PrismaOAuthClientStorage, Hasher } from '@crossauth/backend';
+import { PrismaUserStorage, PrismaOAuthClientStorage, Crypto } from '@crossauth/backend';
 import { CrossauthLogger } from '@crossauth/common';
 
 const prisma = new PrismaClient();

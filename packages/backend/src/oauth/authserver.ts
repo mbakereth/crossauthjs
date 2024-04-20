@@ -10,7 +10,7 @@ import {
     OAuthAuthorizationStorage} from '../storage';
 import { Authenticator } from '../auth';
 import { setParameter, ParamType } from '../utils';
-import { Hasher } from '../hasher';
+import { Crypto } from '../crypto';
 import type {
     OpenIdConfiguration,
     GrantType,
@@ -592,7 +592,7 @@ export class OAuthAuthorizationServer {
         }
         if (authenticateClient) {
             const passwordCorrect = 
-                await Hasher.passwordsEqual(clientSecret??"", 
+                await Crypto.passwordsEqual(clientSecret??"", 
                     client.clientSecret??"");
             if (!passwordCorrect) {
                 return {
@@ -1072,8 +1072,8 @@ export class OAuthAuthorizationServer {
         error: string,
         error_description: string
     }> {
-        const mfaToken = Hasher.randomValue(this.codeLength);
-        const mfaKey = KeyPrefix.mfaToken + Hasher.hash(mfaToken);
+        const mfaToken = Crypto.randomValue(this.codeLength);
+        const mfaKey = KeyPrefix.mfaToken + Crypto.hash(mfaToken);
         const now = new Date();
         try {
             await this.keyStorage.saveKey(
@@ -1111,7 +1111,7 @@ export class OAuthAuthorizationServer {
             let user : User|undefined;
             let key : Key|undefined;
             try {
-                const mfaKey = KeyPrefix.mfaToken + Hasher.hash(mfaToken);
+                const mfaKey = KeyPrefix.mfaToken + Crypto.hash(mfaToken);
                 key = await this.keyStorage.getKey(mfaKey);
                 if (!key.userId) {
                     return {
@@ -1264,7 +1264,7 @@ export class OAuthAuthorizationServer {
         let omfaFields : {[key:string]:any} = {};
         if (challengeType == "oob") {
             omfaFields = {
-                oobCode : Hasher.randomValue(this.codeLength),
+                oobCode : Crypto.randomValue(this.codeLength),
             }
         }
         try {
@@ -1431,7 +1431,7 @@ export class OAuthAuthorizationServer {
             authzData.challengeMethod = codeChallengeMethod;
             // we store this as a hash for security.  If S256 is used, 
             // that will be a second hash
-            authzData.challenge = Hasher.hash(codeChallenge);
+            authzData.challenge = Crypto.hash(codeChallenge);
         }
         if (user) {
             authzData.username = user.username;
@@ -1444,9 +1444,9 @@ export class OAuthAuthorizationServer {
         let authzCode = "";
         for (let i=0; i<10 && !success; ++i) {
             try {
-                authzCode = Hasher.randomValue(this.codeLength);
+                authzCode = Crypto.randomValue(this.codeLength);
                 this.keyStorage.saveKey(undefined,
-                    KeyPrefix.authorizationCode + Hasher.hash(authzCode),
+                    KeyPrefix.authorizationCode + Crypto.hash(authzCode),
                     created,
                     expires,
                     authzDataString);
@@ -1487,7 +1487,7 @@ export class OAuthAuthorizationServer {
             // it will not be undefined
             if (client.clientSecret!=undefined) { 
                 passwordCorrect = 
-                    await Hasher.passwordsEqual(clientSecret??"", 
+                    await Crypto.passwordsEqual(clientSecret??"", 
                         client.clientSecret??"");
             }
         } catch (e) {
@@ -1516,7 +1516,7 @@ export class OAuthAuthorizationServer {
             // authorization code
             let key : Key|undefined;
             try {
-                key = await this.keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code));
+                key = await this.keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code));
                 authzData = KeyStorage.decodeData(key.data);
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -1553,10 +1553,10 @@ export class OAuthAuthorizationServer {
         if (authzData.challenge) {
             const hashedVerifier = 
                 authzData.challengeMethod == "plain" ? 
-                    codeVerifier??"" : Hasher.sha256(codeVerifier??"");
+                    codeVerifier??"" : Crypto.sha256(codeVerifier??"");
             // we store the challenge in hashed form for security, 
             // so if S256 is used this will be a second hash
-            if (Hasher.hash(hashedVerifier) != authzData.challenge) {
+            if (Crypto.hash(hashedVerifier) != authzData.challenge) {
                 return {
                     error: "access_denied",
                     error_description: "Code verifier is incorrect"
@@ -1569,7 +1569,7 @@ export class OAuthAuthorizationServer {
         let dateAccessTokenExpires : Date|undefined;
 
         // create access token payload
-        const accessTokenJti = Hasher.uuid();
+        const accessTokenJti = Crypto.uuid();
         const accessTokenPayload : {[key:string]: any} = {
             jti: accessTokenJti,
             iat: timeCreated,
@@ -1608,7 +1608,7 @@ export class OAuthAuthorizationServer {
         if (this.persistAccessToken && this.keyStorage) {
             await this.keyStorage?.saveKey(
                 undefined, // to avoid user storage dependency, we don't set this
-                KeyPrefix.accessToken+Hasher.hash(accessTokenJti),
+                KeyPrefix.accessToken+Crypto.hash(accessTokenJti),
                 now,
                 dateAccessTokenExpires
             );
@@ -1632,7 +1632,7 @@ export class OAuthAuthorizationServer {
                 }
             }
             // create id token payload
-            const idokenJti = Hasher.uuid();
+            const idokenJti = Crypto.uuid();
             let idTokenPayload : {[key:string]: any} = {
                 jti: idokenJti,
                 iat: timeCreated,
@@ -1729,7 +1729,7 @@ export class OAuthAuthorizationServer {
         let refreshToken : string|undefined = undefined;
         if (issueRefreshToken) { 
             // create refresh token 
-            refreshToken = Hasher.randomValue(this.codeLength); 
+            refreshToken = Crypto.randomValue(this.codeLength); 
             const refreshData : {[key:string]: any} = {
                 username: authzData.username,
                 client_id: client.clientId,
@@ -1750,7 +1750,7 @@ export class OAuthAuthorizationServer {
             // save refresh token
             await this.keyStorage?.saveKey(
                 undefined, // to avoid user storage dependency
-                KeyPrefix.refreshToken+Hasher.hash(refreshToken),
+                KeyPrefix.refreshToken+Crypto.hash(refreshToken),
                 now,
                 refreshTokenExpires,
                 JSON.stringify(refreshData)
@@ -1777,7 +1777,7 @@ export class OAuthAuthorizationServer {
     async validAuthorizationCode(code : string) : 
         Promise<boolean> {
         try {
-            const hash = KeyPrefix.authorizationCode + Hasher.hash(code);
+            const hash = KeyPrefix.authorizationCode + Crypto.hash(code);
             await this.keyStorage.getKey(hash);
             return true;
         } catch (e) {
@@ -1795,7 +1795,7 @@ export class OAuthAuthorizationServer {
     async validRefreshToken(token : string) : 
         Promise<boolean> {
         try {
-            const hash = KeyPrefix.refreshToken + Hasher.hash(token);
+            const hash = KeyPrefix.refreshToken + Crypto.hash(token);
             await this.keyStorage.getKey(hash);
             return true;
         } catch (e) {
@@ -1814,7 +1814,7 @@ export class OAuthAuthorizationServer {
         Promise<{[key:string]:any}|undefined> {
         if (!token) return undefined;
         try {
-            const hash = KeyPrefix.refreshToken + Hasher.hash(token);
+            const hash = KeyPrefix.refreshToken + Crypto.hash(token);
             const key = await this.keyStorage.getKey(hash);
             return JSON.parse(key.data||"{}");
         } catch (e) {
@@ -1854,7 +1854,7 @@ export class OAuthAuthorizationServer {
         try {
             const decoded = await this.validateJwt(token, "access");
             if (this.persistAccessToken) {
-                const hash = KeyPrefix.accessToken + Hasher.hash(decoded.payload.jti);
+                const hash = KeyPrefix.accessToken + Crypto.hash(decoded.payload.jti);
                 await this.keyStorage.getKey(hash);
             }
             return decoded;

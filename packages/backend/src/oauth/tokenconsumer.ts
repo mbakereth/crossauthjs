@@ -1,6 +1,6 @@
 import { KeyStorage } from '../storage';
 import { setParameter, ParamType } from '../utils';
-import { Hasher } from '../hasher';
+import { Crypto } from '../crypto';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { CrossauthError, ErrorCode, KeyPrefix } from '@crossauth/common';
 import fs from 'node:fs';
@@ -113,13 +113,13 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
     }
 
     /**
-     * Uses {@link Hasher.hash} to hash the given string.
+     * Uses {@link Crypto.hash} to hash the given string.
      * 
      * @param plaintext the string to hash
      * @returns Base64-url-encoded hash
      */
     hash(plaintext : string) : string { 
-        return Hasher.hash(plaintext); 
+        return Crypto.hash(plaintext); 
     }
 
     /**
@@ -145,7 +145,7 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
             if (tokenType == "access" && this.persistAccessToken && 
                 this.keyStorage) {
                 try {
-                    const key = KeyPrefix.accessToken + Hasher.hash(payload.jti);
+                    const key = KeyPrefix.accessToken + Crypto.hash(payload.jti);
                     const tokenInStorage = await this.keyStorage.getKey(key);
                     const now = new Date();
                     if (tokenInStorage.expires && 
@@ -155,7 +155,7 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
                     }
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({msg: "Couldn't get token from database - is it valid?", 
-                        hashedAccessToken: Hasher.hash(payload.jti)}))
+                        hashedAccessToken: Crypto.hash(payload.jti)}))
                     CrossauthLogger.logger.debug(j({err: e}));
                     return undefined;
                 }

@@ -18,7 +18,7 @@ import { CrossauthLogger, j } from '@crossauth/common';
 import { type Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth.ts';
 import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth.ts';
 import { setParameter, ParamType } from './utils.ts';
-import { Hasher } from './hasher.ts';
+import { Crypto } from './crypto.ts';
 
 /**
  * Options for {@link SessionManager}
@@ -439,7 +439,7 @@ export class SessionManager {
         value: { [key: string]: any }) : Promise<void> {
         //const sessionId = this.session.unsignCookie(sessionCookieValue);
         const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
-        CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Hasher.hash(sessionId)}));
+        CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
         await this.keyStorage.updateData(hashedSessionKey, name, value);
     }
     

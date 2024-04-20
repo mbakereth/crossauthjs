@@ -34,7 +34,7 @@ export interface PasswordHash {
 }
 
 /**
- * Option parameters for {@link Hasher.passwordHash}
+ * Option parameters for {@link Crypto.passwordHash}
  */
 export interface HashOptions {
     salt? : string;
@@ -48,7 +48,7 @@ export interface HashOptions {
 /**
  * Provides cryptographic functions
  */
-export class Hasher {
+export class Crypto {
 
     /**
      * Returns true if the plaintext password, when hashed, equals the one in the hash, using
@@ -59,8 +59,8 @@ export class Hasher {
      * @returns true if they are equal, false otherwise
      */
     static async passwordsEqual(plaintext : string, encodedHash : string, secret? : string) : Promise<boolean> {
-        let hash = Hasher.decodePasswordHash(encodedHash);
-        let newHash = await Hasher.passwordHash(plaintext, {
+        let hash = Crypto.decodePasswordHash(encodedHash);
+        let newHash = await Crypto.passwordHash(plaintext, {
             salt: hash.salt,
             encode: false,
             secret: hash.useSecret ? secret : undefined,
@@ -151,7 +151,7 @@ export class Hasher {
      * @returns random salt as a base64 encoded string
      */
     static randomSalt() : string {
-        return Hasher.randomValue(PBKDF2_SALTLENGTH);
+        return Crypto.randomValue(PBKDF2_SALTLENGTH);
     }
 
     /**
@@ -202,7 +202,7 @@ export class Hasher {
     static async passwordHash(plaintext : string, options : HashOptions = {}) 
         : Promise<string> {
         let { salt, secret, encode} = {...options};
-        if (!salt) salt = Hasher.randomSalt();
+        if (!salt) salt = Crypto.randomSalt();
         let useSecret = secret != undefined;
         let saltAndSecret = useSecret ? salt + "!" + secret : salt;
         
@@ -231,7 +231,7 @@ export class Hasher {
      * @returns a Base64-URL-encoded string that can be hashed.
      */
     static signableToken(payload : {[key:string]: any}, salt? : string, timestamp? : number) : string {
-        if (salt == undefined) salt = Hasher.randomSalt();
+        if (salt == undefined) salt = Crypto.randomSalt();
         if (!timestamp) timestamp = (new Date()).getTime();
         return Buffer.from(JSON.stringify({...payload, t: timestamp, s: salt})).toString('base64url');
     }
@@ -248,7 +248,7 @@ export class Hasher {
      */
     static sign(payload : {[key:string]: any}|string, secret: string, salt? : string, timestamp? : number) : string {
         if (typeof payload != "string") {
-            payload = Hasher.signableToken(payload, salt, timestamp);
+            payload = Crypto.signableToken(payload, salt, timestamp);
         }
         const hmac = createHmac(SIGN_DIGEST, secret);
         return payload + "." + hmac.update(payload).digest('base64url');

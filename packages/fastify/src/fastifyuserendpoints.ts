@@ -15,7 +15,7 @@ import { FastifySessionServer,
 import {
     setParameter,
     ParamType,
-    Hasher } from '@crossauth/backend';
+    Crypto } from '@crossauth/backend';
 import type {
     AuthenticationParameters } from '@crossauth/backend';
 import type {
@@ -913,7 +913,7 @@ export class FastifyUserEndpoints {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
                     msg: "Reset password failure",
-                    hashedToken: Hasher.hash(request.body.token),
+                    hashedToken: Crypto.hash(request.body.token),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
                 }));
@@ -952,7 +952,7 @@ export class FastifyUserEndpoints {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
                     msg: "Reset password failure",
-                    hashedToken: Hasher.hash(request.body.token),
+                    hashedToken: Crypto.hash(request.body.token),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
                 }));
@@ -993,7 +993,7 @@ export class FastifyUserEndpoints {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
                     msg: "Verify email failed",
-                    hashedToken: Hasher.hash(request.params.token),
+                    hashedToken: Crypto.hash(request.params.token),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
                 }));
@@ -1031,7 +1031,7 @@ export class FastifyUserEndpoints {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
                     msg: "Verify email failure",
-                    hashedToken: Hasher.hash(request.params.token),
+                    hashedToken: Crypto.hash(request.params.token),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
                 }));

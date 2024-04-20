@@ -3,7 +3,7 @@ import { KeyPrefix } from '@crossauth/common';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { UserStorage, KeyStorage, UserStorageGetOptions } from './storage';
 import { type TokenEmailerOptions } from './emailtokens.ts';
-import { Hasher } from './hasher';
+import { Crypto } from './crypto.ts';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from './utils.ts';
 
@@ -105,7 +105,7 @@ export class DoubleSubmitCsrfToken {
      * @returns the session key, date created and expiry.
      */
     createCsrfToken() : string {
-        return Hasher.randomValue(CSRF_LENGTH);
+        return Crypto.randomValue(CSRF_LENGTH);
     }
 
     /**
@@ -117,7 +117,7 @@ export class DoubleSubmitCsrfToken {
      * @returns a {@link Cookie } object,
      */
     makeCsrfCookie(token : string) : Cookie {
-        const cookieValue = Hasher.sign({v: token}, this.secret, "")
+        const cookieValue = Crypto.sign({v: token}, this.secret, "")
         let options : CookieOptions = {}
         if (this.domain) {
             options.domain = this.domain;
@@ -144,7 +144,7 @@ export class DoubleSubmitCsrfToken {
     }
 
     unsignCookie(cookieValue : string) : string {
-        return Hasher.unsign(cookieValue, this.secret).v;
+        return Crypto.unsign(cookieValue, this.secret).v;
     }
 
     /**
@@ -171,8 +171,8 @@ export class DoubleSubmitCsrfToken {
     }
 
     private maskCsrfToken(token : string) : string {
-        const mask = Hasher.randomValue(CSRF_LENGTH);
-        const maskedToken = Hasher.xor(token, mask);
+        const mask = Crypto.randomValue(CSRF_LENGTH);
+        const maskedToken = Crypto.xor(token, mask);
         return mask + "." + maskedToken;
     }
 
@@ -181,7 +181,7 @@ export class DoubleSubmitCsrfToken {
         if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidCsrf, "CSRF token in header or form not in correct format");
         const mask = parts[0];
         const maskedToken = parts[1];
-        return Hasher.xor(maskedToken, mask);
+        return Crypto.xor(maskedToken, mask);
     }
 
     /**
@@ -202,14 +202,14 @@ export class DoubleSubmitCsrfToken {
         // cookie contains unmasked token and signature.  Verify the signature
         let cookieToken : string;
         try {
-            cookieToken = Hasher.unsign(cookieValue, this.secret).v;
+            cookieToken = Crypto.unsign(cookieValue, this.secret).v;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             throw new CrossauthError(ErrorCode.InvalidCsrf, "Invalid CSRF cookie");
         }
 
         if (cookieToken != formOrHeaderToken) {
-            CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token received - form/header value does not match", csrfCookieHash: Hasher.hash(cookieValue)}));
+            CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token received - form/header value does not match", csrfCookieHash: Crypto.hash(cookieValue)}));
             throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
@@ -228,9 +228,9 @@ export class DoubleSubmitCsrfToken {
      */
     validateCsrfCookie(cookieValue : string)  {
         try {
-            return Hasher.unsign(cookieValue, this.secret).v;
+            return Crypto.unsign(cookieValue, this.secret).v;
         } catch (e) {
-            // Hasher will give us InvalidKey.  Throw a more meaningful error
+            // Crypto will give us InvalidKey.  Throw a more meaningful error
             CrossauthLogger.logger.error(j({err: e}));
             throw new CrossauthError(ErrorCode.InvalidCsrf, "Invalid CSRF cookie");
 
@@ -344,7 +344,7 @@ export class SessionCookie {
      * @returns a base64-url-encoded string that can go into the storage
      */
     static hashSessionId(sessionId : string) : string {
-        return KeyPrefix.session + Hasher.hash(sessionId);
+        return KeyPrefix.session + Crypto.hash(sessionId);
     }
 
     /**
@@ -367,7 +367,7 @@ export class SessionCookie {
         extraFields: { [key: string]: any } = {}) : Promise<Key> {
         const maxTries = 10;
         let numTries = 0;
-        let sessionId = Hasher.randomValue(SESSIONID_LENGTH);
+        let sessionId = Crypto.randomValue(SESSIONID_LENGTH);
         const dateCreated = new Date();
         let expires = this.expiry(dateCreated);
         let succeeded = false;
@@ -384,7 +384,7 @@ export class SessionCookie {
                 let ce = CrossauthError.asCrossauthError(e);
                 if (ce.code == ErrorCode.KeyExists || ce.code == ErrorCode.InvalidKey) {
                     numTries++;
-                    sessionId = Hasher.randomValue(SESSIONID_LENGTH);
+                    sessionId = Crypto.randomValue(SESSIONID_LENGTH);
                     if (numTries > maxTries) {
                         CrossauthLogger.logger.error(j({msg: "Max attempts exceeded trying to create session ID"}))
                         throw new CrossauthError(ErrorCode.KeyExists)
@@ -413,7 +413,7 @@ export class SessionCookie {
      * @returns a {@link Cookie } object,
      */
     makeCookie(sessionKey : Key, persist? : boolean) : Cookie {
-        let signedValue = Hasher.sign({v: sessionKey.value}, this.secret, "");
+        let signedValue = Crypto.sign({v: sessionKey.value}, this.secret, "");
         let options : CookieOptions = {}
         if (persist == undefined) persist = this.persist;
         if (this.domain) {
@@ -487,7 +487,7 @@ export class SessionCookie {
      *         is invalid. 
      */
     unsignCookie(cookieValue : string) : string {
-        return Hasher.unsign(cookieValue, this.secret).v;
+        return Crypto.unsign(cookieValue, this.secret).v;
     }
 
     /**
@@ -533,18 +533,18 @@ export class SessionCookie {
         key.value = sessionId; // storage only has hashed version
         if (key.expires) {
             if (now > key.expires.getTime()) {
-                CrossauthLogger.logger.warn(j({msg: "Session id in cookie expired in key storage", hashedSessionCookie: Hasher.hash(sessionId)}));
+                CrossauthLogger.logger.warn(j({msg: "Session id in cookie expired in key storage", hashedSessionCookie: Crypto.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.Expired);
             }
         }
         if (key.userId && this.idleTimeout > 0 && key.lastActive 
             && now > key.lastActive.getTime() + this.idleTimeout*1000) {
-                CrossauthLogger.logger.warn(j({msg: "Session cookie with expired idle time received", hashedSessionCookie: Hasher.hash(sessionId)}));
+                CrossauthLogger.logger.warn(j({msg: "Session cookie with expired idle time received", hashedSessionCookie: Crypto.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.Expired);
         }
         if (this.filterFunction) {
             if (!this.filterFunction(key)) {
-                CrossauthLogger.logger.warn(j({msg: "Filter function on session id in cookie failed", hashedSessionCookie: Hasher.hash(sessionId)}));
+                CrossauthLogger.logger.warn(j({msg: "Filter function on session id in cookie failed", hashedSessionCookie: Crypto.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.InvalidKey);
             }
         }

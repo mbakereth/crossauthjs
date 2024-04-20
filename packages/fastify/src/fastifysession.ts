@@ -16,7 +16,7 @@ import {
     KeyStorage,
     OAuthClientStorage,
     Authenticator,
-    Hasher,
+    Crypto,
     SessionManager,
     setParameter,
     ParamType } from '@crossauth/backend';
@@ -986,10 +986,10 @@ export class FastifySessionServer {
             if (sessionCookieValue) {
                 try {
                     reportSession.hashedSessionId = 
-                    Hasher.hash(this.sessionManager.getSessionId(sessionCookieValue));
+                    Crypto.hash(this.sessionManager.getSessionId(sessionCookieValue));
                 } catch {
                     reportSession.hashedSessionCookie = 
-                        Hasher.hash(sessionCookieValue);
+                        Crypto.hash(sessionCookieValue);
                 }
             }
 
@@ -2588,7 +2588,7 @@ export class FastifySessionServer {
     getHashOfSessionId(request : FastifyRequest) : string {
         if (!request.sessionId) return "";
         try {
-            return Hasher.hash(request.sessionId);
+            return Crypto.hash(request.sessionId);
         } catch (e) {}
         return "";
     }
@@ -2603,7 +2603,7 @@ export class FastifySessionServer {
         const cookieValue = this.getCsrfCookieValue(request);
         if (!cookieValue) return "";
         try {
-            return Hasher.hash(cookieValue.split(".")[0]);
+            return Crypto.hash(cookieValue.split(".")[0]);
         } catch (e) {}
         return "";
     }

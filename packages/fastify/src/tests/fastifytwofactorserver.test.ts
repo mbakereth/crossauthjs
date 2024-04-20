@@ -2,7 +2,7 @@ import { beforeAll, afterEach, expect, test, vi } from 'vitest'
 import path from 'path';
 import fastify from 'fastify';
 import { getTestUserStorage }  from './inmemorytestdata';
-import { InMemoryUserStorage, InMemoryKeyStorage, TotpAuthenticator, EmailAuthenticator, LocalPasswordAuthenticator, Hasher } from '@crossauth/backend';
+import { InMemoryUserStorage, InMemoryKeyStorage, TotpAuthenticator, EmailAuthenticator, LocalPasswordAuthenticator, Crypto } from '@crossauth/backend';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import Jimp from 'jimp';
 import jsQR from 'jsqr';
@@ -835,7 +835,7 @@ test('FastifyServer.factor2ProtectedPage', async () => {
     } });
     expect(res.statusCode).toBe(200);
     const {secrets} = await userStorage.getUserByUsername("mary");
-    const passwordsEqual = await Hasher.passwordsEqual("newPass123", secrets.password??"");
+    const passwordsEqual = await Crypto.passwordsEqual("newPass123", secrets.password??"");
     expect(passwordsEqual).toBe(true);
 });
 
@@ -881,7 +881,7 @@ test('FastifyServer.factor2ProtectedPageWrongPassword', async () => {
     body = JSON.parse(res.body)
     expect(body.args.errorCodeName).toBe("UsernameOrPasswordInvalid")
     const {secrets} = await userStorage.getUserByUsername("mary");
-    const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password??"");
+    const passwordsEqual = await Crypto.passwordsEqual("maryPass123", secrets.password??"");
     expect(passwordsEqual).toBe(true);
 });
 
@@ -926,6 +926,6 @@ test('FastifyServer.factor2ProtectedPageWrongToken', async () => {
     expect(res.statusCode).toBe(302);
     expect(res.headers.location).toBe("/factor2?error=InvalidToken");
     const {secrets} = await userStorage.getUserByUsername("mary");
-    const passwordsEqual = await Hasher.passwordsEqual("maryPass123", secrets.password??"");
+    const passwordsEqual = await Crypto.passwordsEqual("maryPass123", secrets.password??"");
     expect(passwordsEqual).toBe(true);
 });

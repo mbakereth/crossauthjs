@@ -2,7 +2,7 @@ import type { ApiKey } from '@crossauth/common';
 import { KeyPrefix } from '@crossauth/common';
 import { KeyStorage } from './storage.ts';
 import { setParameter, ParamType } from './utils.ts';
-import { Hasher } from './hasher';
+import { Crypto } from './crypto.ts';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 
 /**
@@ -94,7 +94,7 @@ export class ApiKeyManager {
         expiry?: number,
         extraFields?: { [key: string]: any }) : 
             Promise<{key: ApiKey, token: string}> {
-        const value = Hasher.randomValue(this.keyLength);
+        const value = Crypto.randomValue(this.keyLength);
         const created = new Date();
         const expires = expiry ? new Date(created.getTime()+expiry*1000) : undefined;
         const hashedKey = ApiKeyManager.hashApiKeyValue(value);
@@ -120,7 +120,7 @@ export class ApiKeyManager {
     }
 
     private static hashApiKeyValue(unsignedValue : string) {
-        return Hasher.hash(unsignedValue);
+        return Crypto.hash(unsignedValue);
     }
 
     /**
@@ -132,15 +132,15 @@ export class ApiKeyManager {
      * @returns a hash of the value (without the prefix).
      */
     static hashSignedApiKeyValue(unsignedValue : string) {
-        return Hasher.hash(unsignedValue.split(".")[0]);
+        return Crypto.hash(unsignedValue.split(".")[0]);
     }
 
     private unsignApiKeyValue(signedValue : string) : string {
-        return Hasher.unsign(signedValue, this.secret).v;
+        return Crypto.unsign(signedValue, this.secret).v;
     }
 
     private signApiKeyValue(unsignedValue : string) : string {
-        return Hasher.sign({v: unsignedValue}, this.secret);
+        return Crypto.sign({v: unsignedValue}, this.secret);
 
     }
 

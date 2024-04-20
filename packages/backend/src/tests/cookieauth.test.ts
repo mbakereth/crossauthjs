@@ -1,6 +1,6 @@
 import { test, expect, beforeAll } from 'vitest';
 import { DoubleSubmitCsrfToken, SessionCookie } from '../cookieauth';
-import { Hasher } from '../hasher';
+import { Crypto } from '../crypto';
 import { SessionManager } from '../session';
 import { LocalPasswordAuthenticator } from '../authenticators/passwordauth';
 import { InMemoryUserStorage, InMemoryKeyStorage } from '../storage/inmemorystorage';
@@ -63,7 +63,7 @@ test('DoubleSubmitCsrfToken.signAndUnsignCookie', async () => {
     const auth = new DoubleSubmitCsrfToken({secret: secret});
     const token = auth.createCsrfToken();
     const cookie = auth.makeCsrfCookie(token);
-    const cookieToken = Hasher.unsign(cookie.value, secret).v;
+    const cookieToken = Crypto.unsign(cookie.value, secret).v;
     expect(cookieToken).toBe(token);
 });
 

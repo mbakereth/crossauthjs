@@ -4,7 +4,7 @@ import {
     InMemoryOAuthClientStorage,
     InMemoryKeyStorage,
     OAuthClientStorage,
-    Hasher,
+    Crypto,
     LocalPasswordAuthenticator,
     TotpAuthenticator,
     EmailAuthenticator } from '@crossauth/backend';
@@ -15,7 +15,7 @@ import { getTestUserStorage }  from './inmemorytestdata';
 
 export async function createClient(secretRequired = true) : Promise<{clientStorage : OAuthClientStorage, client : OAuthClient}> {
     const clientStorage = new InMemoryOAuthClientStorage();
-    const clientSecret = await Hasher.passwordHash("DEF", {
+    const clientSecret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
         keyLen: 32,
@@ -98,7 +98,7 @@ export async function getAuthorizationCode({
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
     const codeVerifier = "ABC123";
-    if (challenge) codeChallenge = Hasher.hash(codeVerifier);
+    if (challenge) codeChallenge = Crypto.hash(codeVerifier);
     const {code, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 

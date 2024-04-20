@@ -2,7 +2,7 @@ import { beforeAll, afterEach, expect, test, vi } from 'vitest'
 import path from 'path';
 import fastify from 'fastify';
 import { getTestUserStorage }  from './inmemorytestdata';
-import { InMemoryUserStorage, InMemoryKeyStorage, LocalPasswordAuthenticator, TotpAuthenticator, Hasher, SessionCookie } from '@crossauth/backend';
+import { InMemoryUserStorage, InMemoryKeyStorage, LocalPasswordAuthenticator, TotpAuthenticator, Crypto, SessionCookie } from '@crossauth/backend';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import { CrossauthError } from '@crossauth/common';
 
@@ -215,7 +215,7 @@ test('FastifyServer.wrongCsrf', async () => {
     body = JSON.parse(res.body);
     expect(body.template).toBe("login.njk");
     const {csrfCookie} = getCsrf(res);
-    const csrfToken = csrfTokens?.makeCsrfFormOrHeaderToken(Hasher.randomValue(16))
+    const csrfToken = csrfTokens?.makeCsrfFormOrHeaderToken(Crypto.randomValue(16))
 
     // Error on invalid token
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {username: "bob", password: "abc", csrfToken: csrfToken} })
@@ -225,7 +225,7 @@ test('FastifyServer.wrongCsrf', async () => {
     // error on invalid cookie
     res = await server.app.inject({ method: "GET", url: "/login" })
     const {csrfToken: csrfToken2} = getCsrf(res);
-    const csrfCookie2 = csrfTokens?.makeCsrfCookie(Hasher.randomValue(16));
+    const csrfCookie2 = csrfTokens?.makeCsrfCookie(Crypto.randomValue(16));
     res = await server.app.inject({ method: "POST", url: "/login", cookies: {CSRFTOKEN: csrfCookie2?.value??""}, payload: {username: "bob", password: "abc", csrfToken: csrfToken2} })
     body = JSON.parse(res.body);
     expect(body.args.errorCodeName).toBe("InvalidCsrf");
@@ -269,7 +269,7 @@ test('FastifyServer.wrongSession', async () => {
     expect(body.args.status).toBe(401);
 
     // Invalid session ID
-    const sessionCookie2 = Hasher.randomValue(16);
+    const sessionCookie2 = Crypto.randomValue(16);
     res = await server.app.inject({ method: "GET", cookies: {SESSIONID: sessionCookie2}, url: "/changepassword" });
     body = JSON.parse(res.body);
     expect(body.template).toBe("error.njk");

@@ -10,7 +10,7 @@ import {
     setParameter,
     ParamType,
     Authenticator,
-    Hasher, 
+    Crypto, 
     OAuthClientManager} from '@crossauth/backend';
 import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
 import {
@@ -175,7 +175,7 @@ export class FastifyAuthorizationServer {
                     CrossauthLogger.logger.error(j({
                         msg: ce.message,
                         hashedCsrfCookie: csrfCookie ? 
-                        Hasher.hash(csrfCookie) : undefined,
+                        Crypto.hash(csrfCookie) : undefined,
                         user: request.user?.username,
                         cerr: ce
                     }));
@@ -245,7 +245,7 @@ export class FastifyAuthorizationServer {
                     const parts = request.headers.authorization.split(" ");
                     if (parts.length == 2 &&
                         parts[0].toLocaleLowerCase() == "basic") {
-                        const decoded = Hasher.base64Decode(parts[1]);
+                        const decoded = Crypto.base64Decode(parts[1]);
                         const parts2 = decoded.split(":", 2);
                         if (parts2.length == 2) {
                             clientId1 = parts2[0];

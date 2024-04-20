@@ -1,5 +1,5 @@
 import { OAuthClientBase, OAuthFlows } from '@crossauth/common';
-import { Hasher } from '../hasher';
+import { Crypto } from '../crypto';
 import { setParameter, ParamType } from '../utils';
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
 import {
@@ -91,21 +91,21 @@ export class OAuthClientBackend extends OAuthClientBase {
     }
 
     /**
-     * Uses {@link Hasher.randomValue} to create a random string
+     * Uses {@link Crypto.randomValue} to create a random string
      * @param length the length of the random array of bytes before
      *        base64-url-encoding
      * @returns the Base64-URL-encoded random string
      */
     protected randomValue(length : number) : string {
-        return Hasher.randomValue(length);
+        return Crypto.randomValue(length);
     }
 
     /**
-     * Uses {@link Hasher.sha256} to create hash a string using SHA256
+     * Uses {@link Crypto.sha256} to create hash a string using SHA256
      * @param plaintext the text to hash
      * @returns the Base64-URL-encoded hash
      */
     protected sha256(plaintext :string) : string {
-        return Hasher.sha256(plaintext);
+        return Crypto.sha256(plaintext);
     }
 }

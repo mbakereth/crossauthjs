@@ -34,8 +34,8 @@ export { ApiKeyManager } from './apikey';
 export type { ApiKeyManagerOptions } from './apikey';
 
 // hasher
-export { Hasher } from './hasher';
-export type { PasswordHash } from './hasher';
+export { Crypto } from './crypto';
+export type { PasswordHash } from './crypto';
 
 // OAuth
 export { OAuthAuthorizationServer } from './oauth/authserver';

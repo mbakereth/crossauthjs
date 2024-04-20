@@ -2,7 +2,7 @@ import { test, expect } from 'vitest';
 import { OAuthResourceServer } from '../resserver';
 import fs from 'node:fs';
 import { getAuthorizationCode } from './common';
-import { Hasher } from '../../hasher';
+import { Crypto } from '../../crypto';
 import { KeyPrefix } from '@crossauth/common';
 
 test('ResourceServer.validAccessToken', async () => {
@@ -227,7 +227,7 @@ test('ResourceServer.persistAccessToken', async () => {
     const decodedAccessToken
         = await authServer.validAccessToken(access_token??"");
     expect(decodedAccessToken).toBeDefined();
-    const key = KeyPrefix.accessToken+Hasher.hash(decodedAccessToken?.payload.jti);
+    const key = KeyPrefix.accessToken+Crypto.hash(decodedAccessToken?.payload.jti);
     const storedAccessToken = await keyStorage?.getKey(key);
     expect(storedAccessToken?.value).toBe(key);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');

@@ -3,7 +3,7 @@ import { LocalPasswordAuthenticator } from '@crossauth/backend';
 import {
   PrismaUserStorage,
   PrismaOAuthClientStorage,
-  Hasher,
+  Crypto,
   UserStorage,
   TotpAuthenticator,
   EmailAuthenticator } from '@crossauth/backend';
@@ -101,7 +101,7 @@ async function main() {
   console.log({ user3 })
 
   const clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
-  const clientSecret = await Hasher.passwordHash("DEF", {
+  const clientSecret = await Crypto.passwordHash("DEF", {
       encode: true,
       iterations: 1000,
       keyLen: 32,

@@ -2,7 +2,7 @@ import { expect } from 'vitest';
 import { OAuthAuthorizationServer, type OAuthAuthorizationServerOptions } from '../authserver';
 import { InMemoryOAuthClientStorage, InMemoryKeyStorage } from '../../storage/inmemorystorage';
 import { OAuthClientStorage } from '../../storage';
-import { Hasher } from '../../hasher';
+import { Crypto } from '../../crypto';
 import { OAuthClient, OAuthFlows } from '@crossauth/common';
 import fs from 'node:fs';
 import { LocalPasswordAuthenticator } from '../..';
@@ -10,7 +10,7 @@ import { getTestUserStorage }  from '../../storage/tests/inmemorytestdata';
 
 export async function createClient(secretRequired = true) : Promise<{clientStorage : OAuthClientStorage, client : OAuthClient}> {
     const clientStorage = new InMemoryOAuthClientStorage();
-    const clientSecret = await Hasher.passwordHash("DEF", {
+    const clientSecret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
         keyLen: 32,
@@ -110,7 +110,7 @@ export async function getAuthorizationCode({
     const inputState = "ABCXYZ";
     let codeChallenge : string|undefined;
     const codeVerifier = "ABC123";
-    if (challenge) codeChallenge = Hasher.hash(codeVerifier);
+    if (challenge) codeChallenge = Crypto.hash(codeVerifier);
     const {code, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 

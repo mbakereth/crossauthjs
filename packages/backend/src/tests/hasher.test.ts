@@ -1,48 +1,48 @@
 import { test, expect } from 'vitest';
-import { Hasher } from '../hasher';
+import { Crypto } from '../crypto';
 
 
-test('Hasher.signAndUnsign', async () => {
+test('Crypto.signAndUnsign', async () => {
     const payload = {foo: "bar"};
     const secret = "SECRET";
-    const sig = Hasher.sign(payload, secret);
-    const decoded = Hasher.unsign(sig, secret);
+    const sig = Crypto.sign(payload, secret);
+    const decoded = Crypto.unsign(sig, secret);
     expect(decoded.foo).toBe(payload.foo);
 });
 
-test('Hasher.passwordHashAndCompare', async () => {
+test('Crypto.passwordHashAndCompare', async () => {
     const password = "PASSWORD"
-    const hash = await Hasher.passwordHash(password, {encode: true});
-    const equal = await Hasher.passwordsEqual(password, hash);
+    const hash = await Crypto.passwordHash(password, {encode: true});
+    const equal = await Crypto.passwordsEqual(password, hash);
     expect(equal).toBe(true);
 });
 
-test('Hasher.hashAndCompare', async () => {
+test('Crypto.hashAndCompare', async () => {
     const plaintext = "PLAINTEXT"
-    const hash = Hasher.hash(plaintext);
+    const hash = Crypto.hash(plaintext);
     expect(hash).toBe('y0Dn2tyGFhuXmN5IUS8zLSHBQfzB4ooIb95KM3WqsbU');
 });
 
-test('Hasher.hashAndCompareWithSecret', async () => {
+test('Crypto.hashAndCompareWithSecret', async () => {
     const password = "PASSWORD"
     const secret = "SECRET";
-    const hash = await Hasher.passwordHash(password, {encode: true, secret: secret});
-    const equal = await Hasher.passwordsEqual(password, hash, secret);
+    const hash = await Crypto.passwordHash(password, {encode: true, secret: secret});
+    const equal = await Crypto.passwordsEqual(password, hash, secret);
     expect(equal).toBe(true);
 });
 
-test('Hasher.xor', async () => {
+test('Crypto.xor', async () => {
     const value = Buffer.from("ABCDEFG").toString("base64url");
     const mask  = Buffer.from("HIJKLMN").toString("base64url");
-    const maskedValue = Hasher.xor(value, mask);
-    const unmaskedValue = Hasher.xor(maskedValue, mask);
+    const maskedValue = Crypto.xor(value, mask);
+    const unmaskedValue = Crypto.xor(maskedValue, mask);
     expect(unmaskedValue).toBe(value);
 });
 
-test('Hasher.symmetricEncryption', async () => {
+test('Crypto.symmetricEncryption', async () => {
     const key = "xkDDElW4zZTLdIZ3AS0v0gJbh_SZZSAo6YuWDeEtBaU";
     const plaintext = "This is the plaintext";
-    const ciphertext = Hasher.symmetricEncrypt(plaintext, key);
-    const recoveredText = Hasher.symmetricDecrypt(ciphertext, key);
+    const ciphertext = Crypto.symmetricEncrypt(plaintext, key);
+    const recoveredText = Crypto.symmetricDecrypt(ciphertext, key);
     expect(recoveredText).toBe(plaintext);
 });

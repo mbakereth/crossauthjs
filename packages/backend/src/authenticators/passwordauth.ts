@@ -1,7 +1,7 @@
 import type { User, UserSecretsInputFields, Key, UserInputFields } from '@crossauth/common';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { UserStorage } from '../storage.ts'
-import { Hasher } from '../hasher.ts';
+import { Crypto } from '../crypto.ts';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils.ts';
 import { PasswordAuthenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
@@ -122,7 +122,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
     async authenticateUser(user : UserInputFields, secrets: UserSecretsInputFields, params: AuthenticationParameters) : Promise<void> {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");
         if (!secrets.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
-        if (!await Hasher.passwordsEqual(params.password, secrets.password, this.secret)) {
+        if (!await Crypto.passwordsEqual(params.password, secrets.password, this.secret)) {
             CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
@@ -158,7 +158,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      */
     async createPasswordHash(password : string, salt? : string) : Promise<string> {
         
-        return await Hasher.passwordHash(password, {
+        return await Crypto.passwordHash(password, {
             salt: salt, 
             encode: true, 
             secret: this.enableSecretForPasswords ? this.secret : undefined,
@@ -185,7 +185,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      * @returns true if match, false otherwise
      */
     async passwordMatchesHash(password : string, passwordHash : string, secret? : string) {
-        return await Hasher.passwordsEqual(password, passwordHash, secret);
+        return await Crypto.passwordsEqual(password, passwordHash, secret);
     }
 
     /**

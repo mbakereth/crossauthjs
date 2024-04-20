@@ -5,7 +5,7 @@ import {
     InMemoryUserStorage,
     InMemoryKeyStorage,
     InMemoryOAuthClientStorage,
-    Hasher,
+    Crypto,
     LocalPasswordAuthenticator,
     TotpAuthenticator,
     EmailAuthenticator,
@@ -100,7 +100,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         return "1";
     };
     const clientStorage = new InMemoryOAuthClientStorage();
-    const clientSecret = await Hasher.passwordHash("DEF", {
+    const clientSecret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
         keyLen: 32,
@@ -257,7 +257,7 @@ test('FastifyAuthServer.getAccessTokenWhileLoggedIn', async () => {
     const state = params.state;
     expect(state).toBe("ABC123");
     expect(code).toBeDefined();
-    await keyStorage.getKey(KeyPrefix.authorizationCode+Hasher.hash(code??""));
+    await keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code??""));
 
     res = await server.app.inject({ 
         method: "POST", 
@@ -306,7 +306,7 @@ test('FastifyAuthServer.getAccessTokenWClientCredentialsBasicAuth', async () => 
     let res;
     let body;
 
-    const authorization = Hasher.base64Encode("ABC:DEF");
+    const authorization = Crypto.base64Encode("ABC:DEF");
     res = await server.app.inject({ 
         method: "POST", 
         url: `/token`,  
