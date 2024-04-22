@@ -28,13 +28,10 @@ export interface OAuthTokenConsumerOptions {
     /** Number of seconds tolerance when checking expiration.  Default 10 */
     clockTolerance? : number,
 
-    /** Set this to restrict the issuers (as set in 
-     * {@link @crossauth/backend!OAuthAuthorizationServer}) that will be valid in the JWT.  Required */
-    oauthIssuers? : string,
-
-    /** The base URL for OAuth API calls to the authorization server (the URL 
-     * is the `issuer` field of a JWT) */
-    authServerBaseUri? : string;
+    /** The value to expect in the iss
+     * claim.  If the iss does not match this, the token is rejected.
+     * No default (required) */
+    jwtIssuer? : string;
 
     /**
      * For initializing the token consumer with a static OpenID Connect 
@@ -53,8 +50,7 @@ export abstract class OAuthTokenConsumerBase {
     protected jwtSecretKey : string | undefined;
     protected jwtPublicKey  : string | undefined;
     protected clockTolerance : number = 10;
-    protected oauthIssuers : string[]|undefined = undefined;
-    protected authServerBaseUri = "";
+    protected jwtIssuer = "";
 
     /**
      * The OpenID Connect configuration for the authorization server,
@@ -81,12 +77,11 @@ export abstract class OAuthTokenConsumerBase {
 
         this.consumerName = consumerName;
 
-        if (options.authServerBaseUri) this.authServerBaseUri = options.authServerBaseUri;
+        if (options.jwtIssuer) this.jwtIssuer = options.jwtIssuer;
         if (options.jwtKeyType) this.jwtKeyType = options.jwtKeyType;
         if (options.jwtSecretKey) this.jwtSecretKey = options.jwtSecretKey;
         if (options.jwtPublicKey) this.jwtPublicKey = options.jwtPublicKey;
         if (options.clockTolerance) this.clockTolerance = options.clockTolerance;
-        if (options.oauthIssuers) this.oauthIssuers = options.oauthIssuers.split(/, */);
         if (options.oidcConfig) this.oidcConfig = options.oidcConfig;
 
         if (this.jwtPublicKey && !this.jwtKeyType) {
@@ -140,7 +135,7 @@ export abstract class OAuthTokenConsumerBase {
     /**
      * Loads OpenID Connect configuration, or fetches it from the 
      * authorization server (using the well-known enpoint appended
-     * to `authServerBaseUri` )
+     * to `jwtIssuer` )
      * @param oidcConfig the configuration, or undefined to load it from
      *        the authorization server
      * @throws a {@link CrossauthError} object with {@link ErrorCode} of
@@ -152,12 +147,12 @@ export abstract class OAuthTokenConsumerBase {
             return;
         }
 
-        if (!this.authServerBaseUri) {
-            throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration.  Either set authServerBaseUri or set config manually");
+        if (!this.jwtIssuer) {
+            throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration.  Either set jwtIssuer or set config manually");
         }
         let resp : Response|undefined = undefined;
         try {
-            resp = await fetch(new URL("/.well-known/openid-configuration", this.authServerBaseUri));
+            resp = await fetch(new URL("/.well-known/openid-configuration", this.jwtIssuer));
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
         }
@@ -253,13 +248,9 @@ export abstract class OAuthTokenConsumerBase {
         if (decoded.type != tokenType) {
             CrossauthLogger.logger.error(j({msg: tokenType + " expected but got " + decoded.type}));
         }
-        if (this.oauthIssuers) {
-            if ((Array.isArray(this.oauthIssuers) && !this.oauthIssuers.includes(decoded.iss)) ||
-                (!Array.isArray(this.oauthIssuers) && this.oauthIssuers != decoded.iss)) {
-                CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: this.hash(decoded.jti)}));
-                return undefined;
-
-            }
+        if (decoded.iss != this.jwtIssuer) {
+            CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: this.hash(decoded.jti)}));
+            return undefined;
         }
         if (decoded.aud) {
             if ((Array.isArray(decoded.aud) && !decoded.aud.includes(this.consumerName)) ||

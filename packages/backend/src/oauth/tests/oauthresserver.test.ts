@@ -206,7 +206,7 @@ test('ResourceServer.invalidIsser', async () => {
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10,
-            oauthIssuers: "http://differentissuer:3000"
+            jwtIssuer: "http://expectedissuer.com",
         });
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeUndefined();
@@ -231,7 +231,7 @@ test('ResourceServer.persistAccessToken', async () => {
     const storedAccessToken = await keyStorage?.getKey(key);
     expect(storedAccessToken?.value).toBe(key);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
-    const resserver = new OAuthResourceServer({jwtKeyType: "RS256", jwtPublicKey: publicKey, clockTolerance: 10, oauthIssuers: "http://localhost:3000", persistAccessToken: true, keyStorage: keyStorage});
+    const resserver = new OAuthResourceServer({jwtKeyType: "RS256", jwtPublicKey: publicKey, clockTolerance: 10, persistAccessToken: true, keyStorage: keyStorage});
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeDefined();
 

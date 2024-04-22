@@ -50,7 +50,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const app = fastify({logger: false});
     const resserver = new FastifyOAuthResourceServer(
-        app, undefined, {}, {authServerBaseUri: "http://server.com"}
+        app, undefined, {}, {jwtIssuer: "http://server.com"}
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await resserver.tokenConsumer.loadConfig();
@@ -93,7 +93,7 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const app = fastify({logger: false});
     const resserver = new FastifyOAuthResourceServer(
-        app, undefined, {}, {authServerBaseUri: "http://server.com"}
+        app, undefined, {}, {jwtIssuer: "http://server.com"}
     );
     app.get('/post',  async (request : FastifyRequest, reply : FastifyReply) =>  {
         reply.header(...JSONHDR).send({token: request.accessTokenPayload});

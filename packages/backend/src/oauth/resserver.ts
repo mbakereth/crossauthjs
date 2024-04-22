@@ -31,7 +31,7 @@ export class OAuthResourceServer {
      */
     constructor(options : OAuthResourceServerOptions = {}) {
 
-        setParameter("resourceServerName", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER", true);
+        setParameter("resourceServerName", ParamType.String, this, options, "OAUTH_AUDIENCE", true);
 
         this.tokenConsumer = new OAuthTokenConsumerBackend(this.resourceServerName, options);
     }

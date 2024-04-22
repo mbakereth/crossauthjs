@@ -64,7 +64,7 @@ export async function getAuthServer({
         "localpassword": authenticator,
     };
 
-    if (aud) options.resourceServers = aud;
+    if (aud) options.audience = aud;
     if (persistAccessToken) {
         options.persistAccessToken = true;
     }

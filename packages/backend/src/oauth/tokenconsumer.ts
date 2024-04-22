@@ -73,7 +73,7 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
         super(consumerName, {...options, ...options1});
         this.consumerName = consumerName;
 
-        setParameter("authServerBaseUri", ParamType.String, this, options, "OAUTH_AUTH_SERVER_BASE_URI");
+        setParameter("jwtIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
         setParameter("jwtPublicKeyFile", ParamType.String, this, options, "JWT_PUBLIC_KEY_FILE");
         setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");

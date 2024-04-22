@@ -69,7 +69,7 @@ export async function getAuthServer({
         validFlows: "all",
         userStorage,
     };
-    if (aud) options.resourceServers = aud;
+    if (aud) options.audience = aud;
     if (persistAccessToken) {
         options.persistAccessToken = true;
     }

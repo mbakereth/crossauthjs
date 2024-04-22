@@ -57,7 +57,7 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
     oauthIssuer? : string,
 
     /** JWT issuer, eg https://yoursite.com.  Required (no default) */
-    resourceServers? : string,
+    audience? : string,
 
     /** If true, only redirect Uri's registered for the client will be 
      * accepted */
@@ -199,7 +199,7 @@ export class OAuthAuthorizationServer {
     clientManager : OAuthClientManager;
 
     private oauthIssuer : string = "";
-    private resourceServers : string[]|null = null;
+    private audience : string|null = null;
     private requireRedirectUriRegistration = true;
     private requireClientSecretOrChallenge = true;
     private jwtAlgorithm = "RS256";
@@ -259,7 +259,7 @@ export class OAuthAuthorizationServer {
         this.clientManager = new OAuthClientManager({clientStorage, ...options});
 
         setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
-        setParameter("resourceServers", ParamType.String, this, options, "OAUTH_RESOURCE_SERVER");
+        setParameter("audience", ParamType.String, this, options, "OAUTH_AUDIENCE");
         setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
         setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");
         setParameter("jwtAlgorithm", ParamType.String, this, options, "JWT_ALGORITHM");
@@ -1586,8 +1586,8 @@ export class OAuthAuthorizationServer {
                 new Date(now.getTime()+this.accessTokenExpiry*1000 + 
                     this.clockTolerance*1000);
         }
-        if (this.resourceServers) {
-            accessTokenPayload.aud = this.resourceServers;
+        if (this.audience) {
+            accessTokenPayload.aud = this.audience;
         }
 
         // create access token jwt

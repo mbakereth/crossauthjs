@@ -60,7 +60,7 @@ const server = new FastifyServer(userStorage, {
         keyStorage: keyStorage,
     },
     oAuthClient: {
-        authServerBaseUri: process.env["AUTHORIZATION_SERVER"],
+        jwtIssuer: process.env["JWT_ISSUER"],
     }}, {
     app: app,
     views: path.join(__dirname, '../views'),

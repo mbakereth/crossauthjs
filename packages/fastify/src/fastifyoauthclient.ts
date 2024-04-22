@@ -435,9 +435,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         "have_access_token"|"have_refresh"|"have_id")[] = [];
 
     constructor(server: FastifyServer,
-        authServerBaseUri: string,
+        jwtIssuer: string,
         options: FastifyOAuthClientOptions) {
-        super(authServerBaseUri, options);
+        super(jwtIssuer, options);
         this.server = server;
         setParameter("sessionDataName", ParamType.String, this, options, "OAUTH_SESSION_DATA_NAME");
         setParameter("siteUrl", ParamType.String, this, options, "SITE_URL", true);
