@@ -8,6 +8,7 @@ import fastifyFormBody from '@fastify/formbody';
 import type { FastifyCookieOptions } from '@fastify/cookie'
 import cookie from '@fastify/cookie'
 import nunjucks from "nunjucks";
+import { OAuthTokenConsumerBackend } from '@crossauth/backend';
 
 import {
     CrossauthError,
@@ -348,8 +349,8 @@ export class FastifyServer {
 
         if (oAuthResServer) {
             this.oAuthResServer = new FastifyOAuthResourceServer(this.app, 
-                this.oAuthAuthServer,
-                oAuthResServer.protectedEndpoints, options
+                [new OAuthTokenConsumerBackend(options)],
+                            oAuthResServer.protectedEndpoints, options
             )
         }
     }

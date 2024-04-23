@@ -476,6 +476,9 @@ importers:
       install:
         specifier: ^0.13.0
         version: 0.13.0
+      jose:
+        specifier: ^5.2.3
+        version: 5.2.3
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2

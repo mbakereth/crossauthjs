@@ -5,6 +5,7 @@ import { OpenIdConfiguration } from '@crossauth/common';
 import { getAuthorizationCode } from './oauthcommon';
 import { FastifyRequest, FastifyReply } from 'fastify';
 import fastify from 'fastify';
+import { OAuthTokenConsumerBackend } from '@crossauth/backend';
 
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -49,13 +50,16 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const app = fastify({logger: false});
+    const issuer = process.env["CROSSAUTH_OAUTH_ISSUER"]??"";
     const resserver = new FastifyOAuthResourceServer(
-        app, undefined, {}, {jwtIssuer: "http://server.com"}
+        app,
+        [new OAuthTokenConsumerBackend({jwtIssuer: issuer})],
+        {},
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.tokenConsumer.loadConfig();
+    await resserver.tokenConsumers[issuer].loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.tokenConsumer.loadJwks();
+    await resserver.tokenConsumers[issuer].loadJwks();
     // @ts-ignore
     const reply : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token}
@@ -92,17 +96,20 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const app = fastify({logger: false});
+    const issuer = process.env["CROSSAUTH_OAUTH_ISSUER"]??"";
     const resserver = new FastifyOAuthResourceServer(
-        app, undefined, {}, {jwtIssuer: "http://server.com"}
+        app,
+        [new OAuthTokenConsumerBackend({jwtIssuer: issuer})],
+        {},
     );
     app.get('/post',  async (request : FastifyRequest, reply : FastifyReply) =>  {
         reply.header(...JSONHDR).send({token: request.accessTokenPayload});
     });
 
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.tokenConsumer.loadConfig();
+    await resserver.tokenConsumers[issuer].loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.tokenConsumer.loadJwks();
+    await resserver.tokenConsumers[issuer].loadJwks();
     // @ts-ignore
     const reply : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token}

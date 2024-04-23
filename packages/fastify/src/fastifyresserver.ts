@@ -3,23 +3,21 @@ import { Server, IncomingMessage, ServerResponse } from 'http'
 import { CrossauthError, CrossauthLogger, j, ErrorCode } from '@crossauth/common';
 import {  OAuthResourceServer, UserStorage } from '@crossauth/backend';
 import type { OAuthResourceServerOptions } from '@crossauth/backend';
-import {  FastifyAuthorizationServer } from './fastifyoauthserver';
+import { OAuthTokenConsumerBackend } from '@crossauth/backend';
 
 export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOptions {
     userStorage? : UserStorage;
 }
 
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
-    //private authServer?: FastifyAuthorizationServer;
     private protectedEndpoints : {[key:string]: {scope? : string}} = {};
 
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>, 
-        _authServer? : FastifyAuthorizationServer,
+        tokenConsumers: OAuthTokenConsumerBackend[],
         protectedEndpoints? : {[key:string]: {scope? : string}},
         options : FastifyOAuthResourceServerOptions = {}) {
-        super(options);
-        //this.authServer = authServer;
+        super(tokenConsumers, options);
 
         if (protectedEndpoints) {
             const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;

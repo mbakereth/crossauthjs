@@ -107,6 +107,11 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
      * cipher.  privateKey or privateKeyFile is also required. */
     jwtPublicKey? : string,
 
+    /**
+     * The kid to give the jwt signing key.  Default "1".
+     */
+    jwtKid? : string,
+
     /** Whether to persist access tokens in key storage.  Default false */
     persistAccessToken? : boolean,
 
@@ -212,6 +217,7 @@ export class OAuthAuthorizationServer {
     private jwtSecretKeyFile = "";
     private jwtPublicKeyFile = "";
     private jwtPrivateKeyFile = "";
+    private jwtKid = "1";
     private secretOrPrivateKey = "";
     private secretOrPublicKey = "";
     private persistAccessToken = false;
@@ -271,6 +277,7 @@ export class OAuthAuthorizationServer {
         setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
         setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
         setParameter("jwtPrivateKey", ParamType.String, this, options, "JWT_PRIVATE_KEY");
+        setParameter("jwtKid", ParamType.String, this, options, "JWT_KID");
         setParameter("persistAccessToken", ParamType.String, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
         setParameter("issueRefreshToken", ParamType.String, this, options, "OAUTH_ISSUE_REFRESH_TOKEN");
         setParameter("opaqueAccessToken", ParamType.String, this, options, "OAUTH_OPAQUE_ACCESS_TOKEN");
@@ -1713,7 +1720,7 @@ export class OAuthAuthorizationServer {
             idToken = await new Promise((resolve, reject) => {
                 jwt.sign(idTokenPayload, this.secretOrPrivateKey, {
                     algorithm: this.jwtAlgorithmChecked,
-                    keyid: "1"
+                    keyid: this.jwtKid,
                     }, 
                     (error: Error | null,
                     encoded: string | undefined) => {

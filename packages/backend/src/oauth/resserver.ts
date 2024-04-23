@@ -1,16 +1,14 @@
-import {  CrossauthLogger, j } from '@crossauth/common';
+import {  CrossauthError, ErrorCode, CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
 import {
     OAuthTokenConsumerBackend,
     type OAuthTokenConsumerBackendOptions } from './tokenconsumer';
+import * as jose from 'jose';
 
 /**
  * Options for {@link OAuthResourceServer}
  */
-export interface OAuthResourceServerOptions extends OAuthTokenConsumerBackendOptions {
-
-    /** Name for this resource server.  The `aud` field in the JWT must match this */
-    resourceServerName? : string,
+export interface OAuthResourceServerOptions {
 }
 
 /**
@@ -20,20 +18,19 @@ export interface OAuthResourceServerOptions extends OAuthTokenConsumerBackendOpt
  */
 export class OAuthResourceServer {
     
-    protected resourceServerName : string = "";
-
     /** The token consumer that validates the access tokens.  Required */
-    tokenConsumer : OAuthTokenConsumerBackend;
+    tokenConsumers : {[key:string] : OAuthTokenConsumerBackend} = {};
 
     /**
      * Constructor
      * @param options See {@link OAuthResourceServerOptions}
      */
-    constructor(options : OAuthResourceServerOptions = {}) {
+    constructor(tokenConsumers : OAuthTokenConsumerBackend[], _options : OAuthResourceServerOptions = {}) {
 
-        setParameter("resourceServerName", ParamType.String, this, options, "OAUTH_AUDIENCE", true);
+        for (let consumer of tokenConsumers) {
+            this.tokenConsumers[consumer.jwtIssuer] = consumer;
 
-        this.tokenConsumer = new OAuthTokenConsumerBackend(this.resourceServerName, options);
+        }
     }
 
     /**
@@ -52,7 +49,10 @@ export class OAuthResourceServer {
     async accessTokenAuthorized(accessToken: string) 
         : Promise<{[key:string]: any}|undefined> {
             try {
-                return await this.tokenConsumer.tokenAuthorized(accessToken, "access");
+                const payload = jose.decodeJwt(accessToken);
+                if (payload.iss && payload.iss in this.tokenConsumers)
+                    return await this.tokenConsumers[payload.iss].tokenAuthorized(accessToken, "access");
+                throw new CrossauthError(ErrorCode.Unauthorized, "Invalid issuer in access token");
             } catch (e) {
                 CrossauthLogger.logger.warn(j({err: e}));
                 return undefined;

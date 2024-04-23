@@ -32,6 +32,12 @@ export interface OAuthTokenConsumerBackendOptions
      * JWT.  Either this or `jwtPublicKey` is required when using this kind of 
      * cipher.  privateKey or privateKeyFile is also required. */
     jwtPublicKeyFile? : string,
+
+    /**
+     * The aud claim needs to match this value.
+     * No default (required)
+     */
+    audience? : string,
 }
 
 /**
@@ -45,7 +51,7 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
     /**
      * Value passed to the constructor.  The `aud` claim must match it
      */
-    protected readonly consumerName : string;
+    protected readonly audience : string;
 
     /**
      * Value passed to the constructor. If true, access tokens are saved
@@ -60,18 +66,20 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
     /**
      * Constructor
      * 
-     * @param consumerName the `aud` claim in the access token must match
+     * @param audience the `aud` claim in the access token must match
      *        this value or the token will be rejected.
      * @param options see {@link OAuthTokenConsumerBackendOptions}
      */
-    constructor(consumerName : string, options : OAuthTokenConsumerBackendOptions = {}) {
+    constructor(options : OAuthTokenConsumerBackendOptions = {}) {
 
         const options1 : {
             jwtKeyType? : string,
-        } = {};
+            audience : string,
+        } = {audience: ""};
         setParameter("jwtKeyType", ParamType.String, options1, options, "JWT_KEY_TYPE");
-        super(consumerName, {...options, ...options1});
-        this.consumerName = consumerName;
+        setParameter("audience", ParamType.String, options1, options, "OAUTH_AUDIENCE", true);
+        super(options1.audience, {...options, ...options1});
+        this.audience = options1.audience;
 
         setParameter("jwtIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");

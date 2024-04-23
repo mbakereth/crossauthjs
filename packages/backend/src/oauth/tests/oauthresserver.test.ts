@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { getAuthorizationCode } from './common';
 import { Crypto } from '../../crypto';
 import { KeyPrefix } from '@crossauth/common';
+import { OAuthTokenConsumerBackend } from '../tokenconsumer';
 
 test('ResourceServer.validAccessToken', async () => {
 
@@ -24,7 +25,12 @@ test('ResourceServer.validAccessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
-    const resserver = new OAuthResourceServer({jwtKeyType: "RS256", jwtPublicKey: publicKey, clockTolerance: 10});
+    const resserver = new OAuthResourceServer(
+        [new OAuthTokenConsumerBackend({
+            jwtKeyType: "RS256",
+            jwtPublicKey: publicKey,
+            clockTolerance: 10
+    })]);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeDefined();
 });
@@ -48,11 +54,12 @@ test('ResourceServer.invalidPublicKey', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key-wrong.pem", 'utf8');
-    const resserver = new OAuthResourceServer({
-        jwtKeyType: "RS256",
-        jwtPublicKey: publicKey,
-        clockTolerance: 10
-    });
+    const resserver = new OAuthResourceServer(
+        [new OAuthTokenConsumerBackend({
+            jwtKeyType: "RS256",
+            jwtPublicKey: publicKey,
+            clockTolerance: 10
+    })]);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeUndefined();
 });
@@ -88,7 +95,12 @@ test('ResourceServer.invalidAccessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
-    const resserver = new OAuthResourceServer({jwtKeyType: "RS256", jwtPublicKey: publicKey, clockTolerance: 10});
+    const resserver = new OAuthResourceServer(
+        [new OAuthTokenConsumerBackend({
+            jwtKeyType: "RS256",
+            jwtPublicKey: publicKey,
+            clockTolerance: 10
+    })]);
     const authorized = await resserver.accessTokenAuthorized("x"+access_token??"");
     expect(authorized).toBeUndefined();
 });
@@ -111,7 +123,12 @@ test('ResourceServer.validCodeChallenge', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
-    const resserver = new OAuthResourceServer({jwtKeyType: "RS256", jwtPublicKey: publicKey, clockTolerance: 10});
+    const resserver = new OAuthResourceServer(
+        [new OAuthTokenConsumerBackend({
+            jwtKeyType: "RS256",
+            jwtPublicKey: publicKey,
+            clockTolerance: 10
+    })]);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeDefined();
 });
@@ -147,7 +164,12 @@ test('ResourceServer.validAud', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
-    const resserver = new OAuthResourceServer({jwtKeyType: "RS256", jwtPublicKey: publicKey, clockTolerance: 10, });
+    const resserver = new OAuthResourceServer(
+        [new OAuthTokenConsumerBackend({
+            jwtKeyType: "RS256",
+            jwtPublicKey: publicKey,
+            clockTolerance: 10
+    })]);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeDefined();
 });
@@ -171,13 +193,13 @@ test('ResourceServer.invalidAud', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
-    const resserver = 
-        new OAuthResourceServer({
-            resourceServerName: "wrongresourceserver",
+    const resserver = new OAuthResourceServer(
+        [new OAuthTokenConsumerBackend({
+            audience: "wrongresourceserver",
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
-            clockTolerance: 10,
-        });
+            clockTolerance: 10
+    })]);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeUndefined();
 });
@@ -202,12 +224,13 @@ test('ResourceServer.invalidIsser', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = 
-        new OAuthResourceServer({
-            jwtKeyType: "RS256",
-            jwtPublicKey: publicKey,
-            clockTolerance: 10,
-            jwtIssuer: "http://expectedissuer.com",
-        });
+        new OAuthResourceServer(
+            [new OAuthTokenConsumerBackend({
+                jwtKeyType: "RS256",
+                jwtPublicKey: publicKey,
+                clockTolerance: 10,
+                jwtIssuer: "http://expectedissuer.com",
+        })]);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeUndefined();
 });
@@ -231,7 +254,14 @@ test('ResourceServer.persistAccessToken', async () => {
     const storedAccessToken = await keyStorage?.getKey(key);
     expect(storedAccessToken?.value).toBe(key);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
-    const resserver = new OAuthResourceServer({jwtKeyType: "RS256", jwtPublicKey: publicKey, clockTolerance: 10, persistAccessToken: true, keyStorage: keyStorage});
+    const resserver = 
+        new OAuthResourceServer(
+            [new OAuthTokenConsumerBackend({
+                jwtKeyType: "RS256",
+                jwtPublicKey: publicKey,
+                clockTolerance: 10,
+                persistAccessToken: true, keyStorage: keyStorage
+        })]);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeDefined();
 
@@ -252,12 +282,16 @@ test('ResourceServer.validateWithJwks', async () => {
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
-    const resserver = new OAuthResourceServer({clockTolerance: 10});
+    const resserver = 
+        new OAuthResourceServer(
+            [new OAuthTokenConsumerBackend({
+                clockTolerance: 10,
+        })]);
 
     const jwks = authServer.jwks();
     expect(jwks.keys.length).toBe(1);
     expect(jwks.keys[0].kty).toBe("RSA");
-    await resserver.tokenConsumer.loadJwks(jwks);
+    await resserver.tokenConsumers[process.env["CROSSAUTH_OAUTH_ISSUER"]??""].loadJwks(jwks);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeDefined();
 });

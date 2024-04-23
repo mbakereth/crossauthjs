@@ -38,6 +38,7 @@ export interface OAuthTokenConsumerOptions {
      * configuration.
      */
     oidcConfig? : (OpenIdConfiguration&{[key:string]:any})|undefined;
+
 }
 
 /**
@@ -45,12 +46,12 @@ export interface OAuthTokenConsumerOptions {
  */
 export abstract class OAuthTokenConsumerBase {
     
-    protected consumerName : string;
+    protected audience : string;
     protected jwtKeyType  : string | undefined;
     protected jwtSecretKey : string | undefined;
     protected jwtPublicKey  : string | undefined;
     protected clockTolerance : number = 10;
-    protected jwtIssuer = "";
+    readonly jwtIssuer : string = "";
 
     /**
      * The OpenID Connect configuration for the authorization server,
@@ -69,13 +70,13 @@ export abstract class OAuthTokenConsumerBase {
     /**
      * Constrctor
      * 
-     * @param consumerName : this is the value expected in the `aud` field
+     * @param audience : this is the value expected in the `aud` field
      *        of the JWT.  The token is rejected if it doesn't match.
      * @param options See {@link OAuthTokenConsumerOptions}.
      */
-    constructor(consumerName : string, options : OAuthTokenConsumerOptions = {}) {
+    constructor(audience : string, options : OAuthTokenConsumerOptions = {}) {
 
-        this.consumerName = consumerName;
+        this.audience = audience;
 
         if (options.jwtIssuer) this.jwtIssuer = options.jwtIssuer;
         if (options.jwtKeyType) this.jwtKeyType = options.jwtKeyType;
@@ -253,8 +254,8 @@ export abstract class OAuthTokenConsumerBase {
             return undefined;
         }
         if (decoded.aud) {
-            if ((Array.isArray(decoded.aud) && !decoded.aud.includes(this.consumerName)) ||
-                (!Array.isArray(decoded.aud) && decoded.aud != this.consumerName)) {
+            if ((Array.isArray(decoded.aud) && !decoded.aud.includes(this.audience)) ||
+                (!Array.isArray(decoded.aud) && decoded.aud != this.audience)) {
                     CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.aud} in access token`, hashedAccessToken: this.hash(decoded.jti)}));
                     return undefined;    
                 }

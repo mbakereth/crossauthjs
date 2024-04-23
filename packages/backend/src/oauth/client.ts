@@ -72,8 +72,10 @@ export class OAuthClientBackend extends OAuthClientBase {
         }
         setParameter("clientId", ParamType.String, options1, options, "OAUTH_CLIENT_ID", true);
         super({ jwtIssuer, 
-            tokenConsumer: new OAuthTokenConsumerBackend(options1.clientId, { 
-                jwtIssuer, ...options }), ...options });
+            tokenConsumer: new OAuthTokenConsumerBackend({ 
+                audience: options1.clientId, 
+                jwtIssuer, 
+                ...options }), ...options });
 
         setParameter("stateLength", ParamType.String, this, options, "OAUTH_STATE_LENGTH");
         setParameter("verifierLength", ParamType.String, this, options, "OAUTH_VERIFIER_LENGTH");
