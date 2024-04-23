@@ -10,7 +10,7 @@ export type EncryptionKey = jose.KeyLike | Uint8Array;
 /**
  * Options that can be passed to {@link OAuthTokenConsumerBase}.
  */
-export interface OAuthTokenConsumerOptions {
+export interface OAuthTokenConsumerBaseOptions {
 
     /** Secret key if using a symmetric cipher for signing the JWT.  
      * Either this or `jwtSecretKeyFile` is required when using this kind of cipher*/
@@ -74,7 +74,7 @@ export abstract class OAuthTokenConsumerBase {
      *        of the JWT.  The token is rejected if it doesn't match.
      * @param options See {@link OAuthTokenConsumerOptions}.
      */
-    constructor(audience : string, options : OAuthTokenConsumerOptions = {}) {
+    constructor(audience : string, options : OAuthTokenConsumerBaseOptions = {}) {
 
         this.audience = audience;
 

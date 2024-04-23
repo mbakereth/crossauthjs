@@ -1,8 +1,8 @@
 import {  CrossauthError, ErrorCode, CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
 import {
-    OAuthTokenConsumerBackend,
-    type OAuthTokenConsumerBackendOptions } from './tokenconsumer';
+    OAuthTokenConsumer,
+    type OAuthTokenConsumerOptions } from './tokenconsumer';
 import * as jose from 'jose';
 
 /**
@@ -19,13 +19,13 @@ export interface OAuthResourceServerOptions {
 export class OAuthResourceServer {
     
     /** The token consumer that validates the access tokens.  Required */
-    tokenConsumers : {[key:string] : OAuthTokenConsumerBackend} = {};
+    tokenConsumers : {[key:string] : OAuthTokenConsumer} = {};
 
     /**
      * Constructor
      * @param options See {@link OAuthResourceServerOptions}
      */
-    constructor(tokenConsumers : OAuthTokenConsumerBackend[], _options : OAuthResourceServerOptions = {}) {
+    constructor(tokenConsumers : OAuthTokenConsumer[], _options : OAuthResourceServerOptions = {}) {
 
         for (let consumer of tokenConsumers) {
             this.tokenConsumers[consumer.jwtIssuer] = consumer;

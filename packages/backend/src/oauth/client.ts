@@ -3,13 +3,13 @@ import { Crypto } from '../crypto';
 import { setParameter, ParamType } from '../utils';
 import { CrossauthError, ErrorCode  } from '@crossauth/common';
 import {
-    OAuthTokenConsumerBackend,
-    type OAuthTokenConsumerBackendOptions } from './tokenconsumer';
+    OAuthTokenConsumer,
+    type OAuthTokenConsumerOptions } from './tokenconsumer';
 
 /**
  * Options for {@link OAuthClientBackend}
  */
-export interface OAuthClientOptions extends OAuthTokenConsumerBackendOptions {
+export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
 
     /** Length of random state variable for passing to `authorize` endpoint
      * (before bsae64-url-encoding)
@@ -72,7 +72,7 @@ export class OAuthClientBackend extends OAuthClientBase {
         }
         setParameter("clientId", ParamType.String, options1, options, "OAUTH_CLIENT_ID", true);
         super({ jwtIssuer, 
-            tokenConsumer: new OAuthTokenConsumerBackend({ 
+            tokenConsumer: new OAuthTokenConsumer({ 
                 audience: options1.clientId, 
                 jwtIssuer, 
                 ...options }), ...options });

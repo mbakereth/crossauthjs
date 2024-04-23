@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { getAuthorizationCode } from './common';
 import { Crypto } from '../../crypto';
 import { KeyPrefix } from '@crossauth/common';
-import { OAuthTokenConsumerBackend } from '../tokenconsumer';
+import { OAuthTokenConsumer } from '../tokenconsumer';
 
 test('ResourceServer.validAccessToken', async () => {
 
@@ -26,7 +26,7 @@ test('ResourceServer.validAccessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumerBackend({
+        [new OAuthTokenConsumer({
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -55,7 +55,7 @@ test('ResourceServer.invalidPublicKey', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key-wrong.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumerBackend({
+        [new OAuthTokenConsumer({
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -96,7 +96,7 @@ test('ResourceServer.invalidAccessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumerBackend({
+        [new OAuthTokenConsumer({
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -124,7 +124,7 @@ test('ResourceServer.validCodeChallenge', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumerBackend({
+        [new OAuthTokenConsumer({
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -165,7 +165,7 @@ test('ResourceServer.validAud', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumerBackend({
+        [new OAuthTokenConsumer({
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -194,7 +194,7 @@ test('ResourceServer.invalidAud', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumerBackend({
+        [new OAuthTokenConsumer({
             audience: "wrongresourceserver",
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
@@ -225,7 +225,7 @@ test('ResourceServer.invalidIsser', async () => {
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = 
         new OAuthResourceServer(
-            [new OAuthTokenConsumerBackend({
+            [new OAuthTokenConsumer({
                 jwtKeyType: "RS256",
                 jwtPublicKey: publicKey,
                 clockTolerance: 10,
@@ -256,7 +256,7 @@ test('ResourceServer.persistAccessToken', async () => {
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = 
         new OAuthResourceServer(
-            [new OAuthTokenConsumerBackend({
+            [new OAuthTokenConsumer({
                 jwtKeyType: "RS256",
                 jwtPublicKey: publicKey,
                 clockTolerance: 10,
@@ -284,7 +284,7 @@ test('ResourceServer.validateWithJwks', async () => {
 
     const resserver = 
         new OAuthResourceServer(
-            [new OAuthTokenConsumerBackend({
+            [new OAuthTokenConsumer({
                 clockTolerance: 10,
         })]);
 

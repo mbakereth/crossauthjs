@@ -6,13 +6,13 @@ import { CrossauthError, ErrorCode, KeyPrefix } from '@crossauth/common';
 import fs from 'node:fs';
 import {
     OAuthTokenConsumerBase,
-    type OAuthTokenConsumerOptions } from '@crossauth/common';
+    type OAuthTokenConsumerBaseOptions } from '@crossauth/common';
 
 /**
- * Options for {@link OAuthTokenConsumerBackend}
+ * Options for {@link OAuthTokenConsumer}
  */
-export interface OAuthTokenConsumerBackendOptions 
-    extends OAuthTokenConsumerOptions {
+export interface OAuthTokenConsumerOptions 
+    extends OAuthTokenConsumerBaseOptions {
 
     /** Whether to persist access tokens in key storage.  Default false.
      * 
@@ -46,7 +46,7 @@ export interface OAuthTokenConsumerBackendOptions
  * It is separated into its own class as the functionality is used in both
  * the OAuth resource server and OAuth client
  */
-export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
+export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
     
     /**
      * Value passed to the constructor.  The `aud` claim must match it
@@ -68,9 +68,9 @@ export class OAuthTokenConsumerBackend extends OAuthTokenConsumerBase {
      * 
      * @param audience the `aud` claim in the access token must match
      *        this value or the token will be rejected.
-     * @param options see {@link OAuthTokenConsumerBackendOptions}
+     * @param options see {@link OAuthTokenConsumerOptions}
      */
-    constructor(options : OAuthTokenConsumerBackendOptions = {}) {
+    constructor(options : OAuthTokenConsumerOptions = {}) {
 
         const options1 : {
             jwtKeyType? : string,

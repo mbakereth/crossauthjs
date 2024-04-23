@@ -5,7 +5,7 @@ import { OpenIdConfiguration } from '@crossauth/common';
 import { getAuthorizationCode } from './oauthcommon';
 import { FastifyRequest, FastifyReply } from 'fastify';
 import fastify from 'fastify';
-import { OAuthTokenConsumerBackend } from '@crossauth/backend';
+import { OAuthTokenConsumer } from '@crossauth/backend';
 
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -53,7 +53,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
     const issuer = process.env["CROSSAUTH_OAUTH_ISSUER"]??"";
     const resserver = new FastifyOAuthResourceServer(
         app,
-        [new OAuthTokenConsumerBackend({jwtIssuer: issuer})],
+        [new OAuthTokenConsumer({jwtIssuer: issuer})],
         {},
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
@@ -99,7 +99,7 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
     const issuer = process.env["CROSSAUTH_OAUTH_ISSUER"]??"";
     const resserver = new FastifyOAuthResourceServer(
         app,
-        [new OAuthTokenConsumerBackend({jwtIssuer: issuer})],
+        [new OAuthTokenConsumer({jwtIssuer: issuer})],
         {},
     );
     app.get('/post',  async (request : FastifyRequest, reply : FastifyReply) =>  {

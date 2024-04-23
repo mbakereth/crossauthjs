@@ -105,7 +105,9 @@ app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
 // {jwtIssuer: AUTH_SERVER_URI} instead
 /*const resserver = new FastifyOAuthResourceServer(
     app, 
-    server.authServer,
+    [new OAuthTokenConsumer({
+        clockTolerance: 10,
+    })],
     {"/resource": {scope: "read write"}}, {
     resourceServerName: "https://resserver.com",
 });*/

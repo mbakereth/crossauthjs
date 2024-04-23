@@ -3,7 +3,7 @@ import { Server, IncomingMessage, ServerResponse } from 'http'
 import { CrossauthError, CrossauthLogger, j, ErrorCode } from '@crossauth/common';
 import {  OAuthResourceServer, UserStorage } from '@crossauth/backend';
 import type { OAuthResourceServerOptions } from '@crossauth/backend';
-import { OAuthTokenConsumerBackend } from '@crossauth/backend';
+import { OAuthTokenConsumer } from '@crossauth/backend';
 
 export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOptions {
     userStorage? : UserStorage;
@@ -14,7 +14,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
 
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>, 
-        tokenConsumers: OAuthTokenConsumerBackend[],
+        tokenConsumers: OAuthTokenConsumer[],
         protectedEndpoints? : {[key:string]: {scope? : string}},
         options : FastifyOAuthResourceServerOptions = {}) {
         super(tokenConsumers, options);
