@@ -48,20 +48,16 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
  * 
  * If you do set `protectedEndpoints` in 
  * {@link FastifyOAuthResourceServer.constructor}
- * then a `preHandler` and `onSend` are created.
+ * then a `preHandler` iscreated.
  * The preHandler
  * hook will set the `accessTokenPayload`, `user` and `scope` fields 
  * on the Fastify request object based on the content
  * of the access token in the `Authorization` header if it is valid.
  * If it is not valid it will set the `authError` and `authErrorDescription`.
  * If the access token is invalid, or there is an error, a 401 or 500
- * response is sent before executing your endpoint code.
- * 
- * The onSend hook sets the `WWW-Authenticate` header if the access token
- * was invalid and the response code is 401.  It adds the scopes to this
- * header if they were set in 
- * `protectedEndpoints` in 
- * {@link FastifyOAuthResourceServer.constructor}.
+ * response is sent before executing your endpoint code.  As per
+ * OAuth requirements, if the response is a 401, the WWW-Authenticate header
+ * is set.  If a scope is required this is included in that header.
  */
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
 
