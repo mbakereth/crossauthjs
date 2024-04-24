@@ -266,7 +266,7 @@ export class FastifyServer {
                     options? : FastifyOAuthClientOptions,
                 },
                 oAuthResServer? : {
-                    protectedEndpoints?: {[key:string]: {scope? : string}},
+                    protectedEndpoints?: {[key:string]: {scope? : string[]}},
                 }},
                 options: FastifyServerOptions = {}) {
 

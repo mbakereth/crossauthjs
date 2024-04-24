@@ -106,6 +106,9 @@ const JSONHDR : [string,string] =
 /**
  * This class adds admin endpoints to the Fastidfy session server
  * 
+ * This clas is not intended to be created directly.  It is created by
+ * {@link FastifySessionServer} if admin endpoints are enabled.
+ * 
  * **Endpoints that can be activated**
  * 
  * All page POST methods are passed user, csrfToken, errorCode, errorCodeName, errorMessage, errorMessages, urlPrefix,
@@ -175,6 +178,9 @@ export class FastifyAdminEndpoints {
     ///////////////////////////////////////////////////////////////////
     // Endpoints
 
+    /**
+     * Adds the `admin/createuser` GET and POST endpoints.
+     */
     addCreateUserEndpoints() {
         this.sessionServer.app.get(this.adminPrefix+'createuser', 
             async (request: FastifyRequest<{ Querystring: LoginQueryType }>,
@@ -258,6 +264,9 @@ export class FastifyAdminEndpoints {
         });
     }
 
+    /**
+     * Adds the `admin/api/createuser` POST endpoint.
+     */
     addApiCreateUserEndpoints() {
         this.sessionServer.app.post(this.adminPrefix+'api/createuser', 
             async (request: FastifyRequest<{ Body: SignupBodyType }>,
@@ -299,6 +308,9 @@ export class FastifyAdminEndpoints {
         });
     }
 
+    /**
+     * Adds the `admin/selectuser` GET and endpoint.
+     */
     addSelectUserEndpoints() {
         this.sessionServer.app.get(this.adminPrefix+'selectuser', 
             async (request: FastifyRequest<{ Querystring: SelectUserQueryType }>,
@@ -358,6 +370,9 @@ export class FastifyAdminEndpoints {
         });
     };
 
+    /**
+     * Adds the `admin/updateuser` GET and POST endpoints.
+     */
     addUpdateUserEndpoints() {
         this.sessionServer.app.get(this.adminPrefix+'updateuser/:id', 
             async (request: FastifyRequest<{ Params: UserParamType }>,
@@ -451,6 +466,9 @@ export class FastifyAdminEndpoints {
         });
     };
 
+    /**
+     * Adds the `admin/deleteuser` GET and POST endpoints.
+     */
     addDeleteUserEndpoints() {
 
         this.sessionServer.app.get(this.adminPrefix+'deleteuser/:id', 
@@ -547,6 +565,9 @@ export class FastifyAdminEndpoints {
 
     }
 
+    /**
+     * Adds the `admin/api/updateuser` POST endpoint.
+     */
     addApiUpdateUserEndpoints() {
         this.sessionServer.app.post(this.adminPrefix+'api/updateuser/:id', 
             async (request: FastifyRequest<{Params: UserParamType, Body: UpdateUserBodyType }>,
@@ -596,6 +617,9 @@ export class FastifyAdminEndpoints {
     }
 
 
+    /**
+     * Adds the `admin/changepassword` GET and POST endpoints.
+     */
     addChangePasswordEndpoints() {
         this.sessionServer.app.get(this.adminPrefix+'changepassword/:id', 
             async (request: FastifyRequest<{Params: UserParamType,  Querystring: ChangePasswordQueryType }>,
@@ -688,6 +712,9 @@ export class FastifyAdminEndpoints {
         });
     }
 
+    /**
+     * Adds the `admin/api/changepassword` POST endpoint.
+     */
     addApiChangePasswordEndpoints() {
         this.sessionServer.app.post(this.adminPrefix+'api/changepassword/:id', 
             async (request: FastifyRequest<{Params: UserParamType, Body: ChangePasswordBodyType }>,
@@ -737,6 +764,9 @@ export class FastifyAdminEndpoints {
         });
     }
 
+    /**
+     * Adds the `admin/api/deleteuser` POST endpoint.
+     */
     addApiDeleteUserEndpoints() {
 
         this.sessionServer.app.post(this.adminPrefix+'api/deleteuser/:id', 

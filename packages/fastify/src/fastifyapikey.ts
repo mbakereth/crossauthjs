@@ -16,11 +16,33 @@ export interface FastifyApiKeyServerOptions extends ApiKeyManagerOptions {
     app? : FastifyInstance<Server, IncomingMessage, ServerResponse>,
 }
 
+/**
+ * This class adds API key functionality to the Fatify server.
+ * 
+ * You shouldn't have to instantiate this directly.  It is created 
+ * when instantiating {@link FastifyServer} if enabling API key support-
+ * 
+ * API keys are bearer tokens than have to be manually created for a user.
+ * They can be used in place of username/password login and session cookies.
+ * 
+ * This class adds a `preHandler` hook that sets the `user` field in the
+ * Fastify request.  It also sets `scopes` in the request object if there
+ * is a `scope` field in the JSON object in the `data` field in in the API
+ * record in key storage.
+ */
 export class FastifyApiKeyServer {
     private app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
     private userStorage : UserStorage;
     private apiKeyManager : ApiKeyManager;
 
+    /**
+     * Constructor
+     * 
+     * @param app the Fastify app instance
+     * @param userStorage the user storage with user accounts
+     * @param keyStorage the storage for finding API keys
+     * @param options See {@link FastifyApiKeyServerOptions}
+     */
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
         userStorage: UserStorage, 

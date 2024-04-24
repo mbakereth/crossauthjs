@@ -25,6 +25,10 @@ import type {
 /////////////////////////////////////////////////////////////////////
 // Fastify data types
 
+/**
+ * Type for Fastify request body when making an updateuser request.
+ * Allows any key value since developers can add fields to the User object.
+ */
 export interface UpdateUserBodyType extends CsrfBodyType {
     [key: string] : string|undefined,
 }
@@ -92,10 +96,23 @@ const JSONHDR : [string,string] =
 ///////////////////////////////////////////////////////////////////////
 // Class
 
+/**
+ * This class provides user endpoints for the Fastify server.
+ * 
+ * Endpoints include changeing password, editing the User record, etc.
+ * 
+ * This class is not intended to be created directly.  It is created
+ * by {@link FastifySessionServer}.  For a description of the endpoints,
+ * and how to create templates for them, see that class.
+ */
 export class FastifyUserEndpoints {
     private sessionServer : FastifySessionServer;
     private enableEmailVerification : boolean = true;
     private enablePasswordReset : boolean = true;
+
+    /**
+     * The app prefix that was set during construction,
+     */
     readonly prefix : string = "/";
 
     // pages
@@ -109,6 +126,13 @@ export class FastifyUserEndpoints {
     private signupPage : string = "signup.njk";
     private deleteUserPage = "deleteuser.njk";
 
+    /**
+     * Constructor.
+     * 
+     * @param sessionServer the instance of the Fastify session server this
+     *        object belongs to
+     * @param options See {@link FastifySessionServerOptions}
+     */
     constructor(sessionServer : FastifySessionServer,
         options: FastifySessionServerOptions = {}) {
 
@@ -130,6 +154,9 @@ export class FastifyUserEndpoints {
     //////////////////////////////////////////////////////////////////
     // Endpoints
 
+    /**
+     * Adds the `updateuser` GET and POST endpoints.
+     */
     addUpdateUserEndpoints() {
         this.sessionServer.app.get(this.prefix+'updateuser', 
             async (request: FastifyRequest,
@@ -214,6 +241,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `api/updateuser` POST endpoint.
+     */
     addApiUpdateUserEndpoints() {
         this.sessionServer.app.post(this.prefix+'api/updateuser', 
             async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
@@ -258,6 +288,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `changefactor2` GET and POST endpoints.
+     */
     addChangeFactor2Endpoints() {
         this.sessionServer.app.get(this.prefix+'changefactor2', 
             async (request: FastifyRequest<{ Querystring: ChangeFactor2QueryType }>,
@@ -361,6 +394,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `api/changefactort2` POST endpoint.
+     */
     addApiChangeFactor2Endpoints() {
         this.sessionServer.app.post(this.prefix+'api/changefactor2', 
             async (request: FastifyRequest<{ Body: ChangeFactor2BodyType }>,
@@ -403,6 +439,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `changepassword` GET and POST endpoints.
+     */
     addChangePasswordEndpoints() {
         this.sessionServer.app.get(this.prefix+'changepassword', 
             async (request: FastifyRequest<{ Querystring: ChangePasswordQueryType }>,
@@ -492,6 +531,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `api/changepassword` POST endpoint.
+     */
     addApiChangePasswordEndpoints() {
         this.sessionServer.app.post(this.prefix+'api/changepassword', 
             async (request: FastifyRequest<{ Body: ChangePasswordBodyType }>,
@@ -532,6 +574,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `configurefactor2` GET and POST endpoints.
+     */
     addConfigureFactor2Endpoints() {
 
         this.sessionServer.app.get(this.prefix+'configurefactor2', 
@@ -671,6 +716,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `api/configurefactor2` POST endpoint.
+     */
     addApiConfigureFactor2Endpoints(prefix : string) {
         this.sessionServer.app.get(prefix+'api/configurefactor2', 
             async (request : FastifyRequest, reply : FastifyReply) => {
@@ -754,6 +802,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `requestpasswordreset` GET and POST endpoints.
+     */
     addRequestPasswordResetEndpoints() {
         this.sessionServer.app.get(this.prefix+'requestpasswordreset', 
         async (request : FastifyRequest<{Querystring: RequestPasswordResetQueryType}>, reply : FastifyReply) => {
@@ -827,6 +878,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `api/requestpasswordreset`POST endpoint.
+     */
     addApiRequestPasswordResetEndpoints() {
         this.sessionServer.app.post(this.prefix+'api/requestpasswordreset', 
             async (request: FastifyRequest<{ Body: RequestPasswordResetBodyType }>,
@@ -865,6 +919,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `resetpassword` GET and POST endpoints.
+     */
     addResetPasswordEndpoints() {
         this.sessionServer.app.get(this.prefix+'resetpassword/:token', 
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
@@ -933,6 +990,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `api/resetpassword` POST endpoint.
+     */
     addApiResetPasswordEndpoints() {
         this.sessionServer.app.post(this.prefix+'api/resetpassword', 
             async (request: FastifyRequest<{ Body: ResetPasswordBodyType }>,
@@ -971,6 +1031,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `verifyemail` GET and POST endpoints.
+     */
     addVerifyEmailEndpoints() {
         this.sessionServer.app.get(this.prefix+'verifyemail/:token', 
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
@@ -1011,6 +1074,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `api/verifyemail` POST endpoint.
+     */
     addApiVerifyEmailEndpoints() {
         this.sessionServer.app.get(this.prefix+'api/verifyemail/:token', 
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
@@ -1050,6 +1116,9 @@ export class FastifyUserEndpoints {
         });
     }
 
+    /**
+     * Adds the `deleteuser` GET and POST endpoints.
+     */
     addDeleteUserEndpoints() {
 
         this.sessionServer.app.get(this.prefix+'deleteuser', 
@@ -1152,6 +1221,9 @@ export class FastifyUserEndpoints {
 
     }
 
+    /**
+     * Adds the `api/deleteuser` POST endpoint.
+     */
     addApiDeleteUserEndpoints() {
 
         this.sessionServer.app.post(this.prefix+'api/deleteuser', 

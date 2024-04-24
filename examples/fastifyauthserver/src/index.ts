@@ -78,7 +78,7 @@ let server = new FastifyServer(userStorage, {
         }},
     },
     oAuthResServer: {
-        protectedEndpoints: {"/resource": {scope: "read write"}}, 
+        protectedEndpoints: {"/resource": {scope: ["read", "write"]}}, 
     }}, {
         app: app,
         views: path.join(__dirname, '../views'),
@@ -108,7 +108,7 @@ app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
     [new OAuthTokenConsumer({
         clockTolerance: 10,
     })],
-    {"/resource": {scope: "read write"}}, {
+    {"/resource": {scope: ["read", "write"]}}, {
     resourceServerName: "https://resserver.com",
 });*/
 app.get('/resource', async (request : FastifyRequest, reply : FastifyReply) =>  {

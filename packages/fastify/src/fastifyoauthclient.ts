@@ -23,43 +23,169 @@ const JSONHDR : [string,string] =
 ///////////////////////////////////////////////////////////////////////////////
 // OPTIONS
 
+/**
+ * Options for {@link FastifyOAuthClient}.
+ */
 export interface FastifyOAuthClientOptions extends OAuthClientOptions {
+
+    /** The base URL for endpoints served by this class.
+     * THe only endpöint that is created is the redirect Uri, which is
+     * `siteUrl` + `prefix` + `authzcode`,
+     */
     siteUrl ?: string,
+
+    /**
+     * The prefix between the `siteUrl` and endpoints created by this
+     * class.  See {@link FastifyOAuthClientOptions.siteUrl}.
+     */
     prefix? : string,
+
+    /**
+     * When using the BFF (backend-for-frontend) pattern, tokens are saved
+     * in the `data` field of the session ID.  They are saved in the JSON
+     * object with this field name.  Default `oatuh`.
+     */
     sessionDataName? : string,
+
+    /**
+     * The template file for rendering error messages
+     * when {@link FastifyOAuthClientOptions.errorResponseType}
+     * is `errorPage`.
+     */
     errorPage? : string,
+
+    /**
+     * The template file for asking the user for username and password
+     * in the password flow,
+     */
     passwordFlowPage? : string,
+
+    /**
+     * The template file for asking the user for an OTP in the password MFA
+     * flow.
+     */
     mfaOtpPage? : string,
+
+    /**
+     * The template file for asking the user for an OOB in the password MFA
+     * flow.
+     */
     mfaOobPage? : string,
+
+    /**
+     * The template file for telling the user that authorization was successful.
+     */
     authorizedPage? : string,
+
+    /**
+     * If the {@link FastifyOAuthClientOptions.tokenResponseType} is
+     * `saveInSessionAndRedirect`, this is the relative URL that the usder
+     * will be redirected to after authorization is complete.
+     */
     authorizedUrl? : string,
+
+    /**
+     * Relative URL to redirect user to if login is required.
+     */
     loginUrl? : string,
+
+    /**
+     * All flows listed here will require the user to login (here at the client).
+     * If if a flow is not listed here, there does not need to be a user
+     * logged in here at the client.
+     * See {@link @crossauth/common!OAuthFlows}.
+     */
     loginProtectedFlows? : string,
+
+    /**
+     * The URL to create the password flow under.  Default `passwordflow`.
+     */
     passwordFlowUrl? : string,
+
+    /**
+     * The URL to create the otp endpoint for the password mfa flow under.  
+     * This endpoint asks the user for his or her OTP.
+     * Default `passwordflowotp`.
+     */
     passwordOtpUrl? : string,
+
+    /**
+     * The URL to create the otp endpoint for the password mfa flow under.  
+     * This endpoint asks the user for his or her OOB.
+     * Default `passwordflowoob`.
+     */
     passwordOobUrl? : string,
+
+    /**
+     * This function is called after successful authorization to pass the
+     * new tokens to.
+     * @param oauthResponse the response from the OAuth `token` endpoint.
+     * @param client the fastify OAuth client
+     * @param request the Fastify request
+     * @param reply the Fastify reply
+     * @returns the Fastify reply
+     */
     receiveTokenFn?: (oauthResponse: OAuthTokenResponse,
         client: FastifyOAuthClient,
         request: FastifyRequest,
-        reply?: FastifyReply) => Promise<FastifyReply>;
+        reply?: FastifyReply) => Promise<FastifyReply|undefined>;
+
+    /**
+     * The function to call when there is an OAuth error and
+     * {@link FastifyOAuthClientOptions.errorResponseType}
+     * is `custom`.
+     * See {@link FastifyErrorFn}.
+     */
     errorFn? :FastifyErrorFn ;
+
+    /**
+     * What to do when receiving tokens.
+     * See {@link FastifyOAuthClient} class documentation for full description.
+     */
     tokenResponseType? : 
         "sendJson" | 
         "saveInSessionAndLoad" | 
         "saveInSessionAndRedirect" | 
         "sendInPage" | 
         "custom";
+
+    /**
+     * What do do on receiving an OAuth error.
+     * See lass documentation for full description.
+     */
     errorResponseType? : 
         "sendJson" | 
         "errorPage" | 
         "custom",
+
+    /** 
+     * Array of resource server endppints to serve through the
+     * BFF (backend-for-frontend) mechanism.
+     * See {@link FastifyOAuthClient} class documentation for full description.
+     */
     bffEndpoints?: {
         url: string,
         methods: ("GET" | "POST" | "PUT" | "DELETE" | "PATCH")[],
         matchSubUrls?: boolean
     }[],
+
+    /**
+     * Prefix for BFF endpoints.  Default "bff".
+     * See {@link FastifyOAuthClient} class documentation for full description.
+     */
     bffEndpointName? : string,
+
+    /**
+     * Base URL for resource server endpoints called through the BFF
+     * mechanism.
+     * See {@link FastifyOAuthClient} class documentation for full description.
+     */
     bffBaseUrl? : string,
+
+    /**
+     * Endpoints to provide to acces tokens through the BFF mechanism,
+     * See {@link FastifyOAuthClient} class documentation for full description.
+     */
     tokenEndpoints? : ("access_token"|"refresh_token"|"id_token"|
         "have_access_token"|"have_refresh"|"have_id")[],
 }
@@ -68,10 +194,16 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
 /////////////////////////////////////////////////////////////////////////////
 // FASTIFY INTERFACES
 
+/**
+ * Query type for the `authorize` Fastify request.
+ */
 interface AuthorizeQueryType {
     scope? : string,
 }
 
+/**
+ * Query type for the redirect Uri Fastify request.
+ */
 interface RedirectUriQueryType {
     code? : string,
     state?: string,
@@ -79,20 +211,32 @@ interface RedirectUriQueryType {
     error_description? : string,
 }
 
+/**
+ * Query type for the password flow Fastify request.
+ */
 interface PasswordQueryType {
     scope? : string,
 }
 
+/**
+ * Query type for the client cresentials flow Fastify request.
+ */
 interface ClientCredentialsBodyType {
     scope? : string,
     csrfToken? : string,
 }
 
+/**
+ * Query type for the refresh token flow Fastify request.
+ */
 interface RefreshTokenBodyType {
     refreshToken?: string,
     csrfToken? : string,
 }
 
+/**
+ * Body type for the password flow Fastify request.
+ */
 interface PasswordBodyType {
     username : string,
     password: string,
@@ -100,6 +244,9 @@ interface PasswordBodyType {
     csrfToken? : string,
 }
 
+/**
+ * Query type for the OTP endpoint on the password mfa flow Fastify request.
+ */
 interface PasswordOtpType {
     scope? : string,
     mfa_token : string,
@@ -107,6 +254,9 @@ interface PasswordOtpType {
     challenge_type? : string,
 }
 
+/**
+ * Query type for the OOB endpoint on the password mfa flow Fastify request.
+ */
 interface PasswordOobType {
     scope? : string,
     mfa_token : string,
@@ -162,6 +312,7 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
     return payload;
 
 }
+
 async function sendJson(oauthResponse: OAuthTokenResponse,
     _client: FastifyOAuthClient,
     _request: FastifyRequest,
@@ -391,6 +542,91 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
 ///////////////////////////////////////////////////////////////////////////////
 // CLASSES
 
+/**
+ * The Fastify implementation of the OAuth client.
+ * 
+ * Makes requests to an authorization server, using a cofigurable set
+ * of flows, which sends back errors or tokens,
+ * 
+ * When constructing this class, you define what happens with tokens that
+ * are returned, or errors that are returned.  You do this with the
+ * configuration options {@link FastifyOAuthClientOptions.tokenResponseType}
+ * and {@link FastifyOAuthClientOptions.errorResponseType}.
+ * 
+ * **{@link FastifyOAuthClientOptions.tokenResponseType}**
+ * 
+ *   - `sendJspn` the token response is sent as-is in the reply to the Fastify 
+ *      request.  In addition to the `token` endpoint response fields,
+ *      `ok: true` and `id_payload` with the decoded 
+ *      payload of the ID token are retruned.
+ *   - `saveInSessionAndLoad` the response fields are saved in the `data`
+ *      field of the session ID in key storage.  In addition, `expires_at` is 
+ *      set to the number of seconds since Epoch that the access token expires
+ *      at.  After saving, page defined in `authorizedPage` is displayed.
+ *      A consequence is the query parameters passed to the 
+ *      redirect Uri are displayed in the address bar, as the response
+ *      is to the redirect to the redirect Uri.
+ *    - saveInSessionAndRedirect` same as `saveInSessionAndLoad` except that 
+ *      a rediret is done to the `authorizedUrl` rather than displaying
+ *      `authorizedPage` template.
+ *    - `sendInPage` the `token` endpoint response is not saved in the session
+ *      but just sent as template arguments when rendering the
+ *      template in `authorizedPage`.  The JSON response fields are sent
+ *      verbatim, with the additional fild of `id_payload` which is the
+ *      decoded payload from the ID token, if present.
+ *    - `custom` the function in 
+ *       {@link FastifyOAuthClientOptions.receiveTokenFn} is called.
+ *      
+ * **{@link FastifyOAuthClientOptions.errorResponseType}**
+ * 
+ *    - `sendJson` a JSON response is sent with fields
+ *       `status`, `errorMessage`,
+ *      `errorMessages` and `errorCodeName`.
+ *    - `errorPage` the template in {@link FastifyOAuthClientOptions.errorPage}
+ *      is displayed with template parameters `status`, `errorMessage`,
+ *      `errorMessages` and `errorCodeName`.
+ *    - `custom` {@link FastifyOAuthClientOptions.errorFn} is called.
+ * 
+ * **Backend-for-Frontend (BFF)**
+ * 
+ * This class supports the backend-for-frontend (BFF) model.  You create an
+ * endpoint for every resource server endpoint you want to be able to call, by
+ * setting them in {@link FastifyOAuthClientOptions.bffEbdpoints}.  You set the
+ * {@link FastifyOAuthClientOptions.tokenResponseType} to `saveInSessionAndLoad`
+ * or `saveInSessionAndRedirect` so that tokens are saved in the session.  
+ * You also set `bffBaseUrl` to the base URL of the resource server.
+ * When you want to call a resource server endpoint, you call
+ * `siteUrl` + `prefix` + `bffEndpointName` + *`url`*. The client will
+ * pull the access token from the session, put it in the `Authorization` header
+ * and called `bffBaseUrl` + *`url`* using fetch, and return the
+ * response verbatim.  
+ * 
+ * This pattern avoids you having to store the access token in the frontend.
+ * 
+ * **Endpoints provided by this class**
+ * 
+ * In addition to the BFF endpoints above, this class provides the following 
+ * endpoints. The ENDPOINT column values can be overridden in 
+ * {@link FastifyOAuthClientOptions}. 
+ * All POST endpoints also require `csrfToken`.
+ * The Flow endpoints are only enabled if the corresponding flow is set
+ * in {@link FastifyOAuthClientOptions.validFlows}. 
+ * Token endpoints are only enabled if the corresponding endpoint is set
+ * in {@link FastifyOAuthClientOptions.tokenEndpoints}. 
+ * 
+ * | METHOD | ENDPOINT                   | GET/BODY PARAMS                 | VARIABLES PASSED/RESPONSE            | FILE                     |
+ * | ------ | -------------------------- | ------------------------------- | ------------------------------------ | ------------------------ |
+ * | GET    | `passwordflow`             | scope                           | user, scope                          | passwordFlowPage         | 
+ * | POST   | `passwordflow`             | *See OAuth password flow spec*  | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `passwordotp`              | *See Password MFA flow spec*    | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `passwordoob`              | *See Password MFA flow spec*    | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `access_token`             |                                 | *Access token payload*               |                          | 
+ * | POST   | `refresh_token`            |                                 | *Refresh token payload*              |                          | 
+ * | POST   | `id_token     `            |                                 | *ID token payload*                   |                          | 
+ * | POST   | `have_access_token`        |                                 | `ok`                                 |                          | 
+ * | POST   | `have_refresh_token`       |                                 | `ok`                                 |                          | 
+ * | POST   | `have_id_token     `       |                                 | `ok`                                 |                          | 
+ */
 export class FastifyOAuthClient extends OAuthClientBackend {
     server : FastifyServer;
     private siteUrl : string = "/";
@@ -434,6 +670,12 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     private tokenEndpoints : ("access_token"|"refresh_token"|"id_token"|
         "have_access_token"|"have_refresh"|"have_id")[] = [];
 
+    /**
+     * Constructor
+     * @param server the {@link FastifyServer} instance
+     * @param jwtIssuer the `iss` claim in the access token must match this value
+     * @param options See {@link FastifyOAuthClientOptions}
+     */
     constructor(server: FastifyServer,
         jwtIssuer: string,
         options: FastifyOAuthClientOptions) {
@@ -807,7 +1049,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 return await this.passwordPost(false, request, reply);
             });
 
-            this.server.app.post(this.prefix+"api/"+this.passwordFlowUrl, 
+            /*this.server.app.post(this.prefix+"api/"+this.passwordFlowUrl, 
                 async (request : FastifyRequest<{ Body: PasswordBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
@@ -818,7 +1060,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         user: request.user?.username
                     }));
                 return await this.passwordPost(true, request, reply);
-            });
+            });*/
 
         }
 
@@ -849,7 +1091,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 return await this.passwordOob(false, request, reply);
             });
 
-            if (this.validFlows.includes(OAuthFlows.PasswordMfa)) {
+            /*if (this.validFlows.includes(OAuthFlows.PasswordMfa)) {
                 this.server.app.post(this.prefix+"api/"+this.passwordOtpUrl, 
                     async (request : FastifyRequest<{ Body: PasswordOtpType }>, 
                         reply : FastifyReply) =>  {
@@ -875,7 +1117,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         }));
                     return await this.passwordOob(true, request, reply);
                 });
-            }
+            }*/
         }
  
 

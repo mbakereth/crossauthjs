@@ -1,3 +1,4 @@
+import { FastifyAdminEndpoints } from './fastifyadminendpoints';
 import {
     type FastifyRequest,
     type FastifyReply } from 'fastify';
@@ -20,6 +21,15 @@ import {
     OAuthClientManager,
     OAuthClientStorage } from '@crossauth/backend';
 
+/**
+ * The `selectclient` and `admin/selectclient` endpoints have a customisable
+ * function for searching for a client.  This is the default 
+ * @param searchTerm the search term passed in the query string
+ * @param clientStorage the client storage to search
+ * @param userId the user id to se3arch for, or null for clients not owned
+ *        by a user
+ * @returns An array of matching {@link @crossauth/common!OAuthClient} objects,
+ */
 export async function defaultClientSearchFn(searchTerm: string,
     clientStorage: OAuthClientStorage, userId? : string|number|null) : Promise<OAuthClient[]> {
         let clients : OAuthClient[] = [];
@@ -50,6 +60,9 @@ export async function defaultClientSearchFn(searchTerm: string,
 /////////////////////////////////////////////////////////////////////
 // Fastify data types
 
+/**
+ * The query type for Fastify selectclient requests,
+ */
 export interface SelectClientQueryType {
     userId? : string|number,
     next? : string,
@@ -61,11 +74,17 @@ export interface SelectClientQueryType {
     havePrevious? : boolean,
 }
 
+/**
+ * The query type for Fastify createclient requests,
+ */
 export interface CreateClientQueryType {
     next? : string;
     userId? : string|number,
 }
 
+/**
+ * The body type for Fastify selectclient requests,
+ */
 export interface CreateClientBodyType extends CsrfBodyType {
     clientName : string,
     confidential? : string,
@@ -82,10 +101,16 @@ export interface CreateClientBodyType extends CsrfBodyType {
     next? : string,
 }
 
+/**
+ * The query type for Fastify updateclient requests,
+ */
 export interface UpdateClientQueryType {
     next? : string;
 }
 
+/**
+ * The body type for Fastify updateclient requests,
+ */
 export interface UpdateClientBodyType extends CsrfBodyType {
     clientName : string,
     confidential? : string,
@@ -103,14 +128,23 @@ export interface UpdateClientBodyType extends CsrfBodyType {
     resetSecret? : string,
 }
 
+/**
+ * The param type for Fastify deleteclient requests,
+ */
 export interface DeleteClientParamType {
     clientId : string
 }
 
+/**
+ * The param type for Fastify updateclient requests,
+ */
 export interface UpdateClientParamType {
     clientId : string
 }
 
+/**
+ * The query type for Fastify deleteclient requests,
+ */
 export interface DeleteClientQueryType {
     next? : string
 }
@@ -121,6 +155,15 @@ const JSONHDR : [string,string] =
 ///////////////////////////////////////////////////////////////////////
 // Class
 
+/**
+ * This class adds admin endpoints for manipulating OAuth clients.
+ * 
+ * It is not intended to be instantiated directly.  It is created
+ * by {@link FastifySessionServer} if admin endpoints and oauth endpoints
+ * are enabled.
+ * 
+ * For endpoints, see {@link FastifyAdminEndpoints}.
+ */
 export class FastifyAdminClientEndpoints {
     private sessionServer : FastifySessionServer;
     private clientStorage : OAuthClientStorage;
@@ -164,6 +207,9 @@ export class FastifyAdminClientEndpoints {
     ///////////////////////////////////////////////////////////////////
     // Endpoints
 
+    /**
+     * Adds the `admin/selectclient` GET endpoint.
+     */
     addSelectClientEndpoints() {
         this.sessionServer.app.get(this.adminPrefix+'selectclient', 
             async (request: FastifyRequest<{ Querystring: SelectClientQueryType }>,
@@ -237,6 +283,9 @@ export class FastifyAdminClientEndpoints {
         });
     };
 
+    /**
+     * Adds the `admin/createclient` GET and POST endpoints.
+     */
     addCreateClientEndpoints() {
 
         this.sessionServer.app.get(this.adminPrefix+'createclient', 
@@ -356,6 +405,9 @@ export class FastifyAdminClientEndpoints {
 
     }
 
+    /**
+     * Adds the `admin/updateclient` GET and POST endpoints.
+     */
     addUpdateClientEndpoints() {
 
         this.sessionServer.app.get(this.adminPrefix+'updateclient/:clientId', 
@@ -507,6 +559,9 @@ export class FastifyAdminClientEndpoints {
 
     }
 
+    /**
+     * Adds the `admin/deleteclient` GET and POST endpoints.
+     */
     addDeleteClientEndpoints() {
 
         this.sessionServer.app.get(this.adminPrefix+'deleteclient/:clientId', 
@@ -601,6 +656,9 @@ export class FastifyAdminClientEndpoints {
 
     }
 
+    /**
+     * Adds the `admin/api/createclient` POST endpoint.
+     */
     addApiCreateClientEndpoints() {
 
         this.sessionServer.app.post(this.adminPrefix+'api/createclient', 
@@ -647,6 +705,9 @@ export class FastifyAdminClientEndpoints {
         });
     }
 
+    /**
+     * Adds the `admin/api/updateclient` POST endpoint.
+     */
     addApiUpdateClientEndpoints() {
 
         this.sessionServer.app.post(this.adminPrefix+'api/updateclient/:clientId', 
@@ -699,6 +760,9 @@ export class FastifyAdminClientEndpoints {
 
     }
 
+    /**
+     * Adds the `admin/api/deleteclient` POST endpoint.
+     */
     addApiDeleteClientEndpoints() {
 
         this.sessionServer.app.post(this.adminPrefix+'api/deleteclient/:clientId', 

@@ -100,7 +100,9 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
     const resserver = new FastifyOAuthResourceServer(
         app,
         [new OAuthTokenConsumer({jwtIssuer: issuer})],
-        {},
+        {
+            "/post" : {}
+        }
     );
     app.get('/post',  async (request : FastifyRequest, reply : FastifyReply) =>  {
         reply.header(...JSONHDR).send({token: request.accessTokenPayload});

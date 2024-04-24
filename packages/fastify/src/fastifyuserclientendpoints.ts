@@ -37,6 +37,16 @@ const JSONHDR : [string,string] =
 ///////////////////////////////////////////////////////////////////////
 // Class
 
+/**
+ * This class provides user endpoints for the Fastify server for manipulating
+ * OAuth clients.
+ * 
+ * Endpoints include changeing password, editing the User record, etc.
+ * 
+ * This class is not intended to be created directly.  It is created
+ * by {@link FastifySessionServer}.  For a description of the endpoints,
+ * and how to create templates for them, see that class.
+ */
 export class FastifyUserClientEndpoints {
     private sessionServer : FastifySessionServer;
     private clientStorage : OAuthClientStorage;
@@ -54,6 +64,11 @@ export class FastifyUserClientEndpoints {
     private updateClientPage = "updateclient.njk";
     private deleteClientPage = "deleteclient.njk";
 
+    /**
+     * Constructor
+     * @param sessionServer instance of the Fatify session server this is being added to
+     * @param options See {@link FastifySessionServerOptions}
+     */
     constructor(sessionServer : FastifySessionServer,
         options: FastifySessionServerOptions = {}) {
 
@@ -80,6 +95,9 @@ export class FastifyUserClientEndpoints {
     ///////////////////////////////////////////////////////////////////
     // Endpoints
 
+    /**
+     * Adds the `selectclient` GET endpoint.
+     */
     addSelectClientEndpoints() {
         this.sessionServer.app.get(this.prefix+'selectclient', 
             async (request: FastifyRequest<{ Querystring: SelectClientQueryType }>,
@@ -146,6 +164,9 @@ export class FastifyUserClientEndpoints {
         });
     };
 
+    /**
+     * Adds the `createclient` GET and POST endpoints.
+     */
     addCreateClientEndpoints() {
 
         this.sessionServer.app.get(this.prefix+'createclient', 
@@ -241,6 +262,9 @@ export class FastifyUserClientEndpoints {
 
     }
 
+    /**
+     * Adds the `api/createclient` POST endpointss.
+     */
     addApiCreateClientEndpoints() {
 
         this.sessionServer.app.post(this.prefix+'api/createclient', 
@@ -286,6 +310,9 @@ export class FastifyUserClientEndpoints {
 
     }
 
+    /**
+     * Adds the `updateclient` GET and POST endpoints.
+     */
     addUpdateClientEndpoints() {
 
         this.sessionServer.app.get(this.prefix+'updateclient/:clientId', 
@@ -437,6 +464,9 @@ export class FastifyUserClientEndpoints {
 
     }
 
+    /**
+     * Adds the `api/updateclient` POST endpoints.
+     */
     addApiUpdateClientEndpoints() {
 
         this.sessionServer.app.post(this.prefix+'api/updateclient/:clientId', 
@@ -489,6 +519,9 @@ export class FastifyUserClientEndpoints {
 
     }
 
+    /**
+     * Adds the `deleteclient` GET and POST endpoints.
+     */
     addDeleteClientEndpoints() {
 
         this.sessionServer.app.get(this.prefix+'deleteclient/:clientId', 
@@ -592,6 +625,9 @@ export class FastifyUserClientEndpoints {
 
     }
 
+    /**
+     * Adds the `api/deleteclient` POST endpoint.
+     */
     addApiDeleteClientEndpoints() {
 
         this.sessionServer.app.post(this.prefix+'api/deleteclient/:clientId', 
