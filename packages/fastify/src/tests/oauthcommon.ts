@@ -63,10 +63,10 @@ export async function getAuthServer({
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         issueRefreshToken: true,
         emptyScopeIsValid: emptyScopeIsValid,
-        validFlows: "all",
+        validFlows: ["all"],
         userStorage,
     };
     if (aud) options.audience = aud;

@@ -195,7 +195,7 @@ export class FastifyAdminClientEndpoints {
         setParameter("updateClientPage", ParamType.String, this, options, "UPDATE_CLIENT_PAGE");
         setParameter("selectClientPage", ParamType.String, this, options, "SELECT_CLIENT_PAGE");
         setParameter("deleteClientPage", ParamType.String, this, options, "DELETE_CLIENT_PAGE");
-        setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();

@@ -27,7 +27,7 @@ export interface UserStorageOptions {
      * Fields that users are allowed to edit.  Any fields passed to a create or
      * update call that are not in this list will be ignored.
      */
-	userEditableFields? : string,
+	userEditableFields? : string[],
 }
 
 /**
@@ -48,7 +48,7 @@ export abstract class UserStorage {
      * @param options See {@link UserStorageOptions}
      */
     constructor(options : UserStorageOptions = {}) {
-        setParameter("userEditableFields", ParamType.StringArray, this, options, "USER_EDITABLE_FIELDS");
+        setParameter("userEditableFields", ParamType.JsonArray, this, options, "USER_EDITABLE_FIELDS");
     }
 
     /**

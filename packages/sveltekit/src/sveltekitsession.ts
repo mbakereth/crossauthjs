@@ -21,7 +21,7 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      */
     validateSession? : (session: Key, user: User|undefined, event : RequestEvent) => void;
 
-    factor2ProtectedEndpoints?: string,
+    factor2ProtectedEndpoints?: string[],
 
     prefix? : string,
 
@@ -53,7 +53,7 @@ export class SvelteKitSessionServer {
 
         setParameter("prefix", ParamType.String, this, options, "PREFIX");
         if (!this.prefix.endsWith("/")) this.prefix += "/";
-        setParameter("factor2ProtectedEndpoints", ParamType.StringArray, this, options, "FACTOR2_PROTECTED_ENDPOINTS");
+        setParameter("factor2ProtectedEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_ENDPOINTS");
 
         if (options.validateSession) this.validateSession = options.validateSession;
 

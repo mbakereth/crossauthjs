@@ -155,11 +155,11 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
 
     /** See `validateScopes`.  This should be a comma separated list, case 
      * sensitive, default empty */
-    validScopes? : string,
+    validScopes? : string[],
 
     /** Flows to support.  A comma-separated list from {@link OAuthFlows}.  
-     * If `all`, there must be none other in the list.  Default `all` */
-    validFlows? : string,
+     * If [`all`], there must be none other in the list.  Default [`all`] */
+    validFlows? : string[],
 
     /** Required if emptyScopeIsValid is false */
     authStorage? : OAuthAuthorizationStorage,
@@ -171,12 +171,12 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
      * `{"scope": "all"}` or `{"scope": {"idtokenfield" : "userfield"}}`.
      * If `scope` is `all` then it applies to all scopes
      */
-    idTokenClaims? : string;
+    idTokenClaims? : {[key:string] : string|string[]|{[key:string]:string}};
 
     /**
      * The 2FA factors that are allowed for the Password MFA flow.
      */
-    allowedFactor2? : string,
+    allowedFactor2? : string[],
 
 }
 
@@ -289,10 +289,10 @@ export class OAuthAuthorizationServer {
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
         setParameter("validateScopes", ParamType.Boolean, this, options, "OAUTH_VALIDATE_SCOPES");
         setParameter("emptyScopeIsValid", ParamType.Boolean, this, options, "OAUTH_EMPTY_SCOPE_VALID");
-        setParameter("validScopes", ParamType.StringArray, this, options, "OAUTH_VALID_SCOPES");
-        setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("validScopes", ParamType.JsonArray, this, options, "OAUTH_VALID_SCOPES");
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
         setParameter("idTokenClaims", ParamType.Json, this, options, "OAUTH_ID_TOKEN_CLAIMS");
-        setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
+        setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
 
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {

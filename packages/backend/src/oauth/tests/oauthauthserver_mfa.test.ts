@@ -112,7 +112,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlow', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -190,7 +190,7 @@ test('AuthorizationServer.Mfa.invalidMfa1', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -266,7 +266,7 @@ test('AuthorizationServer.Mfa.invalidMfa2', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -320,7 +320,7 @@ test('AuthorizationServer.Mfa.invalidMfa3', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -365,7 +365,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlow', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -440,7 +440,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidMFAToken', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -513,7 +513,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOTP', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -587,7 +587,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOOBCode', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -660,7 +660,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 
@@ -773,7 +773,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
 

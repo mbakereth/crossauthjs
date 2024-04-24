@@ -95,7 +95,7 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
      * logged in here at the client.
      * See {@link @crossauth/common!OAuthFlows}.
      */
-    loginProtectedFlows? : string,
+    loginProtectedFlows? : string[],
 
     /**
      * The URL to create the password flow under.  Default `passwordflow`.
@@ -691,7 +691,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("authorizedPage", ParamType.String, this, options, "AUTHORIZED_PAGE");
         setParameter("authorizedUrl", ParamType.String, this, options, "AUTHORIZED_URL");
-        setParameter("loginProtectedFlows", ParamType.StringArray, this, options, "OAUTH_LOGIN_PROTECTED_FLOWS");
+        setParameter("loginProtectedFlows", ParamType.JsonArray, this, options, "OAUTH_LOGIN_PROTECTED_FLOWS");
         setParameter("passwordFlowUrl", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_URL");
         setParameter("passwordOtpUrl", ParamType.String, this, options, "OAUTH_PASSWORD_OTP_URL");
         setParameter("passwordOobUrl", ParamType.String, this, options, "OAUTH_PASSWORD_OOB_URL");

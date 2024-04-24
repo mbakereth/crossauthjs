@@ -147,12 +147,12 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
         }}, {
         app: app,
         views: path.join(__dirname, '../views'),
-        allowedFactor2: "none",
+        allowedFactor2: ["none"],
         enableEmailVerification: false,
         siteUrl: `http://localhost:3000`,
         clientId: "ABC",
         clientSecret: "DEF",
-        validFlows: "all", // activate all OAuth flows
+        validFlows: ["all"], // activate all OAuth flows
         tokenResponseType: "sendJson",
         errorResponseType: "sendJson",
         secret: "ABC",

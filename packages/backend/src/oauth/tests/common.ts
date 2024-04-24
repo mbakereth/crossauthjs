@@ -42,7 +42,7 @@ export async function getAuthServer({
     emptyScopeIsValid? : boolean, 
     secretRequired? : boolean,
     rollingRefreshToken? : boolean,
-    idTokenClaims? : string,
+    idTokenClaims? :  {scope? : string|string[]|{[key:string]:string}},
 } = {}) {
     const {clientStorage, client} = await createClient(secretRequired == undefined || secretRequired == true);
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
@@ -53,10 +53,10 @@ export async function getAuthServer({
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         jwtKeyType: "RS256",
         validateScopes : true,
-        validScopes: "read, write, openid, email1",
+        validScopes: ["read", "write", "openid", "email1"],
         issueRefreshToken: true,
         emptyScopeIsValid: emptyScopeIsValid,
-        validFlows: "all",
+        validFlows: ["all"],
         userStorage,
         idTokenClaims,
     };
@@ -90,7 +90,7 @@ export async function getAuthorizationCode({
      persistAccessToken? : boolean,
      rollingRefreshToken? : boolean,
      scopes? : string,
-     idTokenClaims? : string,
+     idTokenClaims? :  {[key:string] : string[]|{[key:string]:string}},
     } = {}) {
     const secretRequired = challenge == undefined;
     const { client,

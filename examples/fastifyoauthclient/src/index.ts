@@ -64,11 +64,11 @@ const server = new FastifyServer(userStorage, {
     }}, {
     app: app,
     views: path.join(__dirname, '../views'),
-    allowedFactor2: "none",
+    allowedFactor2: ["none"],
     enableEmailVerification: false,
     siteUrl: process.env["RESOURCE_SERVER"],
     loginUrl: "login",
-    validFlows: "all", // activate all OAuth flows
+    validFlows: ["all"], // activate all OAuth flows
     loginProtectedFlows: OAuthFlows.AuthorizationCode + ", " + OAuthFlows.AuthorizationCodeWithPKCE,
     tokenResponseType: "saveInSessionAndRedirect",
     bffEndpoints: [{url: "/resource", methods: ["GET"]}],

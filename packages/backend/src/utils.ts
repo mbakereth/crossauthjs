@@ -8,8 +8,8 @@ export enum ParamType {
     String = 0,
     Number,
     Boolean,
-    StringArray,
     Json,
+    JsonArray,
 }
 
 function getOption(param : string, options: {[key:string]: any}) {
@@ -36,21 +36,12 @@ function hasOption(param : string, options: {[key:string]: any}) : boolean {
 
 function setFromOption(instance : any, param : string, type : ParamType, options : {[key:string]: any}) {
     const value = getOption(param, options);
-    if (type == ParamType.StringArray) {
-        instance[param.replace(".", "_")] = value.split(/ *, */);
-    } else if (type == ParamType.Json) {
-        instance[param.replace(".", "_")] = JSON.parse(value);
-    } else {
-        instance[param.replace(".", "_")] = value;
-    }
+    instance[param.replace(".", "_")] = value;
 }
 
 function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvFile : string) {
     const key = param.replace(".", "_");
     switch (type) {
-        case ParamType.StringArray:
-            instance[key] = (process.env[nameInEnvFile]??"")?.split(/ *, */);
-            break;
         case ParamType.String:
             instance[key] = process.env[nameInEnvFile]=="null" ? null : process.env[nameInEnvFile];
             break;
@@ -62,6 +53,9 @@ function setFromEnv(instance : any, param : string, type : ParamType, nameInEnvF
             break;
         case ParamType.Json:
             instance[key] = JSON.parse((process.env[nameInEnvFile]??"{}"));
+            break;
+        case ParamType.JsonArray:
+            instance[key] = JSON.parse((process.env[nameInEnvFile]??"[]"));
             break;
         }
 }

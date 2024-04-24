@@ -52,7 +52,7 @@ export interface FastifySessionServerOptions
 
     /** List of endpoints to add to the server ("login", "api/login", etc, 
      *  prefixed by the `prefix` parameter.  Empty for allMinusOAuth.  Default allMinusOAuth. */
-    endpoints? : string,
+    endpoints? : string[],
 
     /** Page to redirect to after successful login, default "/" */
     loginRedirect? : string;
@@ -192,7 +192,7 @@ export interface FastifySessionServerOptions
      *   `/resetpassword`,
      *   `/changefactor2`,
      */
-    factor2ProtectedPageEndpoints?: string,
+    factor2ProtectedPageEndpoints?: string[],
 
     /**
      * These page endpoints need the second factor to be entered.  Making
@@ -209,7 +209,7 @@ export interface FastifySessionServerOptions
      *   `/api/resetpassword`,
      *   `/api/changefactor2`,
      */
-    factor2ProtectedApiEndpoints?: string,
+    factor2ProtectedApiEndpoints?: string[],
 
     /**
      * This parameter affects users who are not logged in with a session ID
@@ -912,11 +912,11 @@ export class FastifySessionServer {
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
         setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
-        setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
+        setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
-        setParameter("factor2ProtectedPageEndpoints", ParamType.StringArray, this, options, "FACTOR2_PROTECTED_PAGE_ENDPOINTS");
-        setParameter("factor2ProtectedApiEndpoints", ParamType.StringArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
+        setParameter("factor2ProtectedPageEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_PAGE_ENDPOINTS");
+        setParameter("factor2ProtectedApiEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
         setParameter("enableAdminEndpoints", ParamType.Boolean, this, options, "ENABLE_ADMIN_ENDPOINTS");
         setParameter("enableOAuthClientManagement", ParamType.Boolean, this, options, "ENABLE_OAUTH_CLIENT_MANAGEMENT");
 
@@ -934,7 +934,7 @@ export class FastifySessionServer {
         if (this.enableEmailVerification) this.endpoints = [...this.endpoints, ...EmailVerificationPageEndpoints, ...EmailVerificationApiEndpoints];
         if (this.enablePasswordReset) this.endpoints = [...this.endpoints, ...PasswordResetPageEndpoints, ...PasswordResetApiEndpoints];
         if (options.endpoints) {
-            setParameter("endpoints", ParamType.StringArray, this, options, "SESSION_ENDPOINTS");
+            setParameter("endpoints", ParamType.JsonArray, this, options, "SESSION_ENDPOINTS");
             if (this.endpoints.length == 1 && this.endpoints[0] == "all") this.endpoints = AllEndpoints;
             if (this.endpoints.length == 1 && this.endpoints[0] == "allMinusOAuth") this.endpoints = AllEndpointsMinusOAuth;
         }
@@ -967,7 +967,7 @@ export class FastifySessionServer {
         this.addEndpoints();
 
 
-        setParameter("endpoints", ParamType.StringArray, this, options, "ENDPOINTS");
+        setParameter("endpoints", ParamType.JsonArray, this, options, "ENDPOINTS");
 
         this.userStorage = userStorage;
         this.authenticators = authenticators;

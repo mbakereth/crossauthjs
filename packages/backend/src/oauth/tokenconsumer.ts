@@ -87,7 +87,6 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
         setParameter("jwtSecretKey", ParamType.String, this, options, "JWT_SECRET_KEY");
         setParameter("jwtPublicKey", ParamType.String, this, options, "JWT_PUBLIC_KEY");
         setParameter("clockTolerance", ParamType.Number, this, options, "OAUTH_CLOCK_TOLERANCE");
-        setParameter("oauthIssuers", ParamType.StringArray, this, options, "OAUTH_ISSUER");
         setParameter("persistAccessToken", ParamType.Boolean, this, options, "OAUTH_PERSIST_ACCESS_TOKEN");
 
         this.keyStorage = options.keyStorage;

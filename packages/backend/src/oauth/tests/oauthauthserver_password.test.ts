@@ -22,7 +22,7 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
     const {access_token, error}
@@ -53,7 +53,7 @@ test('AuthorizationServer.passwordFlow.incorrectPassword', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage: userStorage,
     });
     const {access_token, error}

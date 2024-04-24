@@ -26,7 +26,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage, 
     });
 
@@ -65,7 +65,7 @@ test('AuthorizationServer.AuthzCodeFlow.scopePersistence', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         authStorage : authStorage,
         userStorage,
     });
@@ -107,7 +107,7 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeDisallowed', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         emptyScopeIsValid: false,
         authStorage : authStorage,
         userStorage,
@@ -143,7 +143,7 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeAllowed', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         authStorage : authStorage,
         emptyScopeIsValid: true,
         userStorage,
@@ -180,7 +180,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
         jwtPrivateKey : privateKey,
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage,
     });
     const inputState = "ABCXYZ";
@@ -218,7 +218,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyPr
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKey : publicKey,
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage,
     });
     const inputState = "ABCXYZ";
@@ -256,7 +256,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKeyFi
         jwtSecretKeyFile : "keys/secretkey.txt",
         jwtAlgorithm: "HS256",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage,
     });
     const inputState = "ABCXYZ";
@@ -293,7 +293,7 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKey',
         jwtSecretKey : secretKey,
         jwtAlgorithm: "HS256",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage,
     });
     const inputState = "ABCXYZ";
@@ -329,7 +329,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidScope', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage,
     });
     const inputState = "ABCXYZ";
@@ -358,7 +358,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidRedirectUri', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage,
     });
     const inputState = "ABCXYZ";
@@ -381,7 +381,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKeyInConstructor', async () => {
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         jwtSecretKeyFile : "keys/secretkey.txt",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
 
     } 
     await expect(async () => {new OAuthAuthorizationServer(clientStorage,
@@ -404,7 +404,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidResponseType', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage,
     });
     const inputState = "ABCXYZ";
@@ -434,7 +434,7 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
         jwtPrivateKeyFile : "keys/rsa-private-key.pem",
         jwtPublicKeyFile : "keys/rsa-public-key-wrong.pem",
         validateScopes : true,
-        validScopes: "read, write",
+        validScopes: ["read", "write"],
         userStorage,
     });
     const inputState = "ABCXYZ";
@@ -678,7 +678,7 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdToken', async () => {
 test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenAllClaims', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({scopes: "read write openid",
-        idTokenClaims: '{"all": {"email1": "email"}}'});
+        idTokenClaims: {"all": {"email1": "email"}}});
     const {access_token, refresh_token, expires_in, error, error_description, id_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
@@ -722,7 +722,7 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenAllClaims', async 
 test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenSCopedClaims', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode({scopes: "read write openid email1",
-        idTokenClaims: '{"email1": {"email1": "email"}}'});
+        idTokenClaims: {"email1": {"email1": "email"}}});
     const {access_token, refresh_token, expires_in, error, error_description, id_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 

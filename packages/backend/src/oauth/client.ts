@@ -44,7 +44,7 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
     /**
      * Set of flows to enable (see {@link @crossauth/common!OAuthFlows})
      */
-    validFlows? : string,
+    validFlows? : string[],
 }
 
 /**
@@ -82,7 +82,7 @@ export class OAuthClientBackend extends OAuthClientBase {
         setParameter("clientId", ParamType.String, this, options, "OAUTH_CLIENT_ID");
         setParameter("clientSecret", ParamType.String, this, options, "OAUTH_CLIENT_SECRET");
         setParameter("codeChallengeMethod", ParamType.String, this, options, "OAUTH_CODE_CHALLENGE_METHOD");
-        setParameter("validFlows", ParamType.StringArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
         if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();
         } else {

@@ -64,7 +64,7 @@ export interface SessionManagerOptions extends TokenEmailerOptions {
      * The name corresponds to the key you give when adding authenticators.
      * See `authentiators` in {@link SessionManager.constructor}.
      */
-    allowedFactor2? : string,
+    allowedFactor2? : string[],
 
 }
 
@@ -109,7 +109,7 @@ export class SessionManager {
         this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options??{}});
         this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options??{}});
 
-        setParameter("allowedFactor2", ParamType.StringArray, this, options, "ALLOWED_FACTOR2");
+        setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
         this.emailTokenStorage = this.keyStorage;

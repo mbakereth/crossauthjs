@@ -18,7 +18,7 @@ export interface LdapUserStorageOptions extends UserStorageOptions {
     /** Utl running LDAP server. eg ldap://ldap.example.com or ldaps://ldap,example.com:1636 
      *  No default (required)
      */
-    ldapUrls? : string,
+    ldapUrls? : string[],
 
     /** Search base, for user queries, eg  `ou=users,dc=example,dc=com`.  Default empty */
     ldapUserSearchBase? : string,
@@ -68,7 +68,7 @@ export class LdapUserStorage extends UserStorage {
     constructor(localStorage : UserStorage, options : LdapUserStorageOptions = {}) {
         super(options);
         this.localStorage = localStorage;
-        setParameter("ldapUrls", ParamType.StringArray, this, options, "LDAP_URL", true);
+        setParameter("ldapUrls", ParamType.JsonArray, this, options, "LDAP_URL", true);
         setParameter("ldapUserSearchBase", ParamType.String, this, options, "LDAP_USER_SEARCH_BASE");
         setParameter("ldapUsernameAttribute", ParamType.String, this, options, "LDAP_USENAME_ATTRIBUTE");
         if (options.createUserFn) this.createUserFn = options.createUserFn;
