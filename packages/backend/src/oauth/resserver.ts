@@ -1,8 +1,5 @@
 import {  CrossauthError, ErrorCode, CrossauthLogger, j } from '@crossauth/common';
-import { setParameter, ParamType } from '../utils';
-import {
-    OAuthTokenConsumer,
-    type OAuthTokenConsumerOptions } from './tokenconsumer';
+import { OAuthTokenConsumer } from './tokenconsumer';
 import * as jose from 'jose';
 
 /**

@@ -31,7 +31,7 @@ beforeAll(async () => {
     fetchMocker.doMock();
 });
 
-test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
+test('FastifyOAuthResourceServer.validAndInvalidAccessToken_authorized', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
@@ -54,7 +54,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
     const resserver = new FastifyOAuthResourceServer(
         app,
         [new OAuthTokenConsumer({jwtIssuer: issuer})],
-        {},
+        {}
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await resserver.tokenConsumers[issuer].loadConfig();
@@ -77,7 +77,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken', async () => {
 
 const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=utf-8'];
 
-test('FastifyOAuthResourceServer.preHandlerHook', async () => {
+test('FastifyOAuthResourceServer.validAndInvalidAccessToken_endpoint', async () => {
 
     const {authServer, client, code} = await getAuthorizationCode();
     const {access_token, error, error_description}
@@ -100,13 +100,14 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
     const resserver = new FastifyOAuthResourceServer(
         app,
         [new OAuthTokenConsumer({jwtIssuer: issuer})],
-        {
-            "/post" : {}
-        }
+        {"/endpoint" : {}}
     );
-    app.get('/post',  async (request : FastifyRequest, reply : FastifyReply) =>  {
+    app.get('/endpoint',  async (request : FastifyRequest, reply : FastifyReply) =>  {
         reply.header(...JSONHDR).send({token: request.accessTokenPayload});
     });
+
+    let res;
+    let body;
 
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await resserver.tokenConsumers[issuer].loadConfig();
@@ -116,15 +117,25 @@ test('FastifyOAuthResourceServer.preHandlerHook', async () => {
     const reply : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token}
     }
-    const resp1 = await resserver["authorized"](reply);
-    expect(resp1?.authorized).toBe(true);
 
-    // @ts-ignore
-    const reply2 : FastifyRequest = {
+    res = await app.inject({
+        method: "GET",
+        url: "/endpoint",
+        headers: {authorization: "Bearer " + access_token}
+    });
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body)
+    expect(body.token).toBeDefined();
+
+    res = await app.inject({
+        method: "GET",
+        url: "/endpoint",
         headers: {authorization: "Bearer " + access_token+"x"}
-    }
-    const resp2 = await resserver["authorized"](reply2);
-    expect(resp2?.authorized).toBe(false);
+    });
+    expect(res.statusCode).toBe(401);
+    body = JSON.parse(res.body)
+    expect(body.token).toBeUndefined();
+
 });
 
 afterAll(async () => {
