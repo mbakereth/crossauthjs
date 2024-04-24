@@ -26,11 +26,12 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
     userStorage? : UserStorage;
 
     /**
-     * If you enabled {@link OAuthResourceServerOptions.protectedEndpoints}
+     * If you enabled `protectedEndpoints` in 
+     * {@link FastifyOAuthResourceServer.constructor}
      * and the access token is invalid, a 401 reply will be sent before
      * your endpoint is hit.  This will be the body,  Default {}.
      */
-    errorBody? : {[key:string]:any}
+    errorBody? : {[key:string]:any};
 }
 
 /**
@@ -40,11 +41,13 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
  * {@link FastifyServer}.  
  * 
  * There are two way of using this class.  If you don't set
- * {@link OAuthResourceServerOptions.protectedEndpoints}, then in your
+ * `protectedEndpoints` in 
+ * {@link FastifyOAuthResourceServer.constructor}, then in your
  * protected endpoints, call {@link FastifyOAuthResourceServer.authorized}
  * to check if the access token is valid and get any user credentials.
  * 
- * If you do set {@link OAuthResourceServerOptions.protectedEndpoints}
+ * If you do set `protectedEndpoints` in 
+ * {@link FastifyOAuthResourceServer.constructor}
  * then a `preHandler` and `onSend` are created.
  * The preHandler
  * hook will set the `accessTokenPayload`, `user` and `scope` fields 
@@ -57,7 +60,8 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
  * The onSend hook sets the `WWW-Authenticate` header if the access token
  * was invalid and the response code is 401.  It adds the scopes to this
  * header if they were set in 
- * {@link OAuthResourceServerOptions.protectedEndpoints}.
+ * `protectedEndpoints` in 
+ * {@link FastifyOAuthResourceServer.constructor}.
  */
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
 
