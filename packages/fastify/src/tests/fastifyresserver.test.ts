@@ -133,6 +133,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_endpoint', async () 
         headers: {authorization: "Bearer " + access_token+"x"}
     });
     expect(res.statusCode).toBe(401);
+    expect(res.headers['www-authenticate']).toBe("Bearer");
     body = JSON.parse(res.body)
     expect(body.token).toBeUndefined();
 

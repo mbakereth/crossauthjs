@@ -114,9 +114,13 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                 if (!authResponse) {
                     request.authError = "access_denied"
                     request.authErrorDescription = "No access token";
-                    return reply.status(401).send(this.errorBody);
+                    const authenticateHeader = this.authenticateHeader(request);
+                    return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
                 }
-                if (!authResponse.authorized) return reply.status(401).send(this.errorBody);
+                if (!authResponse.authorized) {
+                    const authenticateHeader = this.authenticateHeader(request);
+                    return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
+                }
                 request.accessTokenPayload = authResponse.tokenPayload;
                 request.user = authResponse.user;
                 if (authResponse.tokenPayload?.scope) {
@@ -148,7 +152,8 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                 request.authType = "oauth";
                 request.authError = authResponse?.error
                 if (authResponse.error == "access_denied") {
-                    return reply.status(401).send(this.errorBody);
+                    const authenticateHeader = this.authenticateHeader(request);
+                    return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
                 } else if (authResponse.error) {
                     return reply.status(500).send(this.errorBody);
                 } 
@@ -156,22 +161,21 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                 CrossauthLogger.logger.debug(j({msg: "Resource server url", url: request.url, authorized: request.accessTokenPayload!= undefined}));
             });
 
-            app.addHook('onSend', async (request : FastifyRequest, reply : FastifyReply) => {
-                const urlWithoutQuery = request.url.split("?", 2)[0];
-                if (request.authType == "oauth" && 
-                    reply.statusCode == 401 && 
-                    !request.accessTokenPayload && 
-                    urlWithoutQuery in this.protectedEndpoints) {
-                    let header = "Bearer";
-                    if (this.protectedEndpoints[urlWithoutQuery].scope) {
-                        header += ' scope="' + (this.protectedEndpoints[urlWithoutQuery].scope??[]).join(" ");
-                    }
-                    CrossauthLogger.logger.debug(j({msg: "Adding www-authenticate header to reply"}));
-                    return reply.header("WWW-Authenticate", header);
-                }
-            });
         }
     }
+
+    private authenticateHeader(request : FastifyRequest) : string {
+        const urlWithoutQuery = request.url.split("?", 2)[0];
+        if (urlWithoutQuery in this.protectedEndpoints) {
+            let header = "Bearer";
+            if (this.protectedEndpoints[urlWithoutQuery].scope) {
+                header += ' scope="' + (this.protectedEndpoints[urlWithoutQuery].scope??[]).join(" ");
+            }
+            return header;
+        }
+        return "";
+    }
+
 
     /**
      * If there is no bearer token, returns `undefinerd`.  If there is a
