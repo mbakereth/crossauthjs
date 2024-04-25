@@ -266,7 +266,7 @@ export class FastifyServer {
                     options? : FastifyOAuthClientOptions,
                 },
                 oAuthResServer? : {
-                    protectedEndpoints?: {[key:string]: {scope? : string[]}},
+                    options? : FastifyOAuthResourceServerOptions,
                 }},
                 options: FastifyServerOptions = {}) {
 
@@ -350,7 +350,7 @@ export class FastifyServer {
         if (oAuthResServer) {
             this.oAuthResServer = new FastifyOAuthResourceServer(this.app, 
                 [new OAuthTokenConsumer(options)],
-                            oAuthResServer.protectedEndpoints, options
+                {...oAuthResServer.options, ...options}
             )
         }
     }

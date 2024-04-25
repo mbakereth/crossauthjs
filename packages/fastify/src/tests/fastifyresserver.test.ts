@@ -54,7 +54,6 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_authorized', async (
     const resserver = new FastifyOAuthResourceServer(
         app,
         [new OAuthTokenConsumer({jwtIssuer: issuer})],
-        {}
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await resserver.tokenConsumers[issuer].loadConfig();
@@ -100,7 +99,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_endpoint', async () 
     const resserver = new FastifyOAuthResourceServer(
         app,
         [new OAuthTokenConsumer({jwtIssuer: issuer})],
-        {"/endpoint" : {}}
+        {protectedEndpoints: {"/endpoint" : {}}}
     );
     app.get('/endpoint',  async (request : FastifyRequest, reply : FastifyReply) =>  {
         reply.header(...JSONHDR).send({token: request.accessTokenPayload});

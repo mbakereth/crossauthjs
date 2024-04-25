@@ -32,6 +32,13 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
      * your endpoint is hit.  This will be the body,  Default {}.
      */
     errorBody? : {[key:string]:any};
+
+    /**
+     * If you define this, matching resource server endpoints will return
+     * a status code of 401 Access Denied if the key is invalid or the 
+     * given scopes are not present.
+     */
+    protectedEndpoints? : {[key:string]: {scope? : string[]}},
 }
 
 /**
@@ -74,29 +81,28 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>, 
         tokenConsumers: OAuthTokenConsumer[],
-        protectedEndpoints? : {[key:string]: {scope? : string[]}},
         options : FastifyOAuthResourceServerOptions = {}) {
         super(tokenConsumers, options);
 
         setParameter("errorBody", ParamType.Json, this, options, "OAUTH_RESSERVER_ACCESS_DENIED_BODY");
         this.userStorage = this.userStorage;
 
-        if (protectedEndpoints) {
+        if (options.protectedEndpoints) {
                 const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;
-                for (const [key, value] of Object.entries(protectedEndpoints)) {
+                for (const [key, value] of Object.entries(options.protectedEndpoints)) {
                     if (!key.startsWith("/")) {
                         throw new CrossauthError(ErrorCode.Configuration, "protected endpoints must be absolute paths without the protocol and hostname");
                     }
                     if (value.scope) {
                         value.scope.forEach((s : string) => {
-                            if (!(regex.test(s))) throw new CrossauthError(ErrorCode.Configuration, "Illegal charactwers in scope " + s);
+                            if (!(regex.test(s))) throw new CrossauthError(ErrorCode.Configuration, "Illegal characters in scope " + s);
                         });
                     }
                 }
-                this.protectedEndpoints = protectedEndpoints;
+                this.protectedEndpoints = options.protectedEndpoints;
             }
             
-        if (protectedEndpoints) {
+        if (options.protectedEndpoints) {
             // validate access token and put in request, along with any errors
             app.addHook('preHandler', async (request : FastifyRequest, reply : FastifyReply) => {
                 
@@ -123,7 +129,9 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                     if (Array.isArray(authResponse.tokenPayload.scope)) {
                         let scope : string[] = [];
                         for (let tokenScope of authResponse.tokenPayload.scope) {
-                            if (typeof tokenScope == "string") scope.push(tokenScope);
+                            if (typeof tokenScope == "string") {
+                                scope.push(tokenScope);
+                            }
                         }
                         request.scope = scope;
                     } else if (typeof authResponse.tokenPayload.scope == "string") {
@@ -132,7 +140,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                 }
                 if (this.protectedEndpoints[urlWithoutQuery].scope) {
                     for (let scope of this.protectedEndpoints[urlWithoutQuery].scope??[]) {
-                        if (!request.scope || !(scope in request.scope)) {
+                        if (!request.scope || !(request.scope.includes(scope))) {
                             CrossauthLogger.logger.warn(j({msg: "Access token does not have sufficient scope",
                                 username: request.user?.username, url: request.url}));
                             request.scope = undefined;

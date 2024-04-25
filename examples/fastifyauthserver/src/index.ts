@@ -78,7 +78,10 @@ let server = new FastifyServer(userStorage, {
         }},
     },
     oAuthResServer: {
-        protectedEndpoints: {"/resource": {scope: ["read", "write"]}}, 
+        options: {
+            protectedEndpoints: {"/resource": {scope: ["read", "write"]}}, 
+            errorBody: {ok: false},
+        },
     }}, {
         app: app,
         views: path.join(__dirname, '../views'),
