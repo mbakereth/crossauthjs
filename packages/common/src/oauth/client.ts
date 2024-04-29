@@ -179,6 +179,7 @@ export abstract class OAuthClientBase {
     protected authzCode : string = "";
     protected oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
     protected tokenConsumer : OAuthTokenConsumerBase;
+    protected fetchCredentials : "same-origin"|"include"|undefined = undefined;
 
     /**
      * Constructor.
@@ -207,6 +208,7 @@ export abstract class OAuthClientBase {
         stateLength,
         verifierLength,
         tokenConsumer,
+        fetchCredentials,
     } : {
         jwtIssuer : string,
         stateLength? : number,
@@ -216,6 +218,7 @@ export abstract class OAuthClientBase {
         redirectUri? : string,
         codeChallengeMethod? : "plain" | "S256",
         tokenConsumer : OAuthTokenConsumerBase,
+        fetchCredentials? : "same-origin"|"include",
     }) {
         this.tokenConsumer = tokenConsumer;
         this.jwtIssuer = jwtIssuer;
@@ -226,6 +229,8 @@ export abstract class OAuthClientBase {
         if (redirectUri) this.redirectUri = redirectUri;
         if (codeChallengeMethod) this.codeChallengeMethod = codeChallengeMethod;
         this.jwtIssuer = jwtIssuer;
+        if (fetchCredentials) this.fetchCredentials = fetchCredentials;
+
     }
 
     /**
@@ -537,7 +542,7 @@ export abstract class OAuthClientBase {
     }
 
 
-    /** Request valid authenticators using the Password MFDA flow, 
+    /** Request valid authenticators using the Password MFA flow, 
      * after the Password flow has been initiated.
      * 
      * Does not throw exceptions.
@@ -828,7 +833,8 @@ export abstract class OAuthClientBase {
     }
 
     protected async refreshTokenFlow(refreshToken : string) : 
-        Promise<{[key:string]:any}> {
+        //Promise<{[key:string]:any}> {
+        Promise<OAuthTokenResponse> {
         CrossauthLogger.logger.debug(j({msg: "Starting refresh token flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("refresh_token")) {
@@ -877,8 +883,10 @@ export abstract class OAuthClientBase {
             url: url,
             params: Object.keys(params)
         }));
+        const options = this.fetchCredentials ? {credentials: this.fetchCredentials} : {};
         const resp = await fetch(url, {
             method: 'POST',
+            ...options,
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
@@ -899,8 +907,10 @@ export abstract class OAuthClientBase {
     protected async get(url : string, headers : {[key:string]:any}) : 
         Promise<{[key:string]:any}|{[key:string]:any}[]>{
         CrossauthLogger.logger.debug(j({msg: "Fetch GET", url: url}));
+        const options = this.fetchCredentials ? {credentials: this.fetchCredentials} : {};
         const resp = await fetch(url, {
             method: 'GET',
+            ...options,
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
