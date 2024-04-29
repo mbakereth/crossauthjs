@@ -29,17 +29,40 @@ const JSONHDR : [string,string] = ['Content-Type', 'application/json; charset=ut
 //////////////////////////////////////////////////////////////////////////////
 // OPTIONS
 
+/**
+ * Options for {@link FastifyAuthorizationServer}
+ */
 export interface FastifyAuthorizationServerOptions 
     extends OAuthAuthorizationServerOptions {
+
+    /**
+     * Template to display if there is an error.  Default `error.njk`
+     */
     errorPage? : string,
+
+    /**
+     * Template to request user to authorize client.  
+     * Default `userauthorize.njk`
+     */
     oauthAuthorizePage? : string,
+
+    /**
+     * Prefix for URLs.  Default `/`
+     */
     prefix? : string,
+
+    /**
+     * URL to redirect user to for logging in.  Default `/login`
+     */
     loginUrl? : string,
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // FASTIFY INTERFACES
 
+/**
+ * Query parameters for the `authorize` Fastify request.
+ */
 interface AuthorizeQueryType {
     response_type : string,
     client_id : string,
@@ -50,6 +73,11 @@ interface AuthorizeQueryType {
     code_challenge_method : string,
 }
 
+/**
+ * Body parameters for the `userauthorize` endpoint 
+ * Fastify request requesting the user
+ * to authorize a client.
+ */
 interface UserAuthorizeBodyType {
     csrfToken : string,
     response_type : string,
@@ -62,6 +90,9 @@ interface UserAuthorizeBodyType {
     authorized : string, // true or false 
 }
 
+/**
+ * Body parameters for the `token` endpoint.
+ */
 interface TokenBodyType {
     grant_type : string,
     client_id : string,
@@ -79,6 +110,9 @@ interface TokenBodyType {
     otp? : string,
 }
 
+/**
+ * Body parameters for the `mfa/challenge` endpoint.
+ */
 interface MfaChallengeBodyType {
     client_id : string,
     client_secret?: string,
@@ -90,6 +124,12 @@ interface MfaChallengeBodyType {
 ///////////////////////////////////////////////////////////////////////////////
 // CLASS
 
+/**
+ * Fastify implementation of the OAuth authorization server.
+ * 
+ * You would not usually instantiate this class directly.  It is created
+ * by {@link FastifyServer}.
+ */
 export class FastifyAuthorizationServer {
     private fastifyServer : FastifyServer;
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
@@ -100,6 +140,16 @@ export class FastifyAuthorizationServer {
     private errorPage : string = "error.njk";
     private clientStorage : OAuthClientStorage;
 
+    /**
+     * Constructor
+     * 
+     * @param app the Fastify app
+     * @param fastifyServer the {@link FastifyServer} instance this belongs to
+     * @param clientStorage storage for holding OAuth client configuration
+     * @param keyStorage storage for holding session IDs
+     * @param authenticators user authenticators (factor1 and factor2) to recognize
+     * @param options see {@link FastifyAuthorizationServerOptions}
+     */
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
         fastifyServer : FastifyServer,
@@ -590,6 +640,10 @@ export class FastifyAuthorizationServer {
 
     }
 
+    /**
+     * Returns this server's OpenID Configuration object
+     * @returns the {@link @common/backend!OpenIdConfiguration} object.
+     */
     oidcConfiguration() : OpenIdConfiguration {
         return this.authServer.oidcConfiguration({
                 authorizeEndpoint: this.prefix+"authorize", 
