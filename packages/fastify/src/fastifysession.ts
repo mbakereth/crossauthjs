@@ -2502,7 +2502,8 @@ export class FastifySessionServer {
         request.csrfToken = csrfFormOrHeaderValue;
         reply.setCookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         request.user = undefined;
-
+        const sessionId = this.sessionManager.getSessionId(sessionCookie.value);
+        request.sessionId = sessionId;
         return sessionCookie.value;
     };
 

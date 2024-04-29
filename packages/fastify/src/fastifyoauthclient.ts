@@ -136,7 +136,7 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
      * is `custom`.
      * See {@link FastifyErrorFn}.
      */
-    errorFn? :FastifyErrorFn ;
+    errorFn? :FastifyErrorFn;
 
     /**
      * What to do when receiving tokens.
@@ -426,13 +426,13 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
             throw new CrossauthError(ErrorCode.InvalidSession,
                 "No session data found containing tokens")
         }
+        const expires_at = Date.now() + (oauthResponse.expires_in??0)*1000;
         if (!sessionCookieValue && reply) {
             sessionCookieValue = 
                 await client.server.createAnonymousSession(request,
                     reply,
-                    { [client.sessionDataName]: oauthResponse });
+                    { [client.sessionDataName]: {...oauthResponse, expires_at} });
         } else {
-            const expires_at = Date.now() + (oauthResponse.expires_in??0)*1000;
             const existingData = 
                 await client.server.getSessionData(request, client.sessionDataName);
             await client.server.updateSessionData(request,
@@ -555,7 +555,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
  * 
  * **{@link FastifyOAuthClientOptions.tokenResponseType}**
  * 
- *   - `sendJspn` the token response is sent as-is in the reply to the Fastify 
+ *   - `sendJson` the token response is sent as-is in the reply to the Fastify 
  *      request.  In addition to the `token` endpoint response fields,
  *      `ok: true` and `id_payload` with the decoded 
  *      payload of the ID token are retruned.
@@ -614,18 +614,22 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
  * Token endpoints are only enabled if the corresponding endpoint is set
  * in {@link FastifyOAuthClientOptions.tokenEndpoints}. 
  * 
- * | METHOD | ENDPOINT                   | GET/BODY PARAMS                 | VARIABLES PASSED/RESPONSE            | FILE                     |
- * | ------ | -------------------------- | ------------------------------- | ------------------------------------ | ------------------------ |
- * | GET    | `passwordflow`             | scope                           | user, scope                          | passwordFlowPage         | 
- * | POST   | `passwordflow`             | *See OAuth password flow spec*  | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `passwordotp`              | *See Password MFA flow spec*    | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `passwordoob`              | *See Password MFA flow spec*    | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `access_token`             |                                 | *Access token payload*               |                          | 
- * | POST   | `refresh_token`            |                                 | *Refresh token payload*              |                          | 
- * | POST   | `id_token     `            |                                 | *ID token payload*                   |                          | 
- * | POST   | `have_access_token`        |                                 | `ok`                                 |                          | 
- * | POST   | `have_refresh_token`       |                                 | `ok`                                 |                          | 
- * | POST   | `have_id_token     `       |                                 | `ok`                                 |                          | 
+ * | METHOD | ENDPOINT                   | GET/BODY PARAMS                                     | VARIABLES PASSED/RESPONSE            | FILE                     |
+ * | ------ | -------------------------- | --------------------------------------------------- | ------------------------------------ | ------------------------ |
+ * | GET    | `passwordflow`             | scope                                               | user, scope                          | passwordFlowPage         | 
+ * | POST   | `passwordflow`             | *See OAuth password flow spec*                      | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `passwordotp`              | *See Password MFA flow spec*                        | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `passwordoob`              | *See Password MFA flow spec*                        | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `authzcodeflow`            | *See OAuth authorization code flow spec*            | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `authzcodeflowpkce`        | *See OAuth authorization code flow with PKCE spec*  | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `clientcredflow`           | *See OAuth client credentials flow spec*            | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `refreshtokenflow`         | *See OAuth refresh token flow spec*                 | *See docs for`tokenResponseType`*    |                          | 
+ * | POST   | `access_token`             |                                                     | *Access token payload*               |                          | 
+ * | POST   | `refresh_token`            |                                                     | `token` containing the refresh token |                          | 
+ * | POST   | `id_token     `            |                                                     | *ID token payload*                   |                          | 
+ * | POST   | `have_access_token`        |                                                     | `ok`                                 |                          | 
+ * | POST   | `have_refresh_token`       |                                                     | `ok`                                 |                          | 
+ * | POST   | `have_id_token     `       |                                                     | `ok`                                 |                          | 
  */
 export class FastifyOAuthClient extends OAuthClientBackend {
     server : FastifyServer;
@@ -646,7 +650,11 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             => Promise<FastifyReply|undefined> = sendJson;
     private errorFn : FastifyErrorFn = jsonError;
     private loginUrl : string = "/login";
-    private loginProtectedFlows : string[] = [];
+
+    /** 
+     * See {@link FastifyOAuthClientOptions}
+     */
+    loginProtectedFlows : string[] = [];
     private tokenResponseType :  
         "sendJson" | 
         "saveInSessionAndLoad" | 
@@ -700,6 +708,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         setParameter("mfaOobPage", ParamType.String, this, options, "OAUTH_MFA_OOB_PAGE");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
+        
         if (options.tokenEndpoints) this.tokenEndpoints = options.tokenEndpoints;
 
         if (this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
@@ -957,7 +966,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 }
 
                 if (!request.user && 
-                    (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
+                    (this.loginProtectedFlows.includes(OAuthFlows.RefreshToken))) {
                     return reply.status(401).header(...JSONHDR)
                         .send({ok: false, msg: "Access denied"});                }               
                 try {
@@ -985,28 +994,50 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             });
 
             this.server.app.post(this.prefix+"refreshtokensifexpired", 
-            async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
-                CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
-                    method: 'POST',
-                    url: this.prefix + "refreshtokens",
-                    ip: request.ip,
-                    user: request.user?.username
-                }));
-                return this.refreshTokens(request, reply, false);
-        });
-        this.server.app.post(this.prefix+"api/refreshtokensifexpired", 
-            async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
-                CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
-                    method: 'POST',
-                    url: this.prefix + "refreshtokens",
-                    ip: request.ip,
-                    user: request.user?.username
-                }));
-                return this.refreshTokens(request, reply, true);
-        });
+                async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + "refreshtokens",
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                    return this.refreshTokens(request, reply, false, true);
+            });
+            this.server.app.post(this.prefix+"api/refreshtokensifexpired", 
+                async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + "refreshtokens",
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                    return this.refreshTokens(request, reply, true, true);
+            });
 
+            this.server.app.post(this.prefix+"refreshtokens", 
+                async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + "refreshtokens",
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                    return this.refreshTokens(request, reply, false, false);
+            });
+            this.server.app.post(this.prefix+"api/refreshtokens", 
+                async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + "refreshtokens",
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                    return this.refreshTokens(request, reply, true, false);
+            });
         }
 
         ///////// Password (and MFA) flow
@@ -1150,6 +1181,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 let payload = oauthData[tokenName];
                 if (["access_token", "id_token"].includes(tokenName)) {
                     payload = decodePayload(oauthData[tokenName]);
+                } 
+                else if (tokenName == "refresh_token") {
+                    payload = {token: payload}
                 }
                 if (!payload) {
                     if (isHave) return reply.header(...JSONHDR).status(200).send({ok: false});
@@ -1221,8 +1255,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                             let access_token = oauthData?.access_token;
                             if (oauthData && oauthData.access_token) {
                                 const resp = 
-                                    await server.oAuthClient?.refreshIfExpired(request,
+                                    await server.oAuthClient?.refresh(request,
                                         reply,
+                                        true,
                                         true,
                                         oauthData.refresh_token,
                                         oauthData.expires_at);
@@ -1526,14 +1561,16 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         return await this.receiveTokenFn(resp, this, request, reply)??reply;
     }
 
-    async refreshIfExpired(request: FastifyRequest,
+    async refresh(request: FastifyRequest,
         reply : FastifyReply,
         silent : boolean,
+        onlyIfExpired : boolean,
         refreshToken?: string,
         expiresAt?: number) 
         : Promise<{
             refresh_token?: string,
             access_token?: string,
+            expires_in?: number,
             expires_at?: number,
             error?: string,
             error_description?: string
@@ -1548,7 +1585,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 return undefined;
             }
 
-        if (expiresAt <= Date.now()) {
+        if (!onlyIfExpired || expiresAt <= Date.now()) {
             try {
                 const resp = await this.refreshTokenFlow(refreshToken);
                 if (!resp.error && !resp.access_token) {
@@ -1567,10 +1604,13 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         resp.error_description);
                     return await this.errorFn(this.server, request, reply, ce)
                 }
+                const expires_at = 
+                    (new Date().getTime() + (resp.expires_in??0)*1000);
                 return {
                     access_token: resp.access_token,
                     refresh_token: resp.refresh_token,
-                    expires_at: resp.expires_at,
+                    expires_in: resp.expires_in,
+                    expires_at: expires_at,
                     error: resp.error,
                     error_description: resp.error_description
                 };
@@ -1595,7 +1635,8 @@ export class FastifyOAuthClient extends OAuthClientBackend {
 
     private async refreshTokens(request: FastifyRequest<{ Body: CsrfBodyType }>,
         reply: FastifyReply,
-        silent: boolean) {
+        silent: boolean,
+        onlyIfExpired : boolean) {
         if (!request.csrfToken) {
             return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
         }
@@ -1614,14 +1655,17 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         }
 
         const resp = 
-            await this.server.oAuthClient?.refreshIfExpired(request,
+            await this.server.oAuthClient?.refresh(request,
                 reply,
                 silent,
+                onlyIfExpired,
                 oauthData.refresh_token,
-                oauthData.expires_at);
+                onlyIfExpired ? oauthData.expires_at : undefined);
 
-        if (!silent) return resp;
-        return reply.header(...JSONHDR).status(200).send({ok: true});
+        //if (!silent) return resp;
+        if (!silent) return this.receiveTokenFn(resp??{}, this, request, reply);
+        return reply.header(...JSONHDR).status(200).send({ok: true, expires_at: resp?.expires_at});
     };
+
 
 }

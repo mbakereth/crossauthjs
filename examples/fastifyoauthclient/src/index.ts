@@ -66,10 +66,10 @@ const server = new FastifyServer(userStorage, {
     views: path.join(__dirname, '../views'),
     allowedFactor2: ["none"],
     enableEmailVerification: false,
-    siteUrl: process.env["RESOURCE_SERVER"],
+    siteUrl: "http://localhost:" + port,
     loginUrl: "login",
     validFlows: ["all"], // activate all OAuth flows
-    loginProtectedFlows: OAuthFlows.AuthorizationCode + ", " + OAuthFlows.AuthorizationCodeWithPKCE,
+    loginProtectedFlows: [OAuthFlows.AuthorizationCode, OAuthFlows.AuthorizationCodeWithPKCE],
     tokenResponseType: "saveInSessionAndRedirect",
     bffEndpoints: [{url: "/resource", methods: ["GET"]}],
     bffBaseUrl: process.env["RESOURCE_SERVER"],

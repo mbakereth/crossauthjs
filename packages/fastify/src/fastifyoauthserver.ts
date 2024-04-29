@@ -36,12 +36,29 @@ export interface FastifyAuthorizationServerOptions
     extends OAuthAuthorizationServerOptions {
 
     /**
-     * Template to display if there is an error.  Default `error.njk`
+     * Template file to display on error.  It receives the following parameters;
+     *   - `httpStatus`,
+     *   - `errorCode`,
+     *   - `errorCodeName`
+     *   - `errorMessage`
+     * Default `error.njk`
      */
     errorPage? : string,
 
     /**
-     * Template to request user to authorize client.  
+     * Template file for page asking user to authorize a client.
+     * It receives the following parameters;
+     *   - `user`
+     *   - `response_type`
+     *   - `client_id`
+     *   - `client_name`
+     *   - `redirect_uri`
+     *   - `scope`
+     *   - `scopes`
+     *   - `state`
+     *   - `code_challenge`
+     *   - `code_challenge_method`
+     *   - `csrfToken`
      * Default `userauthorize.njk`
      */
     oauthAuthorizePage? : string,
@@ -52,7 +69,7 @@ export interface FastifyAuthorizationServerOptions
     prefix? : string,
 
     /**
-     * URL to redirect user to for logging in.  Default `/login`
+     * The login URL (provided by {@link FastifySessionServer}). Default `/login`
      */
     loginUrl? : string,
 }
@@ -91,7 +108,7 @@ interface UserAuthorizeBodyType {
 }
 
 /**
- * Body parameters for the `token` endpoint.
+ * The body parameters for the `token` endpoint.  
  */
 interface TokenBodyType {
     grant_type : string,
@@ -111,7 +128,7 @@ interface TokenBodyType {
 }
 
 /**
- * Body parameters for the `mfa/challenge` endpoint.
+ * The body parameters for the `mfa/challenge` endpoint.  
  */
 interface MfaChallengeBodyType {
     client_id : string,
@@ -125,29 +142,42 @@ interface MfaChallengeBodyType {
 // CLASS
 
 /**
- * Fastify implementation of the OAuth authorization server.
+ * This class implements an OAuth authorization server, serving endpoints
+ * with Fastify.
  * 
- * You would not usually instantiate this class directly.  It is created
- * by {@link FastifyServer}.
+ * You shouldn't have to instantiate this directly.  It is instantiated
+ * by {@link FastifyServer} if you enable the authorization server there.
+ * 
+ * | METHOD | ENDPOINT                   | GET/BODY PARAMS                                     | RESPONSE                                           |
+ * | ------ | -------------------------- | --------------------------------------------------- | -------------------------------------------------- |
+ * | GET    | `authorize`                | See OAuth spec                                                                    | See OAuth spec       |
+ * | POST   | `token`                    | See OAuth spec                                                                    | See OAuth spec       |
+ * | GET    | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left |
+ * | POST   | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left |
+ * | POST   | `mfa/challenge     `       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left |
+ * 
  */
 export class FastifyAuthorizationServer {
-    private fastifyServer : FastifyServer;
+
+    /** The Fastify app passed to the constructor */
     readonly app : FastifyInstance<Server, IncomingMessage, ServerResponse>;
+    /** The underlying framework-independent authorization server */
+    readonly authServer : OAuthAuthorizationServer;
+    private fastifyServer : FastifyServer;
     private prefix : string = "/";
     private loginUrl : string = "/login";
-    readonly authServer : OAuthAuthorizationServer;
     private oauthAuthorizePage : string = "userauthorize.njk";
     private errorPage : string = "error.njk";
     private clientStorage : OAuthClientStorage;
 
     /**
      * Constructor
-     * 
      * @param app the Fastify app
-     * @param fastifyServer the {@link FastifyServer} instance this belongs to
-     * @param clientStorage storage for holding OAuth client configuration
-     * @param keyStorage storage for holding session IDs
-     * @param authenticators user authenticators (factor1 and factor2) to recognize
+     * @param fastifyServer the Fastify server this belongs to
+     * @param clientStorage where OAuth clients are stored
+     * @param keyStorage where session IDs are stored
+     * @param authenticators The authenticators (factor1 and factor2) to enable 
+     *        for the password flow
      * @param options see {@link FastifyAuthorizationServerOptions}
      */
     constructor(
@@ -641,8 +671,9 @@ export class FastifyAuthorizationServer {
     }
 
     /**
-     * Returns this server's OpenID Configuration object
-     * @returns the {@link @common/backend!OpenIdConfiguration} object.
+     * Returns this server's OIDC configuration.  Just wraps
+     * {@link @crossauth/backend!OAuthAuthorizationServer.oidcConfiguration}
+     * @returns An {@link @crossauth/common!OpenIdConfiguration} object
      */
     oidcConfiguration() : OpenIdConfiguration {
         return this.authServer.oidcConfiguration({
