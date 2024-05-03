@@ -59,16 +59,17 @@ export interface FastifyAuthorizationServerOptions
      *   - `code_challenge`
      *   - `code_challenge_method`
      *   - `csrfToken`
+     * Default `userauthorize.njk`
      */
     oauthAuthorizePage? : string,
 
     /**
-     * The prefix to append to endpoints
+     * Prefix for URLs.  Default `/`
      */
     prefix? : string,
 
     /**
-     * The login URL (provided by {@link FastifySessionServer})
+     * The login URL (provided by {@link FastifySessionServer}). Default `/login`
      */
     loginUrl? : string,
 }
@@ -77,7 +78,7 @@ export interface FastifyAuthorizationServerOptions
 // FASTIFY INTERFACES
 
 /**
- * The query parameters for the `authorize` endpoint.  
+ * Query parameters for the `authorize` Fastify request.
  */
 interface AuthorizeQueryType {
     response_type : string,
@@ -90,7 +91,9 @@ interface AuthorizeQueryType {
 }
 
 /**
- * The query parameters for the `authorize` endpoint.  
+ * Body parameters for the `userauthorize` endpoint 
+ * Fastify request requesting the user
+ * to authorize a client.
  */
 interface UserAuthorizeBodyType {
     csrfToken : string,
