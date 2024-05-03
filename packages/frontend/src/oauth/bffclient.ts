@@ -1,20 +1,35 @@
-import { CrossauthError } from "@crossauth/common";
+import { CrossauthError, ErrorCode} from "@crossauth/common";
 
 export class OAuthBffClient {
-    private baseUrl : string;
-    private bffPrefix : string;
+    private baseUrl : string = "/";
+    private bffPrefix : string = "bff";
+    private csrfHeader : string = "X-CROSSAUTH-CSRF";
+    private headers : {[key:string]:string} = {};
 
     /**
      * Constructor
      * 
-     * @param baseUrl the base url for BFF calls to the OAuth client
+     * @param param0
+     *   - `baseUrl` the base url for BFF calls to the OAuth client
      *        (eg `https://myclient.com`).  Default is `/`
-     * @param bffBaseUrl the base url for BFF calls to the OAuth client
+     *   - `bffPrefix` the base url for BFF calls to the OAuth client
      *        (eg `bff`, which is the default)
+     *   - `csrfHeader` the header to put CSRF tokens into 
+     *        (default `X-CROSSAUTH-CSRF`))
      */
-    constructor(baseUrl : string = "/", bffPrefix : string = "bff") {
-        this.baseUrl = baseUrl;
-        this.bffPrefix = bffPrefix;
+    constructor({ 
+            baseUrl,
+            bffPrefix,
+            csrfHeader,
+        }  : {
+            baseUrl? : string,
+            bffPrefix? : string,
+            csrfHeader? : string,
+
+        } = {}) {
+        if (baseUrl) this.baseUrl = baseUrl;
+        if (bffPrefix) this.bffPrefix = bffPrefix;
+        if (csrfHeader) this.csrfHeader = csrfHeader;
         if (!(this.baseUrl.endsWith("/"))) this.baseUrl += "/";
         if (this.bffPrefix.startsWith("/") && this.bffPrefix.length > 1) {
             this.bffPrefix = this.bffPrefix.substring(1);
@@ -23,11 +38,22 @@ export class OAuthBffClient {
     }
 
     /**
+     * Any headers added here will be applied to all requests
+     * @param header the header name eg `Access-Control-Allow-Origin`
+     * @param value the header value
+     */
+    addHeader(header : string, value : string) {
+        this.headers[header] = value;
+    }
+
+    /**
      * Gets a CSRF token from the server
      * @returns 
      */
-    async getCsrfToken() : Promise<string> {
+    async getCsrfToken(headers? : {[key:string]:string}) : Promise<string> {
         try {
+            const params = {headers: this.headers};
+            if (headers) params.headers = {...params.headers, ...headers}
             const resp = await fetch(this.baseUrl+"api/getcsrftoken", {});
             const json = await resp.json();
             if (!json.ok) throw CrossauthError.asCrossauthError(json);
@@ -45,10 +71,12 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
+     * @param headers any additional headers to add (will be added to
+     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns the ID token payload or an empty object if there isn't one
      */
-    async getIdToken(csrfToken? : string) : Promise<{[key:string]:any}>{
-        return this.getToken("id", csrfToken);
+    async getIdToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<{[key:string]:any}|null>{
+        return this.getToken("id", csrfToken, headers);
     }
 
     /**
@@ -57,10 +85,12 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
+     * @param headers any additional headers to add (will be added to
+     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns true or false
      */
-    async haveIdToken(csrfToken? : string) : Promise<boolean>{
-        return this.haveToken("id", csrfToken);
+    async haveIdToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<boolean>{
+        return this.haveToken("id", csrfToken, headers);
     }
 
     /**
@@ -71,10 +101,12 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
+     * @param headers any additional headers to add (will be added to
+     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns the access token payload or an empty object if there isn't one
      */
-    async getAccessToken(csrfToken? : string) : Promise<{[key:string]:any}>{
-        return this.getToken("access", csrfToken);
+    async getAccessToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<{[key:string]:any}|null>{
+        return this.getToken("access", csrfToken, headers);
     }
 
     /**
@@ -83,10 +115,12 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
+     * @param headers any additional headers to add (will be added to
+     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns true or false
      */
-    async haveAccessToken(csrfToken? : string) : Promise<boolean>{
-        return this.haveToken("access", csrfToken);
+    async haveAccessToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<boolean>{
+        return this.haveToken("access", csrfToken, headers);
     }
 
     /**
@@ -97,10 +131,12 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
+     * @param headers any additional headers to add (will be added to
+     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns the refresh token payload or an empty object if there isn't one
      */
-    async getRefreshToken(csrfToken? : string) : Promise<{[key:string]:any}>{
-        return this.getToken("refresh", csrfToken);
+    async getRefreshToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<{[key:string]:any}|null>{
+        return this.getToken("refresh", csrfToken, headers);
     }
 
     /**
@@ -109,39 +145,82 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
+     * @param headers any additional headers to add (will be added to
+     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns true or false
      */
-    async haveRefreshToken(csrfToken? : string) : Promise<boolean>{
-        return this.haveToken("refresh", csrfToken);
+    async haveRefreshToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<boolean>{
+        return this.haveToken("refresh", csrfToken, headers);
     }
 
-    private async getToken(tokenName : string, csrfToken? : string) : Promise<{[key:string]:any}>{
+    /**
+     * Calls an API endpoint via the BFF server
+     * @param tokenName 
+     * @param csrfToken 
+     * @param headers any additional headers to add (will be added to
+     *         the ones given with {@link OAuthBffClient.addHeader} )
+     * @returns the HTTP status code and the body or null
+     */
+    async api(method : "GET"|"POST"|"PUT"|"PATCH"|"OPTIONS"|"HEAD"|"DELETE",
+        endpoint : string,
+        body? : {[key:string]:any}, 
+        csrfToken? : string,
+        headers? : {[key:string]:any}) : 
+        Promise<{status : number, body : {[key:string]:any}|null}> {
+        if (!csrfToken && !(["GET", "HEAD", "OPTIONS"].includes(method))) {
+            csrfToken = await this.getCsrfToken();
+        }
+        if (headers) { headers = {...this.headers, ...headers}; }
+        else { headers = {...this.headers}; }
+        if (csrfToken) headers[this.csrfHeader] = csrfToken;
+        if (endpoint.startsWith("/")) endpoint = endpoint.substring(1);
+        let params : {[key:string]:any} = {method, headers};
+        if (body) params.body = body;
+        const resp = await fetch(this.baseUrl + this.bffPrefix + endpoint, 
+            params);
+        let responseBody : {[key:string]:any} | null = null;
+        if (resp.body) responseBody = await resp.json();
+        return {status: resp.status, body: responseBody};
+    }
+
+    private async getToken(tokenName : string, 
+        csrfToken? : string,
+        headers? : {[key:string]:any}) : Promise<{[key:string]:any}|null>{
         if (!csrfToken) csrfToken = await this.getCsrfToken();
         try {
-            const resp = await fetch(this.baseUrl + this.bffPrefix + tokenName + "_token", {
+            if (headers) { headers = {...this.headers, ...headers}; }
+            else { headers = {...this.headers}; }                
+            const resp = await fetch(this.baseUrl + tokenName + "_token", {
                 method: "POST",
                 headers: {
-                    "X-CROSSAUTH-CSRF": csrfToken,
+                    [this.csrfHeader]: csrfToken,
+                    ...headers,
                 }
             })
-            const json = await resp.json();
-            if (!json.ok) throw CrossauthError.asCrossauthError(json);
-            return json;
+            if (resp.status == 204) {
+                return null;
+            }
+            return await resp.json();
         } catch (e) {
             throw CrossauthError.asCrossauthError(e);
         }
     }
 
-    private async haveToken(tokenName : string, csrfToken? : string) : Promise<boolean>{
+    private async haveToken(tokenName : string, 
+        csrfToken? : string,
+        headers? : {[key:string]:any}) : Promise<boolean>{
         if (!csrfToken) csrfToken = await this.getCsrfToken();
-        const resp = await fetch(this.baseUrl + this.bffPrefix + "have_" + tokenName + "_token", {
+        if (headers) { headers = {...this.headers, ...headers}; }
+        else { headers = {...this.headers}; }                
+        const resp = await fetch(this.baseUrl + "have_" + tokenName + "_token", {
             method: "POST",
             headers: {
-                "X-CROSSAUTH-CSRF": csrfToken,
+                [this.csrfHeader]: csrfToken,
+                ...headers,
             }
         })
         const json = await resp.json();
-        if (!json.ok) throw CrossauthError.asCrossauthError(json);
+        if (!json.ok) throw new CrossauthError(ErrorCode.UnknownError, "Couldn't check token")
         return json.ok;
     }
 

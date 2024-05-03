@@ -3,18 +3,23 @@
         <title>Client</title>
         <link rel="stylesheet" href="/public/style.css"/>
 
+        <script src="/public/crossauth_frontend.js"></script>
         <script>
+            var bffClient = new crossauth_frontend.OAuthBffClient();
             function authorize() {
                 window.location.href = '/authzcodeflow?scope=read+write';
             }
-            function callResource() {
-                fetch("/bff/resource")
-                .then(function(response) {return response.json()}).then(function(response) {
-                    document.getElementById("result").innerHTML = "<pre>"+JSON.stringify(response)+"</pre>"
-                })
-                .catch(function(error) {
-                    document.getElementById("result").text = error;
-                })
+            async function callResource() {
+                try {
+                    const resp = await bffClient.api("GET", "resource");
+                    document.getElementById("result").innerHTML = 
+                        "<pre>" + 
+                        JSON.stringify(resp.body) + 
+                        "</pre>"
+                } catch (e) {
+                    console.log(e);
+                    document.getElementById("result").text = e.message;
+                }
             }
         </script>
 

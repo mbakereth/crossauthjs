@@ -3,69 +3,39 @@
         <title>Client</title>
         <link rel="stylesheet" href="/public/style.css"/>
 
+        <script src="/public/crossauth_frontend.js"></script>
         <script>
-            window.onload = function() {
-                fetchWithCsrf("haveAccessToken")
+            var bffClient = new crossauth_frontend.OAuthBffClient();
+            window.onload = async function() {
+                await haveAccessToken();
             };
 
-            function idToken(csrfToken) {
-                fetch("/id_token", {
-                    method: "POST",
-                    headers: {
-                        "X-CROSSAUTH-CSRF": csrfToken,
+            async function getIdToken() {
+                try {
+                    let token = await bffClient.getIdToken();
+                    if (token == null) {
+                        document.getElementById("idtoken").innerHTML = "Error: There is no ID token";
+                    } else {
+                        document.getElementById("idtoken").innerHTML = "<pre>"+JSON.stringify(token, null, '\t')+"</pre>"
+                       
                     }
-                })
-                .then(function(response) {
-                    if (response.status == 200) {
-                        return response.json();
-                    }
-                    if (response.status == 204) {
-                        throw new Error("There is no ID token")
-                    }
-                    throw new Error("Couldn't fetch token")       
-                })
-                .then(function(response) {
-                    document.getElementById("idtoken").innerHTML = "<pre>"+JSON.stringify(response, null, '\t')+"</pre>"
-                })
-                .catch(function(error) {
-                    document.getElementById("idtoken").innerHTML = error;
-                })
+                } catch (e) {
+                    console.log(e);
+                    document.getElementById("idtoken").innerHTML = "<pre>Error: "+e.message+"</pre>";
+                }
             }
 
-            function haveAccessToken(csrfToken) {
-                fetch("/have_access_token", {
-                    method: "POST",
-                    headers: {
-                        "X-CROSSAUTH-CSRF": csrfToken,
+            async function haveAccessToken() {
+                try {
+                    let haveToken = await bffClient.haveAccessToken();
+                    if (!haveToken) {
+                        throw new Error("Couldn't get access token")       
+
                     }
-                })
-                .then(function(response) {
-                    if (response.status == 200) {
-                        return response.json();
-                    }
-                    throw new Error("Couldn't get access token")       
-                })
-                .then(function(response) {
-                    console.log("Response", response);
-                    if (!response.ok) window.location = "/error";
-                })
-                .catch(function(error) {
+                } catch (e) {
+                    console.log(e);
                     window.location = "/error";
-                })
-            }
-
-            function fetchWithCsrf(fnName) {
-                fetch("/api/getcsrftoken", {})
-                .then(function(response) {return response.json()}).then(function(response) {
-                    if (response.ok) {
-                       // fetchIdToken(response.csrfToken);
-                       window[fnName](response.csrfToken);
-                    }
-                    throw new Error("Couldn't fetch CSRF token")
-                })
-                .catch(function(error) {
-                    console.log(error);
-                })
+                }
             }
         </script>
     </head>
@@ -74,7 +44,7 @@
 
         <p>Authorization was successful</p>
 
-        <p><button onclick="fetchWithCsrf('idToken')">ID Token</button></p>
+        <p><button onclick="getIdToken()">ID Token</button></p>
         <p id="idtoken"></p>
 
         <p><a href="/">Home</a></p>
