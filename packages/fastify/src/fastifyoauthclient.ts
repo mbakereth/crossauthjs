@@ -29,7 +29,7 @@ const JSONHDR : [string,string] =
 export interface FastifyOAuthClientOptions extends OAuthClientOptions {
 
     /** The base URL for endpoints served by this class.
-     * THe only endpöint that is created is the redirect Uri, which is
+     * THe only endpoint that is created is the redirect Uri, which is
      * `siteUrl` + `prefix` + `authzcode`,
      */
     siteUrl ?: string,
@@ -614,22 +614,25 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
  * Token endpoints are only enabled if the corresponding endpoint is set
  * in {@link FastifyOAuthClientOptions.tokenEndpoints}. 
  * 
- * | METHOD | ENDPOINT                   | GET/BODY PARAMS                                     | VARIABLES PASSED/RESPONSE            | FILE                     |
- * | ------ | -------------------------- | --------------------------------------------------- | ------------------------------------ | ------------------------ |
- * | GET    | `passwordflow`             | scope                                               | user, scope                          | passwordFlowPage         | 
- * | POST   | `passwordflow`             | *See OAuth password flow spec*                      | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `passwordotp`              | *See Password MFA flow spec*                        | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `passwordoob`              | *See Password MFA flow spec*                        | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `authzcodeflow`            | *See OAuth authorization code flow spec*            | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `authzcodeflowpkce`        | *See OAuth authorization code flow with PKCE spec*  | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `clientcredflow`           | *See OAuth client credentials flow spec*            | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `refreshtokenflow`         | *See OAuth refresh token flow spec*                 | *See docs for`tokenResponseType`*    |                          | 
- * | POST   | `access_token`             |                                                     | *Access token payload*               |                          | 
- * | POST   | `refresh_token`            |                                                     | `token` containing the refresh token |                          | 
- * | POST   | `id_token     `            |                                                     | *ID token payload*                   |                          | 
- * | POST   | `have_access_token`        |                                                     | `ok`                                 |                          | 
- * | POST   | `have_refresh_token`       |                                                     | `ok`                                 |                          | 
- * | POST   | `have_id_token     `       |                                                     | `ok`                                 |                          | 
+ * | METHOD | ENDPOINT            |Description                                                   | GET/BODY PARAMS                                     | VARIABLES PASSED/RESPONSE                                 | FILE                     |
+ * | ------ | --------------------| ------------------------------------------------------------ | --------------------------------------------------- | --------------------------------------------------------- | ------------------------ |
+ * | GET    | `authzcode`         | Redirect URI for receiving authz code                        | *See OAuth authorization code flow spec*            | *See docs for`tokenResponseType`*                         |                          | 
+ * | GET    | `passwordflow`      | Displays page to request username/password for password flow | scope                                               | user, scope                                               | passwordFlowPage         | 
+ * | POST   | `passwordflow`      | Initiates the password flow                                  | *See OAuth password flow spec*                      | *See docs for`tokenResponseType`*                         |                          | 
+ * |        |                     | Requests an OTP from the user for the Password MFA OTP flow  | `mfa_token`, `scope`, `otp`                         | `mfa_token`, `scope`, `error`, `errorMessage`             | mfaOtpPage               | 
+ * |        |                     | Requests an OOB from the user for the Password MFA OOB flow  | `mfa_token`, `oob_code`, `scope`, `oob`             | `mfa_token`, `oob_code`, `scope`, `error`, `errorMessage` | mfaOobPage               | 
+ * | POST   | `passwordotp`       | Token request with the MFA OTP                               | *See Password MFA flow spec*                        | *See docs for`tokenResponseType`*                         |                          | 
+ * | POST   | `passwordoob`       | Token request with the MFA OOB                               | *See Password MFA flow spec*                        | *See docs for`tokenResponseType`*                         |                          | 
+ * | POST   | `authzcodeflow`     | Initiates the authorization code flow                        | *See OAuth authorization code flow spec*            | *See docs for`tokenResponseType`*                         |                          | 
+ * | POST   | `authzcodeflowpkce` | Initiates the authorization code flow with PKCE              | *See OAuth authorization code flow with PKCE spec*  | *See docs for`tokenResponseType`*                         |                          | 
+ * | POST   | `clientcredflow`    | Initiates the client credentials flow                        | *See OAuth client credentials flow spec*            | *See docs for`tokenResponseType`*                         |                          | 
+ * | POST   | `refreshtokenflow`  | Initiates the refresh token flow                             | *See OAuth refresh token flow spec*                 | *See docs for`tokenResponseType`*                         |                          | 
+ * | POST   | `access_token`      | For BFF mode, returns the saved access token                 |                                                     | *Access token payload*                                    |                          | 
+ * | POST   | `refresh_token`     | For BFF mode, returns the saved refresh token                |                                                     | `token` containing the refresh token                      |                          | 
+ * | POST   | `id_token     `     | For BFF mode, returns the saved ID token                     |                                                     | *ID token payload*                                        |                          | 
+ * | POST   | `have_access_token` | For BFF mode, returns whether an acccess token is saved      |                                                     | `ok`                                                      |                          | 
+ * | POST   | `have_refresh_token`| For BFF mode, returns whether a refresh token is saved       |                                                     | `ok`                                                      |                          | 
+ * | POST   | `have_id_token`     | For BFF mode, returns whether an ID token is saved           |                                                     | `ok`                                                      |                          | 
  */
 export class FastifyOAuthClient extends OAuthClientBackend {
     server : FastifyServer;
@@ -827,8 +830,8 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         if (this.validFlows.includes(OAuthFlows.AuthorizationCode) || 
             this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) ||
             this.validFlows.includes(OAuthFlows.OidcAuthorizationCode)) {
-                    this.server.app.get(this.prefix+'authzcode', 
-                async (request : FastifyRequest<{ Querystring: RedirectUriQueryType }>, 
+                this.server.app.get(this.prefix+'authzcode', 
+                    async (request : FastifyRequest<{ Querystring: RedirectUriQueryType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
                         msg: "Page visit",

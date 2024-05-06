@@ -1,5 +1,11 @@
 import { CrossauthError, ErrorCode} from "@crossauth/common";
 
+/**
+ * A browser-side OAuth client designed with work with the
+ * backend-for-frontend (BFF) mode of the backend OAuth client.
+ * 
+ * See {@link @crossauth/fastify!FastifyOAuthClient}.
+ */
 export class OAuthBffClient {
     private baseUrl : string = "/";
     private bffPrefix : string = "bff";
@@ -48,7 +54,8 @@ export class OAuthBffClient {
 
     /**
      * Gets a CSRF token from the server
-     * @returns 
+     * @returns the CSRF token that can be included in
+     *          the `X-CROSSAUTH-CSRF` header
      */
     async getCsrfToken(headers? : {[key:string]:string}) : Promise<string> {
         try {
