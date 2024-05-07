@@ -192,7 +192,7 @@ export interface OAuthClient {
     /**
      * An array of OAuth flows allowed for this client.  
      * 
-     * See {@link OAuthFlows}.
+     * See {@link @crossauth/common!OAuthFlows}.
      */
     validFlow : string[],
 

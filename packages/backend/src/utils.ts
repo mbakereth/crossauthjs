@@ -34,7 +34,7 @@ function hasOption(param : string, options: {[key:string]: any}) : boolean {
     return true;
 }
 
-function setFromOption(instance : any, param : string, type : ParamType, options : {[key:string]: any}) {
+function setFromOption(instance : any, param : string, options : {[key:string]: any}) {
     const value = getOption(param, options);
     instance[param.replace(".", "_")] = value;
 }
@@ -95,7 +95,7 @@ export function setParameter(param : string,
     if (required && !hasOption(param, options) && !(nameInEnvFile && nameInEnvFile in process.env)) {
         throw new CrossauthError(ErrorCode.Configuration, param + " is required");
     }
-        if (hasOption(param, options)) setFromOption(instance, param, type, options);
+        if (hasOption(param, options)) setFromOption(instance, param, options);
         else if (envName && nameInEnvFile in process.env && 
             process.env[nameInEnvFile] != undefined) {
             setFromEnv(instance, param, type, nameInEnvFile);     

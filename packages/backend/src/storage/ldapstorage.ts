@@ -5,8 +5,15 @@ import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
 import ldap from 'ldapjs';
 
+/**
+ * A user returned by an LDAP server
+ */
 export interface LdapUser {
+
+    /** The user's dn in LDAP */
     dn: string,
+
+    /** Optional additional fields from LDAP */
     [ key : string ] : string|string[],
 }
 
@@ -79,7 +86,7 @@ export class LdapUserStorage extends UserStorage {
      * storage.
      * 
      * @param user passed to the default `createUserFn` to create the user object.  `username` field is used for LDAP authentication
-     * @param secrets: `password` for LDAP expected to be set here.
+     * @param secrets `password` for LDAP expected to be set here.
      * @returns the created user object, as it appears in local storage
      */
     async createUser(user : UserInputFields, secrets : UserSecretsInputFields) 
@@ -153,7 +160,7 @@ export class LdapUserStorage extends UserStorage {
 
     /**
      * Deletes a user from local storage (not from LDAP)
-     * @param username username to delete
+     * @param id ID of the user to delete
      */
     async deleteUserById(id : string|number) : Promise<void> {
         await this.localStorage.deleteUserById(id);

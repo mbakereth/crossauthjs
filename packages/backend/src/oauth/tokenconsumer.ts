@@ -66,8 +66,6 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
     /**
      * Constructor
      * 
-     * @param audience the `aud` claim in the access token must match
-     *        this value or the token will be rejected.
      * @param options see {@link OAuthTokenConsumerOptions}
      */
     constructor(options : OAuthTokenConsumerOptions = {}) {

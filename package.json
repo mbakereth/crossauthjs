@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo 'No tests defined'",
     "test-all": "pnpm -r run testonce",
-    "doc": "typedoc --entryPoints packages/common packages/backend"
+    "doc": "typedoc --entryPoints packages/common packages/backend packages/fastify"
   },
   "author": "Matthew Baker",
   "license": "MIT",

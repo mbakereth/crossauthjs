@@ -155,7 +155,7 @@ export interface OAuthTokenResponse {
  * Node.  This base class contains all the non-interpreter specific 
  * functionality.  What is missing is the cryptography which is included
  * in derived Node-only and Browser-only classes.  
- * See {@link crossauth/backend!OAuthClientBackend}.
+ * See {@link @crossauth/backend!OAuthClientBackend}.
  * 
  * Flows supported are Authorization Code Flow with and without PKCE,
  * Client Credentials, Refresh Token, Password and Password MFA.  The
@@ -184,7 +184,7 @@ export abstract class OAuthClientBase {
     /**
      * Constructor.
      * 
-     * @param param0 options:
+     * @param options options:
      *      - `jwtIssuer` the base URI for OAuth calls.  This is
      *        the value in the isser field of a JWT.  The client will
      *        reject any JWTs that are not from this issuer.

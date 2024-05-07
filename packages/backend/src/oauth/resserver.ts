@@ -20,7 +20,10 @@ export class OAuthResourceServer {
 
     /**
      * Constructor
-     * @param options See {@link OAuthResourceServerOptions}
+     * @param tokenConsumers one or more consumers that will process
+     *        the access tokens
+     * @param _options See {@link OAuthResourceServerOptions}.  Unused
+     *        at present
      */
     constructor(tokenConsumers : OAuthTokenConsumer[], _options : OAuthResourceServerOptions = {}) {
 

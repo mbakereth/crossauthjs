@@ -67,10 +67,7 @@ export class PrismaUserStorage extends UserStorage {
 
     /**
      * Creates a PrismaUserStorage object, optionally overriding defaults.
-     * @param userTable the (Prisma, ie lowercase) name of the database table for storing users.  Defaults to `user`.
-     * @param idColumn the column for the unique user ID.  May be a number of string.  Defaults to `id`.  May also be set to `username`.
-     * @param checkPasswordReset if set to true, a user will only be returned as valid if the "passwordReset" field is not `true`.  See explaination above.
-     * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
+     * @param options see {@link PrismaUserStorage}
      */
     constructor(options : PrismaUserStorageOptions = {}) {
         super(options);
@@ -145,9 +142,9 @@ export class PrismaUserStorage extends UserStorage {
     }
 
     /**
-     * Returns a {@link UserWithPassword } instance matching the given username, or throws an Exception.
+     * Returns a {@link @crossauth/common!User} and {@link @crossauth/common!UserSecrets} instance matching the given username, or throws an Exception.
      * @param username the username to look up
-     * @returns a {@link UserWithPassword } instance, ie including the password hash.
+     * @returns a {@link @crossauth/common!User} and {@link @crossauth/common!UserSecrets} instance, ie including the password hash.
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserByUsername(
@@ -158,12 +155,12 @@ export class PrismaUserStorage extends UserStorage {
     }
 
     /**
-     * Returns a {@link UserWithPassword } instance matching the given email address, or throws an Exception.
+     * Returns a {@link @crossauth/common!User} and {@link @crossauth/common!UserSecrets} instance matching the given email address, or throws an Exception.
      * 
      * If there is no email field in the user, the username is assumed to contain the email
      * 
      * @param email the email address to look up
-     * @returns a {@link UserWithPassword } instance, ie including the password hash.
+     * @returns a {@link @crossauth/common!User} and {@link @crossauth/common!UserSecrets} instance, ie including the password hash.
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserByEmail(
@@ -176,7 +173,7 @@ export class PrismaUserStorage extends UserStorage {
     /**
      * Same as {@link getUserByUsername } but matching user ID,
      * @param id the user ID to match 
-     * @returns a {@link UserWithPassword } instance, ie including the password hash.
+     * @returns a {@link @crossauth/common!User} and {@link @crossauth/common!UserSecrets} instance, ie including the password hash.
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist` or `Connection`.
      */
     async getUserById(id : string | number, 
@@ -416,9 +413,7 @@ export class PrismaKeyStorage extends KeyStorage {
     /**
      * Constructor with user storage object to use plus optional parameters.
      * 
-     * @param userStorage an instance of {@link UserStorage } for fetching users.  If also in Prisma, this may be an instance of {@link PrismaUserStorage } but any can be used.
-     * @param keyTable the (Prisma, lowercased) name of the session table.  Defaults to `session`.
-     * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
+     * @param options See {@link PrismaKeyStorageOptions}
      */
     constructor(options : PrismaKeyStorageOptions = {}) {
         super();
@@ -471,7 +466,7 @@ export class PrismaKeyStorage extends KeyStorage {
      * Saves a key in the session table.
      * 
      * @param userId user ID to store with the session key.  See {@link PrismaUserStorage} for how this may differ from `username`.
-     * @param key the key to store.
+     * @param value the value of the key to store.
      * @param created the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will be stored in the key table row
@@ -519,7 +514,7 @@ export class PrismaKeyStorage extends KeyStorage {
 
     /**
      * 
-     * @param key the key to delete
+     * @param value the value of the key to delete
      * @throws {@link @crossauth/common!CrossauthError } if the key could not be deleted.
      */
     async deleteKey(value : string) : Promise<void> {
@@ -648,7 +643,8 @@ export class PrismaKeyStorage extends KeyStorage {
     /**
      * If the given session key exist in the database, update it with the passed values.  If it doesn't
      * exist, throw a CreossauthError with InvalidKey.
-     * @param value 
+     * @param key the new values of the key.   `value` must be set and will not be updated.
+     *        any other fields set (not undefined) will be updated.
      */
     async updateKey(key : Partial<Key>) : Promise<void> {
         await this.updateKeyWithTransaction(key, this.prismaClient);
@@ -770,8 +766,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     /**
      * Constructor with user storage object to use plus optional parameters.
      * 
-     * @param clientTable the (Prisma, lowercased) name of the client table.  Defaults to `client`.
-     * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
+     * @param options See {@link PrismaOAuthClientStorageOptions}
      */
     constructor(options : PrismaOAuthClientStorageOptions = {}) {
         super();
@@ -795,12 +790,6 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         return await this.getClientWithTransaction("clientName", name, this.prismaClient, false, userId);
     }
 
-    /**
-     * Returns the matching Key record, or throws an exception if it doesn't exist
-     * @param key the session key to look up in the session storage.
-     * @returns the {@link User } object for the user with the given session key, with the password hash removed, as well as the expiry date/time of the key.
-     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
-     */
     private async getClientWithTransaction(field : string, value : string, tx : any, unique : boolean, userId : string|number|null|undefined) : Promise<OAuthClient[]> {
         const userWhere = (userId == undefined && !(userId === null)) ? {} : {user_id: userId};
         try {
@@ -854,7 +843,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     /**
      * Saves a key in the session table.
      * 
-     * @param redirectUri array of valid redirect uri's
+     * @param client fields for the client to create
      * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
      */
     async createClient(client : OAuthClient) : Promise<OAuthClient> {
@@ -871,12 +860,6 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         }
     }
 
-    /**
-     * Saves a key in the session table.
-     * 
-     * @param redirectUri array of valid redirect uri's
-     * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
-     */
     private async createClientWithTransaction(client : OAuthClient, tx : any) : Promise<OAuthClient> {
         const maxAttempts = 10;
         const {redirectUri, validFlow, userId, ...prismaClientData} = client;
@@ -1246,8 +1229,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
     /**
      * Constructor with user storage object to use plus optional parameters.
      * 
-     * @param clientTable the (Prisma, lowercased) name of the client table.  Defaults to `client`.
-     * @param prismaClient an instance of the prisma client to use.  If omitted, one will be created with defaults (ie `new PrismaClient()`).
+     * @param options See {@link PrismaOAuthClientStorageOptions}
      */
     constructor(options : PrismaOAuthClientStorageOptions = {}) {
         super();
@@ -1289,7 +1271,10 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
     /**
      * Saves a key in the session table.
      * 
-     * @param redirectUri array of valid redirect uri's
+     * @param clientId the client to update
+     * @param userId the user ID to associate with the client, or undefined
+     *        for a client not associated with a user
+     * @param scopes the scopes that are authorized (new plus existing)
      * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
      */
     private async updateAuthorizationsWithTransaction(clientId : string, userId : string|number|undefined, scopes : string[], tx : any) : Promise<void> {

@@ -157,7 +157,7 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
      * sensitive, default empty */
     validScopes? : string[],
 
-    /** Flows to support.  A comma-separated list from {@link OAuthFlows}.  
+    /** Flows to support.  A comma-separated list from {@link @crossauth/common!OAuthFlows}.  
      * If [`all`], there must be none other in the list.  Default [`all`] */
     validFlows? : string[],
 
@@ -370,7 +370,7 @@ export class OAuthAuthorizationServer {
      * strings and have be URL-decoded.
      * 
      * For arguments and return parameters, see OAuth2 documentation.
-     * @param param0 object whose values correspond to the OAuth `authorize`
+     * @param options object whose values correspond to the OAuth `authorize`
      *        endpoint, plus `user` if one is logged in at the authorization
      *        server.
      * @returns Values that correspond to the OAuth `authorize` endpoint
@@ -642,7 +642,7 @@ export class OAuthAuthorizationServer {
      * strings and have be URL-decoded.
      * 
      * For arguments and return parameters, see OAuth2 documentation.
-     * @param param0 these arguments correspond to the OAuth `token`
+     * @param options these arguments correspond to the OAuth `token`
      *        endpoint inputs.
      * @return the return object's fields correspond to the OAuth `token`
      *         endpoint JSON output.
@@ -1969,7 +1969,7 @@ export class OAuthAuthorizationServer {
     /**
      * Returns an OIDC configuration object based on this authorization
      * server's configuration
-     * @param param0 
+     * @param options 
      *        - `authorizeEndpoint` the URL for the `authorize` endpoint
      *        - `tokenEndpoint` the URL for the `token` endpoint
      *        - `jwksUri` the URL for the `jwks` endpoint
@@ -2068,7 +2068,7 @@ export class OAuthAuthorizationServer {
      * This doesn't query a user or look anything up in the database.
      * It just checks that they have valid syntax.
      * 
-     * @param param0 these parameters correspond to the OAuth specification
+     * @param options these parameters correspond to the OAuth specification
      * @returns an empty object or an error if the parameters were not valid
      */
     validateAuthorizeParameters({

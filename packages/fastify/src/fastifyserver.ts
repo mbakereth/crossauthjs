@@ -173,7 +173,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * as `factor1` or `factor2`.  
  * 
  * For example, if you have passwords in your user database, you can use
- * {@link LocalPasswordAuthenticator}.  If this method of authentication
+ * {@link @crossauth/backend!LocalPasswordAuthenticator}.  If this method of authentication
  * is called `password` in the `factor1` field of the user record,
  * pass it in the `authenticators` parameter in the constructor with a key
  * of `password`.
@@ -204,7 +204,7 @@ export class FastifyServer {
     /**
      * Integrates fastify session, API key and OAuth servers
      * @param userStorage where to store users
-     * @param param0 object with entries as follow:
+     * @param options object with entries as follow:
      *     - `authenticators` pass in all supported authenticators, both for
      *       factor 1 and factor 2, keyed on the value that appears in
      *       the user record.  See the class documentation for more details.

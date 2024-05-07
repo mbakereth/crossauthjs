@@ -80,7 +80,7 @@ export interface FastifyAuthorizationServerOptions
 /**
  * Query parameters for the `authorize` Fastify request.
  */
-interface AuthorizeQueryType {
+export interface AuthorizeQueryType {
     response_type : string,
     client_id : string,
     redirect_uri : string,
@@ -130,7 +130,7 @@ interface TokenBodyType {
 /**
  * The body parameters for the `mfa/challenge` endpoint.  
  */
-interface MfaChallengeBodyType {
+export interface MfaChallengeBodyType {
     client_id : string,
     client_secret?: string,
     challenge_type: string,

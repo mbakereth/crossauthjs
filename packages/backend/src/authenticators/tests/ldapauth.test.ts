@@ -7,7 +7,7 @@ import { UserInputFields } from '@crossauth/common';
 test('Ldapauth.authenticateUserInLdapAndLocal', async () => {
     const localStorage = new InMemoryUserStorage();
     const ldapStorage = new LdapUserStorage(localStorage, {
-        ldapUrls: "ldap://localhost:1389",
+        ldapUrls: ["ldap://localhost:1389"],
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",
     });
@@ -24,7 +24,7 @@ test('Ldapauth.authenticateUserInLdapAndLocal', async () => {
 test('Ldapauth.authenticateUserInLdapNotInLocal', async () => {
     const localStorage = new InMemoryUserStorage();
     const ldapStorage = new LdapUserStorage(localStorage, {
-        ldapUrls: "ldap://localhost:1389",
+        ldapUrls: ["ldap://localhost:1389"],
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",
     });
@@ -34,7 +34,7 @@ test('Ldapauth.authenticateUserInLdapNotInLocal', async () => {
 test('Ldapauth.authenticateUserAutoCreate', async () => {
     const localStorage = new InMemoryUserStorage();
     const ldapStorage = new LdapUserStorage(localStorage, {
-        ldapUrls: "ldap://localhost:1389",
+        ldapUrls: ["ldap://localhost:1389"],
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",
     });

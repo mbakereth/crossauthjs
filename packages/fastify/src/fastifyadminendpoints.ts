@@ -55,7 +55,7 @@ async function defaultUserSearchFn(searchTerm: string,
 /////////////////////////////////////////////////////////////////////
 // Fastify data types
 
-interface CreateUserBodyType extends SignupBodyType {
+export interface AdminCreateUserBodyType extends SignupBodyType {
 }
 
 interface SelectUserQueryType {
@@ -71,7 +71,10 @@ export interface UserParamType {
     id : string|number,
 }
 
-interface UpdateUserBodyType {
+/**
+ * Body parameters for the admin update user endpoint
+ */
+export interface AdminUpdateUserBodyType {
     username : string,
     [key:string] : any,
 }
@@ -81,7 +84,10 @@ interface ChangePasswordQueryType {
     required?: boolean
 }
 
-interface ChangePasswordBodyType extends CsrfBodyType {
+/**
+ * Body parameters for the admin change password endpoint
+ */
+export interface AdminChangePasswordBodyType extends CsrfBodyType {
     oldPassword: string,
     newPassword: string,
     repeatPassword?: string,
@@ -89,7 +95,10 @@ interface ChangePasswordBodyType extends CsrfBodyType {
     required?: boolean
 }
 
-export interface DeleteUserParamType {
+/**
+ * URL parameters for the admin delete user endpoint
+ */
+export interface AdminDeleteUserParamType {
     id : string|number
 }
 
@@ -211,7 +220,7 @@ export class FastifyAdminEndpoints {
         });
 
         this.sessionServer.app.post(this.adminPrefix+'createuser', 
-            async (request: FastifyRequest<{ Body: CreateUserBodyType }>,
+            async (request: FastifyRequest<{ Body: AdminCreateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
@@ -409,7 +418,7 @@ export class FastifyAdminEndpoints {
         });
 
         this.sessionServer.app.post(this.adminPrefix+'updateuser/:id', 
-            async (request: FastifyRequest<{Params: UserParamType, Body: UpdateUserBodyType }>,
+            async (request: FastifyRequest<{Params: UserParamType, Body: AdminUpdateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
@@ -472,7 +481,7 @@ export class FastifyAdminEndpoints {
     addDeleteUserEndpoints() {
 
         this.sessionServer.app.get(this.adminPrefix+'deleteuser/:id', 
-            async (request: FastifyRequest<{ Params: DeleteUserParamType, Querystring: DeleteUserQueryType }>,
+            async (request: FastifyRequest<{ Params: AdminDeleteUserParamType, Querystring: DeleteUserQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
@@ -509,7 +518,7 @@ export class FastifyAdminEndpoints {
         });
 
         this.sessionServer.app.post(this.adminPrefix+'deleteuser/:id', 
-            async (request: FastifyRequest<{ Params: DeleteUserParamType, Body: DeleteUserQueryType }>,
+            async (request: FastifyRequest<{ Params: AdminDeleteUserParamType, Body: DeleteUserQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
@@ -570,7 +579,7 @@ export class FastifyAdminEndpoints {
      */
     addApiUpdateUserEndpoints() {
         this.sessionServer.app.post(this.adminPrefix+'api/updateuser/:id', 
-            async (request: FastifyRequest<{Params: UserParamType, Body: UpdateUserBodyType }>,
+            async (request: FastifyRequest<{Params: UserParamType, Body: AdminUpdateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
@@ -661,7 +670,7 @@ export class FastifyAdminEndpoints {
         });
 
         this.sessionServer.app.post(this.adminPrefix+'changepassword/:id', 
-            async (request: FastifyRequest<{Params: UserParamType, Body: ChangePasswordBodyType }>,
+            async (request: FastifyRequest<{Params: UserParamType, Body: AdminChangePasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
@@ -717,7 +726,7 @@ export class FastifyAdminEndpoints {
      */
     addApiChangePasswordEndpoints() {
         this.sessionServer.app.post(this.adminPrefix+'api/changepassword/:id', 
-            async (request: FastifyRequest<{Params: UserParamType, Body: ChangePasswordBodyType }>,
+            async (request: FastifyRequest<{Params: UserParamType, Body: AdminChangePasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
@@ -770,7 +779,7 @@ export class FastifyAdminEndpoints {
     addApiDeleteUserEndpoints() {
 
         this.sessionServer.app.post(this.adminPrefix+'api/deleteuser/:id', 
-            async (request: FastifyRequest<{ Params: DeleteUserParamType }>,
+            async (request: FastifyRequest<{ Params: AdminDeleteUserParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
                     msg: "API visit",
@@ -811,7 +820,7 @@ export class FastifyAdminEndpoints {
     ///////////////////////////////////////////////////////////
     // Internal functions
 
-    private async createUser(request : FastifyRequest<{ Body: CreateUserBodyType }>, 
+    private async createUser(request : FastifyRequest<{ Body: AdminCreateUserBodyType }>, 
         reply : FastifyReply, 
         successFn : (res : FastifyReply, data: {[key:string]:any}, user? : User) 
         => void) {
@@ -893,7 +902,7 @@ export class FastifyAdminEndpoints {
 
     } 
 
-    private async updateUser(user : User, request : FastifyRequest<{ Body: UpdateUserBodyType }>, 
+    private async updateUser(user : User, request : FastifyRequest<{ Body: AdminUpdateUserBodyType }>, 
         reply : FastifyReply, 
         successFn : (res : FastifyReply, user : User, emailVerificationRequired : boolean)
         => void) {
@@ -934,7 +943,7 @@ export class FastifyAdminEndpoints {
         return successFn(reply, request.user, emailVerificationNeeded);
     }
 
-    private async changePassword(user : User, request : FastifyRequest<{ Body: ChangePasswordBodyType }>, 
+    private async changePassword(user : User, request : FastifyRequest<{ Body: AdminChangePasswordBodyType }>, 
         reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
 
@@ -982,7 +991,7 @@ export class FastifyAdminEndpoints {
         return successFn(reply, undefined);
     }
 
-    private async deleteUser(request : FastifyRequest<{ Params: DeleteUserParamType }>, 
+    private async deleteUser(request : FastifyRequest<{ Params: AdminDeleteUserParamType }>, 
         reply : FastifyReply, 
         successFn : (res : FastifyReply) => FastifyReply) {
             

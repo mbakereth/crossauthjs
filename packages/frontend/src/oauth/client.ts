@@ -17,7 +17,7 @@ export class OAuthBffClient {
     /**
      * Constructor
      * 
-     * @param param0
+     * @param options
      *   - `baseUrl` the base url for BFF calls to the OAuth client
      *        (eg `https://myclient.com`).  Required: no default
      *   - `redirectUri` a URL on the site serving this app which the

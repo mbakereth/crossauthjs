@@ -533,14 +533,20 @@ export interface ArbitraryBodyType {
 //////////////////////////////////////////////////////////////////////////////
 // REQUEST INTERFACES
 
-interface LoginBodyType extends CsrfBodyType {
+/**
+ * Body parameters for the /login URL
+ */
+export interface LoginBodyType extends CsrfBodyType {
     username: string,
     password: string,
     persist? : boolean,
     next? : string,
 }
 
-interface LoginFactor2BodyType extends CsrfBodyType {
+/**
+ * Body parameters for the /loginfactor2 URL
+ */
+export interface LoginFactor2BodyType extends CsrfBodyType {
     persist? : boolean,
     next? : string,
     otp? : string,

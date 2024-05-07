@@ -14,7 +14,7 @@ beforeAll(async () => {
     await prismaClient.key.deleteMany({});
     await prismaClient.oAuthClient.deleteMany({});
     await prismaClient.oAuthAuthorization.deleteMany({});
-    userStorage = new PrismaUserStorage({prismaClient: prismaClient, userEditableFields: "email, dummyField"});
+    userStorage = new PrismaUserStorage({prismaClient: prismaClient, userEditableFields: ["email", "dummyField"]});
     let authenticator = new LocalPasswordAuthenticator(userStorage);
     await userStorage.createUser({
         username: "bob", 

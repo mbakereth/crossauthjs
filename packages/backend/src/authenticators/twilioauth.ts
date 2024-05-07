@@ -18,7 +18,7 @@ export class TwilioAuthenticator extends SmsAuthenticator {
      * To call this, you must have `TWILIO_ACCOUNT_SID` and
      * `TWILIO_AUTH_TOKEN` environment variables set.
      * 
-     * @param options see {@link TwilioAuthenticatorOptions}
+     * @param options see {@link SmsAuthenticatorOptions}
      * @throws {@link @crossauth/common!CrossauthError} with
      *         {@link @crossauth/common!ErrorCode} of `Configuration`.
      */

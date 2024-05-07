@@ -37,11 +37,23 @@ export interface PasswordHash {
  * Option parameters for {@link Crypto.passwordHash}
  */
 export interface HashOptions {
+
+    /** A salt to prepend to the message before hashing */
     salt? : string;
+
+    /** Whether to Base64-URL-encode the result */
     encode? : boolean;
+
+    /** A secret to append to the salt when hashing, or undefined for no secret */
     secret? : string;
+
+    /** Number of PBKDF2 iterations */
     iterations? : number,
+
+    /** Length (before Base64-encoding) of the PBKDF2 key being generated */
     keyLen? : number,
+
+    /** PBKDF2 digest method */
     digest? : string,
 }
 
@@ -131,10 +143,11 @@ export class Crypto {
      * 
      * @param hashedPassword the Base64-encoded PBKDF2 hash of the password
      * @param salt the salt used for the password.
+     * @param useSecret whether or not to use the application secret as part
+     *        of the hash.
      * @param iterations the number of PBKDF2 iterations
      * @param keyLen the key length PBKDF2 parameter - results in a hashed password this length, before Base64,
      * @param digest The digest algorithm, eg `pbkdf2`
-     * @param secret If defined, this will be appended to the salt when creating the hash
      * @returns a string encode the above parameters.
      */
     static encodePasswordHash(hashedPassword : string, 

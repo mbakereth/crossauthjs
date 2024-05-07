@@ -147,8 +147,8 @@ export class InMemoryUserStorage extends UserStorage {
     /**
      * Same as {@link getUserByUsername } - userId is the username in this model,
      * @param id the user ID to match 
-     * @returns a {@link @@crossauth/common!User} and 
-     *          {@link @@crossauth/common!UserSecrets}instance, ie including 
+     * @returns a {@link @crossauth/common!User} and 
+     *          {@link @crossauth/common!UserSecrets}instance, ie including 
      *          the password hash.
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist` or `Connection`.
      */
@@ -261,7 +261,7 @@ export class InMemoryKeyStorage extends KeyStorage {
      * Saves a session key in the session table.
      * 
      * @param userId user ID to store with the session key.  See {@link InMemoryUserStorage} for how this may differ from `username`.
-     * @param key the session key to store.
+     * @param keyValue the value of session key to store.
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will also be stored in the key table row
@@ -294,7 +294,7 @@ export class InMemoryKeyStorage extends KeyStorage {
 
     /**
      * 
-     * @param key the key to delete
+     * @param keyValue the value of key to delete
      */
     async deleteKey(keyValue : string) : Promise<void> {
         if (keyValue in this.keys) {
@@ -436,8 +436,8 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
 
     /**
      * Returns the matching client record or throws an exception.
-     * @param key the key to look up in the key storage.
-     * @returns the matching Key record
+     * @param clientId the client to look up in the key storage.
+     * @returns the matching client record
      * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
     async getClientById(clientId : string) : Promise<OAuthClient> {
@@ -452,8 +452,8 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
 
     /**
      * Returns the matching client record or throws an exception.
-     * @param key the key to look up in the key storage.
-     * @returns the matching Key record
+     * @param name the client to look up in the key storage.
+     * @returns the matching client record
      * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
     async getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]> {
@@ -569,9 +569,14 @@ export class InMemoryOAuthAuthorizationStorage extends OAuthAuthorizationStorage
     /**
      * Saves a client in the client table.
      * 
-     * @param client the client to save.
+     * @param clientId the client to save.
+     * @param userId the user Id to associate with the client.  Undefined means
+     *        not associated with a user
+     * @param scopes the scopes that have been authorized for the client
      */
-    async updateAuthorizations(clientId : string, userId : string|number|undefined, scopes : string[]) : Promise<void> {
+    async updateAuthorizations(clientId: string,
+        userId: string | number | undefined,
+        scopes: string[]) : Promise<void> {
         if (userId) {
             if (!(clientId in this.byClientAndUser)) this.byClientAndUser[clientId] = {};
             const byClient = this.byClientAndUser[clientId];

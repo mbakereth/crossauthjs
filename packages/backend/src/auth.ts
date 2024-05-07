@@ -61,10 +61,12 @@ export abstract class Authenticator {
      * Should return the user if it exists in storage, otherwise throw {@link @crossauth/common!CrossauthError}:
      * with {@link @crossauth/common!ErrorCode} of `Connection`, `UserNotExist` or `PasswordNotMatch`
      * 
-     * @param username the username to authenticate
-     * @param password the password to authenticate
+     * @param user the user to authenticate
+     * @param secrets user secrets for authenticating
      */
-    abstract authenticateUser(user : UserInputFields|undefined, secrets : UserSecretsInputFields, params: AuthenticationParameters) : Promise<void>;
+    abstract authenticateUser(user: UserInputFields | undefined,
+        secrets: UserSecretsInputFields,
+        params: AuthenticationParameters) : Promise<void>;
 
     /**
      * This method should create and return any secrets that are persisted in storage, eg hashes of passwords.

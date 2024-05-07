@@ -5,7 +5,7 @@ import { LdapUserStorage } from '../ldapstorage';
 test('LdapStorage.createUser', async () => {
     const localStorage = new InMemoryUserStorage();
     const ldapStorage = new LdapUserStorage(localStorage, {
-        ldapUrls: "ldap://localhost:1389",
+        ldapUrls: ["ldap://localhost:1389"],
         ldapUserSearchBase: "ou=users,dc=example,dc=org",
         ldapUsernameAttribute: "cn",
     });

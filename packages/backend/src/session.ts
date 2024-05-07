@@ -88,8 +88,8 @@ export class SessionManager {
     /**
      * Constructor
      * @param userStorage the {@link UserStorage} instance to use, eg {@link PrismaUserStorage}.
-     * @param keyStorage  the {@link KeyStorage} instance to use, eg {@link PrismaSessionStorage}.
-     * @param authenticator authenticator used to validate users, eg {@link LocalPasswordAuthenticatorOptions }.
+     * @param keyStorage  the {@link KeyStorage} instance to use, eg {@link PrismaKeyStorage}.
+     * @param authenticators authenticators used to validate users, eg {@link LocalPasswordAuthenticatorOptions }.
      * @param options optional parameters for authentication. See {@link SessionManagerOptions }.
      */
     constructor(
@@ -347,7 +347,6 @@ export class SessionManager {
     
     /**
      * Creates and returns a signed CSRF token based on the session ID
-     * @param sessionId the session ID
      * @returns a CSRF cookie and value to put in the form or CSRF header
      */
     async createCsrfToken() : 
@@ -379,7 +378,7 @@ export class SessionManager {
      * 
      * @param sessionCookieValue value from the session ID cookie
      * @returns the usigned cookie value.
-     * @throws {@link @crossauth/CrossauthError} with `InvalidKey`
+     * @throws {@link @crossauth/common!CrossauthError} with `InvalidKey`
      *         if the signature is invalid.
      */
     getSessionId(sessionCookieValue : string) : string {
@@ -403,7 +402,7 @@ export class SessionManager {
     /**
      * Throws {@link @crossauth/common!CrossauthError} with `InvalidKey` if 
      * the passed CSRF cookie value is not valid (ie invalid signature)
-     * @param validateCsrfCookie the CSRF cookie value 
+     * @param csrfCookieValue the CSRF cookie value 
      */
     validateCsrfCookie(csrfCookieValue : string) {
         this.csrfTokens.validateCsrfCookie(csrfCookieValue);
@@ -459,7 +458,7 @@ export class SessionManager {
      * If email verification is enabled, the user's state is set to
      * `awaitingemailverification`. Otherwise it is set to `active`.
      * 
-     * @param User fields to put in the new entry
+     * @param user fields to put in the new entry
      * @param params parameters to pass to the relevant factor 1 authenticator.
      * @param repeatParams if this is set, an exception will be raised if
      *        the values here to not match those in `params`.

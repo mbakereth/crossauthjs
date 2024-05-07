@@ -197,14 +197,14 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
 /**
  * Query type for the `authorize` Fastify request.
  */
-interface AuthorizeQueryType {
+export interface ClientAuthorizeQueryType {
     scope? : string,
 }
 
 /**
  * Query type for the redirect Uri Fastify request.
  */
-interface RedirectUriQueryType {
+export interface RedirectUriQueryType {
     code? : string,
     state?: string,
     error? : string,
@@ -214,14 +214,14 @@ interface RedirectUriQueryType {
 /**
  * Query type for the password flow Fastify request.
  */
-interface PasswordQueryType {
+export interface PasswordQueryType {
     scope? : string,
 }
 
 /**
  * Query type for the client cresentials flow Fastify request.
  */
-interface ClientCredentialsBodyType {
+export interface ClientCredentialsBodyType {
     scope? : string,
     csrfToken? : string,
 }
@@ -229,7 +229,7 @@ interface ClientCredentialsBodyType {
 /**
  * Query type for the refresh token flow Fastify request.
  */
-interface RefreshTokenBodyType {
+export interface RefreshTokenBodyType {
     refreshToken?: string,
     csrfToken? : string,
 }
@@ -237,7 +237,7 @@ interface RefreshTokenBodyType {
 /**
  * Body type for the password flow Fastify request.
  */
-interface PasswordBodyType {
+export interface PasswordBodyType {
     username : string,
     password: string,
     scope? : string,
@@ -247,7 +247,7 @@ interface PasswordBodyType {
 /**
  * Query type for the OTP endpoint on the password mfa flow Fastify request.
  */
-interface PasswordOtpType {
+export interface PasswordOtpType {
     scope? : string,
     mfa_token : string,
     otp : string,
@@ -257,7 +257,7 @@ interface PasswordOtpType {
 /**
  * Query type for the OOB endpoint on the password mfa flow Fastify request.
  */
-interface PasswordOobType {
+export interface PasswordOobType {
     scope? : string,
     mfa_token : string,
     oob_code : string,
@@ -766,7 +766,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
 
         if (this.validFlows.includes(OAuthFlows.AuthorizationCode)) {
             this.server.app.get(this.prefix+'authzcodeflow', 
-                async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, 
+                async (request : FastifyRequest<{ Querystring: ClientAuthorizeQueryType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
                         msg: "Page visit",
@@ -799,7 +799,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
 
         if (this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
             this.server.app.get(this.prefix+'authzcodeflowpkce', 
-                async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, 
+                async (request : FastifyRequest<{ Querystring: ClientAuthorizeQueryType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
                         msg: "Page visit",

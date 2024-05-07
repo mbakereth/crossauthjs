@@ -71,7 +71,7 @@ export abstract class UserStorage {
      * 
      * @param id the user id to return the user of
      * @param options optionally turn off checks.  Used internally
-     * @throws {@link @crossauth/common!CrossauthException} with 
+     * @throws {@link @crossauth/common!CrossauthError} with 
      * {@link @crossauth/common!ErrorCode} either `UserNotExist` or `Connection`
      */
     abstract getUserById(
@@ -141,7 +141,7 @@ export abstract class UserStorage {
      * @param skip skip this number of records from the start of the set
      * @param take only return at most this number of records
      * 
-     * @returns an array of {@link @crossauth/common/User} objects.
+     * @returns an array of {@link @crossauth/common!User} objects.
      */
     abstract getUsers(skip? : number, take? : number) : Promise<User[]>;
 
@@ -282,7 +282,7 @@ export interface OAuthClientStorageOptions {
 /**
  * Base class for storing OAuth clients.
  *
- * This class is subclassed for various types of client storage,  Eg {@link PrismaOAuthStorage } is for storing
+ * This class is subclassed for various types of client storage,  Eg {@link PrismaOAuthClientStorage } is for storing
  * clients in a database table, managed by the Prisma ORM.
  */
 export abstract class OAuthClientStorage {

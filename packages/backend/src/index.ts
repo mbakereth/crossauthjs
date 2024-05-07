@@ -3,11 +3,13 @@ export { setParameter, ParamType } from './utils';
 
 // storage
 export { UserStorage, KeyStorage, OAuthClientStorage, OAuthAuthorizationStorage } from './storage'; 
+export type { UserStorageOptions, UserStorageGetOptions, OAuthAuthorizationStorageOptions, OAuthClientStorageOptions } from './storage'; 
 export { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage } from './storage/prismastorage';
-export type { PrismaUserStorageOptions, PrismaKeyStorageOptions, PrismaOAuthAuthorizationStorageOptions } from './storage/prismastorage';
+export type { PrismaUserStorageOptions, PrismaKeyStorageOptions, PrismaOAuthAuthorizationStorageOptions, PrismaOAuthClientStorageOptions } from './storage/prismastorage';
 export { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage, InMemoryOAuthAuthorizationStorage } from './storage/inmemorystorage';
+export type { InMemoryUserStorageOptions } from './storage/inmemorystorage';
 export { LdapUserStorage } from './storage/ldapstorage';
-export type  { LdapUserStorageOptions } from './storage/ldapstorage';
+export type  { LdapUser, LdapUserStorageOptions } from './storage/ldapstorage';
 
 // authenticators
 export { Authenticator, PasswordAuthenticator } from './auth';
@@ -22,12 +24,14 @@ export {  TwilioAuthenticator } from './authenticators/twilioauth';
 export {  LdapAuthenticator } from './authenticators/ldapauth';
 export type {  LdapAuthenticatorOptions } from './authenticators/ldapauth';
 export { TotpAuthenticator } from './authenticators/totpauth';
+export { TokenEmailer } from './emailtokens';
+export type { TokenEmailerOptions } from './emailtokens';
 
 // session management
 export { SessionManager } from './session';
 export type { SessionManagerOptions } from './session';
 export { SessionCookie, DoubleSubmitCsrfToken } from './cookieauth';
-export type { CookieOptions, Cookie } from './cookieauth';
+export type { CookieOptions, Cookie, DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth';
 
 // API key management
 export { ApiKeyManager } from './apikey';
@@ -35,7 +39,7 @@ export type { ApiKeyManagerOptions } from './apikey';
 
 // hasher
 export { Crypto } from './crypto';
-export type { PasswordHash } from './crypto';
+export type { PasswordHash, HashOptions } from './crypto';
 
 // OAuth
 export { OAuthAuthorizationServer } from './oauth/authserver';

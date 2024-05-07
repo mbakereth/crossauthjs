@@ -101,8 +101,7 @@ export class DoubleSubmitCsrfToken {
      * 
      * Date created is the current date/time on the server.
      * 
-     * @param uniqueUserId the user ID to store with the session key.
-     * @returns the session key, date created and expiry.
+     * @returns a random CSRF token.
      */
     createCsrfToken() : string {
         return Crypto.randomValue(CSRF_LENGTH);
@@ -150,7 +149,7 @@ export class DoubleSubmitCsrfToken {
     /**
      * Takes a session ID and creates a string representation of the cookie (value of the HTTP `Cookie` header).
      * 
-     * @param token the session key to put in the cookie
+     * @param cookieValue the value to put in the cookie
      * @returns a string representation of the cookie and options.
      */
     makeCsrfCookieString(cookieValue : string) : string {
@@ -191,7 +190,7 @@ export class DoubleSubmitCsrfToken {
      *     * The signature in the cookie must match the token in the cookie
      *     * The token in the cookie must matched the value in the form or header after unmasking
      * 
-     * @param token the token (with signature) to validate.
+     * @param cookieValue the CSRDF cookie value to validate.
      * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
      * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `InvalidKey`
      */
@@ -222,8 +221,7 @@ export class DoubleSubmitCsrfToken {
      *     * The signature in the cookie must match the token in the cookie
      *     * The token in the cookie must matched the value in the form or header after unmasking
      * 
-     * @param token the token (with signature) to validate.
-     * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
+     * @param cookieValue the CSRF cookie value to validate.
      * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `InvalidKey`
      */
     validateCsrfCookie(cookieValue : string)  {
@@ -443,7 +441,7 @@ export class SessionCookie {
      * Takes a session ID and creates a string representation of the cookie
      * (value of the HTTP `Cookie` header).
      * 
-     * @param sessionKey the session key to put in the cookie
+     * @param cookie the cookie vlaues to make a string from
      * @returns a string representation of the cookie and options.
      */
     makeCookieString(cookie : Cookie) : string {
@@ -497,7 +495,8 @@ export class SessionCookie {
      * 
      * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
      * 
-     * @param cookieValue the value in the session cookie
+     * @param sessionId the value in the session cookie
+     * @param options See {@link UserStorageGetOptions}
      * @returns a {@link @crossauth/common!User } object, with the password hash removed, and the {@link @crossauth/common!Key } with the unhashed
      *          sessionId
      * @throws a {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to `InvalidSessionId` or `Expired`.

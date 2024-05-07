@@ -33,23 +33,35 @@ export interface UpdateUserBodyType extends CsrfBodyType {
     [key: string] : string|undefined,
 }
 
-interface ChangeFactor2QueryType {
+/**
+ * Query parameters for the changefactor2 GET endpoint
+ */
+export interface ChangeFactor2QueryType {
     next? : string,
     required? : boolean,
 }
     
-interface ChangeFactor2BodyType extends CsrfBodyType {
+/**
+ * Body parameters for the changefactor2 POST endpoint
+ */
+export interface ChangeFactor2BodyType extends CsrfBodyType {
     factor2: string,
     next? : string,
     required?: boolean
 }
 
-interface ChangePasswordQueryType {
+/**
+ * Query parameters for the changepassword GET endpoint
+ */
+export interface ChangePasswordQueryType {
     next? : string;
     required?: boolean
 }
 
-interface ChangePasswordBodyType extends CsrfBodyType {
+/**
+ * Body parameters for the changepassword POST endpoint
+ */
+export interface ChangePasswordBodyType extends CsrfBodyType {
     oldPassword: string,
     newPassword: string,
     repeatPassword?: string,
@@ -57,35 +69,53 @@ interface ChangePasswordBodyType extends CsrfBodyType {
     required?: boolean
 }
 
-interface ConfigureFactor2QueryType {
+/**
+ * Query parameters for the configurefactor2 GET endpoingt
+ */
+export interface ConfigureFactor2QueryType {
     next? : string,
 }
 
-interface ConfigureFactor2BodyType extends CsrfBodyType {
+/**
+ * Body parameters for the configurefactor2 POST endpoint
+ */
+export interface ConfigureFactor2BodyType extends CsrfBodyType {
     next? : string,
     otp? : string,
     token? : string,
     [key:string] : any,
 }
 
-interface RequestPasswordResetQueryType {
+/**
+ * Query parameters for the requestpasswordreset GET endpoint
+ */
+export interface RequestPasswordResetQueryType {
     next? : string,
     required? : boolean,
 }
 
-interface RequestPasswordResetBodyType extends CsrfBodyType {
+/**
+ * Body parameters for the requestpasswordreset POST endpoint
+ */
+export interface RequestPasswordResetBodyType extends CsrfBodyType {
     email: string,
     next? : string,
     required? : boolean,
 }
 
-interface ResetPasswordBodyType extends CsrfBodyType {
+/**
+ * Body parameters for the resetpassword POST endpoint
+ */
+export interface ResetPasswordBodyType extends CsrfBodyType {
     token: string,
     newPassword: string,
     repeatPassword?: string,
 }
 
-interface VerifyTokenParamType {
+/**
+ * URL parameter for the verifytoken endpoint
+ */
+export interface VerifyTokenParamType {
     token : string,
 }
 
