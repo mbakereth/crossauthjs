@@ -105,7 +105,7 @@ app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
 
 // This is a resource server endpoint.  It doesn't have to be on the same
 // server as the authorization server, in which initialize it with
-// {jwtIssuer: AUTH_SERVER_URI} instead
+// {authServerBaseUrl: AUTH_SERVER_URI} instead
 /*const resserver = new FastifyOAuthResourceServer(
     app, 
     [new OAuthTokenConsumer({

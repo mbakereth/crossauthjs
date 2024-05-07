@@ -8,6 +8,7 @@ import { getAccessToken, getAuthServer } from './oauthcommon';
 import { getTestUserStorage } from './inmemorytestdata';
 import { InMemoryKeyStorage, LocalPasswordAuthenticator, KeyStorage } from '@crossauth/backend';
 import { FastifyOAuthClient, } from '..';
+import { jwtDecode } from "jwt-decode";
 
 import path from 'path';
 
@@ -78,7 +79,7 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
             keyStorage: keyStorage,
         },
         oAuthClient: {
-            jwtIssuer: "http://server.com",
+            authServerBaseUrl: "http://server.com",
         }}, {
         app: app,
         views: path.join(__dirname, '../views'),
@@ -124,7 +125,7 @@ async function getAccessTokenThroughClient(clientParams : {[key:string]:any}) {
     const refresh_token = resp.refresh_token;
 
     // @ts-ignore
-    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token, refresh_token: refresh_token})});
+    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({access_token: access_token, refresh_token: refresh_token, expires_in: 60_000})});
     res = await server.app.inject({ method: "POST", url: "/passwordflow", cookies: {CSRFTOKEN: csrfCookie}, payload: {
         csrfToken: csrfToken,
         scope: "read write",
@@ -304,10 +305,10 @@ test('FastifyOAuthClient.refreshIfExpiredIsExpired', async () => {
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
-    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()??"{}")}));
+    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, expires_in: 60_000, access_token: JSON.parse(request.body?.toString()??"{}")}));
     if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
     // @ts-ignore
-    let res = await server.oAuthClient?.refreshIfExpired(null, null, true, refresh_token, Date.now()-10000);
+    let res = await server.oAuthClient?.refresh(null, null, true, true, refresh_token, Date.now()-10000);
     expect(res?.access_token).toBeDefined();
 });
 
@@ -322,9 +323,10 @@ test('FastifyOAuthClient.refreshIfExpiredIsNotExpired', async () => {
     //fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, access_token: JSON.parse(request.body?.toString()??"{}")}));
     if (server.oAuthClient) server.oAuthClient["receiveTokenFn"] = receiveFn;
     // @ts-ignore
-    let res = await server.oAuthClient?.refreshIfExpired(null, null, true, refresh_token, Date.now()+expires_in);
+    let res = await server.oAuthClient?.refresh(null, null, true, true, refresh_token, Date.now()+expires_in);
     expect(res?.access_token).toBeUndefined();
 });
+
 
 test('FastifyOAuthClient.refreshFlowEndpoint', async () => { 
     const { server, access_token, refresh_token, sessionCookie, authServer } = await getAccessTokenThroughClient({
@@ -416,7 +418,7 @@ test('FastifyOAuthClient.refreshIfExpiredEndpoint_Interactive', async () => {
     let sessionData = await sessionManager.dataForSessionId(sessionId);
     sessionData.oauth.expires_at = Date.now() - 1000;
     await sessionManager.updateSessionData(sessionId, "oauth", sessionData.oauth)
-    fetchMocker.mockResponseOnce((_request) => {return JSON.stringify({access_token: access_token2, refresh_token: refresh_token2})});
+    fetchMocker.mockResponseOnce((_request) => {return JSON.stringify({expires_in: 60_000, access_token: access_token2, refresh_token: refresh_token2})});
     res = await server.app.inject({ method: "POST", url: "/refreshtokensifexpired", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
      }});

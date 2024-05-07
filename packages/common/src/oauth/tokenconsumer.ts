@@ -31,7 +31,7 @@ export interface OAuthTokenConsumerBaseOptions {
     /** The value to expect in the iss
      * claim.  If the iss does not match this, the token is rejected.
      * No default (required) */
-    jwtIssuer? : string;
+    authServerBaseUrl? : string;
 
     /**
      * For initializing the token consumer with a static OpenID Connect 
@@ -51,7 +51,7 @@ export abstract class OAuthTokenConsumerBase {
     protected jwtSecretKey : string | undefined;
     protected jwtPublicKey  : string | undefined;
     protected clockTolerance : number = 10;
-    readonly jwtIssuer : string = "";
+    readonly authServerBaseUrl : string = "";
 
     /**
      * The OpenID Connect configuration for the authorization server,
@@ -78,7 +78,7 @@ export abstract class OAuthTokenConsumerBase {
 
         this.audience = audience;
 
-        if (options.jwtIssuer) this.jwtIssuer = options.jwtIssuer;
+        if (options.authServerBaseUrl) this.authServerBaseUrl = options.authServerBaseUrl;
         if (options.jwtKeyType) this.jwtKeyType = options.jwtKeyType;
         if (options.jwtSecretKey) this.jwtSecretKey = options.jwtSecretKey;
         if (options.jwtPublicKey) this.jwtPublicKey = options.jwtPublicKey;
@@ -136,7 +136,7 @@ export abstract class OAuthTokenConsumerBase {
     /**
      * Loads OpenID Connect configuration, or fetches it from the 
      * authorization server (using the well-known enpoint appended
-     * to `jwtIssuer` )
+     * to `authServerBaseUrl` )
      * @param oidcConfig the configuration, or undefined to load it from
      *        the authorization server
      * @throws a {@link @crossauth/common!CrossauthError} object with {@link @crossauth/common!ErrorCode} of
@@ -148,12 +148,12 @@ export abstract class OAuthTokenConsumerBase {
             return;
         }
 
-        if (!this.jwtIssuer) {
-            throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration.  Either set jwtIssuer or set config manually");
+        if (!this.authServerBaseUrl) {
+            throw new CrossauthError(ErrorCode.Connection, "Couldn't get OIDC configuration.  Either set authServerBaseUrl or set config manually");
         }
         let resp : Response|undefined = undefined;
         try {
-            resp = await fetch(new URL("/.well-known/openid-configuration", this.jwtIssuer));
+            resp = await fetch(new URL("/.well-known/openid-configuration", this.authServerBaseUrl));
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
         }
@@ -249,7 +249,7 @@ export abstract class OAuthTokenConsumerBase {
         if (decoded.type != tokenType) {
             CrossauthLogger.logger.error(j({msg: tokenType + " expected but got " + decoded.type}));
         }
-        if (decoded.iss != this.jwtIssuer) {
+        if (decoded.iss != this.authServerBaseUrl) {
             CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: this.hash(decoded.jti)}));
             return undefined;
         }

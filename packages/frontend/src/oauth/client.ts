@@ -1,41 +1,67 @@
 import { CrossauthError, ErrorCode} from "@crossauth/common";
 import { URLSearchParams } from "url";
-
-export type RedirectUriErrorFn = (client : OAuthBffClient,
+import { OAuthClientBase, OAuthTokenConsumerBase  } from '@crossauth/common'
+import type { OAuthTokenResponse } from '@crossauth/common'
+/**
+ * This is the type for a function that is called when an OAuth endpoint
+ * returns the `error` field.
+ */
+export type ErrorFn = (client : OAuthClient,
     error : string,
     errorDescription? : string) => Promise<any>;
 
-export type RedirectUriFn = (client : OAuthBffClient,
+/**
+ * This is the type for the function that is called when on a successful
+ * response to the redirect Uri
+ */
+export type RedirectUriFn = (client : OAuthClient,
     code : string,
     state? : string) => Promise<any>;
     
-export class OAuthBffClient {
-    private baseUrl : string;
-    private redirectUri : string;
+export class OAuthClient extends OAuthClientBase {
+    private resServerBaseUrl : string = "";
     private headers : {[key:string]:string} = {};
 
     /**
      * Constructor
      * 
      * @param options
-     *   - `baseUrl` the base url for BFF calls to the OAuth client
-     *        (eg `https://myclient.com`).  Required: no default
+     *   - `authServerBaseUrl` the base url the authorization server.
+     *      For example, the authorize endpoint would be
+     *      `authServerBaseUrl + "authorize"`.
+     *       Required: no default
+     *   - `resServerBaseUrl` the base url the resource server.
+     *      For example, Relative URLs to the resource server are relative
+     *      to this.  If you always give absolute URLs, this is optional.
+     *      If you don't give it and you do make relative URLs, it will be
+     *      relative to the page you are on.  Default: empty string.
      *   - `redirectUri` a URL on the site serving this app which the
      *      authorization server will redirect to with an authorization
      *      code.  See description in class documentation.
+     *      This is not required if you are not using OAuth flows
+     *      which require a redirect URI (eg the password flow).
      */
-    constructor({ 
-            baseUrl,
-            redirectUri,
-        }  : {
-            baseUrl : string,
-            redirectUri : string,
+    constructor(options  : {
+            authServerBaseUrl : string,
+            stateLength? : number,
+            verifierLength? : number,
+            clientId? : string,
+            clientSecret? : string,
+            redirectUri? : string,
+            codeChallengeMethod? : "plain" | "S256",
+            tokenConsumer : OAuthTokenConsumerBase,
+            fetchCredentials? : "same-origin"|"include",
+            resServerBaseUrl? : string,
 
         }) {
-        this.baseUrl = baseUrl;
-        if (!(this.baseUrl.endsWith("/"))) this.baseUrl += "/";
-        this.redirectUri = redirectUri;
-        if (!(this.redirectUri.endsWith("/"))) this.redirectUri += "/";
+        super(options);
+        if (this.resServerBaseUrl != undefined) {
+            this.resServerBaseUrl = options.resServerBaseUrl ?? "";
+            if (this.resServerBaseUrl.length > 0 && 
+                !(this.resServerBaseUrl.endsWith("/"))) {
+                    this.resServerBaseUrl += "/";
+                }
+        }
     }
 
     /**
@@ -54,7 +80,7 @@ export class OAuthBffClient {
      *          `undefined` if neither was called.
      */
     async handleRedirectUri(redirectUriFn : RedirectUriFn, 
-        errorFn : RedirectUriErrorFn) : Promise<any|undefined> {
+        errorFn : ErrorFn) : Promise<any|undefined> {
         const url = new URL(window.location.href);
         if (url.origin + url.pathname != this.redirectUri) return undefined;
         const params = new URLSearchParams();
@@ -72,5 +98,28 @@ export class OAuthBffClient {
         else if (error) return await errorFn(this, error, errorDescription);
         return undefined;
     }
+
+    ///////
+    // Implementation of abstract methods
+
+    /**
+     * Produce a random Base64-url-encoded string, whose length before 
+     * base64-url-encoding is the given length,
+     * @param length the length of the random array before base64-url-encoding.
+     * @returns the random value as a Base64-url-encoded srting
+     */
+    protected randomValue(length : number) : string {
+        return "";
+    }
+
+    /**
+     * SHA256 and Base64-url-encodes the given test
+     * @param plaintext the text to encode
+     * @returns the SHA256 hash, Base64-url-encode
+     */
+    protected sha256(plaintext :string) : string {
+        return "";
+    }
+    
 }
 

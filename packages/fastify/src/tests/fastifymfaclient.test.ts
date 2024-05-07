@@ -143,7 +143,7 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
             keyStorage: keyStorage,
         },
         oAuthClient: {
-            jwtIssuer: "http://server.com",
+            authServerBaseUrl: "http://server.com",
         }}, {
         app: app,
         views: path.join(__dirname, '../views'),

@@ -421,23 +421,9 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
 
     logTokens(oauthResponse);
     try {
-        let sessionCookieValue = client.server.getSessionCookieValue(request);
-        if (!reply && !sessionCookieValue) {
-            throw new CrossauthError(ErrorCode.InvalidSession,
-                "No session data found containing tokens")
-        }
-        const expires_at = Date.now() + (oauthResponse.expires_in??0)*1000;
-        if (!sessionCookieValue && reply) {
-            sessionCookieValue = 
-                await client.server.createAnonymousSession(request,
-                    reply,
-                    { [client.sessionDataName]: {...oauthResponse, expires_at} });
-        } else {
-            const existingData = 
-                await client.server.getSessionData(request, client.sessionDataName);
-            await client.server.updateSessionData(request,
-                client.sessionDataName,
-                { ...existingData??{},  ...oauthResponse, expires_at });
+
+        if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
+            await updateSessionData(oauthResponse, client, request, reply);
         }
 
         if (reply) {
@@ -469,6 +455,40 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     }
 }
 
+async function updateSessionData(oauthResponse: OAuthTokenResponse,
+    client: FastifyOAuthClient,
+    request: FastifyRequest,
+    reply?: FastifyReply,
+    ) {
+        let sessionCookieValue = client.server.getSessionCookieValue(request);
+        if (!reply && !sessionCookieValue) {
+            throw new CrossauthError(ErrorCode.InvalidSession,
+                "No session data found containing tokens")
+        }
+        let expires_in = oauthResponse.expires_in;
+        if (!expires_in && oauthResponse.access_token) {
+            const payload = jwtDecode(oauthResponse.access_token);
+            if (payload.exp) expires_in = payload.exp;
+        }
+        if (!expires_in) {
+            throw new CrossauthError(ErrorCode.BadRequest, 
+                "OAuth server did not return an expiry for the access token");
+        }
+        const expires_at = Date.now() + (expires_in)*1000;
+        if (!sessionCookieValue && reply) {
+            sessionCookieValue = 
+                await client.server.createAnonymousSession(request,
+                    reply,
+                    { [client.sessionDataName]: {...oauthResponse, expires_at} });
+        } else {
+            const existingData = 
+                await client.server.getSessionData(request, client.sessionDataName);
+            await client.server.updateSessionData(request,
+                client.sessionDataName,
+                { ...existingData??{},  ...oauthResponse, expires_at });
+        }
+
+}
 async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     client: FastifyOAuthClient,
     request: FastifyRequest,
@@ -491,24 +511,8 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     logTokens(oauthResponse);
 
     try {
-        let sessionCookieValue = client.server.getSessionCookieValue(request);
-        if (!reply && !sessionCookieValue) {
-            throw new CrossauthError(ErrorCode.InvalidSession,
-                "No session data found containing tokens")
-        }
-        if (!sessionCookieValue && reply) {
-            sessionCookieValue = 
-                await client.server.createAnonymousSession(request,
-                    reply,
-                    { [client.sessionDataName]: oauthResponse });
-        } else {
-            const expires_at = 
-                (new Date().getTime() + (oauthResponse.expires_in??0)*1000);
-                const existingData = 
-                await client.server.getSessionData(request, client.sessionDataName);
-            await client.server.updateSessionData(request,
-                client.sessionDataName,
-                { ...existingData??{}, ...oauthResponse, expires_at });
+        if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
+            await updateSessionData(oauthResponse, client, request, reply);
         }
 
         if (reply) {
@@ -684,13 +688,13 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     /**
      * Constructor
      * @param server the {@link FastifyServer} instance
-     * @param jwtIssuer the `iss` claim in the access token must match this value
+     * @param authServerBaseUrl the `iss` claim in the access token must match this value
      * @param options See {@link FastifyOAuthClientOptions}
      */
     constructor(server: FastifyServer,
-        jwtIssuer: string,
+        authServerBaseUrl: string,
         options: FastifyOAuthClientOptions) {
-        super(jwtIssuer, options);
+        super(authServerBaseUrl, options);
         this.server = server;
         setParameter("sessionDataName", ParamType.String, this, options, "OAUTH_SESSION_DATA_NAME");
         setParameter("siteUrl", ParamType.String, this, options, "SITE_URL", true);
@@ -1607,8 +1611,17 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         resp.error_description);
                     return await this.errorFn(this.server, request, reply, ce)
                 }
+                let expires_in = resp.expires_in;
+                if (!expires_in && resp.access_token) {
+                    const payload = jwtDecode(resp.access_token);
+                    if (payload.exp) expires_in = payload.exp;
+                }
+                if (!expires_in) {
+                    throw new CrossauthError(ErrorCode.BadRequest, 
+                        "OAuth server did not return an expiry for the access token");
+                }
                 const expires_at = 
-                    (new Date().getTime() + (resp.expires_in??0)*1000);
+                    (new Date().getTime() + (expires_in*1000));
                 return {
                     access_token: resp.access_token,
                     refresh_token: resp.refresh_token,
@@ -1664,9 +1677,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 onlyIfExpired,
                 oauthData.refresh_token,
                 onlyIfExpired ? oauthData.expires_at : undefined);
-
-        //if (!silent) return resp;
-        if (!silent) return this.receiveTokenFn(resp??{}, this, request, reply);
+        if (!silent) {
+            if (resp != undefined) return resp;
+            return this.receiveTokenFn(resp??{}, this, request, reply);
+        }
         return reply.header(...JSONHDR).status(200).send({ok: true, expires_at: resp?.expires_at});
     };
 

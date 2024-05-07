@@ -231,7 +231,7 @@ export class FastifyServer {
      *       value is an {@link FastifyAuthorizationServerOptions} may also be
      *       provided.
      *     - `oAuthClient` if present, an OAuth client will be created.
-     *       There must be a field called `jwtIssuer` and is the 
+     *       There must be a field called `authServerBaseUrl` and is the 
      *       bsae URL for the authorization server.  When validating access
      *       tokens, the `iss` claim must match this.
      *     - `oAuthResServer` if present. an OAuth resource server will be
@@ -262,7 +262,7 @@ export class FastifyServer {
                     options? : FastifyAuthorizationServerOptions,
                 },
                 oAuthClient? : {
-                    jwtIssuer: string,
+                    authServerBaseUrl: string,
                     options? : FastifyOAuthClientOptions,
                 },
                 oAuthResServer? : {
@@ -343,7 +343,7 @@ export class FastifyServer {
 
         if (oAuthClient) {
             this.oAuthClient = new FastifyOAuthClient(this,
-                oAuthClient.jwtIssuer,
+                oAuthClient.authServerBaseUrl,
                 { ...options, ...oAuthClient.options });
         }
 

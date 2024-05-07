@@ -13,7 +13,7 @@ async function main() {
     CrossauthLogger.logger.level = CrossauthLogger.None;
 
     const oauthClient = new OAuthClientBackend(
-        process.env["JWT_ISSUER"], { 
+        process.env["AUTH_SERVER_BASE_URL"], { 
         clientId: process.env["CLIENT_ID"],
         clientSecret: process.env["CLIENT_SECRET"],
     });

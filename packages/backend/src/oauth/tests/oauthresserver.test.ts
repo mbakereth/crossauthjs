@@ -229,7 +229,7 @@ test('ResourceServer.invalidIsser', async () => {
                 jwtKeyType: "RS256",
                 jwtPublicKey: publicKey,
                 clockTolerance: 10,
-                jwtIssuer: "http://expectedissuer.com",
+                authServerBaseUrl: "http://expectedissuer.com",
         })]);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeUndefined();
@@ -291,7 +291,7 @@ test('ResourceServer.validateWithJwks', async () => {
     const jwks = authServer.jwks();
     expect(jwks.keys.length).toBe(1);
     expect(jwks.keys[0].kty).toBe("RSA");
-    await resserver.tokenConsumers[process.env["CROSSAUTH_OAUTH_ISSUER"]??""].loadJwks(jwks);
+    await resserver.tokenConsumers[process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??""].loadJwks(jwks);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeDefined();
 });

@@ -515,9 +515,9 @@ test('AuthorizationServer.AuthzCodeFlow.oidcConfiguration', async () => {
         tokenEndpoint: "/token",
         jwksUri: "/jwks",
     });
-    expect(wellKnown.authorization_endpoint).toBe(process.env.CROSSAUTH_OAUTH_ISSUER+"/authorize");
-    expect(wellKnown.token_endpoint).toBe(process.env.CROSSAUTH_OAUTH_ISSUER+"/token");
-    expect(wellKnown.jwks_uri).toBe(process.env.CROSSAUTH_OAUTH_ISSUER+"/jwks");
+    expect(wellKnown.authorization_endpoint).toBe(process.env.CROSSAUTH_AUTH_SERVER_BASE_URL+"/authorize");
+    expect(wellKnown.token_endpoint).toBe(process.env.CROSSAUTH_AUTH_SERVER_BASE_URL+"/token");
+    expect(wellKnown.jwks_uri).toBe(process.env.CROSSAUTH_AUTH_SERVER_BASE_URL+"/jwks");
 });
 
 test('AuthorizationServer.AuthzCodeFlow.jwks', async () => {

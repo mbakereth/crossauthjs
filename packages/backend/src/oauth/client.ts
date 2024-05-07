@@ -60,21 +60,21 @@ export class OAuthClientBackend extends OAuthClientBase {
 
     /**
      * Constructor
-     * @param jwtIssuer bsae URI for the authorization server
+     * @param authServerBaseUrl bsae URI for the authorization server
      *        expected to issue access tokens.  If the `iss` field in a JWT
      *        does not match this, it is rejected.
      * @param options See {@link OAuthClientOptions}
      */
-    constructor(jwtIssuer : string, options : OAuthClientOptions) {
+    constructor(authServerBaseUrl : string, options : OAuthClientOptions) {
         // because we can't set instance variables before calling super()
         const options1 = {
             clientId: "",
         }
         setParameter("clientId", ParamType.String, options1, options, "OAUTH_CLIENT_ID", true);
-        super({ jwtIssuer, 
+        super({ authServerBaseUrl, 
             tokenConsumer: new OAuthTokenConsumer({ 
                 audience: options1.clientId, 
-                jwtIssuer, 
+                authServerBaseUrl, 
                 ...options }), ...options });
 
         setParameter("stateLength", ParamType.String, this, options, "OAUTH_STATE_LENGTH");

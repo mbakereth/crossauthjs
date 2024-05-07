@@ -264,7 +264,7 @@ export class OAuthAuthorizationServer {
         }
         this.clientManager = new OAuthClientManager({clientStorage, ...options});
 
-        setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER", true);
+        setParameter("oauthIssuer", ParamType.String, this, options, "AUTH_SERVER_BASE_URL", true);
         setParameter("audience", ParamType.String, this, options, "OAUTH_AUDIENCE");
         setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
         setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");

@@ -2063,7 +2063,7 @@ export class FastifySessionServer {
                 if (this.isSessionUser(request) && !request.csrfToken) return this.sendJsonError(reply,
                     403,
                     "No CSRF token present");
-            //await this.validateCsrfToken(request)
+                    //await this.validateCsrfToken(request)
             try {
                 let user : User|undefined;
                 if (request.sessionId) {
@@ -2693,12 +2693,12 @@ export class FastifySessionServer {
         error?: string,
         e?: any) {
         if (!error || !e) error = "Unknown error";
-        const ce = CrossauthError.asCrossauthError(e);
+        const ce = e ? CrossauthError.asCrossauthError(e) : undefined;
 
         CrossauthLogger.logger.warn(j({
             msg: error,
-            errorCode: ce.code,
-            errorCodeName: ce.codeName,
+            errorCode: ce?.code,
+            errorCodeName: ce?.codeName,
             httpStatus: status
         }));
         return reply.header(...JSONHDR).status(status)
@@ -2706,8 +2706,8 @@ export class FastifySessionServer {
                 ok: false,
                 status: status,
                 errorMessage: error,
-                errorCode: ce.code,
-                errorCodeName: ce.codeName
+                errorCode: ce?.code,
+                errorCodeName: ce?.codeName
             });
     }
 

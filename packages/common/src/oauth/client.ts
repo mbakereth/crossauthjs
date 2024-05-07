@@ -166,7 +166,7 @@ export interface OAuthTokenResponse {
  * without PKCE.
  */
 export abstract class OAuthClientBase {
-    protected jwtIssuer = "";
+    protected authServerBaseUrl = "";
     protected clientId : string|undefined;
     protected clientSecret : string|undefined;
     protected codeChallenge : string|undefined;
@@ -185,7 +185,7 @@ export abstract class OAuthClientBase {
      * Constructor.
      * 
      * @param options options:
-     *      - `jwtIssuer` the base URI for OAuth calls.  This is
+     *      - `authServerBaseUrl` the base URI for OAuth calls.  This is
      *        the value in the isser field of a JWT.  The client will
      *        reject any JWTs that are not from this issuer.
      *      - `clientId` the client ID for this client.
@@ -200,7 +200,7 @@ export abstract class OAuthClientBase {
      *        in browsers), the token consumer, which determines if a token
      *        is valid or not, is abstracted out.
      */
-    constructor({jwtIssuer,
+    constructor({authServerBaseUrl,
         clientId,
         clientSecret,
         redirectUri,
@@ -210,7 +210,7 @@ export abstract class OAuthClientBase {
         tokenConsumer,
         fetchCredentials,
     } : {
-        jwtIssuer : string,
+        authServerBaseUrl : string,
         stateLength? : number,
         verifierLength? : number,
         clientId? : string,
@@ -221,14 +221,14 @@ export abstract class OAuthClientBase {
         fetchCredentials? : "same-origin"|"include",
     }) {
         this.tokenConsumer = tokenConsumer;
-        this.jwtIssuer = jwtIssuer;
+        this.authServerBaseUrl = authServerBaseUrl;
         if (verifierLength) this.verifierLength = verifierLength;
         if (stateLength) this.stateLength = stateLength;
         if (clientId) this.clientId = clientId;
         if (clientSecret) this.clientSecret = clientSecret;
         if (redirectUri) this.redirectUri = redirectUri;
         if (codeChallengeMethod) this.codeChallengeMethod = codeChallengeMethod;
-        this.jwtIssuer = jwtIssuer;
+        this.authServerBaseUrl = authServerBaseUrl;
         if (fetchCredentials) this.fetchCredentials = fetchCredentials;
 
     }
@@ -240,7 +240,7 @@ export abstract class OAuthClientBase {
      * @param oidcConfig if defined, loadsa the config from this object.
      *        Otherwise, performs a fetch by appending
      *        `/.well-known/openid-configuration` to the 
-     *        `jwtIssuer`.
+     *        `authServerBaseUrl`.
      * @throws {@link @crossauth/common!CrossauthError} with the following {@link @crossauth/common!ErrorCode}s
      *   - `Connection` if data from the URL could not be fetched or parsed.
      */
@@ -254,7 +254,7 @@ export abstract class OAuthClientBase {
         let resp : Response|undefined = undefined;
         try {
             const url = new URL("/.well-known/openid-configuration",
-                this.jwtIssuer);
+                this.authServerBaseUrl);
             CrossauthLogger.logger.debug(j({msg: `Fetching OIDC config from ${url}`}))
             resp = await fetch(url);
         } catch (e) {

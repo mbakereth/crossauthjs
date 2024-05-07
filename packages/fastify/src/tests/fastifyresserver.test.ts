@@ -50,10 +50,10 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_authorized', async (
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const app = fastify({logger: false});
-    const issuer = process.env["CROSSAUTH_OAUTH_ISSUER"]??"";
+    const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
     const resserver = new FastifyOAuthResourceServer(
         app,
-        [new OAuthTokenConsumer({jwtIssuer: issuer})],
+        [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await resserver.tokenConsumers[issuer].loadConfig();
@@ -95,10 +95,10 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_endpoint', async () 
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const app = fastify({logger: false});
-    const issuer = process.env["CROSSAUTH_OAUTH_ISSUER"]??"";
+    const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
     const resserver = new FastifyOAuthResourceServer(
         app,
-        [new OAuthTokenConsumer({jwtIssuer: issuer})],
+        [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
         {protectedEndpoints: {"/endpoint" : {}}}
     );
     app.get('/endpoint',  async (request : FastifyRequest, reply : FastifyReply) =>  {

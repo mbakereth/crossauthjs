@@ -28,7 +28,7 @@ export class OAuthResourceServer {
     constructor(tokenConsumers : OAuthTokenConsumer[], _options : OAuthResourceServerOptions = {}) {
 
         for (let consumer of tokenConsumers) {
-            this.tokenConsumers[consumer.jwtIssuer] = consumer;
+            this.tokenConsumers[consumer.authServerBaseUrl] = consumer;
 
         }
     }
