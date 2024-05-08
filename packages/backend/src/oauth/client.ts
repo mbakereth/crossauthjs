@@ -107,7 +107,7 @@ export class OAuthClientBackend extends OAuthClientBase {
      * @param plaintext the text to hash
      * @returns the Base64-URL-encoded hash
      */
-    protected sha256(plaintext :string) : string {
+    protected async sha256(plaintext :string) : Promise<string> {
         return Crypto.sha256(plaintext);
     }
 }

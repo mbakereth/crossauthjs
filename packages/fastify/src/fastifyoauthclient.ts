@@ -150,6 +150,18 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
         "custom";
 
     /**
+     * If defined, refresh token will be set in a cookie with this name,
+     * as well as being sent in the method described in `tokenResponseType`
+     */
+    refreshTokenCookieName? : string,
+
+    refreshTokenCookieDomain : string | undefined ;
+    refreshTokenCookieHttpOnly : boolean;
+    refreshTokenCookiePath : string;
+    refreshTokenCookieSecure : boolean;
+    refreshTokenCookieSameSite : boolean | "lax" | "strict" | "none" | undefined;
+
+    /**
      * What do do on receiving an OAuth error.
      * See lass documentation for full description.
      */
@@ -657,6 +669,12 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             => Promise<FastifyReply|undefined> = sendJson;
     private errorFn : FastifyErrorFn = jsonError;
     private loginUrl : string = "/login";
+    private refreshTokenCookieName : string|undefined;
+    private refreshTokenCookieDomain : string | undefined = undefined;
+    private refreshTokenCookieHttpOnly : boolean = false;
+    private refreshTokenCookiePath : string = "/";
+    private refreshTokenCookieSecure : boolean = true;
+    private refreshTokenCookieSameSite : boolean | "lax" | "strict" | "none" | undefined = "strict";
 
     /** 
      * See {@link FastifyOAuthClientOptions}
@@ -715,6 +733,12 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         setParameter("mfaOobPage", ParamType.String, this, options, "OAUTH_MFA_OOB_PAGE");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
+        setParameter("refreshTokenCookieName", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_NAME");
+        setParameter("refreshTokenCookieDomain", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_DOMAIN");
+        setParameter("refreshTokenCookieHttpOnly", ParamType.Boolean, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_HTTPONLY");
+        setParameter("refreshTokenCookiePath", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_PATH");
+        setParameter("refreshTokenCookieSecure", ParamType.Boolean, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SECURE");
+        setParameter("refreshTokenCookieSameSite", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SAMESITE");
         
         if (options.tokenEndpoints) this.tokenEndpoints = options.tokenEndpoints;
 
@@ -864,6 +888,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                             reply,
                             ce);
                     }
+                    if (resp.refresh_token && this.refreshTokenCookieName) {
+                        this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
+                    }
                     return await this.receiveTokenFn(resp, this, request, reply);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
@@ -912,6 +939,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                             request,
                             reply,
                             ce);
+                    }
+                    if (resp.refresh_token && this.refreshTokenCookieName) {
+                        this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
                     }
                     return await this.receiveTokenFn(resp, this, request, reply);
                 } catch (e) {
@@ -986,6 +1016,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                             request,
                             reply,
                             ce);
+                    }
+                    if (resp.refresh_token && this.refreshTokenCookieName) {
+                        this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
                     }
                     return await this.receiveTokenFn(resp, this, request, reply);
                 } catch (e) {
@@ -1355,6 +1388,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                             csrfToken: request.csrfToken
                         });            
                 }
+                if (resp.refresh_token && this.refreshTokenCookieName) {
+                    this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
+                }
                 return await this.receiveTokenFn(resp, this, request, reply);
                
             } else if (resp.error) {
@@ -1374,6 +1410,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         errorCodeName: ce.codeName,
                         csrfToken: request.csrfToken
                     });            
+            }
+            if (resp.refresh_token && this.refreshTokenCookieName) {
+                this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
             }
             return await this.receiveTokenFn(resp, this, request, reply);
         } catch (e) {
@@ -1527,6 +1566,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 csrfToken: request.csrfToken
             });
         }
+        if (resp.refresh_token && this.refreshTokenCookieName) {
+            this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
+        }
         return await this.receiveTokenFn(resp, this, request, reply)??reply;
     }
 
@@ -1565,6 +1607,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 csrfToken: request.csrfToken
             });
         }
+        if (resp.refresh_token && this.refreshTokenCookieName) {
+            this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
+        }
         return await this.receiveTokenFn(resp, this, request, reply)??reply;
     }
 
@@ -1600,6 +1645,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     resp.error_description = "Unexpectedly did not receive error or access token";
                 }
                 if (!resp.error) {
+                    if (resp.refresh_token && this.refreshTokenCookieName) {
+                        this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
+                    }
                     const resp1 = await this.receiveTokenFn(resp,
                         this,
                         request,
@@ -1678,11 +1726,27 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 oauthData.refresh_token,
                 onlyIfExpired ? oauthData.expires_at : undefined);
         if (!silent) {
-            if (resp != undefined) return resp;
+            // if (resp != undefined) return resp; XXX
+            if (resp == undefined) return resp;
+            if (resp.refresh_token && this.refreshTokenCookieName) {
+                this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
+            }
             return this.receiveTokenFn(resp??{}, this, request, reply);
         }
         return reply.header(...JSONHDR).status(200).send({ok: true, expires_at: resp?.expires_at});
     };
 
+    private setRefreshTokenCookie(reply : FastifyReply, token : string, expiresIn : number|undefined) {
+        if (!this.refreshTokenCookieName) return;
+        let expiresAt = expiresIn ? new Date(Date.now() + expiresIn*1000).toUTCString() : undefined;
+        let cookieString = this.refreshTokenCookieName + "=" + token;
+        if (expiresAt) cookieString += "; expires=" + new Date(expiresAt).toUTCString();
+        if (this.refreshTokenCookieSameSite) cookieString += "; SameSite=" + this.refreshTokenCookieSameSite;
+        if (this.refreshTokenCookieDomain) cookieString += "; domain=" + this.refreshTokenCookieDomain;
+        if (this.refreshTokenCookiePath) cookieString += "; path=" + this.refreshTokenCookiePath;
+        if (this.refreshTokenCookieHttpOnly == true) cookieString += "; httpOnly";
+        if (this.refreshTokenCookieSecure == true) cookieString += "; secure";
+        reply.setCookie(this.refreshTokenCookieName, cookieString)
+    }
 
 }

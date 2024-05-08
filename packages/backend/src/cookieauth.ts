@@ -445,15 +445,16 @@ export class SessionCookie {
      * @returns a string representation of the cookie and options.
      */
     makeCookieString(cookie : Cookie) : string {
-        let cookieString = cookie.name + "=" + cookie.value + "; SameSite=" + this.sameSite;
+        let cookieString = cookie.name + "=" + cookie.value;
+        if (this.sameSite) cookieString += "; SameSite=" + this.sameSite;
         if (cookie.options.expires) {
-            cookieString += "; " + new Date(cookie.options.expires).toUTCString();
+            cookieString += "; expires=" + new Date(cookie.options.expires).toUTCString();
         }
         if (this.domain) {
-            cookieString += "; " + this.domain;
+            cookieString += "; domain=" + this.domain;
         }
         if (this.path) {
-            cookieString += "; " + this.path;
+            cookieString += "; path=" + this.path;
         }
         if (this.httpOnly) {
             cookieString += "; httpOnly";

@@ -180,6 +180,7 @@ export abstract class OAuthClientBase {
     protected oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
     protected tokenConsumer : OAuthTokenConsumerBase;
     protected fetchCredentials : "same-origin"|"include"|undefined = undefined;
+    protected authServerHeaders : {[key:string]:string} = {};
 
     /**
      * Constructor.
@@ -234,6 +235,17 @@ export abstract class OAuthClientBase {
     }
 
     /**
+     * Any headers added here will be applied to all requests to the
+     * authorization server.
+     * 
+     * @param header the header name eg `Access-Control-Allow-Origin`
+     * @param value the header value
+     */
+    addAuthServerHeader(header : string, value : string) {
+        this.authServerHeaders[header] = value;
+    }
+
+    /**
      * Loads OpenID Connect configuration so that the client can determine
      * the URLs it can call and the features the authorization server provides.
      * 
@@ -256,7 +268,7 @@ export abstract class OAuthClientBase {
             const url = new URL("/.well-known/openid-configuration",
                 this.authServerBaseUrl);
             CrossauthLogger.logger.debug(j({msg: `Fetching OIDC config from ${url}`}))
-            resp = await fetch(url);
+            resp = await fetch(url, {headers: this.authServerHeaders});
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
         }
@@ -290,7 +302,7 @@ export abstract class OAuthClientBase {
      * @param plaintext the text to encode
      * @returns the SHA256 hash, Base64-url-encode
      */
-    protected abstract sha256(plaintext :string) : string;
+    protected abstract sha256(plaintext :string) : Promise<string>;
 
     /**
      * Starts the authorizatuin code flow, optionally with PKCE.
@@ -309,7 +321,7 @@ export abstract class OAuthClientBase {
      *          - `error_description` friendly error message or undefined
      *            if no error
      */
-    protected async startAuthorizationCodeFlow(scope?: string,
+    async startAuthorizationCodeFlow(scope?: string,
         pkce: boolean = false) : 
         Promise<{
             url?: string,
@@ -356,7 +368,7 @@ export abstract class OAuthClientBase {
             this.codeVerifier = this.randomValue(this.verifierLength);
             this.codeChallenge = 
                 this.codeChallengeMethod == "plain" ? 
-                this.codeVerifier : this.sha256(this.codeVerifier);
+                this.codeVerifier : await this.sha256(this.codeVerifier);
             url += "&code_challenge=" + this.codeChallenge;
         }
 
@@ -368,8 +380,10 @@ export abstract class OAuthClientBase {
      * 
      * Does not throw exceptions.
      *
-     * Makes a POST request to the `token` endpoint with the
-     * authorization code to get an access token, etc.
+     * If an error wasn't reported,  a POST request to the `token` endpoint with 
+     * the authorization code to get an access token, etc.  If there was 
+     * an error, this is just passed through without calling and further
+     * endpoints.
      * 
      * @param code the authorization code
      * @param state the random state variable
@@ -423,7 +437,7 @@ export abstract class OAuthClientBase {
         if (clientSecret) params.client_secret = clientSecret;
         params.code_verifier = this.codeVerifier;
         try {
-            return this.post(url, params);
+            return this.post(url, params, this.authServerHeaders);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -445,7 +459,7 @@ export abstract class OAuthClientBase {
      * @returns The {@link OAuthTokenResponse} from the `token` endpoint
      *          request, or `error` and `error_description`.
      */
-    protected async clientCredentialsFlow(scope? : string) : 
+    async clientCredentialsFlow(scope? : string) : 
         Promise<OAuthTokenResponse> {
         CrossauthLogger.logger.debug(j({msg: "Starting client credentials flow"}));
         if (!this.oidcConfig) await this.loadConfig();
@@ -476,7 +490,7 @@ export abstract class OAuthClientBase {
         }
         if (scope) params.scope = scope;
         try {
-            return await this.post(url, params);
+            return await this.post(url, params, this.authServerHeaders);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -530,7 +544,7 @@ export abstract class OAuthClientBase {
         }
         if (scope) params.scope = scope;
         try {
-            return await this.post(url, params);
+            return await this.post(url, params, this.authServerHeaders);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -578,7 +592,7 @@ export abstract class OAuthClientBase {
             this.oidcConfig.issuer + (this.oidcConfig.issuer.endsWith("/") ? 
             "" : "/") + "mfa/authenticators";
         const resp = 
-            await this.get(url, {'authorization': 'Bearer ' + mfaToken});
+            await this.get(url, {'authorization': 'Bearer ' + mfaToken, ...this.authServerHeaders});
         if (!Array.isArray(resp)) {
             return {
                 error: "server_error",
@@ -646,7 +660,7 @@ export abstract class OAuthClientBase {
             challenge_type: "otp",
             mfa_token: mfaToken,
             authenticator_id: authenticatorId,
-        });
+        }, this.authServerHeaders);
         if (resp.challenge_type != "otp") {
             return {
                 error: resp.error ?? "server_error",
@@ -707,7 +721,7 @@ export abstract class OAuthClientBase {
             challenge_type: "otp",
             mfa_token: mfaToken,
             otp: otp,
-        });
+        }, this.authServerHeaders);
         return {
             id_token: otpResp.id_token,
             access_token: otpResp.access_token,
@@ -767,7 +781,7 @@ export abstract class OAuthClientBase {
             challenge_type: "oob",
             mfa_token: mfaToken,
             authenticator_id: authenticatorId,
-        });
+        }, this.authServerHeaders);
         if (resp.challenge_type != "oob" || !resp.oob_code || !resp.binding_method) {
             return {error: resp.error??"server_error", error_description: resp.error_description??"Invalid OOB challenge response"};
         }
@@ -818,7 +832,7 @@ export abstract class OAuthClientBase {
             mfa_token: mfaToken,
             oob_code: oobCode,
             binding_code: bindingCode,
-        });
+        }, this.authServerHeaders);
         return {
             id_token: resp.id_token,
             access_token: resp.access_token,
@@ -832,7 +846,7 @@ export abstract class OAuthClientBase {
 
     }
 
-    protected async refreshTokenFlow(refreshToken : string) : 
+    async refreshTokenFlow(refreshToken : string) : 
         //Promise<{[key:string]:any}> {
         Promise<OAuthTokenResponse> {
         CrossauthLogger.logger.debug(j({msg: "Starting refresh token flow"}));
@@ -857,7 +871,7 @@ export abstract class OAuthClientBase {
             refresh_token: refreshToken,
         }
         try {
-            return await this.post(url, params);
+            return await this.post(url, params, this.authServerHeaders);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -876,7 +890,7 @@ export abstract class OAuthClientBase {
      * @returns the parsed JSON response as an object.
      * @throws any exception raised by `fetch()`
      */
-    protected async post(url : string, params : {[key:string]:any}) : 
+    protected async post(url : string, params : {[key:string]:any}, headers : {[key:string]:any} = {}) : 
         Promise<{[key:string]:any}>{
         CrossauthLogger.logger.debug(j({
             msg: "Fetch POST",
@@ -889,7 +903,8 @@ export abstract class OAuthClientBase {
             ...options,
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...headers,
             },
             body: JSON.stringify(params)
         });
@@ -904,7 +919,7 @@ export abstract class OAuthClientBase {
      * @returns the parsed JSON response as an object.
      * @throws any exception raised by `fetch()`
      */
-    protected async get(url : string, headers : {[key:string]:any}) : 
+    protected async get(url : string, headers : {[key:string]:any} = {}) : 
         Promise<{[key:string]:any}|{[key:string]:any}[]>{
         CrossauthLogger.logger.debug(j({msg: "Fetch GET", url: url}));
         const options = this.fetchCredentials ? {credentials: this.fetchCredentials} : {};

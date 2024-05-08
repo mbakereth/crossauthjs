@@ -1,4 +1,3 @@
-import { CrossauthError, ErrorCode} from "@crossauth/common";
 import { URLSearchParams } from "url";
 import { OAuthClientBase, OAuthTokenConsumerBase  } from '@crossauth/common'
 import type { OAuthTokenResponse } from '@crossauth/common'
@@ -11,16 +10,27 @@ export type ErrorFn = (client : OAuthClient,
     errorDescription? : string) => Promise<any>;
 
 /**
- * This is the type for the function that is called when on a successful
- * response to the redirect Uri
+ * If this URL was called with an OAuth authorize response, the `token`
+ * endpoint will be called and, if successful, passed to this function.
  */
-export type RedirectUriFn = (client : OAuthClient,
-    code : string,
-    state? : string) => Promise<any>;
+export type ReceiveTokenFn = (client : OAuthClient,
+    response : OAuthTokenResponse) => Promise<any>;
     
+export type TokenResponseType = 
+    "return" |
+    "localStorage" |
+    "sessionStorage" |
+    "cookie";
+
 export class OAuthClient extends OAuthClientBase {
     private resServerBaseUrl : string = "";
-    private headers : {[key:string]:string} = {};
+    private resServerHeaders : {[key:string]:string} = {};
+    private accessTokenResponseType? : TokenResponseType = "return";
+    private refreshTokenResponseType? : TokenResponseType = "return";
+    private idTokenResponseType? : TokenResponseType = "return";
+    private accessTokenName? : string = "CROSSAUTH_AT";
+    private refreshTokenName? : string = "CROSSAUTH_RT";
+    private idTokenName? : string = "CROSSAUTH_IT";
 
     /**
      * Constructor
@@ -40,6 +50,19 @@ export class OAuthClient extends OAuthClientBase {
      *      code.  See description in class documentation.
      *      This is not required if you are not using OAuth flows
      *      which require a redirect URI (eg the password flow).
+     *   - `accessTokenResponseType` where to store access tokens.  See
+     *     class documentation.  Default `return`.
+     *   - `refreshTokenResponseType` where to store refresh tokens.  See
+     *     class documentation.  Default `return`.
+     *   - `idTokenResponseType` where to store id tokens.  See
+     *     class documentation.  Default `return`.
+     *   - `accessTokenName` name for access token in local or session
+     *     storage or cookie, depending on `accessTokenResponseType`
+     *   - `refreshTokenName` name for refresh token in local or session
+     *     storage or cookie, depending on `refreshTokenResponseType`
+     *   - `idTokenName` name for id token in local or session
+     *     storage or cookie, depending on `idTokenResponseType`
+     *  For other options see {@link @crossauth/common/OAuthClientBase}.
      */
     constructor(options  : {
             authServerBaseUrl : string,
@@ -52,6 +75,12 @@ export class OAuthClient extends OAuthClientBase {
             tokenConsumer : OAuthTokenConsumerBase,
             fetchCredentials? : "same-origin"|"include",
             resServerBaseUrl? : string,
+            accessTokenResponseType? : TokenResponseType,
+            refreshTokenResponseType? : TokenResponseType,
+            idTokenResponseType? : TokenResponseType,
+            accessTokenName? : string,
+            refreshTokenName? : string,
+            idTokenName? : string,
 
         }) {
         super(options);
@@ -62,41 +91,71 @@ export class OAuthClient extends OAuthClientBase {
                     this.resServerBaseUrl += "/";
                 }
         }
+        if (options.accessTokenResponseType) this.accessTokenResponseType = options.accessTokenResponseType;
+        if (options.idTokenResponseType) this.idTokenResponseType = options.idTokenResponseType;
+        if (options.refreshTokenResponseType) this.refreshTokenResponseType = options.refreshTokenResponseType;
+        if (options.accessTokenName) this.accessTokenName = options.accessTokenName;
+        if (options.idTokenName) this.idTokenName = options.idTokenName;
+        if (options.refreshTokenName) this.refreshTokenName = options.refreshTokenName;
     }
 
     /**
-     * Processes the query parameters for a Redirect URI request.
+     * Any headers added here will be applied to all requests
+     * @param header the header name eg `Access-Control-Allow-Origin`
+     * @param value the header value
+     */
+    addResServerHeader(header : string, value : string) {
+        this.resServerHeaders[header] = value;
+    }
+
+    /**
+     * Processes the query parameters for a Redirect URI request if they
+     * exist in the URL.
      * 
      * Call this on page load to see if it was called as redirect URI.
      * 
-     * To match, the URL must be the redirectUri value.
+     * If this URL doesn't match the redirect URI passed in the constructor,
+     * or this URL was not called with OAuth Redirect URI query parameters,
+     * undefined is returned.
      * 
-     * @param redirectUriFn this is called if `code` is in the query
-     *        parameters
-     * @param errorFn this is called if `error` is in the query
-     *        parameters
-     * @returns the returned value for `redirectUriFn` if it was called,
-     *          the returned value of  `errorFn` if it was called,
-     *          `undefined` if neither was called.
+     * If this URL contains the error query parameter, `errorFn` is called.
+     * It is also called if the state does not match.
+     * 
+     * If an authorization code was in the query parameters, the token
+     * endpoint is called.  Depending on whether that returned an error,
+     * either `receiveTokenFn` or `errorFn` will be called.
+     * 
+     * @param receiveTokenFn if defined, called if a token is returned.
+     *        
+     * @param errorFn if defined, called if any OAuth endpoint returned `error`, 
+     *        or if the `state` was not correct.
+     * 
+     * @returns the result of `receiveTokenFn`, `errorFn` or `undefined`.  If
+     *          `receiveTokenFn`/`errorFn` is not defined, rather than calling
+     *          it, this function just returns the OAuth response.
+     *       
      */
-    async handleRedirectUri(redirectUriFn : RedirectUriFn, 
-        errorFn : ErrorFn) : Promise<any|undefined> {
+    async handleRedirectUri(receiveTokenFn? : ReceiveTokenFn, 
+        errorFn? : ErrorFn) : Promise<any|undefined> {
         const url = new URL(window.location.href);
         if (url.origin + url.pathname != this.redirectUri) return undefined;
         const params = new URLSearchParams();
         let code : string|undefined = undefined;
         let state : string|undefined = undefined;
         let error : string|undefined = undefined;
-        let errorDescription : string|undefined = undefined;
+        let error_description : string|undefined = undefined;
         for (const [key, value] of params) {
             if (key == "code") code = value;
             if (key == "state") state = value;
             if (key == "error") error = value;
-            if (key == "error_description") errorDescription = value;
+            if (key == "error_description") error_description = value;
         }
-        if (code) return await redirectUriFn(this, code, state);
-        else if (error) return await errorFn(this, error, errorDescription);
-        return undefined;
+        if (!error && !code) return undefined;
+
+        if (error) return errorFn ? await errorFn(this, error, error_description) : {error, error_description};
+        const resp = await this.redirectEndpoint(code, state, error, error_description);
+        if (resp.error) return errorFn ? await errorFn(this, resp.error, resp.error_description) : resp;
+        return receiveTokenFn ? await receiveTokenFn(this, resp) : resp;
     }
 
     ///////
@@ -109,7 +168,12 @@ export class OAuthClient extends OAuthClientBase {
      * @returns the random value as a Base64-url-encoded srting
      */
     protected randomValue(length : number) : string {
-        return "";
+        const array = new Uint8Array(length);
+        self.crypto.getRandomValues(array);
+        return btoa(array.reduce((acc, current) => acc + String.fromCharCode(current), ""))
+            .replace(/\//g, "_")
+            .replace(/\+/g, "-")
+            .replace(/=+$/, "");
     }
 
     /**
@@ -117,8 +181,15 @@ export class OAuthClient extends OAuthClientBase {
      * @param plaintext the text to encode
      * @returns the SHA256 hash, Base64-url-encode
      */
-    protected sha256(plaintext :string) : string {
-        return "";
+    protected async sha256(plaintext :string) : Promise<string> {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(plaintext);
+        const hash = await crypto.subtle.digest("SHA-256", data);
+        const hashArray = Array.from(new Uint8Array(hash)); 
+        return btoa(hashArray.reduce((acc, current) => acc + String.fromCharCode(current), ""))
+            .replace(/\//g, "_")
+            .replace(/\+/g, "-")
+            .replace(/=+$/, "");
     }
     
 }
