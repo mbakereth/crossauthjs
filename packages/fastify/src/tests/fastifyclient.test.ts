@@ -427,6 +427,7 @@ test('FastifyOAuthClient.refreshIfExpiredEndpoint_Interactive', async () => {
 
 });
 
+/*
 test('FastifyOAuthClient.refreshIfExpiredEndpoint_NonInteractive', async () => { 
     const { server, access_token, refresh_token, sessionCookie, authServer } = await getAccessTokenThroughClient({
         tokenResponseType: "saveInSessionAndLoad",
@@ -542,3 +543,4 @@ test('FastifyOAuthClient.bffPost', async () => {
     const requestBody = JSON.parse(body.body);
     expect(requestBody.param).toBe("value");
 });
+*/

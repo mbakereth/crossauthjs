@@ -72,6 +72,51 @@ export interface FastifyAuthorizationServerOptions
      * The login URL (provided by {@link FastifySessionServer}). Default `/login`
      */
     loginUrl? : string,
+
+    /**
+     * How to send the refresh token.
+     *   - `json` sent in the JSON response as per the OAuth specification
+     *   - `cookie` sent as a cookie called `refreshTokenCookieName`.
+     *   - `both` both of the above
+     * Default `json`
+     */
+    refreshTokenType? : "json" | "cookie" | "both",
+
+    /**
+     * If `refreshTokenType` is `cookie` or `both`, this will be the cookie
+     * name.  Default `CROSSAUTH_REFRESH_TOKEN`
+     */
+    refreshTokenCookieName? : string,
+
+    /**
+     * Domain to set when sending a refresh token cookie.
+     * Only used if `refreshTokenType` is not `json`
+     */
+    refreshTokenCookieDomain? : string | undefined;
+
+    /**
+     * Whether to set `httpOnly` when sending a refresh token cookie.
+     * Only used if `refreshTokenType` is not `json`
+     */
+    refreshTokenCookieHttpOnly? : boolean;
+
+    /**
+     * Path to set when sending a refresh token cookie.
+     * Only used if `refreshTokenType` is not `json`
+     */
+    refreshTokenCookiePath? : string;
+
+    /**
+     * Whether to set the `secure` flag when sending a refresh token cookie.
+     * Only used if `refreshTokenType` is not `json`
+     */
+    refreshTokenCookieSecure? : boolean;
+
+    /**
+     * SameSite value to set when sending a refresh token cookie.
+     * Only used if `refreshTokenType` is not `json`
+     */
+    refreshTokenCookieSameSite? : boolean | "lax" | "strict" | "none" | undefined;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -125,6 +170,7 @@ interface TokenBodyType {
     oob_code? : string,
     binding_code? : string,
     otp? : string,
+    refresh_token? : string,
 }
 
 /**
@@ -170,6 +216,15 @@ export class FastifyAuthorizationServer {
     private errorPage : string = "error.njk";
     private clientStorage : OAuthClientStorage;
 
+    // Refresh token cookie functionality
+    private refreshTokenType : "json"|"cookie"|"both" = "json";
+    private refreshTokenCookieName : string = "CROSSAUTH_REFRESH_TOKEN";
+    private refreshTokenCookieDomain : string | undefined = undefined;
+    private refreshTokenCookieHttpOnly : boolean = false;
+    private refreshTokenCookiePath : string = "/";
+    private refreshTokenCookieSecure : boolean = true;
+    private refreshTokenCookieSameSite : boolean | "lax" | "strict" | "none" | undefined = "strict";
+
     /**
      * Constructor
      * @param app the Fastify app
@@ -203,6 +258,13 @@ export class FastifyAuthorizationServer {
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
         setParameter("oauthAuthorizePage", ParamType.String, this, options, "OAUTH_AUTHORIZE_PAGE");
+        setParameter("refreshTokenType", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_TYPE");
+        setParameter("refreshTokenCookieName", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_NAME");
+        setParameter("refreshTokenCookieDomain", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_DOMAIN");
+        setParameter("refreshTokenCookieHttpOnly", ParamType.Boolean, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_HTTPONLY");
+        setParameter("refreshTokenCookiePath", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_PATH");
+        setParameter("refreshTokenCookieSecure", ParamType.Boolean, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SECURE");
+        setParameter("refreshTokenCookieSameSite", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SAMESITE");
 
         app.get(this.prefix+'.well-known/openid-configuration', 
             async (_request : FastifyRequest, reply : FastifyReply) =>  {
@@ -301,6 +363,7 @@ export class FastifyAuthorizationServer {
             this.authServer.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) ||
             this.authServer.validFlows.includes(OAuthFlows.OidcAuthorizationCode) ||
             this.authServer.validFlows.includes(OAuthFlows.ClientCredentials) ||
+            this.authServer.validFlows.includes(OAuthFlows.RefreshToken) ||
             this.authServer.validFlows.includes(OAuthFlows.Password) ||
             this.authServer.validFlows.includes(OAuthFlows.PasswordMfa)) {
 
@@ -316,7 +379,7 @@ export class FastifyAuthorizationServer {
                     }));
 
                 // OAuth spec says we may take client credentials from 
-                // authorization jeader
+                // authorization header
                 let clientId = request.body.client_id;
                 let clientSecret = request.body.client_secret;
                 if (request.headers.authorization) {
@@ -342,6 +405,19 @@ export class FastifyAuthorizationServer {
                     }
                 }
 
+                // if refreshTokenType is not "json", check if there
+                // is a refresh token in the cookie
+                let refreshToken = request.body.refresh_token;
+                if (this.refreshTokenType == "cookie" && request.cookies && 
+                    this.refreshTokenCookieName in request.cookies) {       
+                    refreshToken = request.cookies[this.refreshTokenCookieName];
+                }
+                if (this.refreshTokenType == "both" && request.cookies && 
+                    this.refreshTokenCookieName in request.cookies &&
+                    refreshToken == undefined) {       
+                    refreshToken = request.cookies[this.refreshTokenCookieName];
+                }
+        
                 const resp = await this.authServer.tokenEndpoint({
                     grantType: request.body.grant_type,
                     clientId : clientId,
@@ -355,8 +431,12 @@ export class FastifyAuthorizationServer {
                     oobCode: request.body.oob_code,
                     bindingCode: request.body.binding_code,
                     otp: request.body.otp,
+                    refreshToken: refreshToken,
                 });
 
+                if (resp.refresh_token && this.refreshTokenType != "json") {
+                    this.setRefreshTokenCookie(reply, resp.refresh_token, resp.expires_in);
+                }
                 if (resp.error || !resp.access_token) {
                     let error = "server_error";
                     let errorDescription = "Neither code nor error received when requestoing authorization";
@@ -668,6 +748,19 @@ export class FastifyAuthorizationServer {
         
         return reply.header(...JSONHDR).status(200).send(resp);
 
+    }
+
+    private setRefreshTokenCookie(reply : FastifyReply, token : string, expiresIn : number|undefined) {
+        if (!this.refreshTokenCookieName) return;
+        let expiresAt = expiresIn ? new Date(Date.now() + expiresIn*1000).toUTCString() : undefined;
+        let cookieString = this.refreshTokenCookieName + "=" + token;
+        if (expiresAt) cookieString += "; expires=" + new Date(expiresAt).toUTCString();
+        if (this.refreshTokenCookieSameSite) cookieString += "; SameSite=" + this.refreshTokenCookieSameSite;
+        if (this.refreshTokenCookieDomain) cookieString += "; domain=" + this.refreshTokenCookieDomain;
+        if (this.refreshTokenCookiePath) cookieString += "; path=" + this.refreshTokenCookiePath;
+        if (this.refreshTokenCookieHttpOnly == true) cookieString += "; httpOnly";
+        if (this.refreshTokenCookieSecure == true) cookieString += "; secure";
+        reply.setCookie(this.refreshTokenCookieName, cookieString)
     }
 
     /**
