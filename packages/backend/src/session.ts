@@ -65,7 +65,6 @@ export interface SessionManagerOptions extends TokenEmailerOptions {
      * See `authentiators` in {@link SessionManager.constructor}.
      */
     allowedFactor2? : string[],
-
 }
 
 /**

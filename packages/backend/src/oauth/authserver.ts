@@ -8,6 +8,7 @@ import {
     UserStorage,
     OAuthClientStorage,
     OAuthAuthorizationStorage} from '../storage';
+
 import { Authenticator } from '../auth';
 import { setParameter, ParamType } from '../utils';
 import { Crypto } from '../crypto';
@@ -177,7 +178,6 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
      * The 2FA factors that are allowed for the Password MFA flow.
      */
     allowedFactor2? : string[],
-
 }
 
 /**

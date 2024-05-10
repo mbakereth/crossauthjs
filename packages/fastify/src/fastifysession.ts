@@ -30,8 +30,6 @@ import { FastifyAdminEndpoints } from './fastifyadminendpoints'
 import { FastifyAdminClientEndpoints } from './fastifyadminclientendpoints'
 import { FastifyUserClientEndpoints } from './fastifyuserclientendpoints'
 
-export const CSRFHEADER = "X-CROSSAUTH-CSRF";
-
 const JSONHDR : [string,string] = 
     ['Content-Type', 'application/json; charset=utf-8'];
 
@@ -926,7 +924,6 @@ export class FastifySessionServer {
         setParameter("enableAdminEndpoints", ParamType.Boolean, this, options, "ENABLE_ADMIN_ENDPOINTS");
         setParameter("enableOAuthClientManagement", ParamType.Boolean, this, options, "ENABLE_OAUTH_CLIENT_MANAGEMENT");
 
-
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
         if (options.createUserFn) this.createUserFn = options.createUserFn;
         if (options.updateUserFn) this.updateUserFn = options.updateUserFn;
@@ -1028,7 +1025,7 @@ export class FastifySessionServer {
                         const csrfFormOrHeaderValue = await this.sessionManager.createCsrfFormOrHeaderValue(cookieValue);
                         request.csrfToken = csrfFormOrHeaderValue;
                     }
-                    reply.header(CSRFHEADER, request.csrfToken);
+                    reply.header(this.sessionManager.csrfHeaderName, request.csrfToken);
                 } catch (e) {
                     CrossauthLogger.logger.error(j({
                         msg: "Couldn't create CSRF token",
@@ -2647,8 +2644,9 @@ export class FastifySessionServer {
         let token : string|undefined = undefined;
 
         // first try to get token from header
-        if (request.headers && CSRFHEADER.toLowerCase() in request.headers) { 
-            const header = request.headers[CSRFHEADER.toLowerCase()];
+        const header1 = this.sessionManager.csrfHeaderName;
+        if (request.headers && header1.toLowerCase() in request.headers) { 
+            const header = request.headers[header1.toLowerCase()];
             if (Array.isArray(header)) token = header[0];
             else token = header;
         }
@@ -2663,7 +2661,7 @@ export class FastifySessionServer {
                     .validateDoubleSubmitCsrfToken(this.getCsrfCookieValue(request), 
                         token);
                 request.csrfToken = token;
-                reply.header(CSRFHEADER, token);
+                reply.header(this.sessionManager.csrfHeaderName, token);
             }
             catch (e) {
                 CrossauthLogger.logger.warn(j({

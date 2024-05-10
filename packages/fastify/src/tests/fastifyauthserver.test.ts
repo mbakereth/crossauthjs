@@ -616,9 +616,24 @@ test('FastifyAuthServer.refreshTokenFlowFromCookie', async () => {
     let body;
 
     res = await server.app.inject({ 
+        method: "GET", 
+        url: `/getcsrftoken`,  
+        cookies: {SESSIONID: sessionCookie}});
+    body = JSON.parse(res.body);
+    expect(body.csrfToken).toBeDefined();
+    const csrfCookies = res.cookies.filter((cookie: any) => {return cookie.name == "CSRFTOKEN"});
+    expect(csrfCookies.length).toBe(1);
+
+    res = await server.app.inject({ 
         method: "POST", 
         url: `/token`,  
-        cookies: {SESSIONID: sessionCookie, CROSSAUTH_REFRESH_TOKEN: refresh_token}, payload: {
+        cookies: {
+            SESSIONID: sessionCookie,
+            CROSSAUTH_REFRESH_TOKEN: refresh_token,
+            CSRFTOKEN: csrfCookies[0].value,
+        }, headers: {
+            "X-CROSSAUTH-CSRF": body.csrfToken
+        }, payload: {
             grant_type: "refresh_token",
             client_id: "ABC",
             client_secret: "DEF",

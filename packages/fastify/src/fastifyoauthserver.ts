@@ -11,8 +11,12 @@ import {
     ParamType,
     Authenticator,
     Crypto, 
-    OAuthClientManager} from '@crossauth/backend';
-import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
+    OAuthClientManager,
+    DoubleSubmitCsrfToken } from '@crossauth/backend';
+import type {
+    OAuthAuthorizationServerOptions,
+    DoubleSubmitCsrfTokenOptions,
+    Cookie } from '@crossauth/backend';
 import {
     CrossauthError,
     CrossauthLogger,
@@ -117,6 +121,9 @@ export interface FastifyAuthorizationServerOptions
      * Only used if `refreshTokenType` is not `json`
      */
     refreshTokenCookieSameSite? : boolean | "lax" | "strict" | "none" | undefined;
+
+    /** options for csrf cookie manager */
+    doubleSubmitCookieOptions? : DoubleSubmitCsrfTokenOptions,
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -198,6 +205,7 @@ export interface MfaChallengeBodyType {
  * | ------ | -------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------- |
  * | GET    | `authorize`                | See OAuth spec                                                                    | See OAuth spec                                     |
  * | GET    | `userauthorize`            | See {@link UserAuthorizeBodyType}                                                 | oauthAuthorizePage                                 |
+ * | GET    | `csrftoken`                |                                                                                   | ok, csrfToken (and Set-Cookie)                     |
  * | POST   | `token`                    | See OAuth spec                                                                    | See OAuth spec                                     |
  * | GET    | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
  * | POST   | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
@@ -225,6 +233,8 @@ export class FastifyAuthorizationServer {
     private refreshTokenCookiePath : string = "/";
     private refreshTokenCookieSecure : boolean = true;
     private refreshTokenCookieSameSite : boolean | "lax" | "strict" | "none" | undefined = "strict";
+
+    private csrfTokens : DoubleSubmitCsrfToken | undefined;
 
     /**
      * Constructor
@@ -267,6 +277,10 @@ export class FastifyAuthorizationServer {
         setParameter("refreshTokenCookieSecure", ParamType.Boolean, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SECURE");
         setParameter("refreshTokenCookieSameSite", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SAMESITE");
 
+        if (this.refreshTokenType != "json") {
+            this.csrfTokens = new DoubleSubmitCsrfToken(options.doubleSubmitCookieOptions);
+            this.addApiGetCsrfTokenEndpoints();
+        }
         app.get(this.prefix+'.well-known/openid-configuration', 
             async (_request : FastifyRequest, reply : FastifyReply) =>  {
             return reply.header(...JSONHDR).status(200).send(
@@ -407,15 +421,34 @@ export class FastifyAuthorizationServer {
                 }
 
                 // if refreshTokenType is not "json", check if there
-                // is a refresh token in the cookie
+                // is a refresh token in the cookie.
+                // there must also be a valid CSRF token
                 let refreshToken = request.body.refresh_token;
-                if (this.refreshTokenType == "cookie" && request.cookies && 
-                    this.refreshTokenCookieName in request.cookies) {       
-                    refreshToken = request.cookies[this.refreshTokenCookieName];
-                }
-                if (this.refreshTokenType == "both" && request.cookies && 
+                if (((this.refreshTokenType == "cookie" && request.cookies && 
+                    this.refreshTokenCookieName in request.cookies) ||
+                    (this.refreshTokenType == "both" && request.cookies && 
                     this.refreshTokenCookieName in request.cookies &&
-                    refreshToken == undefined) {       
+                    refreshToken == undefined)) &&
+                    this.csrfTokens /* this part is just for typescript checker */) {  
+                    const csrfCookie = request.cookies[this.csrfTokens.cookieName];
+                    let csrfHeader = request.headers[this.csrfTokens.headerName.toLowerCase()];
+                    if (Array.isArray(csrfHeader)) csrfHeader = csrfHeader[0];
+                    if (!csrfCookie || !csrfHeader) {
+                        return {
+                            error: "access_denied",
+                            error_description: "Invalid csrf token",
+                        }
+                    }
+                    try {
+                        this.csrfTokens.validateDoubleSubmitCsrfToken(csrfCookie, csrfHeader)
+                    } catch (e) {
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        CrossauthLogger.logger.warn(j({cerr: e, msg: "Invalid csrf token", clientId: request.body.client_id}));
+                        return {
+                            error: "access_denied",
+                            error_description: "Invalid csrf token",
+                        }
+                    }
                     refreshToken = request.cookies[this.refreshTokenCookieName];
                 }
         
@@ -494,6 +527,69 @@ export class FastifyAuthorizationServer {
                 return await this.mfaChallengeEndpoint(request, reply, request.body);
             });
         }
+    }
+
+    /**
+     * Creates and returns a signed CSRF token based on the session ID
+     * @returns a CSRF cookie and value to put in the form or CSRF header
+     */
+    private async createCsrfToken() : 
+        Promise<{csrfCookie : Cookie, csrfFormOrHeaderValue : string}> {
+        if (!this.csrfTokens) throw new CrossauthError(ErrorCode.Configuration, "CSRF tokens not enabled");
+        this.csrfTokens.makeCsrfCookie(await this.csrfTokens.createCsrfToken());
+        const csrfToken = this.csrfTokens.createCsrfToken();
+        const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
+        const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
+        return {
+            csrfCookie,
+            csrfFormOrHeaderValue,
+        }
+    }
+
+    private addApiGetCsrfTokenEndpoints() {
+        if (!this.csrfTokens) return ;
+        this.app.get(this.prefix+'getcsrftoken', 
+            async (request: FastifyRequest,
+                reply: FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "API visit",
+                    method: 'POST',
+                    url: this.prefix + 'getcsrftoken',
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+            if (!this.csrfTokens) return;
+            let csrfCookieValue = "";
+            try {
+                const {csrfCookie,
+                    csrfFormOrHeaderValue} = await this.createCsrfToken();
+                csrfCookieValue = csrfCookie.value;
+                    reply.setCookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
+                return reply.header(...JSONHDR)
+                    .send({
+                    ok: true,
+                    csrfToken: csrfFormOrHeaderValue
+                });
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.error(j({
+                    msg: "getcsrftoken failure",
+                    user: request.user?.username,
+                    hashedCsrfCookie: Crypto.hash(csrfCookieValue.split(".")[0]),
+                    errorCode: ce.code,
+                    errorCodeName: ce.codeName
+                }));
+                CrossauthLogger.logger.debug(j({err: e}));
+                return reply.status(ce.httpStatus).header(...JSONHDR)
+                    .send({
+                        ok: false,
+                        errorCode: ce.code,
+                        errorCodeName: ce.codeName,
+                        error: ce.message,
+                    });
+
+            }
+        });
     }
 
     private async authorizeEndpoint(request: FastifyRequest,
