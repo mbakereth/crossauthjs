@@ -122,6 +122,14 @@ export interface FastifyAuthorizationServerOptions
      */
     refreshTokenCookieSameSite? : boolean | "lax" | "strict" | "none" | undefined;
 
+    /** If true, create a `getcsrftoken` endpoint.
+     * You will only need to do this is you don't have session management
+     * enabled on your server, which provides an identical  `api/getcsrftoken`,
+     * and if `refreshTokenType` is not `json`.
+     * Default `false`
+     */
+    createGetCsrfTokenEndpoint? : false,
+
     /** options for csrf cookie manager */
     doubleSubmitCookieOptions? : DoubleSubmitCsrfTokenOptions,
 }
@@ -235,7 +243,7 @@ export class FastifyAuthorizationServer {
     private refreshTokenCookieSameSite : boolean | "lax" | "strict" | "none" | undefined = "strict";
 
     private csrfTokens : DoubleSubmitCsrfToken | undefined;
-
+    private createGetCsrfTokenEndpoint = false;
     /**
      * Constructor
      * @param app the Fastify app
@@ -276,9 +284,16 @@ export class FastifyAuthorizationServer {
         setParameter("refreshTokenCookiePath", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_PATH");
         setParameter("refreshTokenCookieSecure", ParamType.Boolean, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SECURE");
         setParameter("refreshTokenCookieSameSite", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SAMESITE");
+        setParameter("createGetCsrfTokenEndpoint", ParamType.String, this, options, "OAUTH_CREATE_GET_CSRF_TOKEN_ENDPOINT");
 
         if (this.refreshTokenType != "json") {
-            this.csrfTokens = new DoubleSubmitCsrfToken(options.doubleSubmitCookieOptions);
+            if (this.createGetCsrfTokenEndpoint) {
+                this.csrfTokens = new DoubleSubmitCsrfToken(options.doubleSubmitCookieOptions);
+            } else if (this.fastifyServer.sessionServer) {
+                this.csrfTokens = this.fastifyServer.sessionServer.sessionManager.csrfTokens;
+            }
+        }
+        if (this.createGetCsrfTokenEndpoint) {
             this.addApiGetCsrfTokenEndpoints();
         }
         app.get(this.prefix+'.well-known/openid-configuration', 

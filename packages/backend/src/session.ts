@@ -74,7 +74,7 @@ export class SessionManager {
     userStorage : UserStorage;
     keyStorage : KeyStorage;
     emailTokenStorage : KeyStorage;
-    private csrfTokens : DoubleSubmitCsrfToken;
+    readonly csrfTokens : DoubleSubmitCsrfToken;
     private session : SessionCookie;
     readonly authenticators : {[key:string] : Authenticator};
     //readonly authenticator : UsernamePasswordAuthenticator;

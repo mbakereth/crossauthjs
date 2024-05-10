@@ -132,7 +132,6 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         }}, {
             app: app,
             views: path.join(__dirname, '../views'),
-            secret: "ABCDEFG",
             allowedFactor2: ["none", "totp", "email"],
             validScopes: ["read", "write"],
             jwtKeyType: "RS256",
@@ -617,7 +616,7 @@ test('FastifyAuthServer.refreshTokenFlowFromCookie', async () => {
 
     res = await server.app.inject({ 
         method: "GET", 
-        url: `/getcsrftoken`,  
+        url: `/api/getcsrftoken`,  
         cookies: {SESSIONID: sessionCookie}});
     body = JSON.parse(res.body);
     expect(body.csrfToken).toBeDefined();
