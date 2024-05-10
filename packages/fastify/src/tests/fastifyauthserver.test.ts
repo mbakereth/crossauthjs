@@ -523,3 +523,109 @@ test('FastifyAuthServer.getAccessTokenWithPasswordMfaOOBFlow', async () => {
 
 
 });
+
+async function authorize(options : {[key:string]:any} = {}) {
+    let {server, keyStorage} = await makeAppWithOptions(options);
+
+    let res;
+    let body;
+
+    const {sessionCookie, csrfCookie, csrfToken} = await login(server);
+    res = await server.app.inject({ 
+        method: "GET", 
+        url: `/authorize?response_type=code&client_id=ABC&redirect_uri=http://example.com/redirect&scope=read+write&state=ABC123`,  
+        cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
+    body = JSON.parse(res.body)
+    expect(body.args.response_type).toBe("code");
+
+    // get authorization code
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/userauthorize`,  
+        cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}, payload: {
+            authorized: "true",
+            response_type: "code",
+            client_id: "ABC",
+            redirect_uri: "http://example.com/redirect",
+            scope: "read write",
+            state: "ABC123",
+            csrfToken: csrfToken,
+        }});
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toContain("/redirect?");
+    const params = getQueryParams(res.headers.location??"");
+    const code = params.code;
+    const state = params.state;
+    expect(state).toBe("ABC123");
+    expect(code).toBeDefined();
+    await keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code??""));
+
+    // get tokens
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        cookies: {SESSIONID: sessionCookie}, payload: {
+            grant_type: "authorization_code",
+            client_id: "ABC",
+            client_secret: "DEF",
+            code: code,
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeDefined();
+
+    return {
+        server, 
+        keyStorage,
+        sessionCookie,
+        ...body,
+    }
+}
+test('FastifyAuthServer.refreshTokenFlow', async () => {
+
+    let {server, sessionCookie, refresh_token} = await authorize({
+        issueRefreshToken: true,
+    });
+
+    let res;
+    let body;
+
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        cookies: {SESSIONID: sessionCookie}, payload: {
+            grant_type: "refresh_token",
+            client_id: "ABC",
+            client_secret: "DEF",
+            refresh_token: refresh_token
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeDefined();
+    // @ts-ignore
+    await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
+
+});
+
+test('FastifyAuthServer.refreshTokenFlowFromCookie', async () => {
+
+    let {server, sessionCookie, refresh_token} = await authorize({
+        issueRefreshToken: true,
+        refreshTokenType: "cookie",
+    });
+
+    let res;
+    let body;
+
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        cookies: {SESSIONID: sessionCookie, CROSSAUTH_REFRESH_TOKEN: refresh_token}, payload: {
+            grant_type: "refresh_token",
+            client_id: "ABC",
+            client_secret: "DEF",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeDefined();
+    // @ts-ignore
+    await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
+
+});

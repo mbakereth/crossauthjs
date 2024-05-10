@@ -140,7 +140,7 @@ export interface AuthorizeQueryType {
  * Fastify request requesting the user
  * to authorize a client.
  */
-interface UserAuthorizeBodyType {
+export interface UserAuthorizeBodyType {
     csrfToken : string,
     response_type : string,
     client_id : string,
@@ -194,13 +194,14 @@ export interface MfaChallengeBodyType {
  * You shouldn't have to instantiate this directly.  It is instantiated
  * by {@link FastifyServer} if you enable the authorization server there.
  * 
- * | METHOD | ENDPOINT                   | GET/BODY PARAMS                                     | RESPONSE                                           |
- * | ------ | -------------------------- | --------------------------------------------------- | -------------------------------------------------- |
- * | GET    | `authorize`                | See OAuth spec                                                                    | See OAuth spec       |
- * | POST   | `token`                    | See OAuth spec                                                                    | See OAuth spec       |
- * | GET    | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left |
- * | POST   | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left |
- * | POST   | `mfa/challenge     `       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left |
+ * | METHOD | ENDPOINT                   | GET/BODY PARAMS                                                                   | RESPONSE/TEMPLATE FILE                             |
+ * | ------ | -------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------- |
+ * | GET    | `authorize`                | See OAuth spec                                                                    | See OAuth spec                                     |
+ * | GET    | `userauthorize`            | See {@link UserAuthorizeBodyType}                                                 | oauthAuthorizePage                                 |
+ * | POST   | `token`                    | See OAuth spec                                                                    | See OAuth spec                                     |
+ * | GET    | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
+ * | POST   | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
+ * | POST   | `mfa/challenge     `       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
  * 
  */
 export class FastifyAuthorizationServer {

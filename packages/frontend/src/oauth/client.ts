@@ -57,11 +57,11 @@ export class OAuthClient extends OAuthClientBase {
      *   - `idTokenResponseType` where to store id tokens.  See
      *     class documentation.  Default `return`.
      *   - `accessTokenName` name for access token in local or session
-     *     storage or cookie, depending on `accessTokenResponseType`
+     *     storage, depending on `accessTokenResponseType`
      *   - `refreshTokenName` name for refresh token in local or session
-     *     storage or cookie, depending on `refreshTokenResponseType`
+     *     storage, depending on `refreshTokenResponseType`
      *   - `idTokenName` name for id token in local or session
-     *     storage or cookie, depending on `idTokenResponseType`
+     *     storage, depending on `idTokenResponseType`
      *  For other options see {@link @crossauth/common/OAuthClientBase}.
      */
     constructor(options  : {
