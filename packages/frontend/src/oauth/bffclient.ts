@@ -1,4 +1,6 @@
-import { CrossauthError, ErrorCode} from "@crossauth/common";
+import { CrossauthError, CrossauthLogger, ErrorCode, j } from "@crossauth/common";
+
+const TOLERANCE_SECONDS = 30;
 
 /**
  * A browser-side OAuth client designed with work with the
@@ -7,40 +9,61 @@ import { CrossauthError, ErrorCode} from "@crossauth/common";
  * See {@link @crossauth/fastify!FastifyOAuthClient}.
  */
 export class OAuthBffClient {
-    private baseUrl : string = "/";
+    private sessionBaseUrl : string = "/";
+    private oauthBaseUrl : string = "/";
     private bffPrefix : string = "bff";
     private csrfHeader : string = "X-CROSSAUTH-CSRF";
     private headers : {[key:string]:string} = {};
+    private autoRefreshActive = false;
+    private mode :  "no-cors" | "cors" | "same-origin" = "cors";
+    private credentials : "include" | "omit" | "same-origin" = "same-origin";
 
     /**
      * Constructor
      * 
      * @param options
-     *   - `baseUrl` the base url for BFF calls to the OAuth client
+     *   - `sessionBaseUrl` the base url for calls to the client session manager
+     *        (eg `https://myclient.com`).  Default is `/`
+     *   - `oauthBaseUrl` the base url for calls to the oauth client backend
      *        (eg `https://myclient.com`).  Default is `/`
      *   - `bffPrefix` the base url for BFF calls to the OAuth client
      *        (eg `bff`, which is the default)
      *   - `csrfHeader` the header to put CSRF tokens into 
      *        (default `X-CROSSAUTH-CSRF`))
+     *   - `mode` overrides the default `mode` in fetch calls
+     *   - `credentials` - overrides the default `credentials` for fetch calls
+     *   - `headers` - adds headers to fetfh calls
      */
     constructor({ 
-            baseUrl,
+            sessionBaseUrl,
+            oauthBaseUrl,
             bffPrefix,
             csrfHeader,
+            credentials,
+            mode,
+            headers,
         }  : {
-            baseUrl? : string,
+            sessionBaseUrl? : string,
+            oauthBaseUrl? : string,
             bffPrefix? : string,
             csrfHeader? : string,
+            credentials? : "include" | "omit" | "same-origin",
+            mode? : "no-cors" | "cors" | "same-origin",
+            headers? : {[key:string]:any},
 
         } = {}) {
-        if (baseUrl) this.baseUrl = baseUrl;
+        if (sessionBaseUrl) this.sessionBaseUrl = sessionBaseUrl;
+        if (oauthBaseUrl) this.oauthBaseUrl = oauthBaseUrl;
         if (bffPrefix) this.bffPrefix = bffPrefix;
         if (csrfHeader) this.csrfHeader = csrfHeader;
-        if (!(this.baseUrl.endsWith("/"))) this.baseUrl += "/";
+        if (!(this.sessionBaseUrl.endsWith("/"))) this.sessionBaseUrl += "/";
         if (this.bffPrefix.startsWith("/") && this.bffPrefix.length > 1) {
             this.bffPrefix = this.bffPrefix.substring(1);
         }
         if (!(this.bffPrefix.endsWith("/"))) this.bffPrefix += "/";
+        if (headers) this.headers = headers;
+        if (mode) this.mode = mode;
+        if (credentials) this.credentials = credentials;
     }
 
     /**
@@ -57,11 +80,13 @@ export class OAuthBffClient {
      * @returns the CSRF token that can be included in
      *          the `X-CROSSAUTH-CSRF` header
      */
-    async getCsrfToken(headers? : {[key:string]:string}) : Promise<string> {
+    async getCsrfToken() : Promise<string> {
         try {
-            const params = {headers: this.headers};
-            if (headers) params.headers = {...params.headers, ...headers}
-            const resp = await fetch(this.baseUrl+"api/getcsrftoken", {});
+            const resp = await fetch(this.sessionBaseUrl+"api/getcsrftoken", {
+                headers: this.headers,
+                credentials: this.credentials,
+                mode: this.mode,
+            });
             const json = await resp.json();
             if (!json.ok) throw CrossauthError.asCrossauthError(json);
             return json.csrfToken;
@@ -78,12 +103,10 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
-     * @param headers any additional headers to add (will be added to
-     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns the ID token payload or an empty object if there isn't one
      */
-    async getIdToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<{[key:string]:any}|null>{
-        return this.getToken("id", csrfToken, headers);
+    async getIdToken(csrfToken? : string) : Promise<{[key:string]:any}|null>{
+        return this.getToken("id", csrfToken);
     }
 
     /**
@@ -92,12 +115,10 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
-     * @param headers any additional headers to add (will be added to
-     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns true or false
      */
-    async haveIdToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<boolean>{
-        return this.haveToken("id", csrfToken, headers);
+    async haveIdToken(csrfToken? : string) : Promise<boolean>{
+        return this.haveToken("id", csrfToken);
     }
 
     /**
@@ -112,8 +133,8 @@ export class OAuthBffClient {
      *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns the access token payload or an empty object if there isn't one
      */
-    async getAccessToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<{[key:string]:any}|null>{
-        return this.getToken("access", csrfToken, headers);
+    async getAccessToken(csrfToken? : string) : Promise<{[key:string]:any}|null>{
+        return this.getToken("access", csrfToken);
     }
 
     /**
@@ -122,12 +143,10 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
-     * @param headers any additional headers to add (will be added to
-     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns true or false
      */
-    async haveAccessToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<boolean>{
-        return this.haveToken("access", csrfToken, headers);
+    async haveAccessToken(csrfToken? : string) : Promise<boolean>{
+        return this.haveToken("access", csrfToken);
     }
 
     /**
@@ -138,12 +157,10 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
-     * @param headers any additional headers to add (will be added to
-     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns the refresh token payload or an empty object if there isn't one
      */
-    async getRefreshToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<{[key:string]:any}|null>{
-        return this.getToken("refresh", csrfToken, headers);
+    async getRefreshToken(csrfToken? : string) : Promise<{[key:string]:any}|null>{
+        return this.getToken("refresh", csrfToken);
     }
 
     /**
@@ -152,57 +169,54 @@ export class OAuthBffClient {
      * 
      * @param crfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
-     * @param headers any additional headers to add (will be added to
-     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns true or false
      */
-    async haveRefreshToken(csrfToken? : string, headers? : {[key:string]:any}) : Promise<boolean>{
-        return this.haveToken("refresh", csrfToken, headers);
+    async haveRefreshToken(csrfToken? : string) : Promise<boolean>{
+        return this.haveToken("refresh", csrfToken);
     }
 
     /**
      * Calls an API endpoint via the BFF server
      * @param tokenName 
      * @param csrfToken 
-     * @param headers any additional headers to add (will be added to
-     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns the HTTP status code and the body or null
      */
     async api(method : "GET"|"POST"|"PUT"|"PATCH"|"OPTIONS"|"HEAD"|"DELETE",
         endpoint : string,
         body? : {[key:string]:any}, 
-        csrfToken? : string,
-        headers? : {[key:string]:any}) : 
+        csrfToken? : string) : 
         Promise<{status : number, body : {[key:string]:any}|null}> {
-        if (!csrfToken && !(["GET", "HEAD", "OPTIONS"].includes(method))) {
+            let headers = {...this.headers};
+            if (!csrfToken && !(["GET", "HEAD", "OPTIONS"].includes(method))) {
             csrfToken = await this.getCsrfToken();
+            headers[this.csrfHeader] = csrfToken;
         }
-        if (headers) { headers = {...this.headers, ...headers}; }
-        else { headers = {...this.headers}; }
-        if (csrfToken) headers[this.csrfHeader] = csrfToken;
         if (endpoint.startsWith("/")) endpoint = endpoint.substring(1);
-        let params : {[key:string]:any} = {method, headers};
-        if (body) params.body = body;
-        const resp = await fetch(this.baseUrl + this.bffPrefix + endpoint, 
-            params);
+        let params : {body? : string}= {};
+        if (body) params.body = JSON.stringify(body);
+        const resp = await fetch(this.sessionBaseUrl + this.bffPrefix + endpoint, 
+            {
+                headers: this.headers,
+                mode: this.mode,
+                credentials: this.credentials,
+                ...params,
+            });
         let responseBody : {[key:string]:any} | null = null;
         if (resp.body) responseBody = await resp.json();
         return {status: resp.status, body: responseBody};
     }
 
     private async getToken(tokenName : string, 
-        csrfToken? : string,
-        headers? : {[key:string]:any}) : Promise<{[key:string]:any}|null>{
+        csrfToken? : string,) : Promise<{[key:string]:any}|null>{
         if (!csrfToken) csrfToken = await this.getCsrfToken();
+        let headers = {...this.headers};
+        headers[this.csrfHeader] = csrfToken;
         try {
-            if (headers) { headers = {...this.headers, ...headers}; }
-            else { headers = {...this.headers}; }                
-            const resp = await fetch(this.baseUrl + tokenName + "_token", {
+            const resp = await fetch(this.sessionBaseUrl + tokenName + "_token", {
                 method: "POST",
-                headers: {
-                    [this.csrfHeader]: csrfToken,
-                    ...headers,
-                }
+                headers: this.headers,
+                mode: this.mode,
+                credentials: this.credentials,
             })
             if (resp.status == 204) {
                 return null;
@@ -214,21 +228,122 @@ export class OAuthBffClient {
     }
 
     private async haveToken(tokenName : string, 
-        csrfToken? : string,
-        headers? : {[key:string]:any}) : Promise<boolean>{
+        csrfToken? : string) : Promise<boolean>{
         if (!csrfToken) csrfToken = await this.getCsrfToken();
-        if (headers) { headers = {...this.headers, ...headers}; }
-        else { headers = {...this.headers}; }                
-        const resp = await fetch(this.baseUrl + "have_" + tokenName + "_token", {
+        let headers = {...this.headers};
+        headers[this.csrfHeader] = csrfToken;
+        const resp = await fetch(this.sessionBaseUrl + "have_" + tokenName + "_token", {
             method: "POST",
-            headers: {
-                [this.csrfHeader]: csrfToken,
-                ...headers,
-            }
+            headers: this.headers,
+            mode: this.mode,
+            credentials: this.credentials,
         })
         const json = await resp.json();
         if (!json.ok) throw new CrossauthError(ErrorCode.UnknownError, "Couldn't check token")
         return json.ok;
     }
 
+    private async scheduleAutoRefresh(errorFn : (msg : string, e? : CrossauthError) => void) {
+            // Get CSRF token
+            const csrfToken = await this.getCsrfToken();
+
+            // Get tokens
+            const idTask = this.getIdToken(csrfToken);
+            const accessTask = this.getAccessToken(csrfToken);
+            const refreshTask = this.getRefreshToken(csrfToken);
+            const tokens = await Promise.all([idTask, accessTask, refreshTask]);
+            const idToken = tokens[0];
+            const accessToken = tokens[1];
+            const refreshToken = tokens[2];
+            if (!refreshToken) return;
+
+            // get expiries
+            let tokenExpiry : number | undefined = undefined;
+            let refreshExpiry : number | undefined = undefined;
+            if (idToken?.exp && 
+                (tokenExpiry == undefined || idToken?.exp > tokenExpiry)) {
+                    tokenExpiry = idToken.exp;
+            }
+            if (accessToken?.exp && 
+                (tokenExpiry == undefined || accessToken?.exp > tokenExpiry)) {
+                    tokenExpiry = accessToken.exp;
+            }
+            if (refreshToken?.exp && 
+                (refreshExpiry == undefined || refreshToken?.exp > refreshExpiry)) {
+                    refreshExpiry = refreshToken.exp;
+            }
+            const now = Date.now();
+            console.log("now", now, "token expiry", tokenExpiry, "refresh expiry", refreshExpiry);
+
+            // if neither access nor ID token expires, we have nothing to do
+            if (!tokenExpiry) return;
+
+            // renew token TOLERANCE_SECONDS before expiry
+            const renewTime = tokenExpiry*1000 - now - TOLERANCE_SECONDS;
+            if (renewTime < 0) return;
+
+            // if refresh token is about to expire, don't try to use it
+            if (refreshExpiry && refreshExpiry - TOLERANCE_SECONDS < renewTime) {
+                return;
+            }
+
+            // schedule auto refresh task
+            let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
+            console.log("Refresh tokens: waiting", renewTime);
+            await wait(renewTime);
+            await this.autoRefresh(errorFn, csrfToken);
+
+    }
+
+    async startAutoRefresh(errorFn : (msg : string, e? : CrossauthError) => void) {
+    
+        if (!this.autoRefreshActive) {
+            this.autoRefreshActive = true;
+            await this.scheduleAutoRefresh(errorFn);
+        }
+    }
+
+
+    stopAutoRefresh() {
+        this.autoRefreshActive = false;
+    }
+
+    async autoRefresh(errorFn : (msg : string, e? : CrossauthError) => void,
+        csrfToken : string) {
+        if (this.autoRefreshActive) {
+            try {
+                let headers = {...this.headers};
+                headers[this.csrfHeader] = csrfToken;
+                        console.log("Requesting", this.oauthBaseUrl + "refreshtokenflow", csrfToken);
+                const resp = await fetch(this.oauthBaseUrl + "refreshtokenflow", {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        ...headers,
+                    },
+                    mode: this.mode,
+                    credentials: this.credentials,
+                    body: JSON.stringify({
+                        csrfToken
+                    })
+                });
+                if (!resp.ok) {
+                    CrossauthLogger.logger.error(j({msg: "Failed auto refreshing tokens", status: resp.status}));
+    
+                }
+                const reply = await resp.json();
+                console.log("Response", reply);
+
+                //await this.scheduleAutoRefresh(errorFn, headers);
+
+                }
+            catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug(j({err: ce}));
+                CrossauthLogger.logger.error(j({cerr: ce, msg: "Failed auto refreshing tokens"}));
+                errorFn(ce.message, ce);
+            }
+        }
+    }
 }

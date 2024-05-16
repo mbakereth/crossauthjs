@@ -21,6 +21,10 @@
                     document.getElementById("result").text = e.message;
                 }
             }
+            bffClient.startAutoRefresh().catch((err) => {
+                CrossauthError.logger.debug(j({err: e }));
+                CrossauthError.logger.error(j({msg: "Couldn't start auto refresh" }));
+            });
         </script>
 
         </head>

@@ -123,7 +123,7 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
      * @param plaintext the string to hash
      * @returns Base64-url-encoded hash
      */
-    hash(plaintext : string) : string { 
+    async hash(plaintext : string) : Promise<string> { 
         return Crypto.hash(plaintext); 
     }
 

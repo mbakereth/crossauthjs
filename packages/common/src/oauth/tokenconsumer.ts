@@ -250,13 +250,13 @@ export abstract class OAuthTokenConsumerBase {
             CrossauthLogger.logger.error(j({msg: tokenType + " expected but got " + decoded.type}));
         }
         if (decoded.iss != this.authServerBaseUrl) {
-            CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: this.hash(decoded.jti)}));
+            CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: await this.hash(decoded.jti)}));
             return undefined;
         }
         if (decoded.aud) {
             if ((Array.isArray(decoded.aud) && !decoded.aud.includes(this.audience)) ||
                 (!Array.isArray(decoded.aud) && decoded.aud != this.audience)) {
-                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.aud} in access token`, hashedAccessToken: this.hash(decoded.jti)}));
+                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.aud} in access token`, hashedAccessToken: await this.hash(decoded.jti)}));
                     return undefined;    
                 }
         }
@@ -304,5 +304,5 @@ export abstract class OAuthTokenConsumerBase {
         }
     }
 
-    abstract hash(plaintext : string) : string;
+    abstract hash(plaintext : string) : Promise<string>;
 };
