@@ -251,6 +251,7 @@ export class OAuthBffClient {
     
         if (!this.autoRefreshActive) {
             this.autoRefreshActive = true;
+            CrossauthLogger.logger.debug(j({msg: "Starting auto refresh"}));
             await this.scheduleAutoRefresh(tokensToFetch, errorFn);
         }
     }
@@ -258,13 +259,13 @@ export class OAuthBffClient {
 
     stopAutoRefresh() {
         this.autoRefreshActive = false;
+        CrossauthLogger.logger.debug(j({msg: "Stopping auto refresh"}));
     }
 
     private async scheduleAutoRefresh(tokensToFetch : ("access"|"id")[], 
         errorFn? : (msg : string, e? : CrossauthError) => void) {
             // Get CSRF token
             const csrfToken = await this.getCsrfToken();
-            console.log("Csrf token", csrfToken)
 
             // Get tokens
             const idTask = tokensToFetch.includes("id") ? this.getIdToken(csrfToken) : undefined;
@@ -292,7 +293,6 @@ export class OAuthBffClient {
                     refreshExpiry = refreshToken.exp;
             }
             const now = Date.now();
-            console.log("now", now, "token expiry", tokenExpiry, "refresh expiry", refreshExpiry);
 
             // if neither access nor ID token expires, we have nothing to do
             if (!tokenExpiry) return;
@@ -308,7 +308,7 @@ export class OAuthBffClient {
 
             // schedule auto refresh task
             let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
-            console.log("Refresh tokens: waiting", renewTime);
+            CrossauthLogger.logger.debug(j({msg: `Waiting $renewTime before refreshing tokens`}))
             await wait(renewTime);
             await this.autoRefresh(tokensToFetch, csrfToken, errorFn);
 
@@ -320,7 +320,7 @@ export class OAuthBffClient {
             try {
                 let headers = {...this.headers};
                 headers[this.csrfHeader] = csrfToken;
-                        console.log("Requesting", this.oauthBaseUrl + "api/refreshtokens", csrfToken);
+                CrossauthLogger.logger.debug(j({msg: `Initiating auto refresh`}))
                 const resp = await fetch(this.oauthBaseUrl + "api/refreshtokens", {
                     method: 'POST',
                     headers: {
@@ -338,9 +338,8 @@ export class OAuthBffClient {
                     CrossauthLogger.logger.error(j({msg: "Failed auto refreshing tokens", status: resp.status}));
     
                 }
-                console.log("Got resp", resp);
                 const reply = await resp.json();
-                console.log("Response", reply);
+                CrossauthLogger.logger.debug(j({msg: "Got auto refresh response", ...reply}));
 
                 if (reply.ok) {
                     await this.scheduleAutoRefresh(tokensToFetch, errorFn);
@@ -355,6 +354,7 @@ export class OAuthBffClient {
                     errorFn(ce.message, ce);
                 } else {
                     console.log(String(ce.message));
+                    CrossauthLogger.logger.error(j({msg: ce.message}))
                 }
             }
         }

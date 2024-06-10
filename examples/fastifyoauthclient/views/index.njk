@@ -9,6 +9,10 @@
                 mode: "same-origin",
                 credentials: "same-origin",
             });
+            var logger = crossauth_frontend.CrossauthLogger.logger;
+            var j = crossauth_frontend.j;
+            logger.setLevel(crossauth_frontend.CrossauthLogger.Debug);
+            logger.info("Hello")
             function authorize() {
                 window.location.href = '/authzcodeflow?scope=read+write';
             }
@@ -20,13 +24,14 @@
                         JSON.stringify(resp.body) + 
                         "</pre>"
                 } catch (e) {
-                    console.log(e);
+                    logger.debug(j({err: e }));
+                    logger.error(j({msg: "Couldn't start auto refresh" }));
                     document.getElementById("result").text = e.message;
                 }
             }
             bffClient.startAutoRefresh().catch((err) => {
-                CrossauthError.logger.debug(j({err: e }));
-                CrossauthError.logger.error(j({msg: "Couldn't start auto refresh" }));
+                logger.debug(j({err: e }));
+                logger.error(j({msg: "Couldn't start auto refresh" }));
             });
         </script>
 
