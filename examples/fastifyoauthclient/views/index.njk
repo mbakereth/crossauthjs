@@ -5,7 +5,10 @@
 
         <script src="/public/crossauth_frontend.js"></script>
         <script>
-            var bffClient = new crossauth_frontend.OAuthBffClient();
+            var bffClient = new crossauth_frontend.OAuthBffClient({
+                mode: "same-origin",
+                credentials: "same-origin",
+            });
             function authorize() {
                 window.location.href = '/authzcodeflow?scope=read+write';
             }

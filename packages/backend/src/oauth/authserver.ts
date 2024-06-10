@@ -1716,7 +1716,7 @@ export class OAuthAuthorizationServer {
                 idTokenPayload.exp = timeCreated + this.accessTokenExpiry
             }
     
-            // create access token jwt
+            // create id token jwt
             idToken = await new Promise((resolve, reject) => {
                 jwt.sign(idTokenPayload, this.secretOrPrivateKey, {
                     algorithm: this.jwtAlgorithmChecked,
@@ -1734,9 +1734,11 @@ export class OAuthAuthorizationServer {
         }
 
         let refreshToken : string|undefined = undefined;
+        console.log("Issue refresh token", issueRefreshToken)
         if (issueRefreshToken) { 
             // create refresh token 
-            refreshToken = Crypto.randomValue(this.codeLength); 
+            //refreshToken = Crypto.randomValue(this.codeLength); 
+
             const refreshData : {[key:string]: any} = {
                 username: authzData.username,
                 client_id: client.clientId,
@@ -1746,24 +1748,54 @@ export class OAuthAuthorizationServer {
                 refreshData.scope = scopes;
             }
             let refreshTokenExpires : Date|undefined = undefined;
+            // create refresh token payload
+            const refreshTokenJti = Crypto.uuid();
+            const refreshTokenPayload : {[key:string]: any} = {
+                jti: refreshTokenJti,
+                iat: timeCreated,
+                iss: this.oauthIssuer,
+                sub: authzData.username,
+                type: "access",
+            };
             if (this.refreshTokenExpiry != null) {
+                refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry
                 refreshTokenExpires = 
                     this.refreshTokenExpiry ? 
                         new Date(timeCreated + this.refreshTokenExpiry*1000 + 
                             this.clockTolerance*1000) : 
                         undefined;
-                    }
+            }
+            if (this.audience) {
+                accessTokenPayload.aud = this.oauthIssuer; 
+            }
+
+            // create refresh token jwt
+            refreshToken = await new Promise((resolve, reject) => {
+                jwt.sign(refreshTokenPayload,
+                    this.secretOrPrivateKey,
+                    { algorithm: this.jwtAlgorithmChecked, keyid: "1" }, 
+                    (error: Error | null,
+                    encoded: string | undefined) => {
+                        if (encoded) resolve(encoded);
+                        else if (error) reject(error);
+                        else reject(new CrossauthError(ErrorCode.Unauthorized,
+                            "Couldn't create jwt"));
+                    });
+            });
 
             // save refresh token
-            await this.keyStorage?.saveKey(
-                undefined, // to avoid user storage dependency
-                KeyPrefix.refreshToken+Crypto.hash(refreshToken),
-                now,
-                refreshTokenExpires,
-                JSON.stringify(refreshData)
-            );
+            if (refreshToken) {
+                await this.keyStorage?.saveKey(
+                    undefined, // to avoid user storage dependency
+                    KeyPrefix.refreshToken+Crypto.hash(refreshToken),
+                    now,
+                    refreshTokenExpires,
+                    JSON.stringify(refreshData)
+                );
+            }
         }
         
+        console.log("Returning tokens", accessToken, refreshToken, idToken)
         return {
             access_token : accessToken,
             id_token: idToken,

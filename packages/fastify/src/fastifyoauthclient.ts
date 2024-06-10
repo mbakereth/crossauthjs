@@ -517,6 +517,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
 
         if (reply) {
             if (!client.authorizedUrl) {
+
                 return reply.status(500)
                     .view(client.errorPage, {
                         status: 500,
@@ -526,6 +527,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
                     });
 
             }
+
             return reply.redirect(client.authorizedUrl);
         }
     } catch (e) {
@@ -941,7 +943,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         user: request.user?.username
                     }));
 
-                // if sessions are enabled, require a csrf token
+                    // if sessions are enabled, require a csrf token
                 const {error, reply: reply1} = 
                     await server.errorIfCsrfInvalid(request,
                         reply,
@@ -979,7 +981,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 try {
                     const resp = 
                         await this.refreshTokenFlow(refreshToken);
-                    if (resp.error) {
+                        if (resp.error) {
                         const ce = CrossauthError.fromOAuthError(resp.error, 
                             resp.error_description);
                         return await this.errorFn(this.server,
@@ -1582,6 +1584,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             error?: string,
             error_description?: string
         }|FastifyReply|undefined> {
+            console.log("refresh", onlyIfExpired, expiresAt, Date.now())
             if (!expiresAt || !refreshToken) {
                 if (!silent) {
                     return await this.receiveTokenFn({},
@@ -1670,13 +1673,18 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             }
         }
 
+        console.log("Refreshing")
+
         const resp = 
             await this.refresh(request,
                 reply,
                 silent,
                 onlyIfExpired,
                 oauthData.refresh_token,
-                onlyIfExpired ? oauthData.expires_at : undefined);
+                //onlyIfExpired ? oauthData.expires_at : undefined
+                oauthData.expires_at
+            );
+        console.log("Got response", resp, silent);
         if (!silent) {
             if (resp == undefined) return this.receiveTokenFn({}, this, request, reply);
             if (resp != undefined) return resp; // XXX

@@ -214,14 +214,17 @@ export class OAuthBffClient {
         try {
             const resp = await fetch(this.sessionBaseUrl + tokenName + "_token", {
                 method: "POST",
-                headers: this.headers,
+                headers: headers,
                 mode: this.mode,
                 credentials: this.credentials,
             })
             if (resp.status == 204) {
                 return null;
             }
-            return await resp.json();
+            const body = await resp.json();
+            console.log(tokenName, body);
+            return body;
+            //return await resp.json();
         } catch (e) {
             throw CrossauthError.asCrossauthError(e);
         }
@@ -243,13 +246,29 @@ export class OAuthBffClient {
         return json.ok;
     }
 
-    private async scheduleAutoRefresh(errorFn : (msg : string, e? : CrossauthError) => void) {
+    async startAutoRefresh(tokensToFetch : ("access"|"id")[] = ["access", "id"], 
+        errorFn? : (msg : string, e? : CrossauthError) => void) {
+    
+        if (!this.autoRefreshActive) {
+            this.autoRefreshActive = true;
+            await this.scheduleAutoRefresh(tokensToFetch, errorFn);
+        }
+    }
+
+
+    stopAutoRefresh() {
+        this.autoRefreshActive = false;
+    }
+
+    private async scheduleAutoRefresh(tokensToFetch : ("access"|"id")[], 
+        errorFn? : (msg : string, e? : CrossauthError) => void) {
             // Get CSRF token
             const csrfToken = await this.getCsrfToken();
+            console.log("Csrf token", csrfToken)
 
             // Get tokens
-            const idTask = this.getIdToken(csrfToken);
-            const accessTask = this.getAccessToken(csrfToken);
+            const idTask = tokensToFetch.includes("id") ? this.getIdToken(csrfToken) : undefined;
+            const accessTask = tokensToFetch.includes("access") ? this.getAccessToken(csrfToken) : undefined;
             const refreshTask = this.getRefreshToken(csrfToken);
             const tokens = await Promise.all([idTask, accessTask, refreshTask]);
             const idToken = tokens[0];
@@ -291,31 +310,18 @@ export class OAuthBffClient {
             let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
             console.log("Refresh tokens: waiting", renewTime);
             await wait(renewTime);
-            await this.autoRefresh(errorFn, csrfToken);
+            await this.autoRefresh(tokensToFetch, csrfToken, errorFn);
 
     }
 
-    async startAutoRefresh(errorFn : (msg : string, e? : CrossauthError) => void) {
-    
-        if (!this.autoRefreshActive) {
-            this.autoRefreshActive = true;
-            await this.scheduleAutoRefresh(errorFn);
-        }
-    }
-
-
-    stopAutoRefresh() {
-        this.autoRefreshActive = false;
-    }
-
-    async autoRefresh(errorFn : (msg : string, e? : CrossauthError) => void,
-        csrfToken : string) {
+    private async autoRefresh(tokensToFetch : ("access"|"id")[], csrfToken : string, errorFn? : (msg : string, e? : CrossauthError) => void,
+        ) {
         if (this.autoRefreshActive) {
             try {
                 let headers = {...this.headers};
                 headers[this.csrfHeader] = csrfToken;
-                        console.log("Requesting", this.oauthBaseUrl + "refreshtokenflow", csrfToken);
-                const resp = await fetch(this.oauthBaseUrl + "refreshtokenflow", {
+                        console.log("Requesting", this.oauthBaseUrl + "api/refreshtokens", csrfToken);
+                const resp = await fetch(this.oauthBaseUrl + "api/refreshtokens", {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
@@ -332,17 +338,24 @@ export class OAuthBffClient {
                     CrossauthLogger.logger.error(j({msg: "Failed auto refreshing tokens", status: resp.status}));
     
                 }
+                console.log("Got resp", resp);
                 const reply = await resp.json();
                 console.log("Response", reply);
 
-                //await this.scheduleAutoRefresh(errorFn, headers);
+                if (reply.ok) {
+                    await this.scheduleAutoRefresh(tokensToFetch, errorFn);
+                }
 
                 }
             catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug(j({err: ce}));
                 CrossauthLogger.logger.error(j({cerr: ce, msg: "Failed auto refreshing tokens"}));
-                errorFn(ce.message, ce);
+                if (errorFn) {
+                    errorFn(ce.message, ce);
+                } else {
+                    console.log(String(ce.message));
+                }
             }
         }
     }

@@ -866,10 +866,15 @@ export abstract class OAuthClientBase {
 
         const url = this.oidcConfig.token_endpoint;
 
+        let clientSecret : string|undefined;
+        clientSecret = this.clientSecret;
+
         let params : {[key:string]:any} = {
             grant_type: "refresh_token",
             refresh_token: refreshToken,
+            client_id: this.clientId,
         }
+        if (clientSecret) params.client_secret = clientSecret;
         try {
             return await this.post(url, params, this.authServerHeaders);
         } catch (e) {
