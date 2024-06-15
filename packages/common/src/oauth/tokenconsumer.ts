@@ -119,7 +119,7 @@ export abstract class OAuthTokenConsumerBase {
                     
             } else {
                 if (!this.oidcConfig) {
-                    this.loadConfig();
+                    await this.loadConfig();
                 }
                 if (!this.oidcConfig) {
                     throw new CrossauthError(ErrorCode.Connection, 
@@ -266,7 +266,6 @@ export abstract class OAuthTokenConsumerBase {
     private async validateToken(accessToken : string) : Promise<{[key:string]: any}|undefined> {
 
         // get KID from header
-
         if  (!this.keys || Object.keys(this.keys).length == 0) CrossauthLogger.logger.warn("No keys loaded so cannot validate tokens");
         let kid : string|undefined = undefined;
         try {
@@ -276,7 +275,6 @@ export abstract class OAuthTokenConsumerBase {
             CrossauthLogger.logger.warn(j({msg: "Invalid access token format"}))
             return undefined;
         }
-
         // find key matching header KID and validate signature (and expiry)
         let key : EncryptionKey|undefined = undefined;
         if ("_default" in this.keys) key = this.keys["_default"];

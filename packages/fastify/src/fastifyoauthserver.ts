@@ -472,7 +472,7 @@ export class FastifyAuthorizationServer {
                     grantType: request.body.grant_type,
                     clientId : clientId,
                     clientSecret : clientSecret,
-                    scope: request.body.scope?.replace("+", " "),
+                    scope: request.body.scope,
                     codeVerifier: request.body.code_verifier,
                     code: request.body.code,
                     username: request.body.username,
@@ -654,6 +654,7 @@ export class FastifyAuthorizationServer {
                     .send(DEFAULT_ERROR[status]??ERROR_500);
             }
         }
+        console.log(query.scope)
         let hasAllScopes = false;
         CrossauthLogger.logger.debug(j({
             msg: `Checking scopes have been authorized`,
@@ -661,7 +662,7 @@ export class FastifyAuthorizationServer {
         if (query.scope) {
             hasAllScopes = await this.authServer.hasAllScopes(query.client_id,
                 request.user,
-                query.scope.replace("+", " ").split(" "));
+                query.scope.split(" "));
 
         } else {
             hasAllScopes = await this.authServer.hasAllScopes(query.client_id,
@@ -703,7 +704,7 @@ export class FastifyAuthorizationServer {
                     client_name : client.clientName,
                     redirect_uri: query.redirect_uri,
                     scope: query.scope,
-                    scopes: query.scope ? query.scope.replace("+", " ").split(" ") : undefined,
+                    scopes: query.scope ? query.scope.split(" ") : undefined,
                     state: query.state,
                     code_challenge: query.code_challenge,
                     code_challenge_method: query.code_challenge_method,
@@ -752,7 +753,6 @@ export class FastifyAuthorizationServer {
         let error : string|undefined;
         let errorDescription : string|undefined;
         let code : string|undefined;
-        scope = scope?.replace("+", " "); // this is not done by Fastify by default
 
         // Create an authorizatin code
         if (authorized) {

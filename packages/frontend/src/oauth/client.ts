@@ -1,14 +1,13 @@
 //import { URLSearchParams } from "url";
 import {
     OAuthClientBase,
-    OAuthTokenConsumerBase,
     CrossauthLogger,
     j,
     ErrorCode,
     CrossauthError } from '@crossauth/common'
 import type { OAuthTokenResponse } from '@crossauth/common'
 import { OAuthAutoRefresher } from './autorefresher.ts';
-
+import { OAuthTokenConsumer } from './tokenconsumer';
 /**
  * This is the type for a function that is called when an OAuth endpoint
  * returns the `error` field.
@@ -91,11 +90,11 @@ export class OAuthClient extends OAuthClientBase {
             authServerBaseUrl : string,
             stateLength? : number,
             verifierLength? : number,
-            clientId? : string,
+            clientId : string,
             clientSecret? : string,
             redirectUri? : string,
             codeChallengeMethod? : "plain" | "S256",
-            tokenConsumer : OAuthTokenConsumerBase,
+            tokenConsumer : OAuthTokenConsumer,
             resServerBaseUrl? : string,
             accessTokenResponseType? : TokenResponseType,
             refreshTokenResponseType? : TokenResponseType,
@@ -108,6 +107,12 @@ export class OAuthClient extends OAuthClientBase {
             resServerHeaders? : {[key:string]:any},
             autoRefresh? : ("access"|"id")[]
         }) {
+        if (!options.tokenConsumer) {
+            options.tokenConsumer = new OAuthTokenConsumer(
+                options.clientId, 
+                {authServerBaseUrl: options.authServerBaseUrl, 
+            });
+        }
         super(options);
         if (this.resServerBaseUrl != undefined) {
             this.resServerBaseUrl = options.resServerBaseUrl ?? "";
@@ -277,6 +282,10 @@ export class OAuthClient extends OAuthClientBase {
      */
     stopAutoRefresh() {
         return this.autoRefresher.stopAutoRefresh();
+    }
+
+    getIdToken() {
+        return this.#idTokenPayload;
     }
 
 

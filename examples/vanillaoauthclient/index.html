@@ -34,11 +34,26 @@
                 }
             }
             
+            function getIdToken() {
+                try {
+                    let token = client.getIdToken();
+                    if (token == null) {
+                        document.getElementById("idtoken").innerHTML = "Error: There is no ID token";
+                    } else {
+                        document.getElementById("idtoken").innerHTML = "<pre>"+JSON.stringify(token, null, '\t')+"</pre>"
+                       
+                    }
+                } catch (e) {
+                    console.log(e);
+                    document.getElementById("idtoken").innerHTML = "<pre>Error: "+e.message+"</pre>";
+                }
+            }
+
             client.startAutoRefresh().catch((err) => {
                 logger.debug(j({err: e }));
                 logger.error(j({msg: "Couldn't start auto refresh" }));
             });
-            
+
         </script>
 
         </head>
@@ -51,6 +66,8 @@
 
         <p><button onClick="callResource()">Call Resource</button></p>
         <p id="result">Result will be here</p>
+        <p><button onclick="getIdToken()">ID Token</button></p>
+        <p id="idtoken"></p>
 
     </body>
 </html>
