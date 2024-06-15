@@ -165,6 +165,9 @@ export class OAuthClient extends OAuthClientBase {
             id_token : idToken,
             refresh_token : refreshToken,
         })
+
+        // get access token payload if we have the token.  This is
+        // synchronous
         if (accessToken) {
             const payload = this.getTokenPayload(accessToken);
             if (payload) {
@@ -172,6 +175,9 @@ export class OAuthClient extends OAuthClientBase {
                 this.#accessTokenPayload = payload;
             }
         }
+
+        // get refresh token payload if we have the token.  This is
+        // synchronous
         if (refreshToken) {
             const payload = this.getTokenPayload(refreshToken);
             if (payload) {
@@ -179,9 +185,13 @@ export class OAuthClient extends OAuthClientBase {
                 this.#refreshTokenPayload = payload;
             }
         }
+
+        // get the ID token payload if we have the token.  This is
+        // asynchronous so we put the next steps in the then clause
         if (idToken) {
             this.validateIdToken(idToken)
                 .then(payload => {
+                // save the payload and start auto refresh, if it was requested
                 this.#idTokenPayload = payload;
                 if (options.autoRefresh) {
                     this.startAutoRefresh(options.autoRefresh)
@@ -194,19 +204,30 @@ export class OAuthClient extends OAuthClientBase {
             .catch(err => {
                 CrossauthLogger.logger.debug(j({err: err, msg: "Couldn't validate ID token"}));
             });
-        } else if (this.#accessToken && options.autoRefresh) {
+
+        // if we don't have the ID token but we do have the access and
+        // refresh tokens, and auto refresh was requested, 
+        // still start auto refresh
+        } else if (this.#accessToken && options.autoRefresh && refreshToken) {
             this.startAutoRefresh(options.autoRefresh)
                 .then()
                 .catch(err => {
                 CrossauthLogger.logger.debug(j({err: err, msg: "Couldn't start auto refresh"}));
             });
-        }
 
-        if (refreshToken && !accessToken) {
+        // otherwise, if we have the refresh token but neither access nor
+        // ID tokens, fetch them now then start auto refresh if requested
+        } else if (refreshToken && !accessToken) {
             this.refreshTokenFlow(refreshToken)
-                .then(resp => {
+                .then(_resp => {
                     CrossauthLogger.logger.debug(j({msg: "Refreshed tokens"}));
-
+                    if (options.autoRefresh) {
+                        this.startAutoRefresh(options.autoRefresh)
+                        .then()
+                        .catch(err => {
+                        CrossauthLogger.logger.debug(j({err: err, msg: "Couldn't start auto refresh"}));
+                    });    
+                }
                 })
                 .catch(err => {
                     const ce = CrossauthError.asCrossauthError(err);
@@ -297,6 +318,14 @@ export class OAuthClient extends OAuthClientBase {
         return this.autoRefresher.stopAutoRefresh();
     }
 
+    /**
+     * Return the ID token payload
+     * 
+     * This does the same thign as {@link idTokenPayload}.  We have it here
+     * as well for consistency with {@link OAuthBffClient}.
+     * 
+     * @returns the payload as an object
+     */
     getIdToken() {
         return this.#idTokenPayload;
     }
