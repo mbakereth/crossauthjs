@@ -116,6 +116,16 @@ async function main() {
   };
   const client = await clientStorage.createClient(inputClient);
   console.log(client);
+  const inputClient2 = {
+      clientId : "DEF",
+      confidential: false,
+      clientSecret: null,
+      clientName: "Example Public Client",
+      redirectUri: ["http://localhost:8080/authzcode.html"],
+      validFlow: OAuthFlows.allFlows(),
+  };
+  const client2 = await clientStorage.createClient(inputClient2);
+  console.log(client2);
 }
 main()
   .then(async () => {

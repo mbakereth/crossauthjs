@@ -1734,7 +1734,6 @@ export class OAuthAuthorizationServer {
         }
 
         let refreshToken : string|undefined = undefined;
-        console.log("Issue refresh token", issueRefreshToken)
         if (issueRefreshToken) { 
             // create refresh token 
             //refreshToken = Crypto.randomValue(this.codeLength); 
@@ -1795,7 +1794,6 @@ export class OAuthAuthorizationServer {
             }
         }
         
-        console.log("Returning tokens", accessToken, refreshToken, idToken)
         return {
             access_token : accessToken,
             id_token: idToken,

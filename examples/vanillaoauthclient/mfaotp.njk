@@ -1,0 +1,27 @@
+<html>
+    <head>
+        <title>Password Flow Login: TOTP</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+    </head>
+    <body>
+        <h1>Password Flow Login: TOTP</h1>
+        <form method="POST" action="/passwordotp">
+            <input type="hidden" name="mfa_token" value="{{ mfa_token }}"/>
+            <input type="hidden" name="scope" value="{{ scope }}"/>
+            {% if errorMessage %}
+                <p class="error">
+                    {{ errorMessage }}
+                </p>
+            {% endif %}
+            <p>
+                Please enter your code from Google Authenticator (or whichever
+                application you registered your 2FA to).
+            <p>
+                <label for="otp">Code</label><br>
+                <input type="password" name="otp" size="20"/>
+            </p>
+            <p><button type="submit">Log In</button></p>
+
+        </form>
+    </body>
+</html>

@@ -1188,12 +1188,12 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     return reply.header(...JSONHDR).status(204).send();
                 }
                 let payload = oauthData[tokenName];
-                if (["access_token", "id_token"].includes(tokenName)) {
+                //if (["access_token", "id_token"].includes(tokenName)) {
                     payload = decodePayload(oauthData[tokenName]);
-                } 
+                /*} 
                 else if (tokenName == "refresh_token") {
                     payload = {token: payload}
-                }
+                }*/
                 if (!payload) {
                     if (isHave) return reply.header(...JSONHDR).status(200).send({ok: false});
                     return reply.header(...JSONHDR).status(204).send();
@@ -1584,7 +1584,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             error?: string,
             error_description?: string
         }|FastifyReply|undefined> {
-            console.log("refresh", onlyIfExpired, expiresAt, Date.now())
             if (!expiresAt || !refreshToken) {
                 if (!silent) {
                     return await this.receiveTokenFn({},
@@ -1673,8 +1672,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             }
         }
 
-        console.log("Refreshing")
-
         const resp = 
             await this.refresh(request,
                 reply,
@@ -1684,7 +1681,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 //onlyIfExpired ? oauthData.expires_at : undefined
                 oauthData.expires_at
             );
-        console.log("Got response", resp, silent);
         if (!silent) {
             if (resp == undefined) return this.receiveTokenFn({}, this, request, reply);
             if (resp != undefined) return resp; // XXX

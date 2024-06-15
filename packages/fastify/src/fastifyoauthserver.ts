@@ -244,6 +244,7 @@ export class FastifyAuthorizationServer {
 
     private csrfTokens : DoubleSubmitCsrfToken | undefined;
     private createGetCsrfTokenEndpoint = false;
+
     /**
      * Constructor
      * @param app the Fastify app
@@ -471,7 +472,7 @@ export class FastifyAuthorizationServer {
                     grantType: request.body.grant_type,
                     clientId : clientId,
                     clientSecret : clientSecret,
-                    scope: request.body.scope,
+                    scope: request.body.scope?.replace("+", " "),
                     codeVerifier: request.body.code_verifier,
                     code: request.body.code,
                     username: request.body.username,
@@ -660,7 +661,7 @@ export class FastifyAuthorizationServer {
         if (query.scope) {
             hasAllScopes = await this.authServer.hasAllScopes(query.client_id,
                 request.user,
-                query.scope.split(" "));
+                query.scope.replace("+", " ").split(" "));
 
         } else {
             hasAllScopes = await this.authServer.hasAllScopes(query.client_id,
@@ -702,7 +703,7 @@ export class FastifyAuthorizationServer {
                     client_name : client.clientName,
                     redirect_uri: query.redirect_uri,
                     scope: query.scope,
-                    scopes: query.scope ? query.scope.split(" ") : undefined,
+                    scopes: query.scope ? query.scope.replace("+", " ").split(" ") : undefined,
                     state: query.state,
                     code_challenge: query.code_challenge,
                     code_challenge_method: query.code_challenge_method,
@@ -751,6 +752,7 @@ export class FastifyAuthorizationServer {
         let error : string|undefined;
         let errorDescription : string|undefined;
         let code : string|undefined;
+        scope = scope?.replace("+", " "); // this is not done by Fastify by default
 
         // Create an authorizatin code
         if (authorized) {

@@ -13,7 +13,7 @@ import fastifystatic from '@fastify/static';
 import view from '@fastify/view';
 import nunjucks from "nunjucks";
 import path from 'path';
-import { CrossauthLogger } from '@crossauth/common';
+import { CrossauthLogger, j } from '@crossauth/common';
 import { totp } from 'otplib';
 //import * as Pino from 'pino'; // you can use loggers other than the default built-in one
 
@@ -92,7 +92,7 @@ let server = new FastifyServer(userStorage, {
         siteUrl: `http://localhost:${port}`,
         authStorage: authStorage,
         userStorage: userStorage,
-        resourceServerName: "https://resserver.com",
+        resourceServerName: "https://localhost:3001",
 });
 
 // SImple page to check login status and logout
@@ -115,6 +115,7 @@ app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
     resourceServerName: "https://resserver.com",
 });*/
 app.get('/resource', async (request : FastifyRequest, reply : FastifyReply) =>  {
+    CrossauthLogger.logger.info(j({msg: "Page load", method: "GET", url: request.url}));
     //const {authorized, error_description, tokenPayload} = await resserver.authorized(request);
     if (request.accessTokenPayload) {
         return reply.header(...JSONHDR).status(200).send({ok: true, timeCalled: new Date(), username: request.accessTokenPayload.sub});

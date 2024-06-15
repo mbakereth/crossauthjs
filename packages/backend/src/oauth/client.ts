@@ -76,13 +76,16 @@ export class OAuthClientBackend extends OAuthClientBase {
                 audience: options1.clientId, 
                 authServerBaseUrl, 
                 ...options }), ...options });
+        this.clientId = options1.clientId;
 
+        let tmp : {[key:string]: any} = {};
         setParameter("stateLength", ParamType.String, this, options, "OAUTH_STATE_LENGTH");
         setParameter("verifierLength", ParamType.String, this, options, "OAUTH_VERIFIER_LENGTH");
-        setParameter("clientId", ParamType.String, this, options, "OAUTH_CLIENT_ID");
-        setParameter("clientSecret", ParamType.String, this, options, "OAUTH_CLIENT_SECRET");
+        setParameter("clientSecret", ParamType.String, tmp, options, "OAUTH_CLIENT_SECRET");
         setParameter("codeChallengeMethod", ParamType.String, this, options, "OAUTH_CODE_CHALLENGE_METHOD");
         setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+        if (tmp.clientSecret) this.clientSecret = tmp.clientSecret;
+
         if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();
         } else {

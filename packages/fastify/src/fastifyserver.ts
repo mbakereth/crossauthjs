@@ -5,6 +5,7 @@ import fastify, {
 import { Server, IncomingMessage, ServerResponse } from 'http'
 import view from '@fastify/view';
 import fastifyFormBody from '@fastify/formbody';
+import cors from '@fastify/cors'
 import type { FastifyCookieOptions } from '@fastify/cookie'
 import cookie from '@fastify/cookie'
 import nunjucks from "nunjucks";
@@ -200,6 +201,8 @@ export class FastifyServer {
     /** See class comment */
     readonly oAuthResServer? : FastifyOAuthResourceServer;
 
+    /** Config for `@fastify/cors` */
+    private cors : {[key:string]:any} | undefined;
 
     /**
      * Integrates fastify session, API key and OAuth servers
@@ -272,6 +275,7 @@ export class FastifyServer {
 
 
         setParameter("views", ParamType.String, this, options, "VIEWS");
+        setParameter("cors", ParamType.Json, this, options, "CORS");
 
         if (options.isAdminFn) FastifyServer.isAdminFn = options.isAdminFn;
 
@@ -295,6 +299,10 @@ export class FastifyServer {
                 });
 
 
+        }
+
+        if (this.cors) {
+            this.app.register(cors, this.cors);      
         }
 
         this.app.addContentTypeParser('text/json',

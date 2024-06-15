@@ -5,6 +5,7 @@ import {
     OAuthTokenConsumerBase,
     DEFAULT_OIDCCONFIG,
     type GrantType } from '..';
+import * as jose from 'jose'
 
 /**
  * Crossauth allows you to define which flows are valid for a given client.
@@ -167,20 +168,21 @@ export interface OAuthTokenResponse {
  */
 export abstract class OAuthClientBase {
     protected authServerBaseUrl = "";
-    protected clientId : string|undefined;
-    protected clientSecret : string|undefined;
-    protected codeChallenge : string|undefined;
+    #clientId : string|undefined;
+    #clientSecret : string|undefined;
+    #codeChallenge : string|undefined;
     protected codeChallengeMethod : "plain" | "S256" = "S256";
-    protected codeVerifier : string|undefined;
+    #codeVerifier : string|undefined;
     protected verifierLength = 32;
     protected redirectUri : string|undefined;
-    protected state = "";
+    #state = "";
     protected stateLength = 32;
     protected authzCode : string = "";
     protected oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
     protected tokenConsumer : OAuthTokenConsumerBase;
-    protected fetchCredentials : "same-origin"|"include"|undefined = undefined;
     protected authServerHeaders : {[key:string]:string} = {};
+    protected authServerMode :  "no-cors" | "cors" | "same-origin" | undefined = undefined;
+    protected authServerCredentials : "include" | "omit" | "same-origin" | undefined = undefined;
 
     /**
      * Constructor.
@@ -200,6 +202,14 @@ export abstract class OAuthClientBase {
      *        and backend specific funtionality (eg classes not available
      *        in browsers), the token consumer, which determines if a token
      *        is valid or not, is abstracted out.
+     *      - authServerCredentials credentials flag for fetch calls to the
+     *        authorization server
+     *      - authServerMode mode flag for fetch calls to the 
+     *        authorization server
+     *      - authServerHeaders headers flag for calls to the
+     *        authorization server
+     *      - `receiveTokensFn` if defined, this will be called when tokens
+     *        are received
      */
     constructor({authServerBaseUrl,
         clientId,
@@ -209,7 +219,9 @@ export abstract class OAuthClientBase {
         stateLength,
         verifierLength,
         tokenConsumer,
-        fetchCredentials,
+        authServerCredentials,
+        authServerMode,
+        authServerHeaders,
     } : {
         authServerBaseUrl : string,
         stateLength? : number,
@@ -219,30 +231,40 @@ export abstract class OAuthClientBase {
         redirectUri? : string,
         codeChallengeMethod? : "plain" | "S256",
         tokenConsumer : OAuthTokenConsumerBase,
-        fetchCredentials? : "same-origin"|"include",
+        authServerHeaders? : {[key:string]:string},
+        authServerCredentials? :"include" | "omit" | "same-origin" | undefined,
+        authServerMode? : "no-cors" | "cors" | "same-origin" | undefined,
+
     }) {
         this.tokenConsumer = tokenConsumer;
         this.authServerBaseUrl = authServerBaseUrl;
         if (verifierLength) this.verifierLength = verifierLength;
         if (stateLength) this.stateLength = stateLength;
-        if (clientId) this.clientId = clientId;
-        if (clientSecret) this.clientSecret = clientSecret;
+        if (clientId) this.#clientId = clientId;
+        if (clientSecret) this.#clientSecret = clientSecret;
         if (redirectUri) this.redirectUri = redirectUri;
         if (codeChallengeMethod) this.codeChallengeMethod = codeChallengeMethod;
         this.authServerBaseUrl = authServerBaseUrl;
-        if (fetchCredentials) this.fetchCredentials = fetchCredentials;
+        if (authServerCredentials) this.authServerCredentials = authServerCredentials;
+        if (authServerMode) this.authServerMode = authServerMode;
+        if (authServerHeaders) this.authServerHeaders = authServerHeaders;
 
     }
 
-    /**
-     * Any headers added here will be applied to all requests to the
-     * authorization server.
-     * 
-     * @param header the header name eg `Access-Control-Allow-Origin`
-     * @param value the header value
-     */
-    addAuthServerHeader(header : string, value : string) {
-        this.authServerHeaders[header] = value;
+    set clientId(value : string) {
+        this.#clientId = value;
+    }
+    set clientSecret(value : string) {
+        this.#clientSecret = value;
+    }
+    set codeVerifier(value : string) {
+        this.#codeVerifier = value;
+    }
+    set codeChallenge(value : string) {
+        this.#codeChallenge = value;
+    }
+    set state(value : string) {
+        this.#state = value;
     }
 
     /**
@@ -268,7 +290,10 @@ export abstract class OAuthClientBase {
             const url = new URL("/.well-known/openid-configuration",
                 this.authServerBaseUrl);
             CrossauthLogger.logger.debug(j({msg: `Fetching OIDC config from ${url}`}))
-            resp = await fetch(url, {headers: this.authServerHeaders});
+            let options : {[key:string]:any} = {headers: this.authServerHeaders};
+            if (this.authServerMode) options.mode = this.authServerMode;
+            if (this.authServerCredentials) options.credentials = this.authServerCredentials;
+            resp = await fetch(url, options);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
         }
@@ -282,7 +307,6 @@ export abstract class OAuthClientBase {
             for (const [key, value] of Object.entries(body)) {
                 this.oidcConfig[key] = value;
             }
-            CrossauthLogger.logger.debug(j({msg: `OIDC Config ${JSON.stringify(this.oidcConfig)}`}));
         } catch (e) {
             throw new CrossauthError(ErrorCode.Connection, 
                 "Unrecognized response from OIDC configuration endpoint");
@@ -343,8 +367,8 @@ export abstract class OAuthClientBase {
                 error_description: "Cannot get authorize endpoint"
             };
         }
-        this.state = this.randomValue(this.stateLength);
-        if (!this.clientId) return {
+        this.#state = this.randomValue(this.stateLength);
+        if (!this.#clientId) return {
             error: "invalid_request",
             error_description: "Cannot make authorization code flow without client id"
         }; 
@@ -356,8 +380,8 @@ export abstract class OAuthClientBase {
         const base = this.oidcConfig.authorization_endpoint;
         let url = base 
             + "?response_type=code"
-            + "&client_id=" + encodeURIComponent(this.clientId)
-            + "&state=" + encodeURIComponent(this.state)
+            + "&client_id=" + encodeURIComponent(this.#clientId)
+            + "&state=" + encodeURIComponent(this.#state)
             + "&redirect_uri=" + encodeURIComponent(this.redirectUri);
 
         if (scope) {
@@ -365,11 +389,11 @@ export abstract class OAuthClientBase {
         }
 
         if (pkce) {
-            this.codeVerifier = this.randomValue(this.verifierLength);
-            this.codeChallenge = 
+            this.#codeVerifier = this.randomValue(this.verifierLength);
+            this.#codeChallenge = 
                 this.codeChallengeMethod == "plain" ? 
-                this.codeVerifier : await this.sha256(this.codeVerifier);
-            url += "&code_challenge=" + this.codeChallenge;
+                this.#codeVerifier : await this.sha256(this.#codeVerifier);
+            url += "&code_challenge=" + this.#codeChallenge;
         }
 
         return {url: url};
@@ -399,13 +423,14 @@ export abstract class OAuthClientBase {
         state?: string,
         error?: string,
         errorDescription?: string) : Promise<OAuthTokenResponse>{
+        if (!this.oidcConfig) await this.loadConfig();      
         if (error || !code) {
             if (!error) error = "server_error";
             if (!errorDescription) errorDescription = "Unknown error";
             return {error, error_description: errorDescription};
         }
-        if (this.state) {
-            if (state != this.state) {
+        if (this.#state) {
+            if (state != this.#state) {
                 return {error: "access_denied", error_description: "State is not valid"};
             }
         }
@@ -428,14 +453,14 @@ export abstract class OAuthClientBase {
         let grant_type : string;
         let clientSecret : string|undefined;
         grant_type = "authorization_code";
-        clientSecret = this.clientSecret;
+        clientSecret = this.#clientSecret;
         let params : {[key:string]:any} = {
             grant_type: grant_type,
-            client_id: this.clientId,
+            client_id: this.#clientId,
             code: this.authzCode,
         }
         if (clientSecret) params.client_secret = clientSecret;
-        params.code_verifier = this.codeVerifier;
+        params.code_verifier = this.#codeVerifier;
         try {
             return this.post(url, params, this.authServerHeaders);
         } catch (e) {
@@ -472,11 +497,11 @@ export abstract class OAuthClientBase {
         if (!this.oidcConfig?.token_endpoint) {
             return {error: "server_error", error_description: "Cannot get token endpoint"};
         }
-        if (!this.clientId) return {
+        if (!this.#clientId) return {
             error: "invalid_request",
             error_description: "Cannot make client credentials flow without client id"
         }; 
-        if (!this.clientSecret) return {
+        if (!this.#clientSecret) return {
             error: "invalid_request",
             error_description: "Cannot make client credentials flow without client secret"
         }; 
@@ -485,8 +510,8 @@ export abstract class OAuthClientBase {
 
         let params : {[key:string]:any} = {
             grant_type: "client_credentials",
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
         }
         if (scope) params.scope = scope;
         try {
@@ -537,8 +562,8 @@ export abstract class OAuthClientBase {
 
         let params : {[key:string]:any} = {
             grant_type: "password",
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
             username : username,
             password : password,
         }
@@ -655,8 +680,8 @@ export abstract class OAuthClientBase {
         const url = this.oidcConfig.issuer + 
             (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/challenge";
         const resp = await this.post(url, {
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
             challenge_type: "otp",
             mfa_token: mfaToken,
             authenticator_id: authenticatorId,
@@ -716,8 +741,8 @@ export abstract class OAuthClientBase {
         const otpUrl = this.oidcConfig.token_endpoint;
         const otpResp = await this.post(otpUrl, {
             grant_type: "http://auth0.com/oauth/grant-type/mfa-otp",
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
             challenge_type: "otp",
             mfa_token: mfaToken,
             otp: otp,
@@ -776,8 +801,8 @@ export abstract class OAuthClientBase {
         const url = this.oidcConfig.issuer + 
             (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/challenge";
         const resp = await this.post(url, {
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
             challenge_type: "oob",
             mfa_token: mfaToken,
             authenticator_id: authenticatorId,
@@ -826,8 +851,8 @@ export abstract class OAuthClientBase {
         const url = this.oidcConfig.token_endpoint;
         const resp = await this.post(url, {
             grant_type: "http://auth0.com/oauth/grant-type/mfa-oob",
-            client_id: this.clientId,
-            client_secret: this.clientSecret,
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
             challenge_type: "otp",
             mfa_token: mfaToken,
             oob_code: oobCode,
@@ -867,12 +892,12 @@ export abstract class OAuthClientBase {
         const url = this.oidcConfig.token_endpoint;
 
         let clientSecret : string|undefined;
-        clientSecret = this.clientSecret;
+        clientSecret = this.#clientSecret;
 
         let params : {[key:string]:any} = {
             grant_type: "refresh_token",
             refresh_token: refreshToken,
-            client_id: this.clientId,
+            client_id: this.#clientId,
         }
         if (clientSecret) params.client_secret = clientSecret;
         try {
@@ -902,7 +927,9 @@ export abstract class OAuthClientBase {
             url: url,
             params: Object.keys(params)
         }));
-        const options = this.fetchCredentials ? {credentials: this.fetchCredentials} : {};
+        let options : {[key:string]:any} = {};
+        if ( this.authServerCredentials) options.credentials = this.authServerCredentials;
+        if ( this.authServerMode) options.mode = this.authServerMode;
         const resp = await fetch(url, {
             method: 'POST',
             ...options,
@@ -927,7 +954,9 @@ export abstract class OAuthClientBase {
     protected async get(url : string, headers : {[key:string]:any} = {}) : 
         Promise<{[key:string]:any}|{[key:string]:any}[]>{
         CrossauthLogger.logger.debug(j({msg: "Fetch GET", url: url}));
-        const options = this.fetchCredentials ? {credentials: this.fetchCredentials} : {};
+        let options : {[key:string]:any} = {};
+        if ( this.authServerCredentials) options.credentials = this.authServerCredentials;
+        if ( this.authServerMode) options.mode = this.authServerMode;
         const resp = await fetch(url, {
             method: 'GET',
             ...options,
@@ -974,6 +1003,10 @@ export abstract class OAuthClientBase {
                 return undefined;
             }
         }
+
+    getTokenPayload(token : string) : {[key:string] : any} {
+        return jose.decodeJwt(token);
+    }
 }
 
 /**

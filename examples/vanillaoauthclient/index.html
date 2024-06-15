@@ -1,0 +1,56 @@
+<html>
+    <head>
+        <title>Client</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+
+        <script src="public/crossauth_frontend.js"></script>
+        <script>
+            var client = new crossauth_frontend.OAuthClient({
+                authServerBaseUrl: "http://localhost:3000",
+                authServerMode: "cors",
+                authServerCredentials: "include",
+                resServerMode: "cors",
+                resServerCredentials: "include",
+                clientId : "DEF",
+                redirectUri: "http://localhost:8080/authzcode.html",
+                accessTokenResponseType: "sessionStorage",
+                idTokenResponseType: "sessionStorage",
+                refreshTokenResponseType: "sessionStorage",
+            });
+            var logger = crossauth_frontend.CrossauthLogger.logger;
+            var j = crossauth_frontend.j;
+            logger.setLevel(crossauth_frontend.CrossauthLogger.Debug);
+            async function callResource() {
+                try {
+                    const resp = await client.api("GET", "http://localhost:3000/resource");
+                    document.getElementById("result").innerHTML = 
+                        "<pre>" + 
+                        JSON.stringify(resp.body) + 
+                        "</pre>"
+                } catch (e) {
+                    logger.debug(j({err: e }));
+                    logger.error(j({msg: "Couldn't start auto refresh" }));
+                    document.getElementById("result").text = e.message;
+                }
+            }
+            
+            client.startAutoRefresh().catch((err) => {
+                logger.debug(j({err: e }));
+                logger.error(j({msg: "Couldn't start auto refresh" }));
+            });
+            
+        </script>
+
+        </head>
+    <body>
+        <h1>Client</h1>
+
+        <p><a href="authzcode.html">Authorization code flow</a></p>
+        <p><a href="password.html">Password flow</a></p>
+        <p><a href="oidc.html">OIDC authorization code flow</a></p>
+
+        <p><button onClick="callResource()">Call Resource</button></p>
+        <p id="result">Result will be here</p>
+
+    </body>
+</html>

@@ -1,0 +1,46 @@
+<html>
+    <head>
+        <title>Client: Authorization Code Flow</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+
+        <script src="/public/crossauth_frontend.js"></script>
+        <script>
+            var client = new crossauth_frontend.OAuthClient({
+                authServerBaseUrl: "http://localhost:3000",
+                authServerMode: "cors",
+                authServerCredentials: "include",
+                resServerMode: "cors",
+                resServerCredentials: "include",
+                clientId : "DEF",
+                redirectUri: "http://localhost:8080/authzcode.html",
+                accessTokenResponseType: "sessionStorage",
+                idTokenResponseType: "sessionStorage",
+                refreshTokenResponseType: "sessionStorage",
+            });
+            var logger = crossauth_frontend.CrossauthLogger.logger;
+            var j = crossauth_frontend.j;
+            logger.setLevel(crossauth_frontend.CrossauthLogger.Debug);
+            client.handleRedirectUri()
+                .then(resp => {
+                    if (resp) {
+                        alert("Authorization successful ");
+                        location.href="/";
+                    }
+                })
+                .catch(err => console.log("Got error " + err));
+
+            function authorize() {
+                client.authorizationCodeFlow('read+write', false);
+            }
+        </script>
+
+        </head>
+    <body>
+        <h1>Client: Authorization Code Flow</h1>
+
+        <p><button onClick="authorize()">Authorize</button></p>
+
+        <p><a href="/">Home</a></p>
+
+    </body>
+</html>

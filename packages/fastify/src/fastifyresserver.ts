@@ -38,7 +38,7 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
      * a status code of 401 Access Denied if the key is invalid or the 
      * given scopes are not present.
      */
-    protectedEndpoints? : {[key:string]: {scope? : string[]}},
+    protectedEndpoints? : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean}},
 }
 
 /**
@@ -69,7 +69,7 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
 
     private userStorage? : UserStorage;
-    private protectedEndpoints : {[key:string]: {scope? : string[]}} = {};
+    private protectedEndpoints : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean}} = {};
     private errorBody : {[key:string]:any} = {};
 
     /**
@@ -88,84 +88,95 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
         this.userStorage = this.userStorage;
 
         if (options.protectedEndpoints) {
-                const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;
-                for (const [key, value] of Object.entries(options.protectedEndpoints)) {
-                    if (!key.startsWith("/")) {
-                        throw new CrossauthError(ErrorCode.Configuration, "protected endpoints must be absolute paths without the protocol and hostname");
-                    }
-                    if (value.scope) {
-                        value.scope.forEach((s : string) => {
-                            if (!(regex.test(s))) throw new CrossauthError(ErrorCode.Configuration, "Illegal characters in scope " + s);
-                        });
-                    }
+            const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;
+            for (const [key, value] of Object.entries(options.protectedEndpoints)) {
+                if (!key.startsWith("/")) {
+                    throw new CrossauthError(ErrorCode.Configuration, "protected endpoints must be absolute paths without the protocol and hostname");
                 }
-                this.protectedEndpoints = options.protectedEndpoints;
+                if (value.scope) {
+                    value.scope.forEach((s : string) => {
+                        if (!(regex.test(s))) throw new CrossauthError(ErrorCode.Configuration, "Illegal characters in scope " + s);
+                    });
+                }
             }
+            this.protectedEndpoints = options.protectedEndpoints;
+        }
             
         if (options.protectedEndpoints) {
             // validate access token and put in request, along with any errors
             app.addHook('preHandler', async (request : FastifyRequest, reply : FastifyReply) => {
                 
                 // don't authenticate if user already logged in with a session
-                if (request.user && request.authType == "cookie") return;
+                //if (request.user && request.authType == "cookie") return;
 
                 const urlWithoutQuery = request.url.split("?", 2)[0];
                 if (!(urlWithoutQuery in this.protectedEndpoints)) return;
 
                 const authResponse = await this.authorized(request);
-                if (!authResponse) {
-                    request.authError = "access_denied"
-                    request.authErrorDescription = "No access token";
-                    const authenticateHeader = this.authenticateHeader(request);
-                    return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
+
+                // If we are also we are not allowing authentication by
+                // and the user is valid, session cookie for this endpoint
+                if (!(request.user && request.authType == "cookie" 
+                    && this.protectedEndpoints[urlWithoutQuery].acceptSessionAuthorization!=true )) {
+                    if (!authResponse) {
+                        request.authError = "access_denied"
+                        request.authErrorDescription = "No access token";
+                        const authenticateHeader = this.authenticateHeader(request);
+                        return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
+                    }
+                    if (!authResponse.authorized) {
+                        const authenticateHeader = this.authenticateHeader(request);
+                        return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
+                    }
                 }
-                if (!authResponse.authorized) {
-                    const authenticateHeader = this.authenticateHeader(request);
-                    return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
-                }
-                request.accessTokenPayload = authResponse.tokenPayload;
-                request.user = authResponse.user;
-                if (authResponse.tokenPayload?.scope) {
-                    if (Array.isArray(authResponse.tokenPayload.scope)) {
-                        let scope : string[] = [];
-                        for (let tokenScope of authResponse.tokenPayload.scope) {
-                            if (typeof tokenScope == "string") {
-                                scope.push(tokenScope);
+
+                if (authResponse) {
+                    // we have a valid token - set the user from it
+                    request.accessTokenPayload = authResponse.tokenPayload;
+                    request.user = authResponse.user;
+                    if (authResponse.tokenPayload?.scope) {
+                        if (Array.isArray(authResponse.tokenPayload.scope)) {
+                            let scope : string[] = [];
+                            for (let tokenScope of authResponse.tokenPayload.scope) {
+                                if (typeof tokenScope == "string") {
+                                    scope.push(tokenScope);
+                                }
+                            }
+                            request.scope = scope;
+                        } else if (typeof authResponse.tokenPayload.scope == "string") {
+                            request.scope = authResponse.tokenPayload.scope.split(" ");
+                        }
+                    }
+                    if (this.protectedEndpoints[urlWithoutQuery].scope) {
+                        for (let scope of this.protectedEndpoints[urlWithoutQuery].scope??[]) {
+                            if (!request.scope || !(request.scope.includes(scope))
+                                && this.protectedEndpoints[urlWithoutQuery].acceptSessionAuthorization!=true) {
+                                CrossauthLogger.logger.warn(j({msg: "Access token does not have sufficient scope",
+                                    username: request.user?.username, url: request.url}));
+                                request.scope = undefined;
+                                request.accessTokenPayload = undefined;
+                                request.user = undefined;
+                                request.authError = "access_denied"
+                                request.authErrorDescription = "Access token does not have sufficient scope";
+                                return reply.status(401).send(this.errorBody);;
                             }
                         }
-                        request.scope = scope;
-                    } else if (typeof authResponse.tokenPayload.scope == "string") {
-                        request.scope = authResponse.tokenPayload.scope.split(" ");
                     }
-                }
-                if (this.protectedEndpoints[urlWithoutQuery].scope) {
-                    for (let scope of this.protectedEndpoints[urlWithoutQuery].scope??[]) {
-                        if (!request.scope || !(request.scope.includes(scope))) {
-                            CrossauthLogger.logger.warn(j({msg: "Access token does not have sufficient scope",
-                                username: request.user?.username, url: request.url}));
-                            request.scope = undefined;
-                            request.accessTokenPayload = undefined;
-                            request.user = undefined;
-                            request.authError = "access_denied"
-                            request.authErrorDescription = "Access token does not have sufficient scope";
-                            return reply.status(401).send(this.errorBody);;
-                        }
-                    }
-                }
 
-                request.authType = "oauth";
-                request.authError = authResponse?.error
-                if (authResponse.error == "access_denied") {
-                    const authenticateHeader = this.authenticateHeader(request);
-                    return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
-                } else if (authResponse.error) {
-                    return reply.status(500).send(this.errorBody);
-                } 
-                request.authErrorDescription = authResponse?.error_description;
-                CrossauthLogger.logger.debug(j({msg: "Resource server url", url: request.url, authorized: request.accessTokenPayload!= undefined}));
+                    request.authType = "oauth";
+                    request.authError = authResponse?.error
+                    if (authResponse?.error == "access_denied") {
+                        const authenticateHeader = this.authenticateHeader(request);
+                        return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
+                    } else if (authResponse?.error) {
+                        return reply.status(500).send(this.errorBody);
+                    } 
+                    request.authErrorDescription = authResponse?.error_description;
+                    CrossauthLogger.logger.debug(j({msg: "Resource server url", url: request.url, authorized: request.accessTokenPayload!= undefined}));
+                }
             });
-
         }
+        
     }
 
     private authenticateHeader(request : FastifyRequest) : string {
