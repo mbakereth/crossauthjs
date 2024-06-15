@@ -1,6 +1,6 @@
 <html>
     <head>
-        <title>Client: Password Flow</title>
+        <title>Client: Refresh Token Flow</title>
         <link rel="stylesheet" href="/public/style.css"/>
 
         <script src="/public/crossauth_frontend.js"></script>
@@ -22,14 +22,12 @@
             logger.setLevel(crossauth_frontend.CrossauthLogger.Debug);
 
             function authorize() {
-                var username = document.getElementById("username").value;
-                var password = document.getElementById("password").value;
 
-                client.passwordFlow(username, password, 'read write')
+                client.refreshTokenFlow()
                 .then(
                     resp => {
                         if (!resp.error) {
-                            alert("Authorization successful");
+                            alert("Refresh successful");
                             location.href = "/";
                         } else {
                             alert(resp.error_description);
@@ -37,30 +35,13 @@
                     })
                 .catch(err => alert(err));
             }
-            window.addEventListener("load",init);
-                function init() { 
-                    document.getElementById("form").addEventListener("submit",function(e) {
-                    e.preventDefault();
-                    });
-                }
         </script>
 
         </head>
         <body>
-            <h1>Client: Authorization Code Flow</h1>
+            <h1>Client: Refresh Token Flow</h1>
     
-            <form id="form">
-                <p>
-                    <label for="username">Username</label><br>
-                    <input type="text" name="username" size="20" id="username"/>
-                </p>
-                <p>
-                    <label for="password">Password</label><br>
-                    <input type="password" name="password" size="20" id="password"/>
-                </p>
-    
-                <p><button id="submit" onClick="authorize()">Authorize</button></p>
-            </form>
+            <p><button onClick="authorize()">Authorize</button></p>
     
             <p><a href="/">Home</a></p>
             </body>

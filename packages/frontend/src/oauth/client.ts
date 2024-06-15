@@ -201,6 +201,19 @@ export class OAuthClient extends OAuthClientBase {
                 CrossauthLogger.logger.debug(j({err: err, msg: "Couldn't start auto refresh"}));
             });
         }
+
+        if (refreshToken && !accessToken) {
+            this.refreshTokenFlow(refreshToken)
+                .then(resp => {
+                    CrossauthLogger.logger.debug(j({msg: "Refreshed tokens"}));
+
+                })
+                .catch(err => {
+                    const ce = CrossauthError.asCrossauthError(err);
+                    CrossauthLogger.logger.debug(j({err: ce}));
+                    CrossauthLogger.logger.error(j({msg: "failed refreshing tokens", cerr: ce}));
+                })
+        }
         
     }
 
@@ -559,8 +572,15 @@ export class OAuthClient extends OAuthClientBase {
      * then saves the tokens, as per the requested method
      * @param scope 
      */
-    async refreshTokenFlow(refreshToken : string) : 
+    async refreshTokenFlow(refreshToken? : string) : 
         Promise<OAuthTokenResponse> {
+        if (!refreshToken) {
+            if (this.#refreshToken) {
+                refreshToken = this.#refreshToken;
+            } else {
+                throw new CrossauthError(ErrorCode.InvalidToken, "Cannot refresh tokens: no refresh token present");
+            }
+        }
         const resp = await super.refreshTokenFlow(refreshToken);
         await this.receiveTokens(resp);
         return resp;
