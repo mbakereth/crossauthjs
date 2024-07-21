@@ -38,12 +38,25 @@ export class SvelteKitServer {
         }
 
         this.hooks = async ({event, resolve}) => {
+            /*
             let response = await resolve(event);
+            console.log("resolve done")
             if (this.sessionServer) {
                 response = await(this.sessionServer.sessionHook({event}, response));
+                console.log("sessionHook done")
                 response = await(this.sessionServer.twoFAHook({event}, response));
             }
             return response;
+            */
+            if (this.sessionServer) {
+                const resp = await(this.sessionServer.sessionHook({event}));
+                let response = await resolve(event);;
+                this.sessionServer.setHeaders(resp.headers, response)
+                response = await(this.sessionServer.twoFAHook({event}, response));
+                return response;
+            }
+            return await resolve(event);
+
         }
     }
 

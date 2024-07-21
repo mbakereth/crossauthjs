@@ -30,7 +30,7 @@ export type { TokenEmailerOptions } from './emailtokens';
 // session management
 export { SessionManager } from './session';
 export type { SessionManagerOptions } from './session';
-export { SessionCookie, DoubleSubmitCsrfToken } from './cookieauth';
+export { SessionCookie, DoubleSubmitCsrfToken, toCookieSerializeOptions } from './cookieauth';
 export type { CookieOptions, Cookie, DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth';
 
 // API key management

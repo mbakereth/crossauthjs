@@ -13,13 +13,13 @@ export async function getTestUserStorage(pepper? : string|undefined) : Promise<I
                 factor1: "localpassword"}, {
                 password: await authenticator.createPasswordHash("bobPass123")
                 } ),
-                userStorage.createUser({
-                    username: "alice", 
-                    email: "alice@alice.com",
-                    state: "active",
-                    factor1: "localpassword"}, {
-                    password: await authenticator.createPasswordHash("alicePass123")
-                    } ),
+        userStorage.createUser({
+            username: "alice", 
+            email: "alice@alice.com",
+            state: "active",
+            factor1: "localpassword"}, {
+            password: await authenticator.createPasswordHash("alicePass123")
+            } ),
         ]);
     return userStorage;
 }

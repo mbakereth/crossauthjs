@@ -1,12 +1,19 @@
 import { KeyStorage, UserStorage, SessionManager, Authenticator, Crypto, DoubleSubmitCsrfToken, setParameter, ParamType } from '@crossauth/backend';
 import type { Cookie, SessionManagerOptions } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus } from '@crossauth/common';
-import type { Key, User } from '@crossauth/common';
+import type { Key, User, UserInputFields } from '@crossauth/common';
 import cookie from 'cookie';
 import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
+import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
+import type { LoginReturn, LogoutReturn } from './sveltekituserendpoints';
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
+
+type Header = {
+    name: string,
+    value: string
+};
 
 /*export const svelteSessionHook: Handle = async function ({ event, resolve }){
 	const response = await resolve(event);
@@ -15,34 +22,103 @@ export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 }*/
 
 export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
+
+    /**
+     * URL to call when factor2 authentication is required
+     */
+    factor2Url? : string,
+
+    /** Function that throws a {@link @crossauth/common!CrossauthError} 
+     *  with {@link @crossauth/common!ErrorCode} `FormEntry` if the user 
+     * doesn't confirm to local rules.  Doesn't validate passwords  */
+    validateUserFn? : (user: UserInputFields) => string[];
+
+    /** Function that creates a user from form fields.
+     * Default one takes fields that begin with `user_`, removing the `user_` 
+     * prefix and filtering out anything not in the userEditableFields list in 
+     * the user storage.
+         */
+    createUserFn?: (request: RequestEvent,
+        userEditableFields: string[]) => UserInputFields;
+
+    /** Function that updates a user from form fields.
+     * Default one takes fields that begin with `user_`, removing the `user_`
+     *  prefix and filtering out anything not in the userEditableFields list in 
+     * the user storage.
+         */
+    updateUserFn?: (user: User,
+        request: RequestEvent,
+        userEditableFields: string[]) => User;
+
+    /** Called when a new session token is going to be saved 
+     *  Add additional fields to your session storage here.  Return a map of 
+     * keys to values.  Don't consume form data.  
+     * Use {@link JsonOrFormData }, which takes a copy first. */
+    addToSession?: (request: RequestEvent, formData : {[key:string]:string}) => 
+        {[key: string] : string|number|boolean|Date|undefined};
+
     /** Called after the session ID is validated.
      * Use this to add additional checks based on the request.  
      * Throw an exception if cecks fail
      */
-    validateSession? : (session: Key, user: User|undefined, event : RequestEvent) => void;
+    validateSession?: (session: Key,
+        user: User | undefined,
+        request: RequestEvent) => void;
 
-    factor2ProtectedEndpoints?: string[],
+    /**
+     * These page endpoints need the second factor to be entered.  Visiting
+     * the page redirects the user to the factor2 page.
+     * 
+     * You probably want to do this for things like changing password.  The
+     * default is
+     *   `/requestpasswordreset`,
+     *   `/updateuser`,
+     *   `/changepassword`,
+     *   `/resetpassword`,
+     *   `/changefactor2`,
+     */
+    factor2ProtectedPageEndpoints?: string[],
 
-    prefix? : string,
-
+    /**
+     * These page endpoints need the second factor to be entered.  Making
+     * a call to these endpoints results in a response of 
+     * `{"ok": true, "factor2Required": true `}.  The user should then
+     * make a call to `/api/factor2`.   If the credetials are correct, the
+     * response will be that of the original request.
+     * 
+     * You probably want to do this for things like changing password.  The
+     * default is
+     *   `/api/requestpasswordreset`,
+     *   `/api/updateuser`,
+     *   `/api/changepassword`,
+     *   `/api/resetpassword`,
+     *   `/api/changefactor2`,
+     */
+    factor2ProtectedApiEndpoints?: string[],    
 }
 
 export class SvelteKitSessionServer {
-    sessionHook : (input: {event: RequestEvent}, response: Response) => MaybePromise<Response>;
+    sessionHook : (input: {event: RequestEvent}, 
+        //response: Response
+    ) => /*MaybePromise<Response>*/ MaybePromise<{headers: Header[]}>;
     twoFAHook : (input: {event: RequestEvent}, response: Response) => MaybePromise<Response>;
     keyStorage : KeyStorage;
     sessionManager : SessionManager;
     userStorage : UserStorage;
     authenticators: {[key:string]: Authenticator};
     private validateSession? : (session: Key, user: User|undefined, event : RequestEvent) => void;
-    private factor2ProtectedEndpoints : string[] = [
+    private factor2ProtectedPageEndpoints : string[] = [
         "/requestpasswordreset",
         "/updateuser",
         "/changepassword",
         "/resetpassword",
         "/changefactor2",
     ]
-    private prefix : string = "/";
+    private factor2ProtectedApiEndpoints : string[] = []
+
+    private factor2Url : string = "/factor2";
+
+    private userEndpoints : SvelteKitUserEndpoints;
 
     constructor(userStorage : UserStorage, keyStorage : KeyStorage, authenticators : {[key:string]: Authenticator}, options : SvelteKitSessionServerOptions = {}) {
 
@@ -51,13 +127,18 @@ export class SvelteKitSessionServer {
         this.authenticators = authenticators
         this.sessionManager = new SessionManager(userStorage, keyStorage, authenticators, options);
 
-        setParameter("prefix", ParamType.String, this, options, "PREFIX");
-        if (!this.prefix.endsWith("/")) this.prefix += "/";
-        setParameter("factor2ProtectedEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_ENDPOINTS");
+        setParameter("factor2Url", ParamType.String, this, options, "FACTOR2_URK");
+        if (!this.factor2Url.endsWith("/")) this.factor2Url += "/";
+        setParameter("factor2ProtectedPageEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_PAGE_ENDPOINTS");
+        setParameter("factor2ProtectedApiEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
 
         if (options.validateSession) this.validateSession = options.validateSession;
 
-        this.sessionHook = async ({ event}, response) => {
+        this.userEndpoints = new SvelteKitUserEndpoints(this, options);
+
+        this.sessionHook = async ({ event}/*, response*/) => {
+
+            let headers : Header[] = [];
 
             const csrfCookieName = this.sessionManager.csrfCookieName;
             const sessionCookieName = this.sessionManager.sessionCookieName;
@@ -77,7 +158,7 @@ export class SvelteKitSessionServer {
             catch (e) {
                 CrossauthLogger.logger.warn(j({msg: "Invalid csrf cookie received", cerr: e, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
                 try {
-                    this.clearCookie(csrfCookieName, response);
+                    this.clearCookie(csrfCookieName, headers);
                 } catch (e2) {
                     CrossauthLogger.logger.debug(j({err: e2}));
                     CrossauthLogger.logger.error(j({cerr: e2, msg: "Couldn't delete CSRF cookie", ip: event.request.referrerPolicy, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
@@ -92,25 +173,26 @@ export class SvelteKitSessionServer {
                     if (!cookieValue) {
                         CrossauthLogger.logger.debug(j({msg: "Invalid CSRF cookie - recreating"}));
                         const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createCsrfToken();
-                        this.setCsrfCookie(csrfCookie, response );
+                        this.setCsrfCookie(csrfCookie, headers );
                         event.locals.csrfToken = csrfFormOrHeaderValue;
                     } else {
                         CrossauthLogger.logger.debug(j({msg: "Valid CSRF cookie - creating token"}));
                         const csrfFormOrHeaderValue = await this.sessionManager.createCsrfFormOrHeaderValue(cookieValue);
                         event.locals.csrfToken = csrfFormOrHeaderValue;
                     }
-                    response.headers.set(CSRFHEADER, event.locals.csrfToken);
+                    this.setHeader(CSRFHEADER, event.locals.csrfToken, headers);
+                    //response.headers.set(CSRFHEADER, event.locals.csrfToken);
                 } catch (e) {
                     CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                     CrossauthLogger.logger.debug(j({err: e}));
-                    this.clearCookie(csrfCookieName, response);
+                    this.clearCookie(csrfCookieName, headers);
                     event.locals.csrfToken = undefined;
                 }
             } else {
                 // for other methods, create a new token only if there is already a valid one
                 if (cookieValue) {
                     try {
-                        await this.csrfToken(event, response);
+                        await this.csrfToken(event, headers);
                     } catch (e) {
                         CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                         CrossauthLogger.logger.debug(j({err: e}));
@@ -130,21 +212,24 @@ export class SvelteKitSessionServer {
                     let {key, user} = await this.sessionManager.userForSessionId(sessionId)
                     if (this.validateSession) this.validateSession(key, user, event);
     
+                    event.locals.sessionId = sessionId;
                     event.locals.user = user;
                     CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(event)}));
-                    this.clearCookie(sessionCookieName, response);
+                    this.clearCookie(sessionCookieName, headers);
                 }
             }
 
-            return response;
+            //return response;
+            return {headers};
         }
 
         this.twoFAHook = async ({ event }, response) => {
 
             const sessionCookieValue = this.getSessionCookieValue(event);
-            if (sessionCookieValue && event.locals.user?.factor2 && (this.factor2ProtectedEndpoints.includes(event.request.url))) {
+            if (sessionCookieValue && event.locals.user?.factor2 && (
+                this.factor2ProtectedApiEndpoints.includes(event.request.url) || this.factor2ProtectedApiEndpoints.includes(event.request.url))) {
                 if (!(["GET", "OPTIONS", "HEAD"].includes(event.request.method))) {
                     const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                     const sessionData = await this.sessionManager.dataForSessionId(sessionId);
@@ -194,11 +279,17 @@ export class SvelteKitSessionServer {
                                     errorCodeName: ErrorCode[error.code],
                                 });
                             } else {
-                                if (this.factor2ProtectedEndpoints.includes(event.request.url)) {
-                                    return new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.prefix+"factor2?error="+ErrorCode[error.code] }});
+                                if (this.factor2ProtectedPageEndpoints.includes(event.request.url)) {
+                                    return new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.factor2Url+"?error="+ErrorCode[error.code] }});
 
                                 } else {
-                                    return new Response(JSON.stringify({ok: false, errorMessage: error.message, errorMessages: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}), {
+                                    return new Response(JSON.stringify({
+                                        ok: false,
+                                        errorMessage: error.message,
+                                        errorMessages: error.messages,
+                                        errorCode: error.code,
+                                        errorCodeName: ErrorCode[error.code]
+                                    }), {
                                         status: error.httpStatus,
                                         statusText : httpStatus(error.httpStatus),
                                         headers: {
@@ -227,10 +318,12 @@ export class SvelteKitSessionServer {
                         const bodyData = new JsonOrFormData();
                         bodyData.loadData(event);
                         this.sessionManager.initiateTwoFactorPageVisit(event.locals.user, sessionCookieValue, bodyData.toObject(), event.request.url.replace(/\?.*$/,""));
-                        if (this.factor2ProtectedEndpoints.includes(event.request.url)) {
-                            return new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.prefix+"factor2" }});
+                        if (this.factor2ProtectedPageEndpoints.includes(event.request.url)) {
+                            return new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.factor2Url }});
                         } else {
-                            return new Response(JSON.stringify({ok: true, factor2Required: true}), {
+                            return new Response(JSON.stringify({
+                                ok: true,
+                                factor2Required: true}), {
                                 headers: {
                                     ...response.headers,
                                     ...{'content-tyoe': 'application/json'},
@@ -264,7 +357,8 @@ export class SvelteKitSessionServer {
     // Helpers
 
     getSessionCookieValue(event : RequestEvent) : string|undefined{
-        if (event.cookies && this.sessionManager.sessionCookieName in event.cookies) {       
+        //let allCookies = event.cookies.getAll();
+        if (event.cookies && event.cookies.get(this.sessionManager.sessionCookieName)) {       
             return event.cookies.get(this.sessionManager.sessionCookieName);
         }
         return undefined;
@@ -279,12 +373,22 @@ export class SvelteKitSessionServer {
         return undefined;
     }
 
-    clearCookie(name : string, resp : Response) {
+    clearCookie(name : string, headers: Header[]) {
         //const cookies = resp.headers.getSetCookie()
-        resp.headers.append('set-cookie', cookie.serialize(name, "", {expires: new Date(Date.now()-3600)}));
+        headers.push({
+            name: "set-cookie",
+            value: cookie.serialize(name, "", {expires: new Date(Date.now()-3600)}),
+        });
+        //resp.headers.append('set-cookie', cookie.serialize(name, "", {expires: new Date(Date.now()-3600)}));
     } 
 
-    setCsrfCookie(cookie : Cookie, resp : Response) {
+    setHeaders(headers: Header[], resp: Response) {
+        for (let header of headers) {
+            resp.headers.append(header.name, header.value);
+        }
+    } 
+
+    setCsrfCookie(cookie : Cookie, headers: Header[]) {
         const csrfCookie = new DoubleSubmitCsrfToken({
             cookieName : cookie.name,
             domain: cookie.options.domain,
@@ -293,7 +397,18 @@ export class SvelteKitSessionServer {
             secure: cookie.options.secure,
             sameSite: cookie.options.sameSite
         });
-        resp.headers.append('set-cookie', csrfCookie.makeCsrfCookieString(cookie.value));
+        headers.push({
+            name: "set-cookie",
+            value: csrfCookie.makeCsrfCookieString(cookie.value)
+        });
+        //resp.headers.append('set-cookie', csrfCookie.makeCsrfCookieString(cookie.value));
+    }
+
+    setHeader(name: string, value: string, headers: Header[]) {
+        headers.push({
+            name: name,
+            value: value,
+        });
     }
 
     getHashOfSessionCookie(event : RequestEvent) : string {
@@ -314,7 +429,7 @@ export class SvelteKitSessionServer {
         return "";
     }
 
-    async csrfToken(event : RequestEvent, resp : Response) {
+    async csrfToken(event : RequestEvent, headers : Header[]) {
         let token : string|undefined = undefined;
 
         // first try token in header
@@ -344,11 +459,12 @@ export class SvelteKitSessionServer {
             try {
                 this.sessionManager.validateDoubleSubmitCsrfToken(this.getCsrfCookieValue(event), token);
                 event.locals.csrfToken = token;
-                resp.headers.set(CSRFHEADER, token);
+                //resp.headers.set(CSRFHEADER, token);
+                this.setHeader(CSRFHEADER, token, headers)
             }
             catch (e) {
                 CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token", hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
-                this.clearCookie(this.sessionManager.csrfCookieName, resp);
+                this.clearCookie(this.sessionManager.csrfCookieName, headers);
                 event.locals.csrfToken = undefined;
             }
         } else {
@@ -379,4 +495,47 @@ export class SvelteKitSessionServer {
         })
     }
 
+    /**
+     * Returns a hash of the session ID.  Used for logging (for security,
+     * the actual session ID is not logged)
+     * @param request the Fastify request
+     * @returns hash of the session ID
+     */
+    getHashOfSessionId(event : RequestEvent) : string {
+        if (!event.locals.sessionId) return "";
+        try {
+            return Crypto.hash(event.locals.sessionId);
+        } catch (e) {}
+        return "";
+    }
+
+    /////////////////////////////////////////////////////////////
+    // User Endpoints
+
+    /**
+     * Log a user in if possible.  
+     * 
+     * Form data is returned unless there was
+     * an error extrafting it.  User is returned if log in was successful.
+     * Error messge and exception are returned if not successful.
+     * 
+     * @param event the Sveltekit event
+     * @returns user, form data, error message and exception (see above)
+     */
+    async login(event : RequestEvent) : Promise<LoginReturn> {
+        return this.userEndpoints.login(event);
+    }
+
+    /**
+     * Log a user out.  
+     * 
+     * Deletes the session if the user was logged in and clears session
+     * and CSRF cookies
+     * 
+     * @param event the Sveltekit event
+     * @returns success of true or false and error message if not successful
+     */
+    async logout(event : RequestEvent) : Promise<LogoutReturn> {
+        return this.userEndpoints.logout(event);
+    }
 }

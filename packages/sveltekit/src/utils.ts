@@ -1,4 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
+import { CrossauthError, ErrorCode } from '@crossauth/common';
 
 export class ObjectIterator implements IterableIterator<[string, string]> {
     values : string[] = [];
@@ -51,7 +52,10 @@ export class KeyIterator implements IterableIterator<string> {
 export class JsonOrFormData {
     private formData : FormData|undefined;
     private jsonData : {[key:string] : string}|undefined;
-    constructor() {}
+    private clone : boolean;
+    constructor(clone = true) {
+        this.clone = clone;
+    }
     
     async loadData(event : RequestEvent) {
         if (!event.request?.body) {
@@ -59,9 +63,11 @@ export class JsonOrFormData {
         }
         const contentType = event.request.headers.get("content-type")
         if (contentType == "application/json") {
-            this.jsonData = await event.request?.clone()?.json();
+            this.jsonData = this.clone ? await event.request?.clone()?.json() :
+                await event.request?.json();
         } else if (contentType == "application/x-www-form-urlencoded" || contentType == "multipart/form-data") {
-            this.formData = await event.request.clone().formData();
+            this.formData = this.clone ? await event.request.clone().formData() :
+                await event.request.formData();
         }
 
     }
@@ -74,6 +80,27 @@ export class JsonOrFormData {
         }
         return undefined;
     } 
+
+    getAsString(param : string) : string|undefined {
+        return this.get(param);
+    }
+
+    getAsBoolean(param : string) : boolean|undefined {
+        const val = this.get(param);
+        if (val == undefined) return undefined;
+        const l = val.toLowerCase();
+        return l == "t" || l == "true" || l == "1" || l == "y" || l == "yes";
+    }
+
+    getAsNumber(param : string) : number|undefined {
+        const val = this.get(param);
+        if (val == undefined) return undefined;
+        try {
+            return Number(val);
+        } catch (e) {
+            throw new CrossauthError(ErrorCode.FormEntry, "Value for " + param + " is not a number");
+        }
+    }
 
     has(param : string) : boolean {
         return ((this.jsonData && param in this.jsonData)

@@ -1,43 +1,11 @@
-import { MockRequestEvent, MockResolver } from './sveltemocks';
+import { MockRequestEvent } from './sveltemocks';
 import { JsonOrFormData } from '../utils';
-import { SvelteKitServer } from '../sveltekitserver';
 import { SvelteKitSessionServer } from '../sveltekitsession';
-import { InMemoryKeyStorage, InMemoryUserStorage, LocalPasswordAuthenticator } from '@crossauth/backend';
 import { test, expect } from 'vitest';
+import { createSession, makeServer, getCookies } from './testshared';
 
-function makeServer() {
-    const keyStorage = new InMemoryKeyStorage();
-    const userStorage = new InMemoryUserStorage();
-    const authenticator = new LocalPasswordAuthenticator(userStorage);
-
-    const server = new SvelteKitServer(userStorage, {
-        authenticators: {
-            password: authenticator
-        },
-        session: {
-            keyStorage: keyStorage,
-            
-        }}, {secret: "ABCDEFG"});   
-    const handle = server.hooks;
-    const resolver = new MockResolver("Response");
-
-    return {server, resolver, handle, keyStorage, userStorage, authenticator};
-}
-function getCookies(resp : Response) {
-    const cookieHeaders = resp.headers.getSetCookie();
-    let cookies : {[key:string]:string} = {};
-    for (let cookie of cookieHeaders) {
-        const parts = cookie.split("=", 2);
-        const semiColon = parts[1].indexOf(";");
-        if (semiColon > -1) {
-            const value = parts[1].substring(0, semiColon).trim();
-            if (value.length > 0) cookies[parts[0]] = value;
-        }
-    }
-    return cookies;
-}
 test('SvelteSessionHooks.hookWithGetNotLoggedIn', async () => {
-    const { server, resolver, handle } = makeServer();
+    const { server, resolver, handle } = await makeServer();
 
     const getRequest = new Request("http://ex.com/test", {method: "GET"});
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
@@ -67,7 +35,7 @@ test('SvelteSessionHooks.hookWithGetNotLoggedIn', async () => {
 });
 
 test('SvelteSessionHooks.hookWithPostNotLoggedIn', async () => {
-    const { resolver, handle } = makeServer();
+    const { resolver, handle } = await makeServer();
 
     const postRequest = new Request("http://ex.com/test", {method: "POST", body: "This is the body"});
     let event = new MockRequestEvent("1", postRequest, {"param1": "value1"});
@@ -78,7 +46,7 @@ test('SvelteSessionHooks.hookWithPostNotLoggedIn', async () => {
 });
 
 test('SvelteMocks.hookGetThenPost', async () => {
-    const { server, resolver, handle } = makeServer();
+    const { server, resolver, handle } = await makeServer();
 
     const getRequest = new Request("http://ex.com/test", {method: "GET"});
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
@@ -184,3 +152,40 @@ test('SvelteSessionHooks.cloneFormResponse', async () => {
     expect(newBody.get("param1")).toBeNull();
     expect(newResponse.headers.get('content-type')).toBe("application/x-www-form-urlencoded");
 });
+
+test('SvelteSessionHooks.hookWithGetIsLoggedIn', async () => {
+    const { server, resolver, handle, userStorage, keyStorage } = await makeServer();
+    const sessionKey = await createSession("bob", userStorage, keyStorage);
+
+    const getRequest = new Request("http://ex.com/test", {
+        method: "GET", headers: { 
+            "cookie": sessionKey.cookie.name + "=" + sessionKey.cookie.value,
+    }});
+    let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
+
+    const resp = await handle({event: event, resolve: resolver.mockResolve});
+    /*const cookieNames = resp.headers.getSetCookie().map((el) => el.split("=")[0]);
+    expect(cookieNames.length).toBe(2);
+    expect(["TESTCOOKIE", "CSRFTOKEN"]).toContain(cookieNames[0]);*/
+    const cookies = getCookies(resp);
+    expect(cookies["CSRFTOKEN"]).toBeDefined();
+    let csrfValid = false;
+    try {
+        server.sessionServer?.sessionManager.validateCsrfCookie(cookies["CSRFTOKEN"]);
+        csrfValid = true;
+    } catch (e) {
+        console.log(e);
+    }
+    expect(csrfValid).toBe(true);
+    expect(event.locals.csrfToken).toBeDefined();
+    expect(event.locals.user).toBeDefined();
+    expect(event.locals.user?.username).toBe("bob");
+
+    csrfValid = false;
+    try {
+        server.sessionServer?.sessionManager.validateDoubleSubmitCsrfToken(cookies["CSRFTOKEN"], event.locals.csrfToken);
+    } catch (e) {
+        console.log(e);
+    }
+});
+

@@ -24,7 +24,7 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
     idColumn? : string,
 
     /** The prisma client instanfce.  Leave this out to have Crossauth create a default one */
-    prismaClient? : PrismaClient,
+    prismaClient? : any; // PrismaClient,
 
     includes? : string[];
 
@@ -387,7 +387,7 @@ export class PrismaUserStorage extends UserStorage {
  */
 export interface PrismaKeyStorageOptions {
     keyTable? : string,
-    prismaClient? : PrismaClient,
+    prismaClient? : any; // PrismaClient,
     transactionTimeout? : number,
 }
 

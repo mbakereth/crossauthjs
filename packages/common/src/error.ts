@@ -347,7 +347,7 @@ export class CrossauthError extends Error {
      * @param e the error to convert.
      * @returns  a `CrossauthError` instance.
      */
-    static asCrossauthError(e: any) : CrossauthError { 
+    static asCrossauthError(e: any, defaultMessage? : string) : CrossauthError { 
         if (e instanceof Error) {
             if ("isCrossauthError" in e) {
                 return e as CrossauthError;
@@ -358,11 +358,14 @@ export class CrossauthError extends Error {
             try {
                 errorCode = Number(e["errorCode"]) ?? ErrorCode.UnknownError;
             } catch {}
-            const errorMessage = "errorMessage" in e ? 
-                e["errorMessage"] : ErrorCode[errorCode];
+            let errorMessage = defaultMessage ?? ErrorCode[errorCode];
+            if ("errorMessage" in e) errorMessage = e["errorMessage"];
+            else if ("message" in e) errorMessage = e["message"];
             return new CrossauthError(errorCode, errorMessage);
         }
-        return new CrossauthError(ErrorCode.UnknownError);
+        let errorMessage = defaultMessage ?? ErrorCode[ErrorCode.UnknownError];
+        if ("message" in e) errorMessage = e["message"];
+        return new CrossauthError(ErrorCode.UnknownError, errorMessage);
     }
 }
 

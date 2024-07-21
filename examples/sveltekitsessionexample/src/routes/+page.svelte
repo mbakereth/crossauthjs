@@ -1,5 +1,34 @@
+<script>
+    import { goto } from '$app/navigation';
+
+    export let data;
+
+    function loginPage() {
+        goto("/login");
+    }
+    function logoutPage() {
+        goto("/logout");
+    }
+    function signupPage() {
+        goto("/signup");
+    }
+</script>
+
+<svelte:head>
+    <title>Sveltekit Example</title>
+</svelte:head>
 <h1>Sveltekit Session Management Example</h1>
 
-<p>This is a paragraph</p>
-
-<p><button class="btn btn-primary">Button</button></p>
+{#if data.user} 
+    <p>Logged in as {data.user.username}</p>
+    <form method="POST" action="logout">
+        <button class="btn btn-primary" on:click={logoutPage}>Logout</button>
+    </form>
+{:else}
+    <p>Not logged in</p>
+    <p>
+        <button class="btn btn-primary" on:click={loginPage}>Login</button>
+        &nbsp;
+        <button class="btn btn-secondary" on:click={signupPage}>Signup</button>
+    </p>
+{/if}

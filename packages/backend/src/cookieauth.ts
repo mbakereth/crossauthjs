@@ -6,6 +6,7 @@ import { type TokenEmailerOptions } from './emailtokens.ts';
 import { Crypto } from './crypto.ts';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from './utils.ts';
+import { CookieSerializeOptions } from 'cookie';
 
 const CSRF_LENGTH = 16;
 const SESSIONID_LENGTH = 16;
@@ -24,6 +25,14 @@ export interface CookieOptions {
     path? : string,
     secure? : boolean,
     sameSite? : boolean | "lax" | "strict" | "none" | undefined,
+}
+
+export function toCookieSerializeOptions(options : CookieOptions) : CookieSerializeOptions & { path: string; } {
+
+    return {
+        ...options,
+        path: options.path ?? "/"
+    }
 }
 
 /**
