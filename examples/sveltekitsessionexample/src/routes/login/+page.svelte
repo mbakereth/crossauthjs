@@ -20,7 +20,7 @@
     <input type="hidden" name="csrfToken" value={data.csrfToken} />
     <input type="hidden" name="next" value={data.next ?? "/"} />
     {#if form?.error} 
-        <p class="bg-error p-2 rounded ">Error: {form?.error}</p>
+        <p class="bg-error p-2 rounded text-slate-900">Error: {form?.error}</p>
     {/if}
     <input type="username" id="username" name="username" class="input input-bordered w-full max-w-xs mb-4" placeholder="Username" value={form?.formData?.username ?? ''}/><br>
 

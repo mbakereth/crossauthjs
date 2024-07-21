@@ -1,34 +1,6 @@
 import { MockRequestEvent } from './sveltemocks';
-import { SvelteKitServer } from '../sveltekitserver';
-import type { MockResolver } from './sveltemocks';
 import { test, expect } from 'vitest';
-import {  makeServer, getCookies } from './testshared';
-import type { Handle } from '@sveltejs/kit';
-
-async function getCsrfToken(server : SvelteKitServer, resolver : MockResolver, handle : Handle ) {
-    const getRequest = new Request("http://ex.com/test", {method: "GET"});
-    let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
-
-    const resp = await handle({event: event, resolve: resolver.mockResolve});
-    /*const cookieNames = resp.headers.getSetCookie().map((el) => el.split("=")[0]);
-    expect(cookieNames.length).toBe(2);
-    expect(["TESTCOOKIE", "CSRFTOKEN"]).toContain(cookieNames[0]);*/
-    const cookies = getCookies(resp);
-    expect(cookies["CSRFTOKEN"]).toBeDefined();
-    let csrfValid = false;
-    try {
-        server.sessionServer?.sessionManager.validateCsrfCookie(cookies["CSRFTOKEN"]);
-        csrfValid = true;
-    } catch (e) {
-        console.log(e);
-    }
-    expect(csrfValid).toBe(true);
-    expect(event.locals.csrfToken).toBeDefined();
-    return {
-        csrfToken: event.locals.csrfToken,
-        csrfCookieValue: cookies["CSRFTOKEN"]
-    };
-}
+import {  makeServer, getCsrfToken } from './testshared';
 
 test('SvelteKitUserEndpoints.login', async () => {
     const { server, resolver, handle } = await makeServer();

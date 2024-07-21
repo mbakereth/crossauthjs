@@ -28,6 +28,13 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      */
     factor2Url? : string,
 
+    /**
+     * URL to call when login is requored.  
+     * 
+     * Default "/"
+     */
+    loginUrl? : string,
+
     /** Function that throws a {@link @crossauth/common!CrossauthError} 
      *  with {@link @crossauth/common!ErrorCode} `FormEntry` if the user 
      * doesn't confirm to local rules.  Doesn't validate passwords  */
@@ -95,13 +102,31 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      *   `/api/changefactor2`,
      */
     factor2ProtectedApiEndpoints?: string[],    
+
+    /**
+     * These page endpoints need the the user to be logged in.  If not,
+     * the user is directed to the login page.
+     * 
+     * The default is empty
+     * 
+     */
+    loginProtectedPageEndpoints?: string[],
+
+    /**
+     * These page endpoints need the the user to be logged in.  If not,
+     * the user is is sent an unauthorized response
+     * 
+     * The default is empty
+     */
+    loginProtectedApiEndpoints?: string[],    
+    
 }
 
 export class SvelteKitSessionServer {
     sessionHook : (input: {event: RequestEvent}, 
         //response: Response
     ) => /*MaybePromise<Response>*/ MaybePromise<{headers: Header[]}>;
-    twoFAHook : (input: {event: RequestEvent}, response: Response) => MaybePromise<Response>;
+    twoFAHook : (input: {event: RequestEvent}, response: Response) => MaybePromise<{twofa: boolean, response: Response}>;
     keyStorage : KeyStorage;
     sessionManager : SessionManager;
     userStorage : UserStorage;
@@ -114,7 +139,9 @@ export class SvelteKitSessionServer {
         "/resetpassword",
         "/changefactor2",
     ]
-    private factor2ProtectedApiEndpoints : string[] = []
+    private factor2ProtectedApiEndpoints : string[] = [];
+    private loginProtectedPageEndpoints : string[] = [];
+    private loginProtectedApiEndpoints : string[] = [];
 
     private factor2Url : string = "/factor2";
 
@@ -131,6 +158,8 @@ export class SvelteKitSessionServer {
         if (!this.factor2Url.endsWith("/")) this.factor2Url += "/";
         setParameter("factor2ProtectedPageEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_PAGE_ENDPOINTS");
         setParameter("factor2ProtectedApiEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
+        setParameter("loginProtectedPageEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_PAGE_ENDPOINTS");
+        setParameter("loginProtectedApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_API_ENDPOINTS");
 
         if (options.validateSession) this.validateSession = options.validateSession;
 
@@ -280,10 +309,10 @@ export class SvelteKitSessionServer {
                                 });
                             } else {
                                 if (this.factor2ProtectedPageEndpoints.includes(event.request.url)) {
-                                    return new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.factor2Url+"?error="+ErrorCode[error.code] }});
+                                    return {twofa: true, response: new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.factor2Url+"?error="+ErrorCode[error.code] }})};
 
                                 } else {
-                                    return new Response(JSON.stringify({
+                                    return {twofa: true, response: new Response(JSON.stringify({
                                         ok: false,
                                         errorMessage: error.message,
                                         errorMessages: error.messages,
@@ -296,7 +325,7 @@ export class SvelteKitSessionServer {
                                             ...response.headers,
                                             ...{'content-tyoe': 'application/json'},
                                         }
-                                    });
+                                    })};
                                 }
                             }
                         }
@@ -304,14 +333,14 @@ export class SvelteKitSessionServer {
                         // 2FA has not started - start it
                         if (!event.locals.csrfToken) {
                             const error = new CrossauthError(ErrorCode.Forbidden, "CSRF token missing");
-                            return new Response(JSON.stringify({ok: false, errorMessage: error.message, errorMessages: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}), {
+                            return {twofa: true, response: new Response(JSON.stringify({ok: false, errorMessage: error.message, errorMessages: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}), {
                                 status: error.httpStatus,
                                 statusText : httpStatus(error.httpStatus),
                                 headers: {
                                     ...response.headers,
                                     ...{'content-tyoe': 'application/json'},
                                 }
-                            });
+                            })};
         
                         }
                         CrossauthLogger.logger.debug("Starting 2FA");
@@ -319,16 +348,16 @@ export class SvelteKitSessionServer {
                         bodyData.loadData(event);
                         this.sessionManager.initiateTwoFactorPageVisit(event.locals.user, sessionCookieValue, bodyData.toObject(), event.request.url.replace(/\?.*$/,""));
                         if (this.factor2ProtectedPageEndpoints.includes(event.request.url)) {
-                            return new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.factor2Url }});
+                            return {twofa: true, response: new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.factor2Url }})};
                         } else {
-                            return new Response(JSON.stringify({
+                            return {twofa: true, response: new Response(JSON.stringify({
                                 ok: true,
                                 factor2Required: true}), {
                                 headers: {
                                     ...response.headers,
                                     ...{'content-tyoe': 'application/json'},
                                 }
-                            });
+                            })};
                         }
                     }
                 } else {
@@ -349,7 +378,7 @@ export class SvelteKitSessionServer {
                     }
                 }
             } 
-            return response;
+            return {twofa: false, response};
         }
     }
 
@@ -507,6 +536,19 @@ export class SvelteKitSessionServer {
             return Crypto.hash(event.locals.sessionId);
         } catch (e) {}
         return "";
+    }
+
+    /////////////////////////////////////////////////////////////
+    // login protected URLs
+
+    isLoginPageProtected(event : RequestEvent) : boolean {
+        const url = new URL(event.request.url);
+        return (this.loginProtectedPageEndpoints.includes(url.pathname));
+    }
+ 
+    isLoginApiProtected(event : RequestEvent) : boolean {
+        const url = new URL(event.request.url);
+        return (this.loginProtectedApiEndpoints.includes(url.pathname));
     }
 
     /////////////////////////////////////////////////////////////

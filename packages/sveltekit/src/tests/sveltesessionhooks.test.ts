@@ -2,7 +2,7 @@ import { MockRequestEvent } from './sveltemocks';
 import { JsonOrFormData } from '../utils';
 import { SvelteKitSessionServer } from '../sveltekitsession';
 import { test, expect } from 'vitest';
-import { createSession, makeServer, getCookies } from './testshared';
+import { createSession, makeServer, getCookies, login } from './testshared';
 
 test('SvelteSessionHooks.hookWithGetNotLoggedIn', async () => {
     const { server, resolver, handle } = await makeServer();
@@ -189,3 +189,22 @@ test('SvelteSessionHooks.hookWithGetIsLoggedIn', async () => {
     }
 });
 
+test('SvelteSessionHooks.loginProtectedNotLoggedIn', async () => {
+    const { server, resolver, handle } = await makeServer();
+
+    let getRequest = new Request("http://ex.com/account", {method: "GET"});
+    let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
+
+    let resp = await handle({event: event, resolve: resolver.mockResolve});
+    expect(resp.status).toBe(302);
+    expect(resp.headers.get('location')).toBe("/");
+
+    // log in
+    let loginEvent = await login(server, resolver, handle);
+
+    // try again now that we are logged in
+    event.request = getRequest;
+    resp = await handle({event: loginEvent, resolve: resolver.mockResolve});
+    expect(resp.status).toBe(200);
+
+});

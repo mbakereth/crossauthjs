@@ -17,9 +17,9 @@
 <h1>Login</h1>
 
 {#if form?.error} 
-    <p class="bg-error p-2 rounded ">Error: {form?.error}</p>
+    <p class="bg-error p-2 rounded text-slate-900">Error: {form?.error}</p>
 {:else}
-<p class="bg-success p-2 rounded ">You have been logged out</p>
+<p class="bg-success p-2 rounded text-slate-900">You have been logged out</p>
 {/if}
 
 <p><a href="/">Home</a></p>
