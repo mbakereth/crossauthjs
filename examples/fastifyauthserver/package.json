@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.ts",
   "scripts": {
-    "build": "pnp exec tsc",
+    "build": "pnpm exec tsc",
     "start": "node dist/index.js",
     "dev": "NODE_PATH=`pwd`/node_modules dotenv -e .env.dev pnpm exec tsx src/index.ts",
     "preinstall": "bash ../../removeprismaclient.sh",

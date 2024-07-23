@@ -11,9 +11,6 @@ test('SvelteSessionHooks.hookWithGetNotLoggedIn', async () => {
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
 
     const resp = await handle({event: event, resolve: resolver.mockResolve});
-    /*const cookieNames = resp.headers.getSetCookie().map((el) => el.split("=")[0]);
-    expect(cookieNames.length).toBe(2);
-    expect(["TESTCOOKIE", "CSRFTOKEN"]).toContain(cookieNames[0]);*/
     const cookies = getCookies(resp);
     expect(cookies["CSRFTOKEN"]).toBeDefined();
     let csrfValid = false;
@@ -164,9 +161,6 @@ test('SvelteSessionHooks.hookWithGetIsLoggedIn', async () => {
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
 
     const resp = await handle({event: event, resolve: resolver.mockResolve});
-    /*const cookieNames = resp.headers.getSetCookie().map((el) => el.split("=")[0]);
-    expect(cookieNames.length).toBe(2);
-    expect(["TESTCOOKIE", "CSRFTOKEN"]).toContain(cookieNames[0]);*/
     const cookies = getCookies(resp);
     expect(cookies["CSRFTOKEN"]).toBeDefined();
     let csrfValid = false;

@@ -2,7 +2,7 @@
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
 	/** @type {import('./$types').PageData} */
-    export let data;
+    //export let data;
 	/** @type {import('./$types').ActionData} */
 	export let form;
     /*onMount(() => {

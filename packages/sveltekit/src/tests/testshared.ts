@@ -68,6 +68,8 @@ export function getCookies(resp : Response) {
         if (semiColon > -1) {
             const value = parts[1].substring(0, semiColon).trim();
             if (value.length > 0) cookies[parts[0]] = value;
+        } else {
+            cookies[parts[0]] = parts[1];
         }
     }
     return cookies;

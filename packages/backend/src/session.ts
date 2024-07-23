@@ -127,10 +127,24 @@ export class SessionManager {
     }
 
     /**
+     * Returns the name used for session ID cookies.
+     */
+        get sessionCookiePath() : string {
+            return this.session.path;
+        }
+    
+    /**
      * Returns the name used for CSRF token cookies.
      */
     get csrfCookieName() : string {
         return this.csrfTokens.cookieName;
+    }
+
+    /**
+     * Returns the name used for CSRF token cookies.
+     */
+    get csrfCookiePath() : string {
+        return this.csrfTokens.path;
     }
 
     /**

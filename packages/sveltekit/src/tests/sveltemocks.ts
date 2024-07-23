@@ -123,10 +123,20 @@ export class MockResolver {
     constructor(body : string|undefined, status=200, statusText = "OK") {
         this.body = body;
         this.status = status;
-        this.statusText = statusText;
+        this.statusText = statusText;        
         this.mockResolve = (event : MockRequestEvent, _opts?: ResolveOptions)  => {
+            let headers : [string,string][] = [];
+            for (let header in event.headers) {
+                headers.push([header, event.headers[header]]);
+            }
+            let cookies = event.cookies.getAll();
+            if (cookies && cookies.length > 0) {
+                for (let cookie of cookies) {
+                    headers.push(["set-cookie", cookie.name + "=" + cookie.value]);
+                }
+            }
             return new Response(this.body, {
-                headers: event.headers,
+                headers: headers,
                 status: this.status??200,
                 statusText: this.statusText??"OK",
             });

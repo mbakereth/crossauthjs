@@ -1,4 +1,13 @@
-import { KeyStorage, UserStorage, SessionManager, Authenticator, Crypto, DoubleSubmitCsrfToken, setParameter, ParamType } from '@crossauth/backend';
+import {
+    KeyStorage,
+    UserStorage,
+    SessionManager,
+    Authenticator,
+    Crypto,
+    DoubleSubmitCsrfToken,
+    setParameter,
+    ParamType,
+    toCookieSerializeOptions } from '@crossauth/backend';
 import type { Cookie, SessionManagerOptions } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus } from '@crossauth/common';
 import type { Key, User, UserInputFields } from '@crossauth/common';
@@ -6,7 +15,8 @@ import cookie from 'cookie';
 import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
-import type { LoginReturn, LogoutReturn } from './sveltekituserendpoints';
+import type { LoginReturn, LogoutReturn, SignupReturn } from './sveltekituserendpoints';
+import { SvelteKitServer } from './sveltekitserver'
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 
@@ -45,7 +55,8 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * prefix and filtering out anything not in the userEditableFields list in 
      * the user storage.
          */
-    createUserFn?: (request: RequestEvent,
+    createUserFn?: (event: RequestEvent,
+        data : {[key:string]:string|undefined},
         userEditableFields: string[]) => UserInputFields;
 
     /** Function that updates a user from form fields.
@@ -54,14 +65,15 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * the user storage.
          */
     updateUserFn?: (user: User,
-        request: RequestEvent,
+        event: RequestEvent,
+        data : {[key:string]:string|undefined},
         userEditableFields: string[]) => User;
 
     /** Called when a new session token is going to be saved 
      *  Add additional fields to your session storage here.  Return a map of 
      * keys to values.  Don't consume form data.  
      * Use {@link JsonOrFormData }, which takes a copy first. */
-    addToSession?: (request: RequestEvent, formData : {[key:string]:string}) => 
+    addToSession?: (event: RequestEvent, formData : {[key:string]:string}) => 
         {[key: string] : string|number|boolean|Date|undefined};
 
     /** Called after the session ID is validated.
@@ -120,18 +132,182 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      */
     loginProtectedApiEndpoints?: string[],    
     
+    /**
+     * These page endpoints need an admin user to be logged in.  
+     * 
+     * This
+     * is defined by the isAdminFn option in {@link SvelteKitServerOptions}.
+     * The default one is to check the `admin` boolean field in the user
+     * object. If there is no user, or the user is not an admin, a 401 
+     * page is returned,
+     * 
+     * The default is empty
+     * 
+     */
+    adminEndpoints?: string[],
+
+    /**
+     * Turns on email verification.  This will cause the verification tokens to 
+     * be sent when the account
+     * is activated and when email is changed.  Default false.
+     */
+    enableEmailVerification? : boolean,
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// DEFAULT FUNCTIONS
+
+/**
+ * Default User validator.  Doesn't validate password
+ * 
+ * Username must be at least two characters.
+ * @param password The password to validate
+ * @returns an array of errors.  If there were no errors, returns an empty array
+ */
+function defaultUserValidator(user : UserInputFields) : string[] {
+    let errors : string[] = [];
+    if (user.username == undefined) errors.push("Username must be given");
+    else if (user.username.length < 2) errors.push("Username must be at least 2 characters");
+    else if (user.username.length > 254) errors.push("Username must be no longer than 254 characters");
+    
+    return errors;
+}
+
+/**
+ * Default function for creating users.  Can be overridden.
+ * 
+ * Takes any field beginning with `user_` and that is also in
+ * `userEditableFields` (without the `user_` prefix).
+ * 
+ * @param request the fastify request
+ * @param userEditableFields the fields a user may edit
+ * @returns the new user
+ */
+function defaultCreateUser(event : RequestEvent, 
+    data : {[key:string]:string|undefined},
+    userEditableFields: string[]) : UserInputFields {
+    let state = "active";
+    let user : UserInputFields = {
+        username: data.username ?? "",
+        state: state,
+    }
+    const callerIsAdmin = event.locals.user && SvelteKitServer.isAdminFn(event.locals.user);
+    for (let field in data) {
+        let name = field.replace(/^user_/, ""); 
+        if (field.startsWith("user_") && 
+            (callerIsAdmin || userEditableFields.includes(name))) {
+            user[name] = data[field];
+        }
+    }
+    user.factor1 = "localpassword";
+    user.factor2 = data.factor2;
+    return user;
+
+}
+
+/**
+ * Default function for creating users.  Can be overridden.
+ * 
+ * Takes any field beginning with `user_` and that is also in
+ * `userEditableFields` (without the `user_` prefix).
+ * 
+ * @param user the user to update
+ * @param request the fastify request
+ * @param userEditableFields the fields a user may edit
+ * @returns the new user
+ */
+function defaultUpdateUser(user: User,
+    event: RequestEvent,
+    data : {[key:string]:string|undefined},
+    userEditableFields: string[]) : User {
+        const callerIsAdmin = event.locals.user && SvelteKitServer.isAdminFn(event.locals.user);
+        for (let field in data) {
+        let name = field.replace(/^user_/, ""); 
+        if (field.startsWith("user_") && 
+            (callerIsAdmin || userEditableFields.includes(name))) {
+            user[name] = data[field];
+        }
+    }
+    return user;
+
 }
 
 export class SvelteKitSessionServer {
-    sessionHook : (input: {event: RequestEvent}, 
+    readonly sessionHook : (input: {event: RequestEvent}, 
         //response: Response
     ) => /*MaybePromise<Response>*/ MaybePromise<{headers: Header[]}>;
-    twoFAHook : (input: {event: RequestEvent}, response: Response) => MaybePromise<{twofa: boolean, response: Response}>;
-    keyStorage : KeyStorage;
-    sessionManager : SessionManager;
-    userStorage : UserStorage;
-    authenticators: {[key:string]: Authenticator};
+    readonly twoFAHook : (input: {event: RequestEvent}, response: Response) => MaybePromise<{twofa: boolean, response: Response}>;
+
+
+    /**
+     * Key storage taken from constructor args.
+     * See {@link SvelteKitSessionServer.constructor}.
+     */
+    readonly keyStorage : KeyStorage;
+
+    /**
+     * Session Manager taken from constructor args.
+     * See {@link SvelteKitSessionServer.constructor}.
+     */
+    readonly sessionManager : SessionManager;
+
+    /**
+     * User storage taken from constructor args.
+     * See {@link SvelteKitSessionServer.constructor}.
+     */
+    readonly userStorage : UserStorage;
+
+    /**
+     * Funtion to validate users upon creation.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
+    validateUserFn : (user : UserInputFields) 
+        => string[] = defaultUserValidator;
+
+    /**
+     * Funtion to create a user record from form fields.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
+    createUserFn: (event : RequestEvent,
+        data : {[key:string]: string|undefined},
+        userEditableFields: string[]) => UserInputFields = defaultCreateUser;
+
+    /**
+     * Funtion to update a user record from form fields.  Taken from the options during 
+     * construction or the default value.
+     * See {@link FastifySessionServerOptions}.
+     */
+    updateUserFn: (user: User,
+        event: RequestEvent,
+        data : {[key:string]: string|undefined},
+        userEditableFields: string[]) => User = defaultUpdateUser;
+
+    /**
+     * The set of authenticators taken from constructor args.
+     * See {@link FastifySessionServer.constructor}.
+     */
+    readonly authenticators: {[key:string]: Authenticator};
+
+    /**
+     * The set of allowed authenticators taken from the options during 
+     * construction.
+     */
+    readonly allowedFactor2 : string[] = [];
+
+    /** Called when a new session token is going to be saved 
+     *  Add additional fields to your session storage here.  Return a map of 
+     * keys to values  */
+    addToSession?: (event: RequestEvent, formData : {[key:string]:string}) => 
+        {[key: string] : string|number|boolean|Date|undefined};
+
+    /**
+     * The set of allowed authenticators taken from the options during 
+     * construction.
+     */
     private validateSession? : (session: Key, user: User|undefined, event : RequestEvent) => void;
+
     private factor2ProtectedPageEndpoints : string[] = [
         "/requestpasswordreset",
         "/updateuser",
@@ -142,6 +318,13 @@ export class SvelteKitSessionServer {
     private factor2ProtectedApiEndpoints : string[] = [];
     private loginProtectedPageEndpoints : string[] = [];
     private loginProtectedApiEndpoints : string[] = [];
+    private adminEndpoints : string[] = [];
+
+    /** Whether email verification is enabled.
+     * 
+     * Reads from constructor options
+     */
+    readonly enableEmailVerification = false;
 
     private factor2Url : string = "/factor2";
 
@@ -151,7 +334,7 @@ export class SvelteKitSessionServer {
 
         this.keyStorage = keyStorage;
         this.userStorage = userStorage;
-        this.authenticators = authenticators
+        this.authenticators = authenticators;
         this.sessionManager = new SessionManager(userStorage, keyStorage, authenticators, options);
 
         setParameter("factor2Url", ParamType.String, this, options, "FACTOR2_URK");
@@ -160,7 +343,14 @@ export class SvelteKitSessionServer {
         setParameter("factor2ProtectedApiEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
         setParameter("loginProtectedPageEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_PAGE_ENDPOINTS");
         setParameter("loginProtectedApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_API_ENDPOINTS");
+        setParameter("adminEndpoints", ParamType.JsonArray, this, options, "ADMIN_ENDPOINTS");
+        setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
+        setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
 
+        if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
+        if (options.createUserFn) this.createUserFn = options.createUserFn;
+        if (options.updateUserFn) this.updateUserFn = options.updateUserFn;
+        if (options.addToSession) this.addToSession = options.addToSession;
         if (options.validateSession) this.validateSession = options.validateSession;
 
         this.userEndpoints = new SvelteKitUserEndpoints(this, options);
@@ -187,7 +377,7 @@ export class SvelteKitSessionServer {
             catch (e) {
                 CrossauthLogger.logger.warn(j({msg: "Invalid csrf cookie received", cerr: e, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
                 try {
-                    this.clearCookie(csrfCookieName, headers);
+                    this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, headers, event);
                 } catch (e2) {
                     CrossauthLogger.logger.debug(j({err: e2}));
                     CrossauthLogger.logger.error(j({cerr: e2, msg: "Couldn't delete CSRF cookie", ip: event.request.referrerPolicy, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
@@ -202,7 +392,7 @@ export class SvelteKitSessionServer {
                     if (!cookieValue) {
                         CrossauthLogger.logger.debug(j({msg: "Invalid CSRF cookie - recreating"}));
                         const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createCsrfToken();
-                        this.setCsrfCookie(csrfCookie, headers );
+                        this.setCsrfCookie(csrfCookie, headers, event );
                         event.locals.csrfToken = csrfFormOrHeaderValue;
                     } else {
                         CrossauthLogger.logger.debug(j({msg: "Valid CSRF cookie - creating token"}));
@@ -214,7 +404,7 @@ export class SvelteKitSessionServer {
                 } catch (e) {
                     CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                     CrossauthLogger.logger.debug(j({err: e}));
-                    this.clearCookie(csrfCookieName, headers);
+                    this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, headers, event);
                     event.locals.csrfToken = undefined;
                 }
             } else {
@@ -233,6 +423,7 @@ export class SvelteKitSessionServer {
     
             // validate any session cookie.  Remove if invalid
             event.locals.user = undefined;
+            event.locals.authType = undefined;
             const sessionCookieValue = this.getSessionCookieValue(event);
             CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
             if (sessionCookieValue) {
@@ -243,10 +434,11 @@ export class SvelteKitSessionServer {
     
                     event.locals.sessionId = sessionId;
                     event.locals.user = user;
+                    event.locals.authType = "cookie";
                     CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(event)}));
-                    this.clearCookie(sessionCookieName, headers);
+                    this.clearCookie(sessionCookieName, this.sessionManager.sessionCookiePath, headers, event);
                 }
             }
 
@@ -402,12 +594,13 @@ export class SvelteKitSessionServer {
         return undefined;
     }
 
-    clearCookie(name : string, headers: Header[]) {
+    clearCookie(name : string, path : string, _headers: Header[], event : RequestEvent) {
         //const cookies = resp.headers.getSetCookie()
-        headers.push({
+       /* headers.push({
             name: "set-cookie",
-            value: cookie.serialize(name, "", {expires: new Date(Date.now()-3600)}),
-        });
+            value: cookie.serialize(name, "", {expires: new Date(Date.now()-3600), path: "/"}),
+        });*/
+        event.cookies.delete(name, {path});
         //resp.headers.append('set-cookie', cookie.serialize(name, "", {expires: new Date(Date.now()-3600)}));
     } 
 
@@ -417,8 +610,8 @@ export class SvelteKitSessionServer {
         }
     } 
 
-    setCsrfCookie(cookie : Cookie, headers: Header[]) {
-        const csrfCookie = new DoubleSubmitCsrfToken({
+    setCsrfCookie(cookie : Cookie, _headers: Header[], event: RequestEvent ) {
+        /*const csrfCookie = new DoubleSubmitCsrfToken({
             cookieName : cookie.name,
             domain: cookie.options.domain,
             httpOnly: cookie.options.httpOnly,
@@ -429,7 +622,8 @@ export class SvelteKitSessionServer {
         headers.push({
             name: "set-cookie",
             value: csrfCookie.makeCsrfCookieString(cookie.value)
-        });
+        });*/
+        event.cookies.set(cookie.name, cookie.value, toCookieSerializeOptions(cookie.options) );
         //resp.headers.append('set-cookie', csrfCookie.makeCsrfCookieString(cookie.value));
     }
 
@@ -493,7 +687,7 @@ export class SvelteKitSessionServer {
             }
             catch (e) {
                 CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token", hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
-                this.clearCookie(this.sessionManager.csrfCookieName, headers);
+                this.clearCookie(this.sessionManager.csrfCookieName, this.sessionManager.csrfCookiePath, headers, event);
                 event.locals.csrfToken = undefined;
             }
         } else {
@@ -551,6 +745,50 @@ export class SvelteKitSessionServer {
         return (this.loginProtectedApiEndpoints.includes(url.pathname));
     }
 
+    isAdminEndpoint(event : RequestEvent) : boolean {
+        const url = new URL(event.request.url);
+        return (this.adminEndpoints.includes(url.pathname));
+    }
+
+    /**
+     * Creates an anonymous session, setting the `Set-Cookue` headers
+     * in the reply.
+     * 
+     * An anonymous sessiin is a session cookie that is not associated
+     * with a user (`userId` is undefined).  It can be used to persist
+     * data between sessions just like a regular user session ID.
+     * 
+     * @param request the Fastify request
+     * @param reply the Fastify reply
+     * @param data session data to save
+     * @returns the session cookie value
+     */
+    async createAnonymousSession(event : RequestEvent, 
+        data? : {[key:string]:any}) : Promise<string> {
+        CrossauthLogger.logger.debug(j({msg: "Creating session ID"}));
+
+        // get custom fields from implentor-provided function
+        const formData = new JsonOrFormData();
+        await formData.loadData(event);
+        let extraFields = this.addToSession ? this.addToSession(event, formData.toObject()) : {}
+        if (data) extraFields.data = JSON.stringify(data);
+
+        // create session, setting the session cookie, CSRF cookie and CSRF token 
+        let { sessionCookie, csrfCookie, csrfFormOrHeaderValue } = 
+            await this.sessionManager.createAnonymousSession(extraFields);
+        event.cookies.set(sessionCookie.name,
+            sessionCookie.value,
+            toCookieSerializeOptions(sessionCookie.options));
+        event.locals.csrfToken = csrfFormOrHeaderValue;
+        event.cookies.set(csrfCookie.name, 
+            csrfCookie.value, 
+            toCookieSerializeOptions(csrfCookie.options))
+        event.locals.user = undefined;
+        const sessionId = this.sessionManager.getSessionId(sessionCookie.value);
+        event.locals.sessionId = sessionId;
+        return sessionCookie.value;
+    };
+    
     /////////////////////////////////////////////////////////////
     // User Endpoints
 
@@ -579,5 +817,27 @@ export class SvelteKitSessionServer {
      */
     async logout(event : RequestEvent) : Promise<LogoutReturn> {
         return this.userEndpoints.logout(event);
+    }
+
+    /**
+     * Log a user in if possible.  
+     * 
+     * Form data is returned unless there was
+     * an error extrafting it.  
+     * 
+     * If login was successful, no factor2 is needed
+     * and no email verification is needed, the user is returned.
+     * 
+     * If email verification is needed, `emailVerificationRequired` is 
+     * returned as `true`.
+     * 
+     * If factor2 configuration is required, `factor2Required` is returned
+     * as `true`.
+     * 
+     * @param event the Sveltekit event
+     * @returns user, form data, error message and exception (see above)
+     */
+    async signup(event : RequestEvent) : Promise<SignupReturn> {
+        return this.userEndpoints.signup(event);
     }
 }

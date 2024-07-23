@@ -73,11 +73,11 @@ export class DoubleSubmitCsrfToken {
     // cookie settings
     /** Name of the CSRF Cookie */
     readonly cookieName : string = "CSRFTOKEN";
-    private domain : string | undefined = undefined;
-    private httpOnly : boolean = false;
-    private path : string = "/";
-    private secure : boolean = true;
-    private sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
+    readonly domain : string | undefined = undefined;
+    readonly httpOnly : boolean = false;
+    readonly path : string = "/";
+    readonly secure : boolean = true;
+    readonly sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
 
     // hasher settings
     private secret : string = "";
@@ -291,12 +291,12 @@ export class SessionCookie {
     // cookie settings
     /** Name of the CSRF Cookie, set from input options */
     readonly cookieName : string = "SESSIONID";
-    private maxAge : number = 60*60*24*4; // 4 weeks
-    private domain : string | undefined = undefined;
-    private httpOnly : boolean = false;
-    private path : string = "/";
-    private secure : boolean = true;
-    private sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
+    readonly maxAge : number = 60*60*24*4; // 4 weeks
+    readonly domain : string | undefined = undefined;
+    readonly httpOnly : boolean = false;
+    readonly path : string = "/";
+    readonly secure : boolean = true;
+    readonly sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
 
     // hasher settings
     private secret : string = "";

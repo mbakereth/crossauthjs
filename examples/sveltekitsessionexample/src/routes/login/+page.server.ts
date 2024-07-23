@@ -7,6 +7,7 @@ export const actions : Actions = {
 	default: async ( event ) => {
         const resp = await crossauth.sessionServer?.login(event);
         if (resp?.success == true) throw redirect(302, '/');
+        delete resp?.exception;
         return resp;
 	}
 };
