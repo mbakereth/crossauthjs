@@ -26,7 +26,7 @@ export type SignupReturn = {
     factor2Data?:  {
         userData: { [key: string]: any },
         username: string,
-        csrfToken: string | undefined
+        csrfToken?: string | undefined
     },
     error?: string,
     exception?: CrossauthError,
@@ -71,7 +71,7 @@ export class SvelteKitUserEndpoints {
 
             // throw an exception if the CSRF token isn't valid
             //await this.validateCsrfToken(request);
-            if (!event.locals.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
+            if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
 
             // keep the old session ID.  If there was one, we will delete it after
             const oldSessionId = this.sessionServer.getSessionCookieValue(event);
@@ -92,11 +92,13 @@ export class SvelteKitUserEndpoints {
                 msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
                 user: username
             }));
-            event.cookies.set(csrfCookie.name,
-                csrfCookie.value,
-                toCookieSerializeOptions(csrfCookie.options));
-            event.locals.csrfToken = 
-                await this.sessionServer.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
+            if (this.sessionServer.enableCsrfProtection) {
+                event.cookies.set(csrfCookie.name,
+                    csrfCookie.value,
+                    toCookieSerializeOptions(csrfCookie.options));
+                event.locals.csrfToken = 
+                    await this.sessionServer.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);    
+            }
 
             // delete the old session key if there was one
             if (oldSessionId) {
@@ -136,8 +138,9 @@ export class SvelteKitUserEndpoints {
             // clear cookies
             CrossauthLogger.logger.debug(j({msg: "Logout: clear cookie " 
                 + this.sessionServer.sessionManager.sessionCookieName}));
-            event.cookies.delete(this.sessionServer.sessionManager.sessionCookieName, {path: "/"})
-            event.cookies.delete(this.sessionServer.sessionManager.csrfCookieName, {path: "/"})
+            event.cookies.delete(this.sessionServer.sessionManager.sessionCookieName, {path: "/"});
+            if (this.sessionServer.enableCsrfProtection)
+                event.cookies.delete(this.sessionServer.sessionManager.csrfCookieName, {path: "/"});
             if (event.locals.sessionId) {
                 try {
                     await this.sessionServer.sessionManager.deleteSession(event.locals.sessionId);
@@ -152,14 +155,16 @@ export class SvelteKitUserEndpoints {
 
             // delete locals
             event.locals.sessionId = undefined;
-            event.locals.csrfToken = undefined;
             event.locals.user = undefined;
-            event.cookies.delete(this.sessionServer.sessionManager.csrfCookieName, {path: "/"});
+            if (this.sessionServer.enableCsrfProtection) {
+                event.locals.csrfToken = undefined;
+                event.cookies.delete(this.sessionServer.sessionManager.csrfCookieName, {path: "/"});
 
-            // create new CSRF token
-            const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionServer.sessionManager.createCsrfToken();
-            this.sessionServer.setCsrfCookie(csrfCookie, [], event );
-            event.locals.csrfToken = csrfFormOrHeaderValue;
+                // create new CSRF token
+                const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionServer.sessionManager.createCsrfToken();
+                this.sessionServer.setCsrfCookie(csrfCookie, event );
+                event.locals.csrfToken = csrfFormOrHeaderValue;
+            }
 
             return { success: true }
         } catch (e) {
@@ -185,7 +190,7 @@ export class SvelteKitUserEndpoints {
             let user : UserInputFields|undefined;
 
             // throw an error if the CSRF token is invalid
-            if (this.isSessionUser(event) && !event.locals.csrfToken) 
+            if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) 
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
 
             if (username == "") throw new CrossauthError(ErrorCode.InvalidUserame, "Username field may not be empty");
@@ -300,13 +305,15 @@ export class SvelteKitUserEndpoints {
                     let data: {
                         userData: { [key: string]: any },
                         username: string,
-                        csrfToken: string | undefined
+                        csrfToken?: string | undefined
                     } = 
                     {
                         userData: userData,
                         username: username,
-                        csrfToken: event.locals.csrfToken,
                     };
+                    if (this.sessionServer.enableCsrfProtection)
+                        data.csrfToken = event.locals.csrfToken;
+
                     return { factor2Data: data, success: true, factor2Required: true, formData};
                 } catch (e) {
                     // if there is an error, make sure we delete the user before returning

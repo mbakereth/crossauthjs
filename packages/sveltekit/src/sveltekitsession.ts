@@ -4,14 +4,12 @@ import {
     SessionManager,
     Authenticator,
     Crypto,
-    DoubleSubmitCsrfToken,
     setParameter,
     ParamType,
     toCookieSerializeOptions } from '@crossauth/backend';
 import type { Cookie, SessionManagerOptions } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus } from '@crossauth/common';
 import type { Key, User, UserInputFields } from '@crossauth/common';
-import cookie from 'cookie';
 import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
@@ -152,6 +150,16 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * is activated and when email is changed.  Default false.
      */
     enableEmailVerification? : boolean,
+
+    /**
+     * CSRF protection is on by default but can be disabled by setting
+     * this to false.
+     * 
+     * Sveltekit has its own CSRF protection enabled by default.  If you
+     * disable it here, make sure you are not doing anything that bypasses
+     * Sveltekit's own protection.
+     */
+    enableCsrfProtection? : boolean,
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -320,6 +328,8 @@ export class SvelteKitSessionServer {
     private loginProtectedApiEndpoints : string[] = [];
     private adminEndpoints : string[] = [];
 
+    readonly enableCsrfProtection = true;
+
     /** Whether email verification is enabled.
      * 
      * Reads from constructor options
@@ -346,6 +356,7 @@ export class SvelteKitSessionServer {
         setParameter("adminEndpoints", ParamType.JsonArray, this, options, "ADMIN_ENDPOINTS");
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
+        setParameter("enableCsrfProtection", ParamType.Boolean, this, options, "ENABLE_CSRF_PROTECTION");
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
         if (options.createUserFn) this.createUserFn = options.createUserFn;
@@ -368,58 +379,63 @@ export class SvelteKitSessionServer {
             // remove it if it is not.
             // we are not checking it matches the CSRF token in the header or
             // body at this stage - just removing invalid cookies
-            CrossauthLogger.logger.debug(j({msg: "Getting csrf cookie"}));
-            let cookieValue : string|undefined;
-            try {
-                 cookieValue = this.getCsrfCookieValue(event);
-                 if (cookieValue) this.sessionManager.validateCsrfCookie(cookieValue);
-            }
-            catch (e) {
-                CrossauthLogger.logger.warn(j({msg: "Invalid csrf cookie received", cerr: e, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
+            if (this.enableCsrfProtection) {
+                CrossauthLogger.logger.debug(j({msg: "Getting csrf cookie"}));
+                let cookieValue : string|undefined;
                 try {
-                    this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, headers, event);
-                } catch (e2) {
-                    CrossauthLogger.logger.debug(j({err: e2}));
-                    CrossauthLogger.logger.error(j({cerr: e2, msg: "Couldn't delete CSRF cookie", ip: event.request.referrerPolicy, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
-                }
-                cookieValue = undefined;
-                event.locals.csrfToken = undefined;
+                    cookieValue = this.getCsrfCookieValue(event);
+                    if (cookieValue) this.sessionManager.validateCsrfCookie(cookieValue);
+               }
+               catch (e) {
+                   CrossauthLogger.logger.warn(j({msg: "Invalid csrf cookie received", cerr: e, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
+                   try {
+                       this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, event);
+                   } catch (e2) {
+                       CrossauthLogger.logger.debug(j({err: e2}));
+                       CrossauthLogger.logger.error(j({cerr: e2, msg: "Couldn't delete CSRF cookie", ip: event.request.referrerPolicy, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
+                   }
+                   cookieValue = undefined;
+                   event.locals.csrfToken = undefined;
+               }
+   
+               if (["GET", "OPTIONS", "HEAD"].includes(event.request.method)) {
+                   // for get methods, create a CSRF token in the request object and response header
+                   try {
+                       if (!cookieValue) {
+                           CrossauthLogger.logger.debug(j({msg: "Invalid CSRF cookie - recreating"}));
+                           const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createCsrfToken();
+                           this.setCsrfCookie(csrfCookie, event );
+                           event.locals.csrfToken = csrfFormOrHeaderValue;
+                       } else {
+                           CrossauthLogger.logger.debug(j({msg: "Valid CSRF cookie - creating token"}));
+                           const csrfFormOrHeaderValue = await this.sessionManager.createCsrfFormOrHeaderValue(cookieValue);
+                           event.locals.csrfToken = csrfFormOrHeaderValue;
+                       }
+                       this.setHeader(CSRFHEADER, event.locals.csrfToken, headers);
+                       //response.headers.set(CSRFHEADER, event.locals.csrfToken);
+                   } catch (e) {
+                       CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                       CrossauthLogger.logger.debug(j({err: e}));
+                       this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, event);
+                       event.locals.csrfToken = undefined;
+                   }
+               } else {
+                   // for other methods, create a new token only if there is already a valid one
+                   if (cookieValue) {
+                       try {
+                           await this.csrfToken(event, headers);
+                       } catch (e) {
+                           CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                           CrossauthLogger.logger.debug(j({err: e}));
+                       }
+                   }
+               }
+       
             }
 
-            if (["GET", "OPTIONS", "HEAD"].includes(event.request.method)) {
-                // for get methods, create a CSRF token in the request object and response header
-                try {
-                    if (!cookieValue) {
-                        CrossauthLogger.logger.debug(j({msg: "Invalid CSRF cookie - recreating"}));
-                        const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createCsrfToken();
-                        this.setCsrfCookie(csrfCookie, headers, event );
-                        event.locals.csrfToken = csrfFormOrHeaderValue;
-                    } else {
-                        CrossauthLogger.logger.debug(j({msg: "Valid CSRF cookie - creating token"}));
-                        const csrfFormOrHeaderValue = await this.sessionManager.createCsrfFormOrHeaderValue(cookieValue);
-                        event.locals.csrfToken = csrfFormOrHeaderValue;
-                    }
-                    this.setHeader(CSRFHEADER, event.locals.csrfToken, headers);
-                    //response.headers.set(CSRFHEADER, event.locals.csrfToken);
-                } catch (e) {
-                    CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
-                    CrossauthLogger.logger.debug(j({err: e}));
-                    this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, headers, event);
-                    event.locals.csrfToken = undefined;
-                }
-            } else {
-                // for other methods, create a new token only if there is already a valid one
-                if (cookieValue) {
-                    try {
-                        await this.csrfToken(event, headers);
-                    } catch (e) {
-                        CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
-                        CrossauthLogger.logger.debug(j({err: e}));
-                    }
-                }
-            }
-
-            // we now either have a valid CSRF token, or none at all
+            // we now either have a valid CSRF token, or none at all (or CSRF
+            // protection has been disabled, in which case the CSRF cookie
+            // is ignored)
     
             // validate any session cookie.  Remove if invalid
             event.locals.user = undefined;
@@ -438,7 +454,7 @@ export class SvelteKitSessionServer {
                     CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(event)}));
-                    this.clearCookie(sessionCookieName, this.sessionManager.sessionCookiePath, headers, event);
+                    this.clearCookie(sessionCookieName, this.sessionManager.sessionCookiePath, event);
                 }
             }
 
@@ -523,7 +539,7 @@ export class SvelteKitSessionServer {
                         }
                     } else {
                         // 2FA has not started - start it
-                        if (!event.locals.csrfToken) {
+                        if (this.enableCsrfProtection && !event.locals.csrfToken) {
                             const error = new CrossauthError(ErrorCode.Forbidden, "CSRF token missing");
                             return {twofa: true, response: new Response(JSON.stringify({ok: false, errorMessage: error.message, errorMessages: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}), {
                                 status: error.httpStatus,
@@ -594,14 +610,8 @@ export class SvelteKitSessionServer {
         return undefined;
     }
 
-    clearCookie(name : string, path : string, _headers: Header[], event : RequestEvent) {
-        //const cookies = resp.headers.getSetCookie()
-       /* headers.push({
-            name: "set-cookie",
-            value: cookie.serialize(name, "", {expires: new Date(Date.now()-3600), path: "/"}),
-        });*/
+    clearCookie(name : string, path : string, event : RequestEvent) {
         event.cookies.delete(name, {path});
-        //resp.headers.append('set-cookie', cookie.serialize(name, "", {expires: new Date(Date.now()-3600)}));
     } 
 
     setHeaders(headers: Header[], resp: Response) {
@@ -610,21 +620,8 @@ export class SvelteKitSessionServer {
         }
     } 
 
-    setCsrfCookie(cookie : Cookie, _headers: Header[], event: RequestEvent ) {
-        /*const csrfCookie = new DoubleSubmitCsrfToken({
-            cookieName : cookie.name,
-            domain: cookie.options.domain,
-            httpOnly: cookie.options.httpOnly,
-            path: cookie.options.path,
-            secure: cookie.options.secure,
-            sameSite: cookie.options.sameSite
-        });
-        headers.push({
-            name: "set-cookie",
-            value: csrfCookie.makeCsrfCookieString(cookie.value)
-        });*/
+    setCsrfCookie(cookie : Cookie, event: RequestEvent ) {
         event.cookies.set(cookie.name, cookie.value, toCookieSerializeOptions(cookie.options) );
-        //resp.headers.append('set-cookie', csrfCookie.makeCsrfCookieString(cookie.value));
     }
 
     setHeader(name: string, value: string, headers: Header[]) {
@@ -687,7 +684,7 @@ export class SvelteKitSessionServer {
             }
             catch (e) {
                 CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token", hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
-                this.clearCookie(this.sessionManager.csrfCookieName, this.sessionManager.csrfCookiePath, headers, event);
+                this.clearCookie(this.sessionManager.csrfCookieName, this.sessionManager.csrfCookiePath, event);
                 event.locals.csrfToken = undefined;
             }
         } else {
@@ -779,10 +776,12 @@ export class SvelteKitSessionServer {
         event.cookies.set(sessionCookie.name,
             sessionCookie.value,
             toCookieSerializeOptions(sessionCookie.options));
-        event.locals.csrfToken = csrfFormOrHeaderValue;
-        event.cookies.set(csrfCookie.name, 
-            csrfCookie.value, 
-            toCookieSerializeOptions(csrfCookie.options))
+        if (this.enableCsrfProtection) {
+            event.locals.csrfToken = csrfFormOrHeaderValue;
+            event.cookies.set(csrfCookie.name, 
+                csrfCookie.value, 
+                toCookieSerializeOptions(csrfCookie.options))    
+        }
         event.locals.user = undefined;
         const sessionId = this.sessionManager.getSessionId(sessionCookie.value);
         event.locals.sessionId = sessionId;
@@ -810,7 +809,7 @@ export class SvelteKitSessionServer {
      * Log a user out.  
      * 
      * Deletes the session if the user was logged in and clears session
-     * and CSRF cookies
+     * and CSRF cookies (if CSRF protection is enabled)
      * 
      * @param event the Sveltekit event
      * @returns success of true or false and error message if not successful
