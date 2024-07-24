@@ -36,6 +36,13 @@ export type SignupReturn = {
     emailVerificationRequired? : boolean
 };
 
+export type VerifyEmailReturn = {
+    user? : User,
+    error?: string,
+    exception?: CrossauthError,
+    success: boolean
+};
+
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 
@@ -126,6 +133,62 @@ export class SvelteKitUserEndpoints {
             }
         }
     }
+
+    /**
+     * This is called after the user has been validated to log the user in
+     */
+    private async loginWithUser(user: User, 
+        bypass2FA : boolean, 
+        event : RequestEvent) {
+
+        // get old session ID so we can delete it after
+        const oldSessionId = this.sessionServer.getSessionCookieValue(event);
+
+        // call implementor-provided hook to add custom fields to session key
+        const data = new JsonOrFormData();
+        await data.loadData(event);
+        let extraFields = this.addToSession ? this.addToSession(event, data.toObject()) : {}
+
+        // log user in - this doesn't do any authentication
+        let { sessionCookie, csrfCookie } = 
+            await this.sessionServer.sessionManager.login("", {}, extraFields, undefined, user, bypass2FA);
+
+        // set the cookies
+        CrossauthLogger.logger.debug(j({
+            msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            user: user.username
+        }));
+        event.cookies.set(sessionCookie.name,
+            sessionCookie.value,
+            toCookieSerializeOptions(sessionCookie.options));
+        CrossauthLogger.logger.debug(j({
+            msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            user: user.username
+        }));
+        if (this.sessionServer.enableCsrfProtection)
+            event.cookies.set(csrfCookie.name, 
+                csrfCookie.value, 
+                toCookieSerializeOptions(csrfCookie.options));
+
+        // delete the old session
+        if (oldSessionId) {
+            try {
+                await this.sessionServer.sessionManager.deleteSession(oldSessionId);
+            } catch (e) {
+                CrossauthLogger.logger.warn(j({
+                    msg: "Couldn't delete session ID from database",
+                    hashOfSessionId: this.sessionServer.getHashOfSessionId(event)
+                }));
+                CrossauthLogger.logger.debug(j({err: e}));
+            }
+        }
+
+        return {
+            user: user,
+            success: true,
+        };
+    }
+    
 
     async logout(event : RequestEvent) : Promise<LogoutReturn> {
 
@@ -233,6 +296,7 @@ export class SvelteKitUserEndpoints {
             // set the user's state to active, awaitingtwofactor or 
             // awaitingemailverification
             // depending on settings for next step
+            console.log("this.sessionServer.enableEmailVerification", this.sessionServer.enableEmailVerification)
             user.state = "active";
             if (formData.factor2 && formData.factor2!="none") {
                 user.state = "awaitingtwofactor";
@@ -339,6 +403,32 @@ export class SvelteKitUserEndpoints {
                 success: false,
                 formData,
             }
+        }
+    }
+
+    async verifyEmail(event : RequestEvent) : Promise<VerifyEmailReturn> {
+        try {
+
+            const token = event.params.token;
+            if (!token) throw new CrossauthError(ErrorCode.InvalidToken, "Invalid email verification token");
+
+            // validate the token and log the user in
+            const user = 
+                await this.sessionServer.sessionManager.applyEmailVerificationToken(token);
+            await this.loginWithUser(user, true, event);
+
+            return {
+                success: true,
+                user: user,
+            }
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+            };
         }
     }
 }

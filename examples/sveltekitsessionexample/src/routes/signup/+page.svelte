@@ -17,7 +17,12 @@
 </svelte:head>
 <h1>Create an Account</h1>
 
-{#if form?.success}
+{#if form?.emailVerificationRequired}
+    <p class="text-slate-900 bg-info p-2 rounded ">Please check your email and
+        follow the link we sent to complete registration.
+    </p>
+    <p><a href="/">Home</a></p>
+{:else if form?.success}
     <p class="text-slate-900 bg-success p-2 rounded ">User created</p>
     <p><a href="/">Home</a></p>
 {:else}

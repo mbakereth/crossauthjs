@@ -13,7 +13,11 @@ import type { Key, User, UserInputFields } from '@crossauth/common';
 import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
-import type { LoginReturn, LogoutReturn, SignupReturn } from './sveltekituserendpoints';
+import type {
+    LoginReturn,
+    LogoutReturn,
+    SignupReturn,
+    VerifyEmailReturn } from './sveltekituserendpoints';
 import { SvelteKitServer } from './sveltekitserver'
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
@@ -839,4 +843,9 @@ export class SvelteKitSessionServer {
     async signup(event : RequestEvent) : Promise<SignupReturn> {
         return this.userEndpoints.signup(event);
     }
+
+    async verifyEmail(event : RequestEvent) : Promise<VerifyEmailReturn> {
+        return this.userEndpoints.verifyEmail(event);
+    }
+
 }
