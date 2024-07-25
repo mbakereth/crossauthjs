@@ -490,7 +490,7 @@ export class SvelteKitSessionServer {
             const sessionCookieValue = this.getSessionCookieValue(event);
             if (sessionCookieValue && event.locals.user?.factor2 && (
                 this.factor2ProtectedApiEndpoints.includes(event.request.url) || this.factor2ProtectedApiEndpoints.includes(event.request.url))) {
-                if (!(["GET", "OPTIONS", "HEAD"].includes(event.request.method))) {
+                    if (!(["GET", "OPTIONS", "HEAD"].includes(event.request.method))) {
                     const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                     const sessionData = await this.sessionManager.dataForSessionId(sessionId);
                     if (("pre2fa") in sessionData) {
@@ -562,6 +562,7 @@ export class SvelteKitSessionServer {
                         }
                     } else {
                         // 2FA has not started - start it
+                        CrossauthLogger.logger.debug("Starting 2FA");
                         if (this.enableCsrfProtection && !event.locals.csrfToken) {
                             const error = new CrossauthError(ErrorCode.Forbidden, "CSRF token missing");
                             return {twofa: true, response: new Response(JSON.stringify({ok: false, errorMessage: error.message, errorMessages: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}), {
@@ -843,6 +844,13 @@ export class SvelteKitSessionServer {
      */
     async login(event : RequestEvent) : Promise<LoginReturn> {
         return this.userEndpoints.login(event);
+    }
+
+    /**
+     * Call this when `login()` returns `factor2Required = true`
+     */
+    async loginFactor2(event : RequestEvent) : Promise<LoginReturn> {
+        return this.userEndpoints.loginFactor2(event);
     }
 
     /**

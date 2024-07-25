@@ -21,6 +21,7 @@
 
 {#if data.user} 
     <p>Logged in as {data.user.username}</p>
+    <p><a href="/account">Account details</a></p>
     <form method="POST" action="logout">
         <button class="btn btn-primary" on:click={logoutPage}>Logout</button>
     </form>

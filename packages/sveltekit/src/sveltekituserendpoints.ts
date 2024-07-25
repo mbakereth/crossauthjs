@@ -12,6 +12,7 @@ export type LoginReturn = {
     error?: string,
     exception?: CrossauthError,
     formData?: {[key:string]:string},
+    factor2Required?: boolean,
     success: boolean
 };
 
@@ -136,11 +137,21 @@ export class SvelteKitUserEndpoints {
                 }
             }
 
-            event.locals.user = user;
-            return { user, formData, success: true };
+            console.log("Login:", user);
+
+            if (!user.factor2 || user.factor2 == "")
+                event.locals.user = user;
+
+            return { 
+                user, 
+                formData, 
+                factor2Required: user.factor2 && user.factor2 != "",
+                success: true, 
+            };
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            console.log("Login:", ce);
             return {
                 error: ce.message,
                 exception: ce,
@@ -526,4 +537,74 @@ export class SvelteKitUserEndpoints {
         }
     }
 
+    async loginFactor2(event : RequestEvent) : Promise<LoginReturn> {
+        if (event.locals.user) {
+            return {
+                user: event.locals.user,
+                success: true,            
+            }
+        }
+
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+            const persist = data.getAsBoolean('persist') ?? false;
+
+            // save the old session ID so we can delete it after (the anonymous session)
+            // If there isn't one it is an error - only allowed to this URL with a 
+            // valid session
+            const oldSessionId = event.locals.sessionId;
+            if (!oldSessionId) throw new CrossauthError(ErrorCode.Unauthorized);
+
+            // validate CSRF token - throw an exception if it is not valid
+            //await this.validateCsrfToken(request);
+            if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && 
+                !event.locals.csrfToken) 
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+
+            let extraFields = this.addToSession ? this.addToSession(event, formData) : {}
+            const {sessionCookie, csrfCookie, user} = 
+            await this.sessionServer.sessionManager.completeTwoFactorLogin(formData, 
+                oldSessionId, 
+                extraFields, 
+                persist);
+            CrossauthLogger.logger.debug(j({
+                msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+                user: user?.username
+            }));
+            event.cookies.set(
+                sessionCookie.name,
+                sessionCookie.value,
+                toCookieSerializeOptions(sessionCookie.options));
+            CrossauthLogger.logger.debug(j({
+                msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+                user: user?.username
+            }));
+            event.cookies.set(
+                csrfCookie.name, 
+                csrfCookie.value, 
+                toCookieSerializeOptions(csrfCookie.options));
+            if (this.sessionServer.enableCsrfProtection)
+                event.locals.csrfToken = 
+                    await this.sessionServer.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
+            event.locals.user = user;
+
+            return {
+                user: user,
+                success: true,            
+            }
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+                formData: formData,
+            }
+        }
+    }
 }

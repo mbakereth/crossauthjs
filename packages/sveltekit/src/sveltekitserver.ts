@@ -51,7 +51,7 @@ export class SvelteKitServer {
         if (session) {
             if (!authenticators) {
                 throw new CrossauthError(ErrorCode.Configuration,
-                    "I fusing session management, must supply authenticators")
+                    "If using session management, must supply authenticators")
             }
             this.sessionServer = new SvelteKitSessionServer(userStorage, session.keyStorage, authenticators, {...session.options, ...options});
         }
@@ -60,7 +60,7 @@ export class SvelteKitServer {
             if (this.sessionServer) {
                 const resp = await(this.sessionServer.sessionHook({event}));
                 let response = await resolve(event);;
-                this.sessionServer.setHeaders(resp.headers, response)
+                this.sessionServer.setHeaders(resp.headers, response);
                 const ret = await(this.sessionServer.twoFAHook({event}, response));
                 response = ret.response;
                 if (!ret.twofa && !event.locals.user) {
