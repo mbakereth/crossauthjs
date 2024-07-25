@@ -17,7 +17,8 @@ import type {
     LoginReturn,
     LogoutReturn,
     SignupReturn,
-    VerifyEmailReturn } from './sveltekituserendpoints';
+    VerifyEmailReturn,
+    ConfigureFactor2Return } from './sveltekituserendpoints';
 import { SvelteKitServer } from './sveltekitserver'
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
@@ -306,7 +307,13 @@ export class SvelteKitSessionServer {
      * The set of allowed authenticators taken from the options during 
      * construction.
      */
-    readonly allowedFactor2 : string[] = [];
+    readonly allowedFactor2 : {name: string, friendlyName: string}[] = [];
+
+    /**
+     * The set of allowed authenticators taken from the options during 
+     * construction.
+     */
+    readonly allowedFactor2Names : string[] = [];
 
     /** Called when a new session token is going to be saved 
      *  Add additional fields to your session storage here.  Return a map of 
@@ -358,7 +365,19 @@ export class SvelteKitSessionServer {
         setParameter("loginProtectedPageEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_PAGE_ENDPOINTS");
         setParameter("loginProtectedApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_API_ENDPOINTS");
         setParameter("adminEndpoints", ParamType.JsonArray, this, options, "ADMIN_ENDPOINTS");
-        setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
+        let options1 : {allowedFactor2?: string[]} = {}
+        setParameter("allowedFactor2", ParamType.JsonArray, options1, options, "ALLOWED_FACTOR2");
+        this.allowedFactor2Names = options.allowedFactor2 ?? ["none"];
+        if (options1.allowedFactor2) {
+            for (let factor of options1.allowedFactor2) {
+                if (factor in this.authenticators) {
+                    this.allowedFactor2.push({name: factor, friendlyName: this.authenticators[factor].friendlyName});
+                } else if (factor == "none") {
+                    this.allowedFactor2.push({name: "none", friendlyName: "None"});
+
+                }
+            }
+        }
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enableCsrfProtection", ParamType.Boolean, this, options, "ENABLE_CSRF_PROTECTION");
 
@@ -733,6 +752,23 @@ export class SvelteKitSessionServer {
         return "";
     }
 
+    async getSessionData(event : RequestEvent, name : string) : Promise<{[key:string]: any}|undefined> {
+        try {
+            const data = event.locals.sessionId ? 
+                await this.sessionManager.dataForSessionId(event.locals.sessionId) : 
+                undefined;
+            if (data && name in data) return data[name];
+        } catch (e) {
+            CrossauthLogger.logger.error(j({
+                msg: "Couldn't get " + name + "from session",
+                cerr: e
+            }))
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
+        return undefined;
+
+    }
+
     /////////////////////////////////////////////////////////////
     // login protected URLs
 
@@ -844,8 +880,20 @@ export class SvelteKitSessionServer {
         return this.userEndpoints.signup(event);
     }
 
+    /**
+     * Takes email verification token from the params on the URL and attempts 
+     * email verification.
+     */
     async verifyEmail(event : RequestEvent) : Promise<VerifyEmailReturn> {
         return this.userEndpoints.verifyEmail(event);
     }
 
+    /**
+     * Completes factor2 configuration using 2fa-specific form fields in the
+     * request bodyand data already stores in the session when 2FA configuration
+     * was initiated
+     */
+    async configureFactor2(event : RequestEvent) : Promise<ConfigureFactor2Return> {
+        return this.userEndpoints.configureFactor2(event);
+    }
 }

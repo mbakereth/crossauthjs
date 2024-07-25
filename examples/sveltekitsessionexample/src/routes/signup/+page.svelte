@@ -1,16 +1,12 @@
 <script>
-    import { goto } from '$app/navigation';
+ import ConfigureTotp from '$lib/components/ConfigureTotp.svelte';
+ import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
 	/** @type {import('./$types').PageData} */
     export let data;
 	/** @type {import('./$types').ActionData} */
 	export let form;
-    let factor2 = form?.formData?.factor2 ?? "";
-    /*onMount(() => {
-        if (form?.success) {
-            goto("/");
-        }
-    });*/
+    let factor2 = form?.formData?.factor2 ?? data.allowedFactor2[0].name;
 </script>
 <svelte:head>
     <title>Create an Account</title>
@@ -22,6 +18,8 @@
         follow the link we sent to complete registration.
     </p>
     <p><a href="/">Home</a></p>
+{:else if form?.factor2Data?.factor2 == "totp"}
+    <ConfigureTotp data={data} factor2Data={form?.factor2Data}/>
 {:else if form?.success}
     <p class="text-slate-900 bg-success p-2 rounded ">User created</p>
     <p><a href="/">Home</a></p>
@@ -77,15 +75,15 @@
         </div>
 
         {#if data.allowedFactor2.length > 1}
-            <div class="form-control">
-                <label class="label" for="factor2">
-                    <span class="label-text">Email</span>
-                </label>
-                {#each data.allowedFactor2 as item }
-                    <input type="radio" name="factor2" id={"factor2_"+item.name} value={item.name} class="radio" bind:group={factor2} /> 
-                    <label for="factor2_{item.name}">{ item.friendlyName }</label>
-                {/each}
-            </div>
+            <p class="label-text">Second Factor</p>
+            {#each data.allowedFactor2 as item }
+                <div class="form-control">
+                    <span class="align-text-bottom mb-2">
+                        <input type="radio" name="factor2" id={"factor2_"+item.name} value={item.name} class="radio align-middle" bind:group={factor2} /> 
+                        <span class="align-bottom ml-2 text-sm">{ item.friendlyName }</span>
+                    </span>
+                </div>
+            {/each}
         {/if}
 
         <button class="btn btn-primary" type="submit">Create</button>

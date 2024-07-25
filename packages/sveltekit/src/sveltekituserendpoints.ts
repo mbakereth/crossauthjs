@@ -26,13 +26,29 @@ export type SignupReturn = {
     factor2Data?:  {
         userData: { [key: string]: any },
         username: string,
-        csrfToken?: string | undefined
+        csrfToken?: string | undefined,
+        factor2: string,
     },
     error?: string,
     exception?: CrossauthError,
     formData?: {[key:string]:string|undefined},
     success: boolean,
     factor2Required?: boolean,
+    emailVerificationRequired? : boolean
+};
+
+export type ConfigureFactor2Return = {
+    user? : UserInputFields,
+    factor2Data?:  {
+        userData: { [key: string]: any },
+        username: string,
+        csrfToken?: string | undefined,
+        factor2: string,
+    },
+    error?: string,
+    exception?: CrossauthError,
+    formData?: {[key:string]:string|undefined},
+    success: boolean,
     emailVerificationRequired? : boolean
 };
 
@@ -150,7 +166,7 @@ export class SvelteKitUserEndpoints {
         let extraFields = this.addToSession ? this.addToSession(event, data.toObject()) : {}
 
         // log user in - this doesn't do any authentication
-        let { sessionCookie, csrfCookie } = 
+        let { sessionCookie, csrfCookie, csrfFormOrHeaderValue } = 
             await this.sessionServer.sessionManager.login("", {}, extraFields, undefined, user, bypass2FA);
 
         // set the cookies
@@ -169,6 +185,11 @@ export class SvelteKitUserEndpoints {
             event.cookies.set(csrfCookie.name, 
                 csrfCookie.value, 
                 toCookieSerializeOptions(csrfCookie.options));
+
+        // set locals
+        event.locals.user = user;
+        event.locals.csrfToken = csrfFormOrHeaderValue;
+        event.locals.sessionId = this.sessionServer.sessionManager.getSessionId(sessionCookie.value);
 
         // delete the old session
         if (oldSessionId) {
@@ -248,7 +269,6 @@ export class SvelteKitUserEndpoints {
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
-            console.log(formData);
             const username = data.get('username') ?? "";
             let user : UserInputFields|undefined;
 
@@ -260,10 +280,10 @@ export class SvelteKitUserEndpoints {
             
             // get factor2 from user input
             if (!formData.factor2) {
-                formData.factor2 = this.sessionServer.allowedFactor2[0]; 
+                formData.factor2 = this.sessionServer.allowedFactor2Names[0]; 
             }
             if (formData.factor2 && 
-                !(this.sessionServer.allowedFactor2.includes(formData.factor2??"none"))) {
+                !(this.sessionServer.allowedFactor2Names.includes(formData.factor2??"none"))) {
                 throw new CrossauthError(ErrorCode.Forbidden, 
                     "Illegal second factor " + formData.factor2 + " requested");
             }
@@ -296,7 +316,6 @@ export class SvelteKitUserEndpoints {
             // set the user's state to active, awaitingtwofactor or 
             // awaitingemailverification
             // depending on settings for next step
-            console.log("this.sessionServer.enableEmailVerification", this.sessionServer.enableEmailVerification)
             user.state = "active";
             if (formData.factor2 && formData.factor2!="none") {
                 user.state = "awaitingtwofactor";
@@ -369,11 +388,13 @@ export class SvelteKitUserEndpoints {
                     let data: {
                         userData: { [key: string]: any },
                         username: string,
-                        csrfToken?: string | undefined
+                        csrfToken?: string | undefined,
+                        factor2: string,
                     } = 
                     {
                         userData: userData,
                         username: username,
+                        factor2: formData.factor2 ?? "none",
                     };
                     if (this.sessionServer.enableCsrfProtection)
                         data.csrfToken = event.locals.csrfToken;
@@ -431,4 +452,78 @@ export class SvelteKitUserEndpoints {
             };
         }
     }
+
+    async configureFactor2(event : RequestEvent) : Promise<ConfigureFactor2Return> {
+
+        let formData : {[key:string]:string|undefined}|undefined = undefined;
+        let factor2Data : {userData: {[key:string]:any}, username: string, csrfToken? : string, factor2: string}|undefined = undefined;
+        let factor2 = "";
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            // get factor2 type from session data 
+            const sessionData = await this.sessionServer.getSessionData(event, "2fa");
+            if (sessionData?.factor2) factor2 = sessionData?.factor2;
+            else throw new CrossauthError(ErrorCode.BadRequest, "Two factor authentication was not started");
+
+            // throw an error if the CSRF token is invalid
+            if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) 
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+
+            // get the session - it may be a real user or anonymous
+            if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
+                "No session active while enabling 2FA.  Please enable cookies");
+            // finish 2FA setup - validate secrets and update user
+            let user = await this.sessionServer.sessionManager.completeTwoFactorSetup(formData, 
+                event.locals.sessionId);
+            /*if (!this.isSessionUser(event) && !this.sessionServer.enableEmailVerification) {
+                // we skip the login if the user is already logged in and we are not doing email verification
+                await this.loginWithUser(user, true, event);
+            }*/
+            if (!this.sessionServer.enableEmailVerification) {
+                // if email verification is enabled, the user will have
+                // to click on their link before logging in.  
+                // completeTwoFactorSetup() already sent the email
+                await this.loginWithUser(user, true, event);
+            }
+
+
+            return {
+                success: true,
+                user: user,
+                emailVerificationRequired: this.sessionServer.enableEmailVerification,
+            };
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+
+            // get user data for 2fa again so that we can show it to
+            // the user again
+            let userData : {[key:string]:any}|undefined = undefined;
+            try {
+                const resp = await this.sessionServer.sessionManager.repeatTwoFactorSignup(event.locals.sessionId ?? "");
+                userData = resp.userData;
+            } catch (e2) {}
+            if (userData)
+                factor2Data = {
+                    userData: userData,
+                    csrfToken: event.locals.csrfToken,
+                    username: userData.username ?? "",
+                    factor2: factor2,
+                };
+
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+                formData: formData,
+                factor2Data: factor2Data,
+                emailVerificationRequired: this.sessionServer.enableEmailVerification,
+            };
+        }
+    }
+
 }
