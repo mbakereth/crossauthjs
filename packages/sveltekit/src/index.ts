@@ -16,6 +16,7 @@ export type {
     ResetPasswordReturn,
     RequestFactor2Return,
     ChangePasswordReturn,
+    DeleteUserReturn,
 } from './sveltekituserendpoints';
 export { SvelteKitServer } from './sveltekitserver';
 export type { SvelteKitServerOptions, Resolver } from './sveltekitserver';

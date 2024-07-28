@@ -24,7 +24,8 @@ import type {
     RequestPasswordResetReturn,
     ResetPasswordReturn,
     RequestFactor2Return,
-    ChangePasswordReturn
+    ChangePasswordReturn,
+    DeleteUserReturn,
  } from './sveltekituserendpoints';
 import { SvelteKitServer } from './sveltekitserver'
 
@@ -1123,5 +1124,14 @@ export class SvelteKitSessionServer {
      */
     async changePassword(event : RequestEvent) : Promise<ChangePasswordReturn> {
         return this.userEndpoints.changePassword(event);
+    }
+
+    /**
+     * Call this to delete the logged-in user
+     * @param event 
+     * @returns 
+     */
+    async deleteUser(event : RequestEvent) : Promise<DeleteUserReturn> {
+        return this.userEndpoints.deleteUser(event);
     }
 }

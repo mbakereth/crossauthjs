@@ -93,6 +93,13 @@ export type ChangePasswordReturn = {
     success: boolean
 };
 
+export type DeleteUserReturn = {
+    user? : User,
+    error?: string,
+    exception?: CrossauthError,
+    success: boolean
+};
+
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 
@@ -927,6 +934,39 @@ export class SvelteKitUserEndpoints {
                 exception: ce,
                 success: false,
                 formData,
+            }
+        }
+    }
+
+    async deleteUser(event : RequestEvent) : Promise<DeleteUserReturn> {
+        CrossauthLogger.logger.debug(j({msg:"deleteUser"}));
+        try {
+
+            // throw an error if the CSRF token is invalid
+            if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+            }
+        
+            // throw an error if not logged in
+            if (!event.locals.user) {
+                throw new CrossauthError(ErrorCode.InsufficientPriviledges);
+            }
+
+            await this.sessionServer.userStorage.deleteUserById(event.locals.user.id);
+            event.cookies.delete(this.sessionServer.sessionManager.sessionCookieName, {path: "/"});
+            event.locals.sessionId = undefined;
+            event.locals.user = undefined;
+            return {
+                success: true,
+
+            };
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
             }
         }
     }

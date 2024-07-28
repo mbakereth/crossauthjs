@@ -60,9 +60,7 @@ test('SvelteKitUserEndpoints.resetPassword', async () => {
     const { server, resolver, handle } = await makeServer();
 
     // log in
-    let resp = await login(server, resolver, handle, "alice", "alicePass123");
-    let loginEvent = resp.event;
-    loginEvent = resp.event;
+    await login(server, resolver, handle, "alice", "alicePass123");
 
     const {csrfToken, csrfCookieValue} = await getCsrfToken(server, resolver, handle);
 
@@ -132,5 +130,44 @@ test('SvelteKitUserEndpoints.changePassword', async () => {
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.changePassword(event);
     expect(resp1?.success).toBe(true);
+
+});
+
+test('SvelteKitUserEndpoints.deleteUser', async () => {
+    const { server, resolver, handle, userStorage } = await makeServer();
+
+    // log in
+    let resp = await login(server, resolver, handle, "bob", "bobPass123");
+    let loginEvent = resp.event;
+    loginEvent = resp.event;
+
+    const {csrfToken, csrfCookieValue} = await getCsrfToken(server, resolver, handle);
+    
+    let sessionCookieValue = loginEvent.cookies.get("SESSIONID");
+    let sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
+
+    // delete user
+    let postRequest = new Request("http://ex.com/deleteuser", {
+        method: "POST",
+        body: "csrfToken="+csrfToken,
+        headers: [
+            ["cookie", "CSRFTOKEN="+csrfCookieValue],
+            ["cookie", "SESSIONID="+sessionCookieValue],
+            ["content-type", "application/x-www-form-urlencoded"],
+        ] 
+        });
+    let event = new MockRequestEvent("1", postRequest, {});
+    event.locals.csrfToken = csrfToken;
+    event.locals.sessionId = sessionId;
+    event.locals.authType = "cookie";
+    event.locals.user = loginEvent.locals.user;
+    let resp1 = await server.sessionServer?.deleteUser(event);
+    expect(resp1?.success).toBe(true);
+    let found = false;
+    try {
+        await userStorage.getUserByEmail("bob");
+        found = true;
+    } catch (e) {}
+    expect(found).toBe(false);
 
 });
