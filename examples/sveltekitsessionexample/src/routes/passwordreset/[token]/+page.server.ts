@@ -19,11 +19,13 @@ export const actions : Actions = {
 
 export const load: PageServerLoad = async (event) => {
     try {
-        CrossauthLogger.logger.debug(j({msg:"PageServerLoad " + event.request.method}));
         const resp = await crossauth.sessionServer?.validatePasswordResetToken(event);
         if (!resp?.user) throw new CrossauthError(ErrorCode.InvalidToken, "The password reset token is invalid");
-        if (!event.locals.sessionId) 
+        if (resp.user.factor2 != "" && !event.locals.sessionId) {
+            // If we have 2FA, we need to create an anonymous session with
+            // user.username set for the 2FA hook to pick up the 2FA config
             await crossauth.sessionServer?.createAnonymousSession(event, {user: {username: resp.user.username}});
+        }
         return {
             tokenValidated: resp?.success ?? false,
             error: resp?.error,
