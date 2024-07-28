@@ -15,6 +15,7 @@ export type {
     RequestPasswordResetReturn,
     ResetPasswordReturn,
     RequestFactor2Return,
+    ChangePasswordReturn,
 } from './sveltekituserendpoints';
 export { SvelteKitServer } from './sveltekitserver';
 export type { SvelteKitServerOptions, Resolver } from './sveltekitserver';
@@ -33,6 +34,7 @@ declare global {
                 authError?: string,
                 authErrorDescription?: string,
                 sessionId? : string,
+                scope? : string,
             }
             // interface PageData {}
             // interface PageState {}

@@ -101,3 +101,36 @@ test('SvelteKitUserEndpoints.resetPassword', async () => {
     expect(resp1?.success).toBe(true);
 
 });
+
+test('SvelteKitUserEndpoints.changePassword', async () => {
+    const { server, resolver, handle } = await makeServer();
+
+    // log in
+    let resp = await login(server, resolver, handle, "bob", "bobPass123");
+    let loginEvent = resp.event;
+    loginEvent = resp.event;
+
+    const {csrfToken, csrfCookieValue} = await getCsrfToken(server, resolver, handle);
+    
+    let sessionCookieValue = loginEvent.cookies.get("SESSIONID");
+    let sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
+
+    // change password
+    let postRequest = new Request("http://ex.com/changepassword", {
+        method: "POST",
+        body: "csrfToken="+csrfToken+"&old_password=bobPass123&new_password=bobPass12&repeat_password=bobPass12",
+        headers: [
+            ["cookie", "CSRFTOKEN="+csrfCookieValue],
+            ["cookie", "SESSIONID="+sessionCookieValue],
+            ["content-type", "application/x-www-form-urlencoded"],
+        ] 
+        });
+    let event = new MockRequestEvent("1", postRequest, {});
+    event.locals.csrfToken = csrfToken;
+    event.locals.sessionId = sessionId;
+    event.locals.authType = "cookie";
+    event.locals.user = loginEvent.locals.user;
+    let resp1 = await server.sessionServer?.changePassword(event);
+    expect(resp1?.success).toBe(true);
+
+});

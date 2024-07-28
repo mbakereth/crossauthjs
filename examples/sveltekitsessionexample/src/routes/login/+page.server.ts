@@ -21,6 +21,6 @@ export const actions : Actions = {
 
 export const load: PageServerLoad = async ({ params }) => {
         return {
-            next: "/test",
+            next: "/",
         };
 };

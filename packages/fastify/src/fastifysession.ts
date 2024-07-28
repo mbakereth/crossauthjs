@@ -923,6 +923,7 @@ export class FastifySessionServer {
         setParameter("factor2ProtectedApiEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
         setParameter("enableAdminEndpoints", ParamType.Boolean, this, options, "ENABLE_ADMIN_ENDPOINTS");
         setParameter("enableOAuthClientManagement", ParamType.Boolean, this, options, "ENABLE_OAUTH_CLIENT_MANAGEMENT");
+        setParameter("editUserScope", ParamType.String, this, options, "EDIT_USER_SCOPE");
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
         if (options.createUserFn) this.createUserFn = options.createUserFn;

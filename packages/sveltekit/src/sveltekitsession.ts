@@ -24,6 +24,7 @@ import type {
     RequestPasswordResetReturn,
     ResetPasswordReturn,
     RequestFactor2Return,
+    ChangePasswordReturn
  } from './sveltekituserendpoints';
 import { SvelteKitServer } from './sveltekitserver'
 
@@ -195,6 +196,16 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * Sveltekit's own protection.
      */
     enableCsrfProtection? : boolean,
+
+    /**
+     * This parameter affects users who are not logged in with a session ID
+     * but with an OAuth access token.  Such users can only update their user
+     * record if the scoped named in this variable has been authorized by
+     * that user for the client.
+     * 
+     * By default, no scopes are authorized to edit the user.
+     */
+    editUserScope? : string,
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -381,6 +392,13 @@ export class SvelteKitSessionServer {
 
     private userEndpoints : SvelteKitUserEndpoints;
 
+    /**
+     * This is read from options during construction.
+     * 
+     * See {@link SvelteKitServerOptions}.
+     */
+    readonly editUserScope? : string;
+
     constructor(userStorage : UserStorage, keyStorage : KeyStorage, authenticators : {[key:string]: Authenticator}, options : SvelteKitSessionServerOptions = {}) {
 
         this.keyStorage = keyStorage;
@@ -411,6 +429,7 @@ export class SvelteKitSessionServer {
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
         setParameter("enableCsrfProtection", ParamType.Boolean, this, options, "ENABLE_CSRF_PROTECTION");
+        setParameter("editUserScope", ParamType.String, this, options, "EDIT_USER_SCOPE");
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
         if (options.createUserFn) this.createUserFn = options.createUserFn;
@@ -1095,5 +1114,14 @@ export class SvelteKitSessionServer {
      */
     async requestFactor2(event : RequestEvent) : Promise<RequestFactor2Return> {
         return this.userEndpoints.requestFactor2(event);
+    }
+
+    /**
+     * Call this with POST data to change the logged-in user's password
+     * @param event 
+     * @returns 
+     */
+    async changePassword(event : RequestEvent) : Promise<ChangePasswordReturn> {
+        return this.userEndpoints.changePassword(event);
     }
 }

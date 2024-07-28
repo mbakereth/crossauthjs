@@ -1422,7 +1422,7 @@ export class FastifyUserEndpoints {
         // can only call this if logged in and CSRF token is valid,
         // or else if login has been initiated but a password change is
         // required
-        let user : User
+        let user : User;
         let required = false;
         if (!this.sessionServer.isSessionUser(request) || !request.user) {
             // user is not logged on - check if there is an anonymous 

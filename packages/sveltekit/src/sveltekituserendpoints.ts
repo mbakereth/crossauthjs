@@ -85,6 +85,14 @@ export type RequestFactor2Return = {
     csrfToken? : string,
 };
 
+export type ChangePasswordReturn = {
+    user? : User,
+    error?: string,
+    exception?: CrossauthError,
+    formData?: {[key:string]:string},
+    success: boolean
+};
+
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 
@@ -99,9 +107,23 @@ export class SvelteKitUserEndpoints {
 
     /** Returns whether there is a user logged in with a cookie-based session
      */
-        isSessionUser(event: RequestEvent) {
+    isSessionUser(event: RequestEvent) {
         return event.locals.user != undefined && event.locals.authType == "cookie";
     }
+
+    /**
+     * A user can edit his or her account if they are logged in with
+     * session management, or are logged in with some other means and
+     * e`ditUserScope` has been set and is included in the user's scopes.
+     * @param request the Fastify request
+     * @returns true or false
+     */
+    canEditUser(event : RequestEvent) {
+        return this.isSessionUser(event) || 
+            (this.sessionServer.editUserScope && event.locals.scope && 
+                event.locals.scope.includes(this.sessionServer.editUserScope));
+    }
+    
 
     async login(event : RequestEvent) : Promise<LoginReturn> {
 
@@ -788,4 +810,124 @@ export class SvelteKitUserEndpoints {
         }
     }
 
+    async changePassword(event : RequestEvent) : Promise<ChangePasswordReturn> {
+        CrossauthLogger.logger.debug(j({msg:"changePassword"}));
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            // can only call this if logged in and CSRF token is valid,
+            // or else if login has been initiated but a password change is
+            // required
+            let user : User;
+            let required = false;
+            if (!this.isSessionUser(event) || !event.locals.user) {
+                // user is not logged on - check if there is an anonymous 
+                // session with passwordchange set (meaning the user state
+                // was set to changepasswordneeded when logging on)
+                const data = await this.sessionServer.getSessionData(event, "passwordchange")
+                if (data?.username) {
+                    const resp = await this.sessionServer.userStorage.getUserByUsername(
+                        data?.username, {
+                            skipActiveCheck: true,
+                            skipEmailVerifiedCheck: true,
+                        });
+                    user = resp.user;
+                    required = true;
+                    if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+                        throw new CrossauthError(ErrorCode.InvalidCsrf);
+                    }
+                } else {
+                    throw new CrossauthError(ErrorCode.Unauthorized);
+                }
+            } else if (!this.canEditUser(event)) {
+                throw new CrossauthError(ErrorCode.InsufficientPriviledges);
+            } else {
+                //this.validateCsrfToken(request)
+                if (this.isSessionUser(event) && 
+                    this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+                    throw new CrossauthError(ErrorCode.InvalidCsrf);
+                }
+                user = event.locals.user;
+            }
+    
+            // get the authenticator for factor1 (passwords on factor2 are not supported)
+            const authenticator = this.sessionServer.authenticators[user.factor1];
+
+            // the form should contain old_{secret}, new_{secret} and repeat_{secret}
+            // extract them, making sure the secret is a valid one
+            const secretNames = authenticator.secretNames();
+            let oldSecrets : AuthenticationParameters = {};
+            let newSecrets : AuthenticationParameters = {};
+            let repeatSecrets : AuthenticationParameters|undefined = {};
+            for (let field in formData) {
+                if (field.startsWith("new_")) {
+                    const name = field.replace(/^new_/, "");
+                    if (secretNames.includes(name)) newSecrets[name] = formData[field];
+                } else if (field.startsWith("old_")) {
+                    const name = field.replace(/^old_/, "");
+                    if (secretNames.includes(name)) oldSecrets[name] = formData[field];
+                } else if (field.startsWith("repeat_")) {
+                    const name = field.replace(/^repeat_/, "");
+                    if (secretNames.includes(name)) repeatSecrets[name] = formData[field];
+                }
+            }
+            if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
+
+            // validate the new secret - this is through an implementor-supplied function
+            let errors = authenticator.validateSecrets(newSecrets);
+            if (errors.length > 0) {
+                throw new CrossauthError(ErrorCode.PasswordFormat);
+            }
+
+            // validate the old secrets, check the new and repeat ones match and 
+            // update if valid
+            const oldState = user.state;
+            try {
+                if (required) {
+                    user.state = "active";
+                    await this.sessionServer.userStorage.updateUser({id: user.id, state:user.state});
+                }
+                await this.sessionServer.sessionManager.changeSecrets(user.username,
+                    1,
+                    newSecrets,
+                    repeatSecrets,
+                    oldSecrets
+                );
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug(j({err: e}));
+                if (required) {
+                    try {
+                        await this.sessionServer.userStorage.updateUser({id: user.id, state: oldState});
+                    } catch (e2) {
+                        CrossauthLogger.logger.debug(j({err: e2}));
+                    }
+                }
+                throw ce; 
+            }
+
+            if (required) {
+                // this was a forced change - user is not actually logged on
+                return await this.loginWithUser(user, false, event);
+            }
+
+            return {
+                success: true,
+                formData: formData,
+            };
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                formData,
+            }
+        }
+    }
 }
