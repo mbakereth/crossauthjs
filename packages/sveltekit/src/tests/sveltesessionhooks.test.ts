@@ -1,8 +1,8 @@
 import { MockRequestEvent } from './sveltemocks';
 import { JsonOrFormData } from '../utils';
-import { SvelteKitSessionServer } from '../sveltekitsession';
 import { test, expect } from 'vitest';
-import { createSession, makeServer, getCookies, login, loginFactor2} from './testshared';
+import { createSession, makeServer, getCookies, login, loginFactor2, getCsrfToken} from './testshared';
+import { SessionCookie } from '@crossauth/backend';
 
 test('SvelteSessionHooks.hookWithGetNotLoggedIn', async () => {
     const { server, resolver, handle } = await makeServer();
@@ -188,4 +188,57 @@ test('SvelteSessionHooks.login2FA', async () => {
     ret = resp.ret;
     expect(ret?.success).toBe(true);
     expect(ret?.user?.username).toBe("alice");
+});
+
+test('SvelteSessionHooks.visitPage2FA', async () => {
+    const { server, resolver, handle } = await makeServer();
+
+    // log in
+    let resp = await login(server, resolver, handle, "alice", "alicePass123");
+    let loginEvent = resp.event;
+    let sessionCookieValue = loginEvent.cookies.get("SESSIONID");
+    let ret = resp.ret;
+    expect(ret?.factor2Required).toBe(true);
+    let sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
+    resp = await loginFactor2(server, resolver, handle, sessionCookieValue??"", sessionId??"");
+    loginEvent = resp.event;
+    ret = resp.ret;
+    expect(ret?.success).toBe(true);
+    expect(ret?.user?.username).toBe("alice");
+
+    const {csrfToken, csrfCookieValue} = await getCsrfToken(server, resolver, handle);
+
+    // visit factor2-protected page
+    let postRequest = new Request("http://ex.com/factor2protected", {
+        method: "POST",
+        body: "csrfToken="+csrfToken+"&param1=value1",
+        headers: { 
+            "cookie": "CSRFTOKEN="+csrfCookieValue,
+            "content-type": "application/x-www-form-urlencoded",
+        }});
+    let event = new MockRequestEvent("1", postRequest, {});
+    event.locals.csrfToken = csrfToken;
+    event.locals.user = ret?.user;
+    sessionCookieValue = loginEvent.cookies.get("SESSIONID");
+    event.cookies.set("SESSIONID", sessionCookieValue??"", {path: "/"});
+    //sessionId = loginEvent.locals.sessionId;
+    sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
+    event.locals.sessionId = sessionId;
+    let resp1 = await handle({event: event, resolve: resolver.mockResolve});
+    expect(resp1.status).toBe(302);
+    expect(resp1.headers.get("location")).toBe("/factor2/");
+
+    // submit factor2
+    postRequest = new Request("http://ex.com/factor2protected", {
+        method: "POST",
+        body: "csrfToken="+csrfToken+"&otp=0000",
+        headers: [ 
+            ["cookie", "CSRFTOKEN="+csrfCookieValue],
+            ["cookie", "SESSIONID="+sessionCookieValue],
+            ["content-type", "application/x-www-form-urlencoded"],
+        ]});
+    event = new MockRequestEvent("1", postRequest, {});
+    resp1 = await handle({event: event, resolve: resolver.mockResolve});
+    expect(resp1.status).toBe(200);
+
 });
