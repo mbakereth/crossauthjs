@@ -1,7 +1,21 @@
 // Sveltekit
 export { SvelteKitSessionServer } from './sveltekitsession';
-export type { SvelteKitSessionServerOptions } from './sveltekitsession';
-export type { LoginReturn, LogoutReturn, SignupReturn } from './sveltekituserendpoints';
+export type { 
+    SvelteKitSessionServerOptions,
+    InitiateFactor2Return,
+    CompleteFactor2Return,
+    CancelFactor2Return
+} from './sveltekitsession';
+export type {
+    LoginReturn,
+    LogoutReturn,
+    SignupReturn,
+    ConfigureFactor2Return,
+    VerifyEmailReturn,
+    RequestPasswordResetReturn,
+    ResetPasswordReturn,
+    RequestFactor2Return,
+} from './sveltekituserendpoints';
 export { SvelteKitServer } from './sveltekitserver';
 export type { SvelteKitServerOptions, Resolver } from './sveltekitserver';
 import type { User, ApiKey } from '@crossauth/common'

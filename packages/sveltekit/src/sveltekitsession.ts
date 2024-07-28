@@ -1,3 +1,4 @@
+import { minimatch } from 'minimatch';
 import {
     KeyStorage,
     UserStorage,
@@ -11,6 +12,7 @@ import type { Cookie, SessionManagerOptions } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus } from '@crossauth/common';
 import type { Key, User, UserInputFields } from '@crossauth/common';
 import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
 import type {
@@ -18,10 +20,35 @@ import type {
     LogoutReturn,
     SignupReturn,
     VerifyEmailReturn,
-    ConfigureFactor2Return } from './sveltekituserendpoints';
+    ConfigureFactor2Return,
+    RequestPasswordResetReturn,
+    ResetPasswordReturn,
+    RequestFactor2Return,
+ } from './sveltekituserendpoints';
 import { SvelteKitServer } from './sveltekitserver'
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
+
+export type InitiateFactor2Return = {
+    success: boolean,
+    factor2? : string,
+    error? : string,
+    exception? : CrossauthError,
+};
+
+export type CompleteFactor2Return = {
+    success: boolean,
+    error? : string,
+    factor2? : string,
+    formData?: {[key:string]:string},
+    exception? : CrossauthError,
+};
+
+export type CancelFactor2Return = {
+    success: boolean,
+    error? : string,
+    exception? : CrossauthError,
+};
 
 type Header = {
     name: string,
@@ -91,13 +118,13 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * These page endpoints need the second factor to be entered.  Visiting
      * the page redirects the user to the factor2 page.
      * 
-     * You probably want to do this for things like changing password.  The
-     * default is
-     *   `/requestpasswordreset`,
-     *   `/updateuser`,
-     *   `/changepassword`,
-     *   `/resetpassword`,
-     *   `/changefactor2`,
+     * You should include at least any URLs which validate a user, also
+     * the url for configuring 2FA.
+     * 
+     * You can have wildcard which is useful for including path info,
+     * eg `/resetpassword/*`
+     * 
+     * THe default is empty.
      */
     factor2ProtectedPageEndpoints?: string[],
 
@@ -108,13 +135,8 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * make a call to `/api/factor2`.   If the credetials are correct, the
      * response will be that of the original request.
      * 
-     * You probably want to do this for things like changing password.  The
-     * default is
-     *   `/api/requestpasswordreset`,
-     *   `/api/updateuser`,
-     *   `/api/changepassword`,
-     *   `/api/resetpassword`,
-     *   `/api/changefactor2`,
+     * You can have wildcard which is useful for including path info,
+     * eg `/resetpassword/*`
      */
     factor2ProtectedApiEndpoints?: string[],    
 
@@ -122,7 +144,10 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * These page endpoints need the the user to be logged in.  If not,
      * the user is directed to the login page.
      * 
-     * The default is empty
+     * You can have wildcard which is useful for including path info,
+     * eg `/resetpassword/*`
+     * 
+     * The default is empty.
      * 
      */
     loginProtectedPageEndpoints?: string[],
@@ -155,6 +180,11 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * is activated and when email is changed.  Default false.
      */
     enableEmailVerification? : boolean,
+
+    /**
+     * Turns on password reset.  Default false.
+     */
+    enablePasswordReset? : boolean,
 
     /**
      * CSRF protection is on by default but can be disabled by setting
@@ -249,7 +279,7 @@ export class SvelteKitSessionServer {
     readonly sessionHook : (input: {event: RequestEvent}, 
         //response: Response
     ) => /*MaybePromise<Response>*/ MaybePromise<{headers: Header[]}>;
-    readonly twoFAHook : (input: {event: RequestEvent}, response: Response) => MaybePromise<{twofa: boolean, response: Response}>;
+    readonly twoFAHook : (input: {event: RequestEvent}) => MaybePromise<{twofa: boolean, success: boolean, response?: Response}>;
 
 
     /**
@@ -327,13 +357,7 @@ export class SvelteKitSessionServer {
      */
     private validateSession? : (session: Key, user: User|undefined, event : RequestEvent) => void;
 
-    private factor2ProtectedPageEndpoints : string[] = [
-        "/requestpasswordreset",
-        "/updateuser",
-        "/changepassword",
-        "/resetpassword",
-        "/changefactor2",
-    ]
+    private factor2ProtectedPageEndpoints : string[] = []
     private factor2ProtectedApiEndpoints : string[] = [];
     private loginProtectedPageEndpoints : string[] = [];
     private loginProtectedApiEndpoints : string[] = [];
@@ -346,6 +370,12 @@ export class SvelteKitSessionServer {
      * Reads from constructor options
      */
     readonly enableEmailVerification = false;
+
+    /** Whether password reset is enabled.
+     * 
+     * Reads from constructor options
+     */
+    readonly enablePasswordReset = false;
 
     private factor2Url : string = "/factor2";
 
@@ -379,6 +409,7 @@ export class SvelteKitSessionServer {
             }
         }
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
+        setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
         setParameter("enableCsrfProtection", ParamType.Boolean, this, options, "ENABLE_CSRF_PROTECTION");
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
@@ -390,6 +421,7 @@ export class SvelteKitSessionServer {
         this.userEndpoints = new SvelteKitUserEndpoints(this, options);
 
         this.sessionHook = async ({ event}/*, response*/) => {
+            CrossauthLogger.logger.debug("Session hook");
 
             let headers : Header[] = [];
 
@@ -485,17 +517,32 @@ export class SvelteKitSessionServer {
             return {headers};
         }
 
-        this.twoFAHook = async ({ event }, response) => {
+        this.twoFAHook = async ({ event }) => {
+            CrossauthLogger.logger.debug(j({msg: "twoFAHook" , username: event.locals.user?.username}) );
 
             const sessionCookieValue = this.getSessionCookieValue(event);
-            if (sessionCookieValue && event.locals.user?.factor2 && (
-                this.factor2ProtectedApiEndpoints.includes(event.request.url) || this.factor2ProtectedApiEndpoints.includes(event.request.url))) {
+            const isFactor2PageProtected = this.isFactor2PageProtected(event);
+            const isFactor2ApiProtected = this.isFactor2ApiProtected(event);
+            let user : User|undefined;
+            if (sessionCookieValue) {
+                if (event.locals.user) user = event.locals.user;
+                else {
+                    const anonUser = await this.getSessionData(event, "user");
+                    if (anonUser) {
+                        const resp = await this.userStorage.getUserByUsername(anonUser.username);
+                        user = resp.user;
+                    }
+                }
+            }
+            if (user && sessionCookieValue && user.factor2 != "" && (
+                isFactor2PageProtected || isFactor2ApiProtected)) {
+                    CrossauthLogger.logger.debug(j({msg:"Factor2-protected endpoint visited"}));
                     if (!(["GET", "OPTIONS", "HEAD"].includes(event.request.method))) {
                     const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                     const sessionData = await this.sessionManager.dataForSessionId(sessionId);
                     if (("pre2fa") in sessionData) {
                         // 2FA has started - validate it
-                        CrossauthLogger.logger.debug("Completing 2FA");
+                        CrossauthLogger.logger.debug(j({msg:"Completing 2FA"}));
 
                         // get secrets from the request body 
                         const authenticator = this.authenticators[sessionData.pre2fa.factor2];
@@ -509,108 +556,130 @@ export class SvelteKitSessionServer {
 
                         const sessionCookieValue = this.getSessionCookieValue(event);
                         if (!sessionCookieValue) throw new CrossauthError(ErrorCode.Unauthorized, "No session cookie found");
-                        let error : CrossauthError|undefined = undefined;
+                        let error1 : CrossauthError|undefined = undefined;
                         try {
-                            await this.sessionManager.completeTwoFactorPageVisit(secrets, sessionCookieValue);
+                            await this.sessionManager.completeTwoFactorPageVisit(secrets, event.locals.sessionId??"");
                         } catch (e) {
-                            error = CrossauthError.asCrossauthError(e);
+                            error1 = CrossauthError.asCrossauthError(e);
                             CrossauthLogger.logger.debug(j({err: e}));
                             const ce = CrossauthError.asCrossauthError(e);
-                            CrossauthLogger.logger.error(j({msg: error.message, cerr: e, user: bodyData.get("username"), errorCode: ce.code, errorCodeName: ce.codeName}));
+                            CrossauthLogger.logger.error(j({msg: error1.message, cerr: e, user: bodyData.get("username"), errorCode: ce.code, errorCodeName: ce.codeName}));
                         }
-                        // restore original request body
-                        response = SvelteKitSessionServer.responseWithNewBody(response, sessionData.pre2fa.body);
-                        if (error) {
-                            if (error.code == ErrorCode.Expired) {
+                        if (error1) {
+                            if (error1.code == ErrorCode.Expired) {
                                 // user will not be able to complete this process - delete 
-                                CrossauthLogger.logger.debug("Error - cancelling 2FA");
+                                CrossauthLogger.logger.debug(j({msg:"Error - cancelling 2FA"}));
                                 // the 2FA data and start again
                                 try {
                                     await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
                                 } catch (e) {
-                                    CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                                    CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: user.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                                     CrossauthLogger.logger.debug(j({err:e}))
                                 }
-                                response = SvelteKitSessionServer.responseWithNewBody(response, {
-                                    ...bodyData.toObject(),
-                                    errorMessage: error.message,
-                                    errorMessages: error.message,
-                                    errorCode: ""+error.code,
-                                    errorCodeName: ErrorCode[error.code],
-                                });
+                                error(401, {message: "Sorry, your code has expired"});
+                                return {success: false, twofa: true};
+
                             } else {
-                                if (this.factor2ProtectedPageEndpoints.includes(event.request.url)) {
-                                    return {twofa: true, response: new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.factor2Url+"?error="+ErrorCode[error.code] }})};
+                                if (isFactor2PageProtected) {
+                                    return {
+                                        twofa: true, 
+                                        success: false, 
+                                        response: 
+                                            new Response('', {
+                                                status: 302, 
+                                                statusText: httpStatus(302), 
+                                                headers: { Location: this.factor2Url+"?error="+ErrorCode[error1.code] }})};
 
                                 } else {
-                                    return {twofa: true, response: new Response(JSON.stringify({
-                                        ok: false,
-                                        errorMessage: error.message,
-                                        errorMessages: error.messages,
-                                        errorCode: error.code,
-                                        errorCodeName: ErrorCode[error.code]
-                                    }), {
-                                        status: error.httpStatus,
-                                        statusText : httpStatus(error.httpStatus),
-                                        headers: {
-                                            ...response.headers,
-                                            ...{'content-tyoe': 'application/json'},
-                                        }
-                                    })};
+                                    return {
+                                        twofa: true, 
+                                        success: false, 
+                                        response: new Response(JSON.stringify({
+                                            ok: false,
+                                            errorMessage: error1.message,
+                                            errorMessages: error1.messages,
+                                            errorCode: error1.code,
+                                            errorCodeName: ErrorCode[error1.code]
+                                        }), {
+                                            status: error1.httpStatus,
+                                            statusText : httpStatus(error1.httpStatus),
+                                            headers: {'content-tyoe': 'application/json'},
+                                        })};
                                 }
                             }
                         }
+                        // restore original request body
+                        SvelteKitSessionServer.updateRequest(event, sessionData.pre2fa.body, sessionData.pre2fa["content-type"]);
+                        return {twofa: true, success: true};
                     } else {
                         // 2FA has not started - start it
-                        CrossauthLogger.logger.debug("Starting 2FA");
+                        CrossauthLogger.logger.debug(j({msg:"Starting 2FA", username: user.username}));
                         if (this.enableCsrfProtection && !event.locals.csrfToken) {
                             const error = new CrossauthError(ErrorCode.Forbidden, "CSRF token missing");
-                            return {twofa: true, response: new Response(JSON.stringify({ok: false, errorMessage: error.message, errorMessages: error.messages, errorCode: error.code, errorCodeName: ErrorCode[error.code]}), {
-                                status: error.httpStatus,
-                                statusText : httpStatus(error.httpStatus),
-                                headers: {
-                                    ...response.headers,
-                                    ...{'content-tyoe': 'application/json'},
-                                }
-                            })};
+                            return {
+                                twofa: true, 
+                                success: false, 
+                                response: new Response(JSON.stringify({
+                                    ok: false, 
+                                    errorMessage: error.message, 
+                                    errorMessages: error.messages, 
+                                    errorCode: error.code, 
+                                    errorCodeName: ErrorCode[error.code]
+                                }), {
+                                    status: error.httpStatus,
+                                    statusText : httpStatus(error.httpStatus),
+                                    headers: {
+                                        ...{'content-tyoe': 'application/json'},
+                                    }
+                                })};
         
                         }
-                        CrossauthLogger.logger.debug("Starting 2FA");
                         const bodyData = new JsonOrFormData();
-                        bodyData.loadData(event);
-                        this.sessionManager.initiateTwoFactorPageVisit(event.locals.user, sessionCookieValue, bodyData.toObject(), event.request.url.replace(/\?.*$/,""));
-                        if (this.factor2ProtectedPageEndpoints.includes(event.request.url)) {
-                            return {twofa: true, response: new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.factor2Url }})};
+                        await bodyData.loadData(event);
+                        let contentType = event.request.headers.get("content-type");
+                        await this.sessionManager.initiateTwoFactorPageVisit(user, event.locals.sessionId??"", bodyData.toObject(), event.request.url.replace(/\?.*$/,""), contentType ? contentType : undefined);
+                        if (isFactor2PageProtected) {
+                            return {
+                                twofa: true, 
+                                success: true, 
+                                response: new Response('', {
+                                    status: 302, 
+                                    statusText: httpStatus(302), 
+                                    headers: { Location: this.factor2Url }})};
                         } else {
-                            return {twofa: true, response: new Response(JSON.stringify({
-                                ok: true,
-                                factor2Required: true}), {
-                                headers: {
-                                    ...response.headers,
-                                    ...{'content-tyoe': 'application/json'},
-                                }
+                            return {
+                                twofa: true, 
+                                success: true, 
+                                response: new Response(JSON.stringify({
+                                    ok: true,
+                                    factor2Required: true}), {
+                                    headers: {
+                                        ...{'content-tyoe': 'application/json'},
+                                    }
                             })};
                         }
                     }
                 } else {
+                    CrossauthLogger.logger.debug(j({msg:"Factor2-protected GET endpoint - cancelling 2FA"}));
+
                     // if we have a get request to one of the protected urls, cancel any pending 2FA
                     const sessionCookieValue = this.getSessionCookieValue(event);
                     if (sessionCookieValue) {
                         const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                         const sessionData = await this.sessionManager.dataForSessionId(sessionId);
                         if (("pre2fa") in sessionData) {
-                            CrossauthLogger.logger.debug("Cancelling 2FA");
+                            CrossauthLogger.logger.debug(j({msg:"Cancelling 2FA"}));
                             try {
                                 await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
                             } catch (e) {
                                 CrossauthLogger.logger.debug(j({err:e}));
-                                CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                                CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: user.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                             }      
                         }
                     }
                 }
             } 
-            return {twofa: false, response};
+            return {twofa: false, success: true};
         }
     }
 
@@ -718,11 +787,12 @@ export class SvelteKitSessionServer {
         return token;
     }
 
-    static responseWithNewBody(origResp : Response, params : {[key:string]:string}) {
-        const contentType = origResp.headers.get('content-type');
-        const newContentType = contentType == 'application/json' ? 'application/json' : 'application/x-www-form-urlencoded';
+    static updateRequest(event: RequestEvent, params : {[key:string]:string}, contentType: string) {
+        
+        //const contentType = event.headers.get('content-type');
+        //const newContentType = contentType == 'application/json' ? 'application/json' : 'application/x-www-form-urlencoded';
         let body : string;
-        if (newContentType == 'application/json') {
+        if (contentType == 'application/json') {
             body = JSON.stringify(params);
         } else {
             body = "";
@@ -732,11 +802,12 @@ export class SvelteKitSessionServer {
                 body += encodeURIComponent(name) + "=" + encodeURIComponent(value);
             }
         }
-        return new Response(body, {
-            headers: {...origResp.headers, ...{'content-type': newContentType}},
-            status: origResp.status,
-            statusText : origResp.statusText,
-        })
+        event.request = new Request(event.request.url, {
+            method: "POST",
+            headers: event.request.headers,
+            body: body
+        });
+        return event;
     }
 
     /**
@@ -770,22 +841,72 @@ export class SvelteKitSessionServer {
 
     }
 
+    async factor2PageVisitStarted(event : RequestEvent) : Promise<boolean> {
+        try {
+            const pre2fa = this.getSessionData(event, "pre2fa");
+            return pre2fa != undefined;
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce, msg: "Couldn't get pre2fa data from session"}));
+            return false;
+        }
+
+    }
+
     /////////////////////////////////////////////////////////////
     // login protected URLs
 
-    isLoginPageProtected(event : RequestEvent) : boolean {
-        const url = new URL(event.request.url);
-        return (this.loginProtectedPageEndpoints.includes(url.pathname));
+    isLoginPageProtected(event : RequestEvent|string) : boolean {
+        const url = new URL(typeof event == "string" ? event : event.request.url);
+        let isProtected = false;
+        return this.loginProtectedPageEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isProtected);
+
+        //return (this.loginProtectedPageEndpoints.includes(url.pathname));
     }
  
-    isLoginApiProtected(event : RequestEvent) : boolean {
-        const url = new URL(event.request.url);
-        return (this.loginProtectedApiEndpoints.includes(url.pathname));
+    isLoginApiProtected(event : RequestEvent|string) : boolean {
+        const url = new URL(typeof event == "string" ? event : event.request.url);
+        //return (this.loginProtectedApiEndpoints.includes(url.pathname));
+        let isProtected = false;
+        return this.loginProtectedApiEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isProtected);
     }
 
-    isAdminEndpoint(event : RequestEvent) : boolean {
-        const url = new URL(event.request.url);
-        return (this.adminEndpoints.includes(url.pathname));
+    isFactor2PageProtected(event : RequestEvent|string) : boolean {
+        const url = new URL(typeof event == "string" ? event : event.request.url);
+        let isProtected = false;
+        return this.factor2ProtectedPageEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isProtected);
+
+        //return (this.loginProtectedPageEndpoints.includes(url.pathname));
+    }
+ 
+    isFactor2ApiProtected(event : RequestEvent|string) : boolean {
+        const url = new URL(typeof event == "string" ? event : event.request.url);
+        //return (this.loginProtectedApiEndpoints.includes(url.pathname));
+        let isProtected = false;
+        return this.factor2ProtectedApiEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isProtected);
+    }
+
+    isAdminEndpoint(event : RequestEvent|string) : boolean {
+        const url = new URL(typeof event == "string" ? event : event.request.url);
+        //return (this.adminEndpoints.includes(url.pathname));
+        let isAdmin = false;
+        return this.adminEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isAdmin);
     }
 
     /**
@@ -803,7 +924,7 @@ export class SvelteKitSessionServer {
      */
     async createAnonymousSession(event : RequestEvent, 
         data? : {[key:string]:any}) : Promise<string> {
-        CrossauthLogger.logger.debug(j({msg: "Creating session ID"}));
+        CrossauthLogger.logger.debug(j({msg: "Creating anonympous session ID  "}));
 
         // get custom fields from implentor-provided function
         const formData = new JsonOrFormData();
@@ -828,6 +949,38 @@ export class SvelteKitSessionServer {
         event.locals.sessionId = sessionId;
         return sessionCookie.value;
     };
+
+    async initiateFactor2FromEmail(event: RequestEvent, email : string) : Promise<InitiateFactor2Return> {
+        try {
+            if (!this.isFactor2PageProtected(event)) return {success: true, factor2: ""};
+            
+            CrossauthLogger.logger.debug(j({msg:"Starting 2FA", email: email}));
+            if (this.enableCsrfProtection && !event.locals.csrfToken) {
+                throw new CrossauthError(ErrorCode.Forbidden, "CSRF token missing");
+            }
+            const bodyData = new JsonOrFormData();
+            await bodyData.loadData(event);
+            const {user} = await this.userStorage.getUserByEmail(email);
+            if (user.factor2 != "") {
+                const sessionCookieValue = await this.createAnonymousSession(event);
+                await this.sessionManager.initiateTwoFactorPageVisit(user, sessionCookieValue, bodyData.toObject(), event.request.url.replace(/\?.*$/,""));
+    
+            }
+            return {
+                success: true, 
+                factor2: user.factor2,
+            };
+    
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+            }
+        }
+
+    }
     
     /////////////////////////////////////////////////////////////
     // User Endpoints
@@ -903,5 +1056,44 @@ export class SvelteKitSessionServer {
      */
     async configureFactor2(event : RequestEvent) : Promise<ConfigureFactor2Return> {
         return this.userEndpoints.configureFactor2(event);
+    }
+
+    /**
+     * Request a password reset.  
+     * 
+     * If it is enabled, emails a password reset token to the email given
+     * in the form data.
+     */
+    async requestPasswordReset(event : RequestEvent) : Promise<RequestPasswordResetReturn> {
+        return this.userEndpoints.requestPasswordReset(event);
+    }
+
+    /**
+     * Call this from the GET url the user clicks on to reset their password.
+     * 
+     * If it is enabled, fetches the user for the token to confirm the token
+     * is valid.
+     */
+    async validatePasswordResetToken(event : RequestEvent) : Promise<ResetPasswordReturn> {
+        return this.userEndpoints.validatePasswordResetToken(event);
+    }
+
+    /**
+     * Call this from the POST url the user uses to fill in a new password
+     * after validating the token in the GET url with
+     * {@link validatePasswordresetToken}.
+     */
+    async resetPassword(event : RequestEvent) : Promise<ResetPasswordReturn> {
+        return this.userEndpoints.resetPassword(event);
+    }
+
+    /**
+     * Call this from your factor2 endpoint to fetch the data needed to
+     * display the factor2 form.
+     * @param event 
+     * @returns 
+     */
+    async requestFactor2(event : RequestEvent) : Promise<RequestFactor2Return> {
+        return this.userEndpoints.requestFactor2(event);
     }
 }

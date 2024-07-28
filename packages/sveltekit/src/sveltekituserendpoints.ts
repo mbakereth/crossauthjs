@@ -60,6 +60,31 @@ export type VerifyEmailReturn = {
     success: boolean
 };
 
+export type RequestPasswordResetReturn = {
+    user? : User,
+    formData?: {[key:string]:string|undefined},
+    error?: string,
+    exception?: CrossauthError,
+    success: boolean
+};
+
+export type ResetPasswordReturn = {
+    user? : User,
+    formData?: {[key:string]:string|undefined},
+    error?: string,
+    exception?: CrossauthError,
+    success: boolean
+};
+
+export type RequestFactor2Return = {
+    success: boolean,
+    action?: string,
+    factor2?: string,
+    error?: string,
+    exception?: CrossauthError,
+    csrfToken? : string,
+};
+
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 
@@ -169,7 +194,7 @@ export class SvelteKitUserEndpoints {
         event : RequestEvent) {
 
         // get old session ID so we can delete it after
-        const oldSessionId = this.sessionServer.getSessionCookieValue(event);
+        const oldSessionId = event.locals.sessionId;
 
         // call implementor-provided hook to add custom fields to session key
         const data = new JsonOrFormData();
@@ -607,4 +632,163 @@ export class SvelteKitUserEndpoints {
             }
         }
     }
+
+    async requestPasswordReset(event : RequestEvent) : Promise<RequestPasswordResetReturn> {
+        let formData : {[key:string]:string|undefined}|undefined = undefined;
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+            const email = data.get('email') ?? "";
+            if (email == "") throw new CrossauthError(ErrorCode.InvalidUserame, "Email field may not be empty");
+
+            // throw an error if the CSRF token is invalid
+            if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) 
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+
+            // this has to be enabled in configuration
+            if (!this.sessionServer.enablePasswordReset) {
+                throw new CrossauthError(ErrorCode.Configuration,
+                    "Password reset not enabled");
+            }
+
+            // Send password reset email
+            await this.sessionServer.sessionManager.requestPasswordReset(email);
+
+
+            return { formData, success: true };
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                formData,
+            }
+        }
+    }
+
+    async validatePasswordResetToken(event : RequestEvent) : Promise<ResetPasswordReturn> {
+        CrossauthLogger.logger.debug(j({msg:"validatePasswordResetToken " + event.request.method}))
+        try {
+
+            const token = event.params.token;
+            if (!token) throw new CrossauthError(ErrorCode.InvalidToken, "Invalid email verification token");
+
+            // validate the token and log the user in
+            const user = 
+                await this.sessionServer.sessionManager.userForPasswordResetToken(token);
+
+            return {
+                success: true,
+                user: user,
+                formData : {token}
+            }
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+            };
+        }
+
+    }
+
+    async resetPassword(event : RequestEvent) : Promise<ResetPasswordReturn> {
+        CrossauthLogger.logger.debug(j({msg:"resetPassword"}));
+        let formData : {[key:string]:string|undefined}|undefined = undefined;
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            // throw an error if the CSRF token is invalid
+            if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) 
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+
+            // this has to be enabled in configuration
+            if (!this.sessionServer.enablePasswordReset) {
+                throw new CrossauthError(ErrorCode.Configuration,
+                    "Password reset not enabled");
+            }
+
+            // get user for token
+            const token = event.params.token ?? "";
+            if (token == "") throw new CrossauthError(ErrorCode.InvalidUserame, "No token provided");
+            const user = await this.sessionServer.sessionManager.userForPasswordResetToken(token);
+
+            // get secrets from the request body 
+            // there should be new_{secret} and repeat_{secret}
+            const authenticator = this.sessionServer.authenticators[user.factor1];
+            const secretNames = authenticator.secretNames();
+            let newSecrets : AuthenticationParameters = {};
+            let repeatSecrets : AuthenticationParameters|undefined = {};
+            for (let field in formData) {
+                if (field.startsWith("new_")) {
+                    const name = field.replace(/^new_/, "");
+                    // @ts-ignore as it complains about formData[field]
+                    if (secretNames.includes(name)) newSecrets[name] = formData[field];
+                } else if (field.startsWith("repeat_")) {
+                    const name = field.replace(/^repeat_/, "");
+                    // @ts-ignore as it complains about formData[field]
+                    if (secretNames.includes(name)) repeatSecrets[name] = formData[field];
+                }
+            }
+            if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
+
+            // validate the new secrets (with the implementor-provided function)
+            let errors = authenticator.validateSecrets(newSecrets);
+            if (errors.length > 0) {
+                throw new CrossauthError(ErrorCode.PasswordFormat);
+            }
+
+            // check new and repeat secrets are valid and update the user
+            const user1 = await this.sessionServer.sessionManager.resetSecret(token, 1, newSecrets, repeatSecrets);
+            // log the user in
+            return this.loginWithUser(user1, true, event);
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                formData,
+            }
+        }
+    }
+
+    async requestFactor2(event : RequestEvent) : Promise<RequestFactor2Return> {
+        try {
+
+            if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
+                "No session cookie present");
+            const sessionCookieValue = this.sessionServer.getSessionCookieValue(event);
+            const sessionId = this.sessionServer.sessionManager.getSessionId(sessionCookieValue??"")
+            const sessionData = 
+            await this.sessionServer.sessionManager.dataForSessionId(sessionId);
+            if (!sessionData?.pre2fa) throw new CrossauthError(ErrorCode.Unauthorized, 
+                "2FA not initiated");
+            return {
+                success: true,
+                csrfToken: event.locals.csrfToken, 
+                action: sessionData.pre2fa.url, 
+                factor2: sessionData.pre2fa.factor2
+            };
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+            }
+        }
+    }
+
 }

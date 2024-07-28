@@ -291,15 +291,26 @@ export class TokenEmailer {
             }
             const now = new Date().getTime();
             if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
-            await this.keyStorage.deleteKey(hash);
+            //await this.keyStorage.deleteKey(hash);
             return {userId: storedToken.userId, newEmail: storedToken.data??''};
         } finally {
-            try {
+            /*try {
                 await this.keyStorage.deleteKey(hash);
             } catch {
                 CrossauthLogger.logger.error("Couldn't delete email verification hash " + Crypto.hash(hash));
-            }
+            }*/
 
+        }
+    }
+
+    async deleteEmailVerificationToken(token : string) {
+        try {
+            const hash = TokenEmailer.hashEmailVerificationToken(token);
+            await this.keyStorage.deleteKey(hash);
+    
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: e}));
         }
     }
 
@@ -339,6 +350,7 @@ export class TokenEmailer {
      */
     async verifyPasswordResetToken(token : string) : Promise<User> {
         const hash = TokenEmailer.hashPasswordResetToken(token);
+        CrossauthLogger.logger.debug("verifyPasswordResetToken " + token + " " + hash);
         let storedToken = await this.keyStorage.getKey(hash);
         if (!storedToken.userId) throw new CrossauthError(ErrorCode.InvalidKey);
         if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);

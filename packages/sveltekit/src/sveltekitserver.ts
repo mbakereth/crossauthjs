@@ -1,6 +1,6 @@
 import { SvelteKitSessionServer, type SvelteKitSessionServerOptions } from './sveltekitsession';
 import { UserStorage, KeyStorage, Authenticator, setParameter, ParamType } from '@crossauth/backend';
-import { CrossauthError, ErrorCode, httpStatus, type User } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus, type User } from '@crossauth/common';
 import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
 
 export interface SvelteKitServerOptions extends SvelteKitSessionServerOptions {
@@ -58,11 +58,10 @@ export class SvelteKitServer {
 
         this.hooks = async ({event, resolve}) => {
             if (this.sessionServer) {
-                const resp = await(this.sessionServer.sessionHook({event}));
-                let response = await resolve(event);;
-                this.sessionServer.setHeaders(resp.headers, response);
-                const ret = await(this.sessionServer.twoFAHook({event}, response));
-                response = ret.response;
+                /*const resp =*/ await this.sessionServer.sessionHook({event});
+                //let response = await resolve(event);
+                //this.sessionServer.setHeaders(resp.headers, response);
+                const ret = await this.sessionServer.twoFAHook({event});
                 if (!ret.twofa && !event.locals.user) {
                     if (this.sessionServer.isLoginPageProtected(event)) 
                         return new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.loginUrl}});
@@ -70,13 +69,13 @@ export class SvelteKitServer {
                         return new Response('', {status: 401, statusText: httpStatus(401)});    
                 }
                 if (!ret.twofa && this.sessionServer.isAdminEndpoint(event) &&
-                    (!event.locals.user || SvelteKitServer.isAdminFn(event.locals.user))) 
+                    (!event.locals.user || SvelteKitServer.isAdminFn(event.locals.user))) {
                     return new Response('', {status: 401, statusText: httpStatus(401)});    
-                return response;
+                }
+                if (ret.response) return ret.response;
             }
             return await resolve(event);
 
         }
     }
-
 }

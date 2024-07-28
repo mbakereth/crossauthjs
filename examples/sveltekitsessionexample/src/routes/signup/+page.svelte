@@ -61,7 +61,7 @@
             <span class="label-text">Email</span>
             </label>
             <label class="input-group">
-                <input type="email" id="user_email" name="user_email" class="input input-bordered w-full max-w-xs mb-4" placeholder="bloggsj@joebloggs.com" value={form?.formData?.user_email ?? ''}/><br>
+                <input type="email" id="user_email" name="user_email" class="input input-bordered w-full max-w-xs mb-4" placeholder="joe@bloggs.com" value={form?.formData?.user_email ?? ''}/><br>
             </label>
         </div>
 

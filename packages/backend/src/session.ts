@@ -721,7 +721,8 @@ export class SessionManager {
         user : User,
         sessionId : string,
         requestBody : {[key:string]: any},
-        url: string | undefined): Promise<{
+        url: string | undefined,
+        contentType? : string): Promise<{
             sessionCookie: Cookie | undefined,
             csrfCookie: Cookie | undefined,
             csrfFormOrHeaderValue: string | undefined
@@ -732,19 +733,13 @@ export class SessionManager {
         let sessionCookie : Cookie|undefined;
         let csrfCookie : Cookie|undefined;
         let csrfFormOrHeaderValue : string|undefined;
-        if (!user) {
-            // user is not logged in - create an anonymous session
-            const resp = await this.createAnonymousSession({});
-            sessionCookie = resp.sessionCookie;
-            sessionId = sessionCookie.value;
-            csrfCookie = resp.csrfCookie;
-            csrfFormOrHeaderValue = resp.csrfFormOrHeaderValue
-    
-        }
-
+        
         //const sessionId = this.session.unsignCookie(sessionCookieValue);
-        const hashedSessionId = SessionCookie.hashSessionId(sessionId)
-        this.keyStorage.updateData(hashedSessionId, "pre2fa", {username: user.username, factor2: user.factor2, secrets: secrets, body: requestBody, url: url});
+        const hashedSessionId = SessionCookie.hashSessionId(sessionId);
+        CrossauthLogger.logger.debug("initiateTwoFactorPageVisit " + user.username + " " + sessionId + " " + hashedSessionId);
+        let newData : {[key:string]:any} = {username: user.username, factor2: user.factor2, secrets: secrets, body: requestBody, url: url};
+        if (contentType) newData["content-type"] = contentType;
+        await this.keyStorage.updateData(hashedSessionId, "pre2fa", newData);
 
         return {
             sessionCookie: sessionCookie,
@@ -886,28 +881,34 @@ export class SessionManager {
      * @returns the new user record
      */
     async applyEmailVerificationToken(token : string) : Promise<User> {
+        CrossauthLogger.logger.debug(j({msg: "applyEmailVerificationToken"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Email verification not enabled");
-        let { userId, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
-        let {user} = await this.userStorage.getUserById(userId, {skipEmailVerifiedCheck: true});
-        let oldEmail;
-        if ("email" in user && user.email != undefined) {
-            oldEmail = user.email;
-        } else {
-            oldEmail = user.username;
+        try {
+            let { userId, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
+            let {user} = await this.userStorage.getUserById(userId, {skipEmailVerifiedCheck: true});
+            let oldEmail;
+            if ("email" in user && user.email != undefined) {
+                oldEmail = user.email;
+            } else {
+                oldEmail = user.username;
+            }
+            let newUser : Partial<User> = {
+                id: user.id,
+            }
+            if (user.state = "awaitingemailverification") {
+                newUser.state = "active";
+            }
+            if (newEmail != "") {
+                newUser.email = newEmail;
+            } else {
+                oldEmail = undefined;
+            }
+            await this.userStorage.updateUser(newUser);
+            await this.tokenEmailer.deleteEmailVerificationToken(token);
+            return {...user, ...newUser, oldEmail: oldEmail};
+    
+        } finally {
         }
-        let newUser : Partial<User> = {
-            id: user.id,
-        }
-        if (user.state = "awaitingemailverification") {
-            newUser.state = "active";
-        }
-        if (newEmail != "") {
-            newUser.email = newEmail;
-        } else {
-            oldEmail = undefined;
-        }
-        await this.userStorage.updateUser(newUser);
-        return {...user, ...newUser, oldEmail: oldEmail};
     }
 
     /**
@@ -917,6 +918,7 @@ export class SessionManager {
      * @throws {@link @crossauth/common!CrossauthError} if the token is not valid.
      */
     async userForPasswordResetToken(token : string) : Promise<User> {
+        CrossauthLogger.logger.debug(j({msg:"userForPasswordResetToken"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
         return await this.tokenEmailer.verifyPasswordResetToken(token);
     }
@@ -1004,6 +1006,7 @@ export class SessionManager {
         factorNumber: 1 | 2,
         params: AuthenticationParameters,
         repeatParams?: AuthenticationParameters) : Promise<User> {
+        CrossauthLogger.logger.debug(j({msg:"resetSecret"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
         const user = await this.userForPasswordResetToken(token);
         const factor = factorNumber == 1 ? user.factor1 : user.factor2;
