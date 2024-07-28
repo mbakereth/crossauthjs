@@ -113,7 +113,7 @@ export class SvelteKitUserEndpoints {
             formData = data.toObject();
             const username = data.get('username') ?? "";
             const persist = data.getAsBoolean('persist') ?? false;
-            if (username == "") throw new CrossauthError(ErrorCode.InvalidUserame, "Username field may not be empty");
+            if (username == "") throw new CrossauthError(ErrorCode.InvalidUsername, "Username field may not be empty");
             
             // call implementor-provided hook to add additional fields to session key
             let extraFields = this.addToSession ? this.addToSession(event, formData) : {}
@@ -309,7 +309,7 @@ export class SvelteKitUserEndpoints {
             if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) 
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
 
-            if (username == "") throw new CrossauthError(ErrorCode.InvalidUserame, "Username field may not be empty");
+            if (username == "") throw new CrossauthError(ErrorCode.InvalidUsername, "Username field may not be empty");
             
             // get factor2 from user input
             if (!formData.factor2) {
@@ -638,7 +638,7 @@ export class SvelteKitUserEndpoints {
             await data.loadData(event);
             formData = data.toObject();
             const email = data.get('email') ?? "";
-            if (email == "") throw new CrossauthError(ErrorCode.InvalidUserame, "Email field may not be empty");
+            if (email == "") throw new CrossauthError(ErrorCode.InvalidUsername, "Email field may not be empty");
 
             // throw an error if the CSRF token is invalid
             if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) 
@@ -716,7 +716,7 @@ export class SvelteKitUserEndpoints {
 
             // get user for token
             const token = event.params.token ?? "";
-            if (token == "") throw new CrossauthError(ErrorCode.InvalidUserame, "No token provided");
+            if (token == "") throw new CrossauthError(ErrorCode.InvalidUsername, "No token provided");
             const user = await this.sessionServer.sessionManager.userForPasswordResetToken(token);
 
             // get secrets from the request body 

@@ -105,7 +105,7 @@ export enum ErrorCode {
     InvalidPhoneNumber,
 
     /** Thrown if an email address in invalid */
-    InvalidUserame,
+    InvalidUsername,
 
     /** Thrown when two passwords do not match each other (eg signup) */
     PasswordMatch,
@@ -202,7 +202,7 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.UserNotActive) {
             _message = "Account is not active"
             _httpStatus = 403;
-        } else if (code == ErrorCode.InvalidUserame) {
+        } else if (code == ErrorCode.InvalidUsername) {
             _message = "Username is not in an allowed format"
             _httpStatus = 400;
         } else if (code == ErrorCode.InvalidEmail) {

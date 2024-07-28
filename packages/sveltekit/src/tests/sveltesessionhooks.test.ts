@@ -2,7 +2,6 @@ import { MockRequestEvent } from './sveltemocks';
 import { JsonOrFormData } from '../utils';
 import { test, expect } from 'vitest';
 import { createSession, makeServer, getCookies, login, loginFactor2, getCsrfToken} from './testshared';
-import { SessionCookie } from '@crossauth/backend';
 
 test('SvelteSessionHooks.hookWithGetNotLoggedIn', async () => {
     const { server, resolver, handle } = await makeServer();

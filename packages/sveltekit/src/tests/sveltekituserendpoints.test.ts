@@ -1,6 +1,8 @@
 import { MockRequestEvent } from './sveltemocks';
 import { test, expect } from 'vitest';
-import {  makeServer, getCsrfToken } from './testshared';
+import {  makeServer, getCsrfToken, login } from './testshared';
+
+export var passwordResetData :  {token : string, extraData: {[key:string]: any}};
 
 test('SvelteKitUserEndpoints.login', async () => {
     const { server, resolver, handle } = await makeServer();
@@ -52,4 +54,50 @@ test('SvelteKitUserEndpoints.logout', async () => {
     ret = await server.sessionServer?.logout(event);
     expect(ret?.user).toBeUndefined();
     expect(event.cookies.get("SESSIONID")).toBeUndefined();
+});
+
+test('SvelteKitUserEndpoints.resetPassword', async () => {
+    const { server, resolver, handle } = await makeServer();
+
+    // log in
+    let resp = await login(server, resolver, handle, "alice", "alicePass123");
+    let loginEvent = resp.event;
+    loginEvent = resp.event;
+
+    const {csrfToken, csrfCookieValue} = await getCsrfToken(server, resolver, handle);
+
+    // @ts-ignore
+    server["sessionServer"]["sessionManager"]["tokenEmailer"]["_sendPasswordResetToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+        passwordResetData = {token, extraData}
+    };
+    
+    // request password reset
+    let postRequest = new Request("http://ex.com/passwordreset", {
+        method: "POST",
+        body: "csrfToken="+csrfToken+"&email=bob@bob.com",
+        headers: { 
+            "cookie": "CSRFTOKEN="+csrfCookieValue,
+            "content-type": "application/x-www-form-urlencoded",
+        }});
+    let event = new MockRequestEvent("1", postRequest, {});
+    event.locals.csrfToken = csrfToken;
+    event.cookies.set("CSRFTOKEN", csrfCookieValue, {path: "/"});
+    let resp1 = await server.sessionServer?.requestPasswordReset(event);
+    expect(resp1?.success).toBe(true);
+    const token = passwordResetData.token;
+
+    // submit password reset
+    postRequest = new Request("http://ex.com/passwordreset/"+token, {
+        method: "POST",
+        body: "csrfToken="+csrfToken+"&new_password='ABCabc123'&repeat_password='ABCabc123'",
+        headers: { 
+            "cookie": "CSRFTOKEN="+csrfCookieValue,
+            "content-type": "application/x-www-form-urlencoded",
+        }});
+    event = new MockRequestEvent("1", postRequest, {token: token});
+    event.locals.csrfToken = csrfToken;
+    event.cookies.set("CSRFTOKEN", csrfCookieValue, {path: "/"});
+    resp1 = await server.sessionServer?.resetPassword(event);
+    expect(resp1?.success).toBe(true);
+
 });
