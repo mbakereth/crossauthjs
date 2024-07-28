@@ -162,8 +162,6 @@ export class SvelteKitUserEndpoints {
                 }
             }
 
-            console.log("Login:", user);
-
             if (!user.factor2 || user.factor2 == "")
                 event.locals.user = user;
 
@@ -176,7 +174,6 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
-            console.log("Login:", ce);
             return {
                 error: ce.message,
                 exception: ce,

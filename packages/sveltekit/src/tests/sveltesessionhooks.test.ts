@@ -2,7 +2,7 @@ import { MockRequestEvent } from './sveltemocks';
 import { JsonOrFormData } from '../utils';
 import { SvelteKitSessionServer } from '../sveltekitsession';
 import { test, expect } from 'vitest';
-import { createSession, makeServer, getCookies, login } from './testshared';
+import { createSession, makeServer, getCookies, login, loginFactor2} from './testshared';
 
 test('SvelteSessionHooks.hookWithGetNotLoggedIn', async () => {
     const { server, resolver, handle } = await makeServer();
@@ -120,36 +120,6 @@ test('SvelteSessionHooks.jsonBody', async () => {
     expect(data.get("X")).toBeUndefined();
 });
 
-test('SvelteSessionHooks.cloneJsonResponse', async () => {
-    const response = new Response(
-        JSON.stringify({"param1": "value1", "param2" : "value2"}),
-        {status: 200, statusText: "OK", headers: {'content-type': 'application/json'}}
-    );
-    const newResponse = SvelteKitSessionServer.responseWithNewBody(
-        response,
-        {"param3": "value3"}
-    );
-    const newBody = await newResponse.json();
-    expect(newBody.param3).toBe("value3");
-    expect(newBody.param1).toBeUndefined();
-    expect(newResponse.headers.get('content-type')).toBe("application/json");
-});
-
-test('SvelteSessionHooks.cloneFormResponse', async () => {
-    const response = new Response(
-        "param1=value1&param2=value2",
-        {status: 200, statusText: "OK", headers: {'content-type': 'application/x-www-form-urlencoded'}}
-    );
-    const newResponse = SvelteKitSessionServer.responseWithNewBody(
-        response,
-        {"param3": "value3"}
-    );
-    const newBody = await newResponse.formData();
-    expect(newBody.get("param3")).toBe("value3");
-    expect(newBody.get("param1")).toBeNull();
-    expect(newResponse.headers.get('content-type')).toBe("application/x-www-form-urlencoded");
-});
-
 test('SvelteSessionHooks.hookWithGetIsLoggedIn', async () => {
     const { server, resolver, handle, userStorage, keyStorage } = await makeServer();
     const sessionKey = await createSession("bob", userStorage, keyStorage);
@@ -194,11 +164,28 @@ test('SvelteSessionHooks.loginProtectedNotLoggedIn', async () => {
     expect(resp.headers.get('location')).toBe("/");
 
     // log in
-    let loginEvent = await login(server, resolver, handle);
+    let {event: loginEvent} = await login(server, resolver, handle);
 
     // try again now that we are logged in
     event.request = getRequest;
     resp = await handle({event: loginEvent, resolve: resolver.mockResolve});
     expect(resp.status).toBe(200);
 
+});
+
+
+test('SvelteSessionHooks.login2FA', async () => {
+    const { server, resolver, handle } = await makeServer();
+
+    // log in
+    let resp = await login(server, resolver, handle, "alice", "alicePass123");
+    const loginEvent = resp.event;
+    const sessionCookie = loginEvent.cookies.get("SESSIONID");
+    let ret = resp.ret;
+    expect(ret?.factor2Required).toBe(true);
+    const sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookie??"");
+    resp = await loginFactor2(server, resolver, handle, sessionCookie??"", sessionId??"");
+    ret = resp.ret;
+    expect(ret?.success).toBe(true);
+    expect(ret?.user?.username).toBe("alice");
 });

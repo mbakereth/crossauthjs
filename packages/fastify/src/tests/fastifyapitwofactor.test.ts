@@ -2,7 +2,7 @@ import { beforeAll, afterEach, expect, test, vi } from 'vitest'
 import path from 'path';
 import fastify from 'fastify';
 import { getTestUserStorage }  from './inmemorytestdata';
-import { InMemoryUserStorage, InMemoryKeyStorage, LocalPasswordAuthenticator , TotpAuthenticator, EmailAuthenticator, SessionCookie } from '@crossauth/backend';
+import { InMemoryUserStorage, InMemoryKeyStorage, LocalPasswordAuthenticator , TotpAuthenticator, EmailAuthenticator, DummyFactor2Authenticator, SessionCookie } from '@crossauth/backend';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import { CrossauthError } from '@crossauth/common';
 import { authenticator as gAuthenticator } from 'otplib';
@@ -19,6 +19,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
     let lpAuthenticator = new LocalPasswordAuthenticator(userStorage, {pbkdf2Iterations: 1_000});
     let totpAuthenticator = new TotpAuthenticator("FastifyTest");
     let emailAuthenticator = new EmailAuthenticator();
+    let dummyFactor2Authenticator = new DummyFactor2Authenticator("0000");
     emailAuthenticator["sendToken"] = async function (to: string, otp : string) {
         emailTokenData = {otp, to}
         return "1";
@@ -31,6 +32,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             localpassword: lpAuthenticator,
             totp: totpAuthenticator,
             email: emailAuthenticator,
+            dummyFactor2: dummyFactor2Authenticator,
         },
         session: {
             keyStorage: keyStorage, 
@@ -38,7 +40,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             app: app,
             views: path.join(__dirname, '../views'),
             secret: "ABCDEFG",
-            allowedFactor2: ["none", "totp", "email"],
+            allowedFactor2: ["none", "totp", "email", "dummyFactor2"],
             siteUrl: `http://localhost:3000`,
             ...options,
         });
@@ -171,6 +173,36 @@ async function loginEmail(server : FastifyServer) : Promise<{sessionCookie : str
     const sessionCookie1 = getSession(res);
     const {csrfCookie: csrfCookie1, csrfToken: csrfToken1} = await getCsrf(server);
     return {sessionCookie: sessionCookie1, csrfCookie: csrfCookie1, csrfToken: csrfToken1};
+};
+
+async function createDummyFactor2Account(server : FastifyServer) {
+
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    res = await server.app.inject({ method: "POST", url: "/api/signup", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        user_email: "mary@mary.com", 
+        factor2: "dummyFactor2",
+        csrfToken: csrfToken
+    } });
+    body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+
+    const sessionCookie = getSession(res);
+    const otp = "0000";
+    res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+        otp: otp
+    } })
+    body = JSON.parse(res.body)
+    
+    expect(body.ok).toBe(true);
+    expect(body.user.username).toBe("mary");
+
 };
 
 async function createNonTotpAccount(server : FastifyServer) {
@@ -537,6 +569,33 @@ test('FastifyServer.api.loginEmail', async () => {
 
     const sessionCookie = getSession(res);
     const otp = emailTokenData.otp;
+    res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
+        csrfToken: csrfToken,
+        otp: otp
+    } })
+    expect(body.ok).toBe(true);
+});
+
+test('FastifyServer.api.dummyFactor2', async () => {
+    let {server} = await makeAppWithOptions({enableEmailVerification: false});
+
+    await createDummyFactor2Account(server);
+
+    let res;
+    let body;
+
+    const {csrfCookie, csrfToken} = await getCsrf(server);
+
+    res = await server.app.inject({ method: "POST", url: "/api/login", cookies: {CSRFTOKEN: csrfCookie}, payload: {
+        username: "mary", 
+        password: "maryPass123", 
+        csrfToken: csrfToken
+    } })
+    body = JSON.parse(res.body)
+    expect(body.ok).toBe(true);
+
+    const sessionCookie = getSession(res);
+    const otp = "0000";
     res = await server.app.inject({ method: "POST", url: "/api/configurefactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
         csrfToken: csrfToken,
         otp: otp

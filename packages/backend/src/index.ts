@@ -21,6 +21,8 @@ export type {  EmailAuthenticatorOptions } from './authenticators/emailauth';
 export {  SmsAuthenticator } from './authenticators/smsauth';
 export type {  SmsAuthenticatorOptions } from './authenticators/smsauth';
 export {  TwilioAuthenticator } from './authenticators/twilioauth';
+export {  DummyFactor2Authenticator } from './authenticators/dummyfactor2';
+export type {  DummyFactor2AuthenticatorOptions } from './authenticators/dummyfactor2';
 export {  LdapAuthenticator } from './authenticators/ldapauth';
 export type {  LdapAuthenticatorOptions } from './authenticators/ldapauth';
 export { TotpAuthenticator } from './authenticators/totpauth';

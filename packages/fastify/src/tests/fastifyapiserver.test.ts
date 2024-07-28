@@ -2,7 +2,7 @@ import { beforeAll, afterEach, expect, test, vi } from 'vitest'
 import path from 'path';
 import fastify from 'fastify';
 import { getTestUserStorage }  from './inmemorytestdata';
-import { InMemoryUserStorage, InMemoryKeyStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator, Crypto, SessionCookie } from '@crossauth/backend';
+import { InMemoryUserStorage, InMemoryKeyStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator, DummyFactor2Authenticator, Crypto, SessionCookie } from '@crossauth/backend';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 
@@ -18,6 +18,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
     let lpAuthenticator = new LocalPasswordAuthenticator(userStorage, {pbkdf2Iterations: 1_000});
     let totpAuthenticator = new TotpAuthenticator("FastifyTest");
     let emailAuthenticator = new EmailAuthenticator();
+    let dummyFactor2Authenticator = new DummyFactor2Authenticator("0000");
     emailAuthenticator["sendToken"] = async function (to: string, token : string) {
         emailTokenData = {token, to}
         return "1";
@@ -30,6 +31,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             localpassword: lpAuthenticator,
             totp: totpAuthenticator,
             email: emailAuthenticator,
+            dummyFactor2: dummyFactor2Authenticator,
         },
         session: {
             keyStorage: keyStorage, 

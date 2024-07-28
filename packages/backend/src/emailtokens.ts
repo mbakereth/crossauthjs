@@ -310,7 +310,7 @@ export class TokenEmailer {
     
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
-            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.debug(j({err: ce}));
         }
     }
 

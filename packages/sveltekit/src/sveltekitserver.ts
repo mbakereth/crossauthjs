@@ -1,6 +1,6 @@
 import { SvelteKitSessionServer, type SvelteKitSessionServerOptions } from './sveltekitsession';
 import { UserStorage, KeyStorage, Authenticator, setParameter, ParamType } from '@crossauth/backend';
-import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus, type User } from '@crossauth/common';
+import { CrossauthError, ErrorCode, httpStatus, type User } from '@crossauth/common';
 import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
 
 export interface SvelteKitServerOptions extends SvelteKitSessionServerOptions {

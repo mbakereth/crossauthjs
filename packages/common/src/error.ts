@@ -241,7 +241,7 @@ export class CrossauthError extends Error {
             _httpStatus = 401;
         } else if (code == ErrorCode.Forbidden) {
             _message = "You do not have permission to access this resource";
-            _httpStatus = 402;
+            _httpStatus = 403;
         } else if (code == ErrorCode.InsufficientPriviledges) {
             _message = "You do not have the right privileges to access this resource";
             _httpStatus = 401;
