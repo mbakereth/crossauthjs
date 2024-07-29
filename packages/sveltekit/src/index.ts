@@ -16,6 +16,7 @@ export type {
     ResetPasswordReturn,
     RequestFactor2Return,
     ChangePasswordReturn,
+    ChangeFactor2Return,
     DeleteUserReturn,
     UpdateUserReturn,
 } from './sveltekituserendpoints';

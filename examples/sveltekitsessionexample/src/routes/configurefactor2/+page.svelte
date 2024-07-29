@@ -25,6 +25,6 @@
 {:else if form?.factor2Data?.factor2 == "totp"}
     <ConfigureTotp data={data} factor2Data={form?.factor2Data}/>
 {:else}
-<p class="text-slate-900 bg-error p-2 rounded ">UNknown second factor</p>
+<p class="text-slate-900 bg-error p-2 rounded ">Unknown second factor</p>
 <p><a href="/">Home</a></p>
 {/if}

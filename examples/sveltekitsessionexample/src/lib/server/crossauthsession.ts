@@ -3,6 +3,7 @@ import {
     PrismaKeyStorage,
     PrismaUserStorage,
     LocalPasswordAuthenticator,
+    EmailAuthenticator,
     TotpAuthenticator } from '@crossauth/backend';
 import { PrismaClient } from '@prisma/client'
 
@@ -12,10 +13,12 @@ const userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFi
 const keyStorage = new PrismaKeyStorage({prismaClient : prisma});
 const passwordAuthenticator = new LocalPasswordAuthenticator(userStorage);
 const totpAuthenticator = new TotpAuthenticator("Sveltekit Example")
+const emailAuthenticator = new EmailAuthenticator();
 export const crossauth = new SvelteKitServer(userStorage, {
     authenticators: {
         localpassword: passwordAuthenticator,
-        totp: totpAuthenticator
+        totp: totpAuthenticator,
+        email: emailAuthenticator,
     },
     session: {
         keyStorage: keyStorage,

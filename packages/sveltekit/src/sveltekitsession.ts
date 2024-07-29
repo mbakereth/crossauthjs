@@ -27,6 +27,7 @@ import type {
     ChangePasswordReturn,
     DeleteUserReturn,
     UpdateUserReturn,
+    ChangeFactor2Return,
  } from './sveltekituserendpoints';
 import { SvelteKitServer } from './sveltekitserver'
 
@@ -1161,5 +1162,14 @@ export class SvelteKitSessionServer {
      */
     async updateUser(event : RequestEvent) : Promise<UpdateUserReturn> {
         return this.userEndpoints.updateUser(event);
+    }
+
+    /**
+     * Call this to change the logged in user's factor2
+     * @param event 
+     * @returns 
+     */
+    async changeFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
+        return this.userEndpoints.changeFactor2(event);
     }
 }

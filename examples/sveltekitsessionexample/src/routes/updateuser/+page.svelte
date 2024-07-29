@@ -7,7 +7,7 @@
     let factor2 = "None";
     for (let i=0; i<data.allowedFactor2.length; ++i)
         if (data.user?.factor2 == data.allowedFactor2[i].name)  
-            factor2 = data.allowedFactor2[0].friendlyName;
+            factor2 = data.allowedFactor2[i].friendlyName;
     function cancel() {
         goto("/account");
     }

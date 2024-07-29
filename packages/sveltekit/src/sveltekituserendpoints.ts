@@ -93,6 +93,20 @@ export type ChangePasswordReturn = {
     success: boolean
 };
 
+export type ChangeFactor2Return = {
+    user? : User,
+    error?: string,
+    exception?: CrossauthError,
+    formData?: {[key:string]:string},
+    success: boolean,
+    factor2Data?:  {
+        userData: { [key: string]: any },
+        username: string,
+        csrfToken?: string | undefined,
+        factor2: string,
+    },
+};
+
 export type DeleteUserReturn = {
     user? : User,
     error?: string,
@@ -1042,6 +1056,90 @@ export class SvelteKitUserEndpoints {
                 success: false,
                 formData,
                 emailVerificationNeeded: false,
+            }
+        }
+    }
+
+    async changeFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
+        CrossauthLogger.logger.debug(j({msg:"updateUser"}));
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            // throw an error if the CSRF token is invalid
+            if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+            }
+    
+            // throw an error if not logged in
+            if (!event.locals.user) {
+                throw new CrossauthError(ErrorCode.InsufficientPriviledges);
+            }
+            
+            // get new user fields from form, including from the 
+            // implementor-provided hook
+            let user : User = {
+                id: event.locals.user.id,
+                username: event.locals.user.username,
+                state: "active",
+            };
+            user = this.sessionServer.updateUserFn(user,
+                event,
+                formData,
+                this.sessionServer.userStorage.userEditableFields);
+
+            // validate the new user using the implementor-provided function
+            let errors = this.sessionServer.validateUserFn(user);
+            if (errors.length > 0) {
+                throw new CrossauthError(ErrorCode.FormEntry, errors);
+            }
+
+            if (!event.locals.sessionId) {
+                throw new CrossauthError(ErrorCode.Unauthorized);
+            }
+    
+            // validate the requested factor2
+            let newFactor2 : string|undefined = formData.factor2;
+            if (formData.factor2 && 
+                !(this.sessionServer.allowedFactor2Names.includes(formData.factor2))) {
+                throw new CrossauthError(ErrorCode.Forbidden,
+                    "Illegal second factor " + formData.factor2 + " requested");
+            }
+            if (formData.factor2 == "none" || formData.factor2 == "") {
+                newFactor2 = undefined;
+            }
+
+        // get data to show user to finish 2FA setup
+        const userData = await this.sessionServer.sessionManager
+            .initiateTwoFactorSetup(user, newFactor2, event.locals.sessionId);
+
+            if (newFactor2) {
+                return {
+                    success: true,
+                    formData: formData,
+                    factor2Data: {
+                        username: event.locals.user.username,
+                        factor2: newFactor2 ?? "",
+                        userData,
+                        csrfToken: event.locals.csrfToken,
+                    }
+                };    
+            } 
+            return {
+                success: true,
+                formData: formData,
+            };
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                formData,
             }
         }
     }
