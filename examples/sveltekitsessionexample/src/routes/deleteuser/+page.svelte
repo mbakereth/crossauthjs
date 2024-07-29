@@ -6,7 +6,7 @@
 	/** @type {import('./$types').ActionData} */
 	export let form;
     function cancel() {
-        goto("/");
+        goto("/account");
     }
 </script>
 <svelte:head>
@@ -27,6 +27,6 @@
 
         <button class="btn btn-primary" type="submit">Yes</button>
         &nbsp;
-        <button class="btn btn-secondary" on:click={cancel}>No</button>
+        <button type="button" class="btn btn-secondary" on:click={cancel}>No</button>
     </form>
 {/if}

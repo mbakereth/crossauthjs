@@ -65,15 +65,6 @@
             </label>
         </div>
 
-        <div class="form-control">
-            <label class="label" for="user_phone">
-            <span class="label-text">Email</span>
-            </label>
-            <label class="input-group">
-                <input type="text" id="user_phone" name="user_phone" class="input input-bordered w-full max-w-xs mb-4" placeholder="+12 3456 7890   " value={form?.formData?.user_phone ?? ''}/><br>
-            </label>
-        </div>
-
         {#if data.allowedFactor2.length > 1}
             <p class="label-text">Second Factor</p>
             {#each data.allowedFactor2 as item }

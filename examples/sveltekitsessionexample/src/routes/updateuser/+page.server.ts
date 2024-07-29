@@ -3,17 +3,19 @@ import { crossauth } from '$lib/server/crossauthsession';
 
 /** @type {import('./$types').Actions} */
 export const actions : Actions = {
-	default: async ( event ) => {
-        const resp = await crossauth.sessionServer?.signup(event);
+    default: async ( event ) => {
+        const resp = await crossauth.sessionServer?.updateUser(event);
         delete resp?.exception;
         return resp;
-	}
+    }
 };
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async (event) => {
+    //crossauth.sessionServer?.refreshLocals(event);
     let allowedFactor2 = crossauth.sessionServer?.allowedFactor2 ??
-        [{name: "none", friendlyName: "None"}];
+    [{name: "none", friendlyName: "None"}];
     return {
-        allowedFactor2
+        allowedFactor2,
+        user: event.locals.user,
     };
 };

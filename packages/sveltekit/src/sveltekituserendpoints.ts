@@ -100,6 +100,15 @@ export type DeleteUserReturn = {
     success: boolean
 };
 
+export type UpdateUserReturn = {
+    user? : User,
+    error?: string,
+    exception?: CrossauthError,
+    formData?: {[key:string]:string},
+    emailVerificationNeeded: boolean,
+    success: boolean
+};
+
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 
@@ -499,6 +508,10 @@ export class SvelteKitUserEndpoints {
             const user = 
                 await this.sessionServer.sessionManager.applyEmailVerificationToken(token);
             await this.loginWithUser(user, true, event);
+            if (event.locals.user) {
+                const resp = await this.sessionServer.userStorage.getUserById(event.locals.user?.id);
+                event.locals.user = resp.user;
+            }
 
             return {
                 success: true,
@@ -808,7 +821,7 @@ export class SvelteKitUserEndpoints {
             };
 
         } catch (e) {
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "2FA failed");
             return {
                 error: ce.message,
                 exception: ce,
@@ -928,7 +941,7 @@ export class SvelteKitUserEndpoints {
             };
 
         } catch (e) {
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't change password");
             return {
                 error: ce.message,
                 exception: ce,
@@ -962,11 +975,73 @@ export class SvelteKitUserEndpoints {
             };
 
         } catch (e) {
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't delete account");
             return {
                 error: ce.message,
                 exception: ce,
                 success: false,
+            }
+        }
+    }
+
+    async updateUser(event : RequestEvent) : Promise<UpdateUserReturn> {
+        CrossauthLogger.logger.debug(j({msg:"updateUser"}));
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            // throw an error if the CSRF token is invalid
+            if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+            }
+    
+            // throw an error if not logged in
+            if (!event.locals.user) {
+                throw new CrossauthError(ErrorCode.InsufficientPriviledges);
+            }
+            
+            // get new user fields from form, including from the 
+            // implementor-provided hook
+            let user : User = {
+                id: event.locals.user.id,
+                username: event.locals.user.username,
+                state: "active",
+            };
+            user = this.sessionServer.updateUserFn(user,
+                event,
+                formData,
+                this.sessionServer.userStorage.userEditableFields);
+
+            // validate the new user using the implementor-provided function
+            let errors = this.sessionServer.validateUserFn(user);
+            if (errors.length > 0) {
+                throw new CrossauthError(ErrorCode.FormEntry, errors);
+            }
+
+            // update the user
+            let emailVerificationNeeded = 
+                await this.sessionServer.sessionManager.updateUser(event.locals.user, user);
+            if (!emailVerificationNeeded) {
+                const resp = await this.sessionServer.userStorage.getUserById(event.locals.user.id);
+                event.locals.user = resp.user;
+            }
+            return {
+                success: true,
+                formData: formData,
+                emailVerificationNeeded,
+            };
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                formData,
+                emailVerificationNeeded: false,
             }
         }
     }

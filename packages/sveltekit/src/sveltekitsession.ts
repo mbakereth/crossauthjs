@@ -26,6 +26,7 @@ import type {
     RequestFactor2Return,
     ChangePasswordReturn,
     DeleteUserReturn,
+    UpdateUserReturn,
  } from './sveltekituserendpoints';
 import { SvelteKitServer } from './sveltekitserver'
 
@@ -1001,6 +1002,24 @@ export class SvelteKitSessionServer {
         }
 
     }
+
+    async refreshLocals(event : RequestEvent) {
+        try {
+            const sessionCookieValue = this.getSessionCookieValue(event);
+            if (sessionCookieValue) {
+                const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
+                event.locals.sessionId = sessionId;    
+                const resp = await this.sessionManager.userForSessionId(sessionId);
+                event.locals.user = resp.user;
+            } else {
+                event.locals.sessionId = undefined;
+                event.locals.user = undefined;
+            }
+        } catch (e) {
+            CrossauthLogger.logger.error(j({errr: e}));
+        }
+
+    }
     
     /////////////////////////////////////////////////////////////
     // User Endpoints
@@ -1133,5 +1152,14 @@ export class SvelteKitSessionServer {
      */
     async deleteUser(event : RequestEvent) : Promise<DeleteUserReturn> {
         return this.userEndpoints.deleteUser(event);
+    }
+
+    /**
+     * Call this to update a user's derails (apart from password and factor2)
+     * @param event 
+     * @returns 
+     */
+    async updateUser(event : RequestEvent) : Promise<UpdateUserReturn> {
+        return this.userEndpoints.updateUser(event);
     }
 }
