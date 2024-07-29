@@ -351,7 +351,7 @@ export class SvelteKitSessionServer {
      * The set of allowed authenticators taken from the options during 
      * construction.
      */
-    readonly allowedFactor2 : {name: string, friendlyName: string}[] = [];
+    readonly allowedFactor2 : {name: string, friendlyName: string, configurable: boolean}[] = [];
 
     /**
      * The set of allowed authenticators taken from the options during 
@@ -422,9 +422,16 @@ export class SvelteKitSessionServer {
         if (options1.allowedFactor2) {
             for (let factor of options1.allowedFactor2) {
                 if (factor in this.authenticators) {
-                    this.allowedFactor2.push({name: factor, friendlyName: this.authenticators[factor].friendlyName});
+                    this.allowedFactor2.push({
+                        name: factor, 
+                        friendlyName: this.authenticators[factor].friendlyName,
+                        configurable: this.authenticators[factor].secretNames().length > 0,
+                    });
                 } else if (factor == "none") {
-                    this.allowedFactor2.push({name: "none", friendlyName: "None"});
+                    this.allowedFactor2.push({
+                        name: "none", 
+                        friendlyName: "None", 
+                        configurable: false});
 
                 }
             }
@@ -1171,5 +1178,14 @@ export class SvelteKitSessionServer {
      */
     async changeFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
         return this.userEndpoints.changeFactor2(event);
+    }
+
+    /**
+     * Call this to change the logged in user's factor2
+     * @param event 
+     * @returns 
+     */
+    async reconfigureFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
+        return this.userEndpoints.reconfigureFactor2(event);
     }
 }

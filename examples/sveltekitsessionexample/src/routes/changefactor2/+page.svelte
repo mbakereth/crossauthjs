@@ -6,10 +6,20 @@
 	/** @type {import('./$types').ActionData} */
 	export let form;
     let factor2 = form?.formData?.factor2 ?? data.user?.factor2 ?? data.allowedFactor2[0].name;
+    let configurable = false;
     if (factor2 == "") factor2 = "none";
+    for (let i=0; i<data.allowedFactor2.length; ++i)
+        if (factor2 == data.allowedFactor2[i].name)  {
+            configurable = data.allowedFactor2[i].configurable;
+        }
 
     function cancel() {
         goto("/account");
+    }
+
+    function reconfigure() {
+        let form = document.forms.namedItem("reconfigureForm");
+        if (form) form.submit();
     }
 </script>
 <svelte:head>
@@ -29,7 +39,7 @@
         <p>You are required to change your two-factor authentication configuration.</p>
     {/if}
 
-    <form method="POST">
+    <form method="POST" action="?/change">
         <input type="hidden" name="csrfToken" value={data.csrfToken} />
 
         {#if data.allowedFactor2.length > 1}
@@ -38,7 +48,11 @@
                 <div class="form-control">
                     <span class="align-text-bottom mb-2">
                         <input type="radio" name="factor2" id={"factor2_"+item.name} value={item.name} class="radio align-middle" bind:group={factor2} /> 
-                        <span class="align-bottom ml-2 text-sm">{ item.friendlyName }</span>
+                        <span class="align-bottom ml-2 text-sm">{ item.friendlyName }
+                            {#if factor2 == item.name && configurable}
+                            &nbsp;<a href={null} class="cursor-pointer" on:click|preventDefault={reconfigure}>Reconfigure</a>
+                            {/if}
+                        </span>
                     </span>
                 </div>
             {/each}
@@ -47,5 +61,8 @@
 
         <button class="btn btn-primary" type="submit">Change</button>&nbsp;
         <button type="button" class="btn btn-secondary" on:click={cancel}>Cancel</button>
+    </form>
+
+    <form method="POST" action="?/reconfigure"id = "reconfigureForm">
     </form>
 {/if}

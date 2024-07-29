@@ -1079,23 +1079,7 @@ export class SvelteKitUserEndpoints {
                 throw new CrossauthError(ErrorCode.InsufficientPriviledges);
             }
             
-            // get new user fields from form, including from the 
-            // implementor-provided hook
-            let user : User = {
-                id: event.locals.user.id,
-                username: event.locals.user.username,
-                state: "active",
-            };
-            user = this.sessionServer.updateUserFn(user,
-                event,
-                formData,
-                this.sessionServer.userStorage.userEditableFields);
-
-            // validate the new user using the implementor-provided function
-            let errors = this.sessionServer.validateUserFn(user);
-            if (errors.length > 0) {
-                throw new CrossauthError(ErrorCode.FormEntry, errors);
-            }
+            let user = event.locals.user;
 
             if (!event.locals.sessionId) {
                 throw new CrossauthError(ErrorCode.Unauthorized);
@@ -1132,6 +1116,71 @@ export class SvelteKitUserEndpoints {
                 success: true,
                 formData: formData,
             };
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                formData,
+            }
+        }
+    }
+
+    async reconfigureFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
+        CrossauthLogger.logger.debug(j({msg:"updateUser"}));
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            // throw an error if the CSRF token is invalid
+            if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+            }
+    
+            // throw an error if not logged in
+            if (!event.locals.user) {
+                throw new CrossauthError(ErrorCode.InsufficientPriviledges);
+            }
+            
+            if (!event.locals.sessionId) {
+                throw new CrossauthError(ErrorCode.Unauthorized);
+            }
+    
+            let user = event.locals.user;
+
+            if (!event.locals.sessionId) {
+                throw new CrossauthError(ErrorCode.Unauthorized);
+            }
+
+            // get second factor authenticator
+            let factor2 : string = user.factor2;
+            const authenticator = this.sessionServer.authenticators[factor2];
+            if (!authenticator || authenticator.secretNames().length == 0) {
+                throw new CrossauthError(ErrorCode.BadRequest, 
+                    "Selected second factor does not have configuration");
+            }
+        
+            // step one in 2FA setup - create secrets and get data to dispaly to user
+            const userData = 
+                await this.sessionServer.sessionManager.initiateTwoFactorSetup(user,
+                    factor2,
+                    event.locals.sessionId);
+
+            return {
+                success: true,
+                formData: formData,
+                factor2Data: {
+                    username: event.locals.user.username,
+                    factor2: user.factor2 ?? "",
+                    userData,
+                    csrfToken: event.locals.csrfToken,
+                }
+        };
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");

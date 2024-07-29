@@ -30,4 +30,9 @@
 :global(p) {
   @apply mt-2 mb-2;
 }
+
+:global(a) {
+  @apply text-primary;
+}
+
 </style>
