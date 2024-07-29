@@ -1,7 +1,7 @@
 import { SvelteKitSessionServer, type SvelteKitSessionServerOptions } from './sveltekitsession';
 import { UserStorage, KeyStorage, Authenticator, setParameter, ParamType } from '@crossauth/backend';
 import { CrossauthError, ErrorCode, httpStatus, type User } from '@crossauth/common';
-import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
+import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise, redirect } from '@sveltejs/kit';
 
 export interface SvelteKitServerOptions extends SvelteKitSessionServerOptions {
     /** User can set this to check if the user is an administrator.
@@ -63,14 +63,42 @@ export class SvelteKitServer {
                 //this.sessionServer.setHeaders(resp.headers, response);
                 const ret = await this.sessionServer.twoFAHook({event});
                 if (!ret.twofa && !event.locals.user) {
-                    if (this.sessionServer.isLoginPageProtected(event)) 
-                        return new Response('', {status: 302, statusText: httpStatus(302), headers: { Location: this.loginUrl}});
+                    if (this.sessionServer.isLoginPageProtected(event))  {
+                        if (this.sessionServer.unauthorizedPage) {
+                            return new Response(null, {status: 302, headers: {location: this.sessionServer.unauthorizedPage}});
+                        }
+                        return new Response('Unauthorized', {
+                            status: 401,
+                            statusText: "Unauthorized",
+                            //headers: {"content-type": "application/json"}
+                        });
+
+                    }
                     if (this.sessionServer.isLoginApiProtected(event)) 
-                        return new Response('', {status: 401, statusText: httpStatus(401)});    
+                        return new Response('{"error": "unauthorized"}', {
+                            status: 401,
+                            statusText: "Unauthorized",
+                            headers: {"content-type": "application/json"}
+                        });
                 }
-                if (!ret.twofa && this.sessionServer.isAdminEndpoint(event) &&
+                if (!ret.twofa && this.sessionServer.isAdminPageEndpoint(event) &&
                     (!event.locals.user || SvelteKitServer.isAdminFn(event.locals.user))) {
-                    return new Response('', {status: 401, statusText: httpStatus(401)});    
+                        if (this.sessionServer.unauthorizedPage) {
+                            return new Response(null, {status: 302, headers: {location: this.sessionServer.unauthorizedPage}});
+                        }
+                        return new Response('Unauthorized', {
+                            status: 401,
+                            statusText: "Unauthorized",
+                            //headers: {"content-type": "application/json"}
+                        });
+                }
+                if (!ret.twofa && this.sessionServer.isAdminApiEndpoint(event) &&
+                    (!event.locals.user || SvelteKitServer.isAdminFn(event.locals.user))) {
+                        return new Response('{"error": "unauthorized"}', {
+                            status: 401,
+                            statusText: "Unauthorized",
+                            headers: {"content-type": "application/json"}
+                        });
                 }
                 if (ret.response) return ret.response;
             }

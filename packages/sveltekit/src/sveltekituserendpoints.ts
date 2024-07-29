@@ -123,6 +123,14 @@ export type UpdateUserReturn = {
     success: boolean
 };
 
+/**
+ * Provides endpoints for users to login, logout and maintain their 
+ * own account.
+ * 
+ * This class is not intended to be used outside of Crossauth.  For 
+ * documentation about functiuons it provides, see
+ * {@link SvelteKitSessionServer}.
+ */
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 

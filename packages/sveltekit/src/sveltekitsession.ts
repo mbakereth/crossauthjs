@@ -165,6 +165,11 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
     loginProtectedApiEndpoints?: string[],    
     
     /**
+     * See `adminPageEndpoints`
+     */
+    unauthorizedPage? : string,
+
+    /**
      * These page endpoints need an admin user to be logged in.  
      * 
      * This
@@ -175,8 +180,26 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * 
      * The default is empty
      * 
+     * If unauthorizedPage is defined, that will be rendered.  Otherwise
+     * a simple text message will be displayed.
+     * 
      */
-    adminEndpoints?: string[],
+    adminPageEndpoints?: string[],
+
+    /**
+     * Same as adminPageEndpoints but returns a JSON error instead of an
+     * error page  
+     * 
+     * This
+     * is defined by the isAdminFn option in {@link SvelteKitServerOptions}.
+     * The default one is to check the `admin` boolean field in the user
+     * object. If there is no user, or the user is not an admin, a 401 
+     * page is returned,
+     * 
+     * The default is empty
+     * 
+     */
+    adminApiEndpoints?: string[],
 
     /**
      * Turns on email verification.  This will cause the verification tokens to 
@@ -375,7 +398,9 @@ export class SvelteKitSessionServer {
     private factor2ProtectedApiEndpoints : string[] = [];
     private loginProtectedPageEndpoints : string[] = [];
     private loginProtectedApiEndpoints : string[] = [];
-    private adminEndpoints : string[] = [];
+    private adminPageEndpoints : string[] = [];
+    private adminApiEndpoints : string[] = [];
+    readonly unauthorizedPage : string|undefined = undefined;
 
     readonly enableCsrfProtection = true;
 
@@ -415,7 +440,9 @@ export class SvelteKitSessionServer {
         setParameter("factor2ProtectedApiEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
         setParameter("loginProtectedPageEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_PAGE_ENDPOINTS");
         setParameter("loginProtectedApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_API_ENDPOINTS");
-        setParameter("adminEndpoints", ParamType.JsonArray, this, options, "ADMIN_ENDPOINTS");
+        setParameter("adminPageEndpoints", ParamType.JsonArray, this, options, "ADMIN_PAGE_ENDPOINTS");
+        setParameter("adminApiEndpoints", ParamType.JsonArray, this, options, "ADMIN_API_ENDPOINTS");
+        setParameter("unauthorizedPage", ParamType.JsonArray, this, options, "UNAUTHORIZED_PAGE");
         let options1 : {allowedFactor2?: string[]} = {}
         setParameter("allowedFactor2", ParamType.JsonArray, options1, options, "ALLOWED_FACTOR2");
         this.allowedFactor2Names = options.allowedFactor2 ?? ["none"];
@@ -928,11 +955,21 @@ export class SvelteKitSessionServer {
             isProtected);
     }
 
-    isAdminEndpoint(event : RequestEvent|string) : boolean {
+    isAdminPageEndpoint(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         //return (this.adminEndpoints.includes(url.pathname));
         let isAdmin = false;
-        return this.adminEndpoints.reduce(
+        return this.adminPageEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isAdmin);
+    }
+
+    isAdminApiEndpoint(event : RequestEvent|string) : boolean {
+        const url = new URL(typeof event == "string" ? event : event.request.url);
+        //return (this.adminEndpoints.includes(url.pathname));
+        let isAdmin = false;
+        return this.adminApiEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
                 accumulator || minimatch(url.pathname, currentValue),
             isAdmin);
@@ -1039,8 +1076,26 @@ export class SvelteKitSessionServer {
      * an error extrafting it.  User is returned if log in was successful.
      * Error messge and exception are returned if not successful.
      * 
-     * @param event the Sveltekit event
-     * @returns user, form data, error message and exception (see above)
+     * @param event the Sveltekit event.  The fields needed are:
+     * 
+     *   - `username`.
+     *   - *secrets* (eg `password`).
+     *   - `repeat_`*secrets* (eg `repeat_password`).
+     * 
+     *   The secrets are authenticator-dependent.
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if login was successful, false otherwise.
+     *     even if factor2 authentication is required, this will still
+     *     be true if there was no error.
+     *   - `user` the user if login was successful
+     *   - `formData` the form fields extracted from the request
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `factor2Required` if true, second factor authentication is needed
+     *     to complete login
      */
     async login(event : RequestEvent) : Promise<LoginReturn> {
         return this.userEndpoints.login(event);
@@ -1048,6 +1103,18 @@ export class SvelteKitSessionServer {
 
     /**
      * Call this when `login()` returns `factor2Required = true`
+     *
+     * @param event the Sveltekit event.  The fields needed are those
+     *        required by the factor2 authenticator.
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if login was successful, false otherwise.
+     *   - `user` the user if login was successful
+     *   - `formData` the form fields extracted from the request
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
      */
     async loginFactor2(event : RequestEvent) : Promise<LoginReturn> {
         return this.userEndpoints.loginFactor2(event);
@@ -1060,17 +1127,24 @@ export class SvelteKitSessionServer {
      * and CSRF cookies (if CSRF protection is enabled)
      * 
      * @param event the Sveltekit event
-     * @returns success of true or false and error message if not successful
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if logout was successful, false otherwise.
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
      */
     async logout(event : RequestEvent) : Promise<LogoutReturn> {
         return this.userEndpoints.logout(event);
     }
 
     /**
-     * Log a user in if possible.  
+     * Creates an account. 
      * 
-     * Form data is returned unless there was
-     * an error extrafting it.  
+     * Form data is returned unless there was an error extrafting it. 
+     * 
+     * Initiates user login if creation was successful. 
      * 
      * If login was successful, no factor2 is needed
      * and no email verification is needed, the user is returned.
@@ -1081,8 +1155,34 @@ export class SvelteKitSessionServer {
      * If factor2 configuration is required, `factor2Required` is returned
      * as `true`.
      * 
-     * @param event the Sveltekit event
-     * @returns user, form data, error message and exception (see above)
+     * @param event the Sveltekit event.  The form fields used are
+     *   - `username` the desired username
+     *   - `factor2` which must be in the `allowedFactor2` option passed
+     *     to the constructor.
+     *   - *secrets* (eg `password`) which are factor1 authenticator specific
+     *   - `repeat_`*secrets* (eg `repeat_password`)
+     *   - `user_*` anything prefixed with `user` that is also in
+     *   - the `userEditableFields` option passed when constructing the
+     *     user storage object will be added to the {@link @crossuath/common!User}
+     *     object (with `user_` removed).
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *     even if factor2 authentication is required, this will still
+     *     be true if there was no error.
+     *   - `user` the user if login was successful
+     *   - `formData` the form fields extracted from the request
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `factor2Required` if true, second factor authentication is needed
+     *     to complete login
+     *   - `factor2Data` contains data that needs to be passed to the user's
+     *      chosen factor2 authenticator
+     *   - `emailVerificationRequired` if true, the user needs to click on
+     *     the link emailed to them to complete signup.
      */
     async signup(event : RequestEvent) : Promise<SignupReturn> {
         return this.userEndpoints.signup(event);
@@ -1091,15 +1191,52 @@ export class SvelteKitSessionServer {
     /**
      * Takes email verification token from the params on the URL and attempts 
      * email verification.
+     * 
+     * @param event the Sveltekit event.  This should contain the URL
+     *        parameter called `token` 
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *     even if factor2 authentication is required, this will still
+     *     be true if there was no error.
+     *   - `user` the user if successful
+     *   - `formData` the form fields extracted from the request
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `factor2Required` if true, second factor authentication is needed
+     *     to complete login
+     *   - `factor2Data` contains data that needs to be passed to the user's
+     *      chosen factor2 authenticator
+     *   - `emailVerificationRequired` if true, the user needs to click on
+     *     the link emailed to them to complete signup.
      */
     async verifyEmail(event : RequestEvent) : Promise<VerifyEmailReturn> {
         return this.userEndpoints.verifyEmail(event);
     }
 
     /**
-     * Completes factor2 configuration using 2fa-specific form fields in the
-     * request bodyand data already stores in the session when 2FA configuration
-     * was initiated
+     * Completes factor2 configuration.  
+     * 
+     * 2FA configuration is initiated with {@link signup()}, or 
+     * {@link changeFactor2()}.  If these return successfully, call this 
+     * function.
+     * 
+     * @param event the Sveltekit event.  This should contain fields
+     *        required by the user's chosen authenticator.
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *   - `user` the user successful
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `emailVerificationRequired` if true, the user needs to click on
+     *     the link emailed to them to complete configuration.
      */
     async configureFactor2(event : RequestEvent) : Promise<ConfigureFactor2Return> {
         return this.userEndpoints.configureFactor2(event);
@@ -1110,6 +1247,18 @@ export class SvelteKitSessionServer {
      * 
      * If it is enabled, emails a password reset token to the email given
      * in the form data.
+     * 
+     * @param event the Sveltekit event.  This should a `email` field.
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *   - `user` the user successful
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `formData` the form fields extracted from the request
      */
     async requestPasswordReset(event : RequestEvent) : Promise<RequestPasswordResetReturn> {
         return this.userEndpoints.requestPasswordReset(event);
@@ -1120,6 +1269,18 @@ export class SvelteKitSessionServer {
      * 
      * If it is enabled, fetches the user for the token to confirm the token
      * is valid.
+
+     * @param event the Sveltekit event.  This should a `token` URL parameter.
+
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *   - `user` the user successful
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `formData` the form fields extracted from the request
      */
     async validatePasswordResetToken(event : RequestEvent) : Promise<ResetPasswordReturn> {
         return this.userEndpoints.validatePasswordResetToken(event);
@@ -1128,7 +1289,21 @@ export class SvelteKitSessionServer {
     /**
      * Call this from the POST url the user uses to fill in a new password
      * after validating the token in the GET url with
-     * {@link validatePasswordresetToken}.
+     * {@link validatePasswordResetToken}.
+     * 
+     * @param event the Sveltekit event.  This should contain
+     *   - `new_`*secrets` (eg `new_password`) the new secret.
+     *   - `repeat_`*secrets` (eg `repeat_password`) repeat of the new secret.
+
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *   - `user` the user if successful
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `formData` the form fields extracted from the request
      */
     async resetPassword(event : RequestEvent) : Promise<ResetPasswordReturn> {
         return this.userEndpoints.resetPassword(event);
@@ -1137,8 +1312,24 @@ export class SvelteKitSessionServer {
     /**
      * Call this from your factor2 endpoint to fetch the data needed to
      * display the factor2 form.
-     * @param event 
-     * @returns 
+     * 
+     * This can only be called after 2FA has been initiated by visiting
+     * a page with factor2 protection, as defined by the 
+     * `factor2ProtectedPageEndpoints` and `factor2ProtectedApiEndpoints` 
+     * defined when constructing this class.
+     * 
+     * @param event the Sveltekit event.  
+
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *   - `action` the URL to load on success.  This was the one originally
+     *     requested by the user before being redirected to 2FA authentication.
+     *   - `factor2` the user's factor2
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
      */
     async requestFactor2(event : RequestEvent) : Promise<RequestFactor2Return> {
         return this.userEndpoints.requestFactor2(event);
@@ -1146,8 +1337,21 @@ export class SvelteKitSessionServer {
 
     /**
      * Call this with POST data to change the logged-in user's password
-     * @param event 
-     * @returns 
+     * 
+     * @param event the Sveltekit event.  This should contain
+     *   - `old_`*secrets` (eg `old_password`) the existing secret.
+     *   - `new_`*secrets` (eg `new_password`) the new secret.
+     *   - `repeat_`*secrets` (eg `repeat_password`) repeat of the new secret.
+
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *   - `user` the user if successful
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `formData` the form fields extracted from the request
      */
     async changePassword(event : RequestEvent) : Promise<ChangePasswordReturn> {
         return this.userEndpoints.changePassword(event);
@@ -1155,35 +1359,90 @@ export class SvelteKitSessionServer {
 
     /**
      * Call this to delete the logged-in user
-     * @param event 
-     * @returns 
+     * 
+     * @param event the Sveltekit event.  
+
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
      */
     async deleteUser(event : RequestEvent) : Promise<DeleteUserReturn> {
         return this.userEndpoints.deleteUser(event);
     }
 
     /**
-     * Call this to update a user's derails (apart from password and factor2)
-     * @param event 
-     * @returns 
+     * Call this to update a user's details (apart from password and factor2)
+     * 
+     * @param event the Sveltekit event.  The form fields used are
+     *   - `username` the desired username
+     *   - `user_*` anything prefixed with `user` that is also in
+     *   - the `userEditableFields` option passed when constructing the
+     *     user storage object will be added to the {@link @crossuath/common!User}
+     *     object (with `user_` removed).
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *     even if factor2 authentication is required, this will still
+     *     be true if there was no error.
+     *   - `user` the user if login was successful
+     *   - `formData` the form fields extracted from the request
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `emailVerificationRequired` if true, the user needs to click on
+     *     the link emailed to them to complete signup.
      */
     async updateUser(event : RequestEvent) : Promise<UpdateUserReturn> {
         return this.userEndpoints.updateUser(event);
     }
 
     /**
-     * Call this to change the logged in user's factor2
-     * @param event 
-     * @returns 
+     * Call this to change the logged in user's factor2.
+     * 
+     * @param event the Sveltekit event.  The form fields used are
+     *   - `factor2` the new designed factor2, which must be in
+     *     the `allowedFactor2` option passed to the constructor.
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *     even if factor2 authentication is required, this will still
+     *     be true if there was no error.
+     *   - `user` the user if login was successful
+     *   - `formData` the form fields extracted from the request
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `factor2Data` the data to pass to the factor2 configuration page.
      */
     async changeFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
         return this.userEndpoints.changeFactor2(event);
     }
 
     /**
-     * Call this to change the logged in user's factor2
-     * @param event 
-     * @returns 
+     * Call this to reconfigure the current factor2 type.
+     * 
+     * @param event the Sveltekit event.  
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *     even if factor2 authentication is required, this will still
+     *     be true if there was no error.
+     *   - `user` the user if login was successful
+     *   - `formData` the form fields extracted from the request
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     *   - `factor2Data` the data to pass to the factor2 configuration page.
      */
     async reconfigureFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
         return this.userEndpoints.reconfigureFactor2(event);
