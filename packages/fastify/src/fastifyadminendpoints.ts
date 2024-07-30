@@ -337,6 +337,10 @@ export class FastifyAdminEndpoints {
                     let users : User[] = [];
                     let skip = Number(request.query.skip);
                     let take = Number(request.query.take);
+                    if (skip < 0) {
+                        take = -skip;
+                        skip = 0;
+                    }
                     if (!skip) skip = 0;
                     if (!take) take = 10;
                     if (request.query.search) {

@@ -1,7 +1,7 @@
 import { SvelteKitSessionServer, type SvelteKitSessionServerOptions } from './sveltekitsession';
 import { UserStorage, KeyStorage, Authenticator, setParameter, ParamType } from '@crossauth/backend';
-import { CrossauthError, ErrorCode, httpStatus, type User } from '@crossauth/common';
-import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise, redirect } from '@sveltejs/kit';
+import { CrossauthError, ErrorCode, type User } from '@crossauth/common';
+import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
 
 export interface SvelteKitServerOptions extends SvelteKitSessionServerOptions {
     /** User can set this to check if the user is an administrator.
@@ -64,41 +64,41 @@ export class SvelteKitServer {
                 const ret = await this.sessionServer.twoFAHook({event});
                 if (!ret.twofa && !event.locals.user) {
                     if (this.sessionServer.isLoginPageProtected(event))  {
-                        if (this.sessionServer.unauthorizedPage) {
-                            return new Response(null, {status: 302, headers: {location: this.sessionServer.unauthorizedPage}});
+                        if (this.loginUrl) {
+                            return new Response(null, {status: 302, headers: {location: this.loginUrl}});
                         }
-                        return new Response('Unauthorized', {
-                            status: 401,
-                            statusText: "Unauthorized",
-                            //headers: {"content-type": "application/json"}
-                        });
+                        return this.sessionServer.error(401, "Unauthorized");
 
                     }
                     if (this.sessionServer.isLoginApiProtected(event)) 
-                        return new Response('{"error": "unauthorized"}', {
+                        return this.sessionServer.error(401, "Unauthorized");
+                        /*return new Response('{"error": "unauthorized"}', {
                             status: 401,
                             statusText: "Unauthorized",
                             headers: {"content-type": "application/json"}
-                        });
+                        });*/
                 }
                 if (!ret.twofa && this.sessionServer.isAdminPageEndpoint(event) &&
-                    (!event.locals.user || SvelteKitServer.isAdminFn(event.locals.user))) {
+                    (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))
+                ) {
                         if (this.sessionServer.unauthorizedPage) {
                             return new Response(null, {status: 302, headers: {location: this.sessionServer.unauthorizedPage}});
                         }
-                        return new Response('Unauthorized', {
+                        /*return new Response('Unauthorized', {
                             status: 401,
                             statusText: "Unauthorized",
                             //headers: {"content-type": "application/json"}
-                        });
+                        });*/
+                        return this.sessionServer.error(401, "Unauthorized");
                 }
                 if (!ret.twofa && this.sessionServer.isAdminApiEndpoint(event) &&
-                    (!event.locals.user || SvelteKitServer.isAdminFn(event.locals.user))) {
-                        return new Response('{"error": "unauthorized"}', {
+                    (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))) {
+                        /*return new Response('{"error": "unauthorized"}', {
                             status: 401,
                             statusText: "Unauthorized",
                             headers: {"content-type": "application/json"}
-                        });
+                        });*/
+                        return this.sessionServer.error(401, "Unauthorized");
                 }
                 if (ret.response) return ret.response;
             }

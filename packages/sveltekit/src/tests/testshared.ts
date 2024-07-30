@@ -119,7 +119,7 @@ export async function login(server : SvelteKitServer, resolver : MockResolver, h
     let event = new MockRequestEvent("1", postRequest, {"param1": "value1"});
     event.locals.csrfToken = csrfToken;
 
-    const ret = await server.sessionServer?.login(event);
+    const ret = await server.sessionServer?.userEndpoints.login(event);
     expect(ret?.user?.username).toBe(user);
     expect(event.cookies.get("SESSIONID")).toBeDefined();
     return {event, ret};
@@ -141,7 +141,7 @@ export async function loginFactor2(server : SvelteKitServer, resolver : MockReso
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
 
-    const ret = await server.sessionServer?.loginFactor2(event);
+    const ret = await server.sessionServer?.userEndpoints.loginFactor2(event);
     return {event, ret};
 };
 

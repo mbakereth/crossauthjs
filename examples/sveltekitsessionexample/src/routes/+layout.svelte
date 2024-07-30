@@ -35,4 +35,8 @@
   @apply text-primary;
 }
 
+:global(a.plain) {
+  @apply text-neutral-content;
+}
+
 </style>

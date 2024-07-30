@@ -6,6 +6,7 @@ import {
     EmailAuthenticator,
     TotpAuthenticator } from '@crossauth/backend';
 import { PrismaClient } from '@prisma/client'
+import { redirect, error } from '@sveltejs/kit';
 
 //export const crossauthSession = new SvelteKitSessionServer();
 export const prisma = new PrismaClient();
@@ -29,5 +30,7 @@ export const crossauth = new SvelteKitServer(userStorage, {
         loginProtectedPageEndpoints: ["/account", "/changepassword"],
         factor2ProtectedPageEndpoints: ["/passwordreset/*"],
         adminPageEndpoints: ["/admin", "/admin/**"],
-        unauthorizedPage: "/401"
+        unauthorizedPage: "/401",
+        redirect,
+        error
     });

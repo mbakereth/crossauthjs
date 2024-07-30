@@ -18,7 +18,7 @@ test('SvelteKitUserEndpoints.login', async () => {
     let event = new MockRequestEvent("1", postRequest, {"param1": "value1"});
     event.locals.csrfToken = csrfToken;
 
-    const ret = await server.sessionServer?.login(event);
+    const ret = await server.sessionServer?.userEndpoints.login(event);
     expect(ret?.user?.username).toBe("bob");
     expect(event.cookies.get("SESSIONID")).toBeDefined();
 });
@@ -37,7 +37,7 @@ test('SvelteKitUserEndpoints.logout', async () => {
     let event = new MockRequestEvent("1", postRequest, {"param1": "value1"});
     event.locals.csrfToken = csrfToken;
 
-    let ret = await server.sessionServer?.login(event);
+    let ret = await server.sessionServer?.userEndpoints.login(event);
     expect(ret?.user?.username).toBe("bob");
     expect(event.cookies.get("SESSIONID")).toBeDefined();
 
@@ -51,7 +51,7 @@ test('SvelteKitUserEndpoints.logout', async () => {
     event = new MockRequestEvent("1", postRequest, {"param1": "value1"});
     event.locals.csrfToken = csrfToken;
 
-    ret = await server.sessionServer?.logout(event);
+    ret = await server.sessionServer?.userEndpoints.logout(event);
     expect(ret?.user).toBeUndefined();
     expect(event.cookies.get("SESSIONID")).toBeUndefined();
 });
@@ -80,7 +80,7 @@ test('SvelteKitUserEndpoints.resetPassword', async () => {
     let event = new MockRequestEvent("1", postRequest, {});
     event.locals.csrfToken = csrfToken;
     event.cookies.set("CSRFTOKEN", csrfCookieValue, {path: "/"});
-    let resp1 = await server.sessionServer?.requestPasswordReset(event);
+    let resp1 = await server.sessionServer?.userEndpoints.requestPasswordReset(event);
     expect(resp1?.success).toBe(true);
     const token = passwordResetData.token;
 
@@ -95,7 +95,7 @@ test('SvelteKitUserEndpoints.resetPassword', async () => {
     event = new MockRequestEvent("1", postRequest, {token: token});
     event.locals.csrfToken = csrfToken;
     event.cookies.set("CSRFTOKEN", csrfCookieValue, {path: "/"});
-    resp1 = await server.sessionServer?.resetPassword(event);
+    resp1 = await server.sessionServer?.userEndpoints.resetPassword(event);
     expect(resp1?.success).toBe(true);
 
 });
@@ -128,7 +128,7 @@ test('SvelteKitUserEndpoints.changePassword', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    let resp1 = await server.sessionServer?.changePassword(event);
+    let resp1 = await server.sessionServer?.userEndpoints.changePassword(event);
     expect(resp1?.success).toBe(true);
 
 });
@@ -161,7 +161,7 @@ test('SvelteKitUserEndpoints.deleteUser', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    let resp1 = await server.sessionServer?.deleteUser(event);
+    let resp1 = await server.sessionServer?.userEndpoints.deleteUser(event);
     expect(resp1?.success).toBe(true);
     let found = false;
     try {

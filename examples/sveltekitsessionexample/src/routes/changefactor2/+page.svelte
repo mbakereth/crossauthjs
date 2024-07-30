@@ -12,15 +12,6 @@
         if (factor2 == data.allowedFactor2[i].name)  {
             configurable = data.allowedFactor2[i].configurable;
         }
-
-    function cancel() {
-        goto("/account");
-    }
-
-    function reconfigure() {
-        let form = document.forms.namedItem("reconfigureForm");
-        if (form) form.submit();
-    }
 </script>
 <svelte:head>
     <title>Change Two-Factor Authentication</title>
@@ -50,7 +41,8 @@
                         <input type="radio" name="factor2" id={"factor2_"+item.name} value={item.name} class="radio align-middle" bind:group={factor2} /> 
                         <span class="align-bottom ml-2 text-sm">{ item.friendlyName }
                             {#if factor2 == item.name && configurable}
-                            &nbsp;<a href={null} class="cursor-pointer" on:click|preventDefault={reconfigure}>Reconfigure</a>
+                            &nbsp;<a href={null} class="cursor-pointer" 
+                                on:click|preventDefault={() => document.forms.namedItem("reconfigureForm")?.submit()}>Reconfigure</a>
                             {/if}
                         </span>
                     </span>
@@ -60,7 +52,7 @@
 
 
         <button class="btn btn-primary" type="submit">Change</button>&nbsp;
-        <button type="button" class="btn btn-secondary" on:click={cancel}>Cancel</button>
+        <button type="button" class="btn btn-secondary" on:click={() => goto("/account")}>Cancel</button>
     </form>
 
     <form method="POST" action="?/reconfigure"id = "reconfigureForm">
