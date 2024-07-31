@@ -16,23 +16,6 @@ import { error, redirect } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
 import { SvelteKitAdminEndpoints} from './sveltekitadminendpoints';
-import type {
-    LoginReturn,
-    LogoutReturn,
-    SignupReturn,
-    VerifyEmailReturn,
-    ConfigureFactor2Return,
-    RequestPasswordResetReturn,
-    ResetPasswordReturn,
-    RequestFactor2Return,
-    ChangePasswordReturn,
-    DeleteUserReturn,
-    UpdateUserReturn,
-    ChangeFactor2Return,
- } from './sveltekituserendpoints';
-import type {
-    SearchUsersReturn
-} from './sveltekitadminendpoints';
 
 import { SvelteKitServer } from './sveltekitserver'
 
@@ -96,6 +79,26 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      */
     loginRedirectUrl? : string,
 
+    /**
+     * URL to call when change password is required.
+     * 
+     * Default "/changepassword"
+     */
+    changePasswordUrl? : string,
+
+    /**
+     * URL to call when change password is required.
+     * 
+     * Default "/resetpassword"
+     */
+    requestPasswordResetUrl? : string,
+
+    /**
+     * URL to call when change factor2 is required.
+     * 
+     * Default "/changefactor2"
+     */
+    changeFactor2Url? : string,
 
     /** Function that throws a {@link @crossauth/common!CrossauthError} 
      *  with {@link @crossauth/common!ErrorCode} `FormEntry` if the user 
@@ -185,7 +188,7 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
     /**
      * See `adminPageEndpoints`
      */
-    unauthorizedPage? : string,
+    unauthorizedUrl? : string,
 
     /**
      * These page endpoints need an admin user to be logged in.  
@@ -198,7 +201,7 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * 
      * The default is empty
      * 
-     * If unauthorizedPage is defined, that will be rendered.  Otherwise
+     * If unauthorizedUrl is defined, that will be rendered.  Otherwise
      * a simple text message will be displayed.
      * 
      */
@@ -435,10 +438,9 @@ export class SvelteKitSessionServer {
     private loginProtectedApiEndpoints : string[] = [];
     private adminPageEndpoints : string[] = [];
     private adminApiEndpoints : string[] = [];
-    readonly unauthorizedPage : string|undefined = undefined;
+    readonly unauthorizedUrl : string|undefined = undefined;
 
     readonly enableCsrfProtection = true;
-    readonly loginRedirectUrl = "/";
 
     /** Whether email verification is enabled.
      * 
@@ -477,7 +479,7 @@ export class SvelteKitSessionServer {
         this.redirect = options.redirect ?? redirect;
         this.error = options.error ?? error;
 
-        setParameter("factor2Url", ParamType.String, this, options, "FACTOR2_URK");
+        setParameter("factor2Url", ParamType.String, this, options, "FACTOR2_URL");
         if (!this.factor2Url.endsWith("/")) this.factor2Url += "/";
         setParameter("factor2ProtectedPageEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_PAGE_ENDPOINTS");
         setParameter("factor2ProtectedApiEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
@@ -485,8 +487,7 @@ export class SvelteKitSessionServer {
         setParameter("loginProtectedApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_API_ENDPOINTS");
         setParameter("adminPageEndpoints", ParamType.JsonArray, this, options, "ADMIN_PAGE_ENDPOINTS");
         setParameter("adminApiEndpoints", ParamType.JsonArray, this, options, "ADMIN_API_ENDPOINTS");
-        setParameter("loginRedirectUrl", ParamType.JsonArray, this, options, "LOGIN_REDIRECT_URL");
-        setParameter("unauthorizedPage", ParamType.JsonArray, this, options, "UNAUTHORIZED_PAGE");
+        setParameter("unauthorizedUrl", ParamType.JsonArray, this, options, "UNAUTHORIZED_PAGE");
         let options1 : {allowedFactor2?: string[]} = {}
         setParameter("allowedFactor2", ParamType.JsonArray, options1, options, "ALLOWED_FACTOR2");
         this.allowedFactor2Names = options.allowedFactor2 ?? ["none"];
@@ -1111,38 +1112,4 @@ export class SvelteKitSessionServer {
 
     }
 
-    //////////////////////////////////////////////////////////////////
-    // Admin endpoints
-
-    /**
-     * Returns either all users or users matching a search term.
-     * 
-     * The search term is defined by `userSearchFn` in
-     * {@link SvelteKitSessionServerOptions}.
-     * 
-     * Does no permission checking - make sure you only call this from
-     * endpoints that are protected.
-     * 
-     * @param event the following query parameters are used:
-     *   - `searchTerm` if undefined or empty, all users will be returned,
-     *     otherwise only those matching this term will be.
-     *   - `skip` skip this number of records from the start of the searcdh
-     *   - `take` return only up to this number of records
-     * @param searchTerm if given, takes precendence over the one in `event` 
-     * @param skip if given, takes precendence over the one in `event` 
-     * @param take if given, takes precendence over the one in `event` 
-     * @returns an object with
-     *   - `success` true if the search was successful, false otherwise
-     *   - `users` a vector of matching users
-     *   - `hasPrevious` there are users before the returned ones in the
-     *     storage
-     *   - `hasNext` there are users after the returned ones in the storage
-     *   - `error` if not successful, an error message
-     *   - `exception` if not successful, a 
-     *     {@link @crossauth/common/CrossauthError} instance
-     */
-    async searchUsers(event : RequestEvent, searchTerm? : string)
-        : Promise<SearchUsersReturn> {
-        return this.adminEndpoints.searchUsers(event, searchTerm);
-    }
 }

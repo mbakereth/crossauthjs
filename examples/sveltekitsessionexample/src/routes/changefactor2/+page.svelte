@@ -32,6 +32,7 @@
 
     <form method="POST" action="?/change">
         <input type="hidden" name="csrfToken" value={data.csrfToken} />
+        <input type="hidden" name="next" value={data?.next ?? "/"} />
 
         {#if data.allowedFactor2.length > 1}
             <p class="label-text">Second Factor</p>

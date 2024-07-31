@@ -18,6 +18,8 @@
 {:else}
     {#if form?.error} 
         <p class="bg-error p-2 rounded text-slate-900">Error: {form?.error}</p>
+    {:else if data?.required}
+    <p class="bg-info p-2 rounded text-slate-900">You are required to change your password</p>
     {/if}
     <form method="POST">
         <input type="hidden" name="csrfToken" value={data.csrfToken} />

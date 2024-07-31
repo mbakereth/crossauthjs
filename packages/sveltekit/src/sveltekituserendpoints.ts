@@ -1,9 +1,13 @@
 import { SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions, SveltekitEndpoint } from './sveltekitsession';
-import { toCookieSerializeOptions } from '@crossauth/backend';
+import { 
+    toCookieSerializeOptions,     
+    setParameter,
+    ParamType,
+ } from '@crossauth/backend';
 import type { AuthenticationParameters } from '@crossauth/backend';
 import type { User, UserInputFields } from '@crossauth/common';
-import { CrossauthError, CrossauthLogger, j, ErrorCode } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 
@@ -133,6 +137,11 @@ export type UpdateUserReturn = {
  */
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
+    private changePasswordUrl = "/changepassword";
+    private changeFactor2Url = "/changefactor2";
+    private requestPasswordResetUrl = "/resetpassword";
+    private loginRedirectUrl = "/";
+    private loginUrl = "/login";
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 
         {[key: string] : string|number|boolean|Date|undefined};
 
@@ -140,6 +149,11 @@ export class SvelteKitUserEndpoints {
         options : SvelteKitSessionServerOptions
     ) {
         this.sessionServer = sessionServer;
+        setParameter("changePasswordUrl", ParamType.String, this, options, "CHANGE_PASSWORD_URL");
+        setParameter("requestPasswordResetUrl", ParamType.String, this, options, "REQUEST_PASSWORD_RESET_URL");
+        setParameter("changeFactor2Url", ParamType.String, this, options, "CHANGE_FACTOR2_URL");
+        setParameter("loginRedirectUrl", ParamType.JsonArray, this, options, "LOGIN_REDIRECT_URL");
+        setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
         if (options.addToSession) this.addToSession = options.addToSession;
     }
 
@@ -203,6 +217,7 @@ export class SvelteKitUserEndpoints {
             formData = data.toObject();
             const username = data.get('username') ?? "";
             const persist = data.getAsBoolean('persist') ?? false;
+            const next = formData.next ?? this.loginRedirectUrl;
             if (username == "") throw new CrossauthError(ErrorCode.InvalidUsername, "Username field may not be empty");
             
             // call implementor-provided hook to add additional fields to session key
@@ -252,17 +267,32 @@ export class SvelteKitUserEndpoints {
                 }
             }
 
-            if (!user.factor2 || user.factor2 == "")
-                event.locals.user = user;
+            console.log("Got user", user)
 
+            if (user.state == UserState.passwordChangeNeeded) {
+                console.log("Redirecting to ", this.changePasswordUrl)
+                this.sessionServer.redirect(302, this.changePasswordUrl + "?required=true&next="+encodeURIComponent("login?next="+next));
+                console.log("Redirecting ok ")
+            } else if (user.state == UserState.passwordResetNeeded) {
+                this.sessionServer.redirect(302, this.requestPasswordResetUrl);
+            } else if (this.sessionServer.allowedFactor2.length > 0 && 
+                user.state == UserState.factor2ResetNeeded || 
+                !this.sessionServer.allowedFactor2.includes(user.factor2?user.factor2:"none")) {
+                    this.sessionServer.redirect(302, this.changeFactor2Url + "?required=true&next="+encodeURIComponent("login?next="+next));
+            } else {
+                if (!user.factor2 || user.factor2 == "")
+                    event.locals.user = user;
+            }
             return { 
                 user, 
                 formData, 
                 factor2Required: user.factor2 && user.factor2 != "",
                 success: true, 
-            };
-
+            };    
         } catch (e) {
+            console.log(e, typeof e);
+            // hack - let Sveltekit redirect through
+            if (typeof e == "object" && e != null && "status" in e && "location" in e) throw e
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
             return {
                 error: ce.message,
@@ -854,7 +884,6 @@ export class SvelteKitUserEndpoints {
             formData = data.toObject();
             const email = data.get('email') ?? "";
             if (email == "") throw new CrossauthError(ErrorCode.InvalidUsername, "Email field may not be empty");
-
             // throw an error if the CSRF token is invalid
             if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) 
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
@@ -1367,13 +1396,40 @@ export class SvelteKitUserEndpoints {
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
             }
     
+            // see if the user is allowed to do this
+            let username = event.locals.user?.username;
+            if (!this.isSessionUser(event) || !event.locals.user) {
+                // user is not logged on - check if there is an anonymous 
+                // session with passwordchange set (meaning the user state
+                // was set to changepasswordneeded when logging on)
+                const sessionData = await this.sessionServer.getSessionData(event, "factor2change")
+                if (!sessionData?.username) {
+                    if (!this.isSessionUser(event)) {
+                        // as we create session data, user has to be logged in with cookies
+                        if (this.sessionServer.unauthorizedUrl) {
+                            this.sessionServer.redirect(302, this.sessionServer.unauthorizedUrl)
+                        }
+                        this.sessionServer.error(401, "Unauthorized");
+                    }
+                }
+                username = sessionData?.username;
+            }
+            let user = event.locals.user;
+            if (!user && username) {
+                const resp = await this.sessionServer.userStorage.getUserByUsername(
+                    username, {
+                        skipActiveCheck: true,
+                        skipEmailVerifiedCheck: true,
+                    });
+                user = resp.user;
+
+            }
+
             // throw an error if not logged in
-            if (!event.locals.user) {
+            if (!user) {
                 throw new CrossauthError(ErrorCode.InsufficientPriviledges);
             }
             
-            let user = event.locals.user;
-
             if (!event.locals.sessionId) {
                 throw new CrossauthError(ErrorCode.Unauthorized);
             }
@@ -1398,7 +1454,7 @@ export class SvelteKitUserEndpoints {
                     success: true,
                     formData: formData,
                     factor2Data: {
-                        username: event.locals.user.username,
+                        username: user.username,
                         factor2: newFactor2 ?? "",
                         userData,
                         csrfToken: event.locals.csrfToken,
@@ -1453,8 +1509,37 @@ export class SvelteKitUserEndpoints {
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
             }
     
+            // see if the user is allowed to do this
+            let username = event.locals.user?.username;
+            if (!this.isSessionUser(event) || !event.locals.user) {
+                // user is not logged on - check if there is an anonymous 
+                // session with passwordchange set (meaning the user state
+                // was set to changepasswordneeded when logging on)
+                const sessionData = await this.sessionServer.getSessionData(event, "factor2change")
+                if (!sessionData?.username) {
+                    if (!this.isSessionUser(event)) {
+                        // as we create session data, user has to be logged in with cookies
+                        if (this.sessionServer.unauthorizedUrl) {
+                            this.sessionServer.redirect(302, this.sessionServer.unauthorizedUrl)
+                        }
+                        this.sessionServer.error(401, "Unauthorized");
+                    }
+                }
+                username = sessionData?.username;
+            }
+            let user = event.locals.user;
+            if (!user && username) {
+                const resp = await this.sessionServer.userStorage.getUserByUsername(
+                    username, {
+                        skipActiveCheck: true,
+                        skipEmailVerifiedCheck: true,
+                    });
+                user = resp.user;
+
+            }
+            
             // throw an error if not logged in
-            if (!event.locals.user) {
+            if (!user) {
                 throw new CrossauthError(ErrorCode.InsufficientPriviledges);
             }
             
@@ -1462,8 +1547,6 @@ export class SvelteKitUserEndpoints {
                 throw new CrossauthError(ErrorCode.Unauthorized);
             }
     
-            let user = event.locals.user;
-
             if (!event.locals.sessionId) {
                 throw new CrossauthError(ErrorCode.Unauthorized);
             }
@@ -1486,7 +1569,7 @@ export class SvelteKitUserEndpoints {
                 success: true,
                 formData: formData,
                 factor2Data: {
-                    username: event.locals.user.username,
+                    username: user.username,
                     factor2: user.factor2 ?? "",
                     userData,
                     csrfToken: event.locals.csrfToken,
@@ -1544,7 +1627,7 @@ export class SvelteKitUserEndpoints {
             login: async ( event ) => {
                 const resp = await this.login(event);
                     if (resp?.success == true && !resp?.factor2Required) 
-                      this.sessionServer.redirect(302, resp.formData?.next ?? this.sessionServer.loginRedirectUrl);
+                      this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
                         if (resp && (
                             resp?.exception?.code == ErrorCode.UserNotExist ||
                             resp?.exception?.code == ErrorCode.PasswordInvalid)) {
@@ -1555,7 +1638,7 @@ export class SvelteKitUserEndpoints {
             },
             factor2: async ( event ) => {
                 const resp = await this.loginFactor2(event);
-                if (resp?.success == true && !resp?.factor2Required) this.sessionServer.redirect(302, resp.formData?.next ?? this.sessionServer.loginRedirectUrl);
+                if (resp?.success == true && !resp?.factor2Required) this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
                 delete resp?.exception;
                 return resp;
         
@@ -1601,13 +1684,43 @@ export class SvelteKitUserEndpoints {
             },
         },
         load: async ( event ) => {
+
+            let username = event.locals.user?.username;
+
+            // see if the user is allowed to do this
+            if (!this.isSessionUser(event) || !event.locals.user) {
+                // user is not logged on - check if there is an anonymous 
+                // session with passwordchange set (meaning the user state
+                // was set to changepasswordneeded when logging on)
+                const sessionData = await this.sessionServer.getSessionData(event, "factor2change")
+                if (!sessionData?.username) {
+                    if (!this.isSessionUser(event)) {
+                        // as we create session data, user has to be logged in with cookies
+                        if (this.sessionServer.unauthorizedUrl) {
+                            this.sessionServer.redirect(this.sessionServer.unauthorizedUrl)
+                        }
+                        this.sessionServer.error(401, "Unauthorized");
+                    }
+                }
+                username = sessionData?.username;
+            }
+
             let allowedFactor2 = this.sessionServer.allowedFactor2 ??
                 [{name: "none", friendlyName: "None", configurable: false}];
-            console.log(allowedFactor2)
-            let required = event.url.searchParams.get("required") == "true";
+            let data : {required?: boolean, next? : string} = {};
+            let requiredString = event.url.searchParams.get("required");
+            let required : boolean|undefined = undefined;
+            if (requiredString) {
+                requiredString = requiredString.toLowerCase();
+                required = requiredString == "true" || requiredString == "1";
+                if (required == true) data.required = true;
+            }
+            let next = event.url.searchParams.get("next");
+            if (next) data.next = next;
             return {
                 allowedFactor2,
-                required,
+                ...data,
+                username,
                 ...this.baseEndpoint(event),
             };
         },
@@ -1622,7 +1735,24 @@ export class SvelteKitUserEndpoints {
             }
         },
         load: async ( event ) => {
+            let data : {required?: boolean, next? : string} = {};
+            let requiredString = event.url.searchParams.get("required");
+            let required : boolean|undefined = undefined;
+            let haveUser = event.locals.user != undefined;
+            if (!haveUser) {
+                const passwordchange = await this.sessionServer.getSessionData(event, "passwordchange");
+                if (passwordchange?.username) haveUser = true;
+            }
+            if (!haveUser) this.sessionServer.redirect(302, this.loginUrl)
+            if (requiredString) {
+                requiredString = requiredString.toLowerCase();
+                required = requiredString == "true" || requiredString == "1";
+                if (required == true) data.required = true;
+            }
+            let next = event.url.searchParams.get("next");
+            if (next) data.next = next;
             return {
+                ...data,
                 ...this.baseEndpoint(event),
             };
         },
@@ -1658,7 +1788,7 @@ export class SvelteKitUserEndpoints {
         },
     };
 
-    readonly passwordResetEndpoint  : SveltekitEndpoint = {
+    readonly resetPasswordEndpoint  : SveltekitEndpoint = {
         actions : {
             default: async ( event ) => {
                 const resp = await this.requestPasswordReset(event);
@@ -1667,7 +1797,16 @@ export class SvelteKitUserEndpoints {
             }
         },
         load: async ( event ) => {
+            let data : {required?: boolean, next? : string} = {};
+            let requiredString = event.url.searchParams.get("required");
+            let required : boolean|undefined = undefined;
+            if (requiredString) {
+                requiredString = requiredString.toLowerCase();
+                required = requiredString == "true" || requiredString == "1";
+                if (required == true) data.required = true;
+            }
             return {
+                ...data,
                 ...this.baseEndpoint(event),
             };
         },

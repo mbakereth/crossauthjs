@@ -67,6 +67,8 @@
         {/if}
       </tbody>
     </table>
-  </div>
+</div>
   
-  <button type="button" class="btn btn-secondary" on:click={() => goto("/admin/users/create")}>New User</button>
+<button type="button" class="btn btn-secondary" on:click={() => goto("/admin/users/create")}>New User</button>
+
+<p><a href="/admin">Admin Home</a></p>

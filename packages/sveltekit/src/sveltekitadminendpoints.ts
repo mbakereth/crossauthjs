@@ -1,5 +1,5 @@
 import { SvelteKitSessionServer } from './sveltekitsession';
-import type { SvelteKitSessionServerOptions } from './sveltekitsession';
+import type { SvelteKitSessionServerOptions, SveltekitEndpoint } from './sveltekitsession';
 import { toCookieSerializeOptions } from '@crossauth/backend';
 import type { AuthenticationParameters, UserStorage } from '@crossauth/backend';
 import type { User, UserInputFields } from '@crossauth/common';
@@ -70,6 +70,45 @@ export class SvelteKitAdminEndpoints {
         if (options.userSearchFn) this.userSearchFn = options.userSearchFn
     }
 
+    /**
+     * Returns either a list of all users or users matching a search term.
+     * 
+     * The returned list is pagenaed using the `skip` and `take` parameters.
+     * 
+     * The searching is done with `userSearchFn` that was passed in the
+     * options (see {@link SvelteKitSessionServerOptions }).  THe default
+     * is an exact username match.
+     * 
+     * By default, the searh and pagination parameters are taken from 
+     * the query parameters in the request but can be overridden.
+     * 
+     * Does no permission checking - make sure you only call this from
+     * endpoints that are protected.
+     * 
+     * @param event the Sveltekit request event.  The following query parameters
+     *        are read:
+     *   - `search` the search term which is ignored if it is undefined, null
+     *      or the empty string.
+     *   - `skip` the number to start returning from.  0 if not defined
+     *   - `take` the maximum number to return.  10 if not defined.
+     * @param search overrides the search term from the query.
+     * @param skip overrides the skip term from the query
+     * @param take overrides the take term from the query
+     * 
+     * @return an object with the following members:
+     *   - `success` true or false depending on whether there was an error
+     *   - `users` the matching array of users
+     *   - `error` error message if `success` is false
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if there was
+     *      an error.
+     *   - `search` the search term that was used
+     *   - `skip` the skip term that was used
+     *   - `take` the take term that was used
+     *   - `hasNext` whether there are still more results after the ones that
+     *      were returned
+     *   - `hasPrevious` whether there are more results before the ones that
+     *      were returned.
+     */
     async searchUsers(event : RequestEvent, searchTerm? : string, skip? : number, take? : number)
         : Promise<SearchUsersReturn> {
         try {
@@ -147,5 +186,13 @@ export class SvelteKitAdminEndpoints {
         }
 
     }
+
+    readonly searchUsersEndpoint  : SveltekitEndpoint = {
+        load: async ( event ) => {
+            const resp = await this.searchUsers(event);
+            delete resp?.exception;
+            return resp;
+        },
+    };
 }
 

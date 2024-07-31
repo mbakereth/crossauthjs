@@ -81,8 +81,8 @@ export class SvelteKitServer {
                 if (!ret.twofa && this.sessionServer.isAdminPageEndpoint(event) &&
                     (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))
                 ) {
-                        if (this.sessionServer.unauthorizedPage) {
-                            return new Response(null, {status: 302, headers: {location: this.sessionServer.unauthorizedPage}});
+                        if (this.sessionServer.unauthorizedUrl) {
+                            return new Response(null, {status: 302, headers: {location: this.sessionServer.unauthorizedUrl}});
                         }
                         /*return new Response('Unauthorized', {
                             status: 401,
@@ -106,4 +106,7 @@ export class SvelteKitServer {
 
         }
     }
+
+    dummyLoad : (event : RequestEvent) => Promise<{[key:string]:any}> = async (_event) => {return {}};
+    dummyActions : {[key:string]: (event : RequestEvent) => Promise<{[key:string]:any}>} = {};
 }
