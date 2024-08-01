@@ -267,12 +267,8 @@ export class SvelteKitUserEndpoints {
                 }
             }
 
-            console.log("Got user", user, user.state, user.factor2, this.sessionServer.allowedFactor2)
-
             if (user.state == UserState.passwordChangeNeeded) {
-                console.log("Redirecting to ", this.changePasswordUrl)
                 this.sessionServer.redirect(302, this.changePasswordUrl + "?required=true&next="+encodeURIComponent("login?next="+next));
-                console.log("Redirecting ok ")
             } else if (user.state == UserState.passwordResetNeeded) {
                 this.sessionServer.redirect(302, this.requestPasswordResetUrl);
             } else if (this.sessionServer.allowedFactor2.length > 0 && 
@@ -290,7 +286,6 @@ export class SvelteKitUserEndpoints {
                 success: true, 
             };    
         } catch (e) {
-            console.log(e, typeof e);
             // hack - let Sveltekit redirect through
             if (typeof e == "object" && e != null && "status" in e && "location" in e) throw e
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");

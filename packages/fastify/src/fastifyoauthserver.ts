@@ -654,7 +654,6 @@ export class FastifyAuthorizationServer {
                     .send(DEFAULT_ERROR[status]??ERROR_500);
             }
         }
-        console.log(query.scope)
         let hasAllScopes = false;
         CrossauthLogger.logger.debug(j({
             msg: `Checking scopes have been authorized`,

@@ -5,7 +5,6 @@
 	/** @type {import('./$types').ActionData} */
 	export let form;
     let selectedState = form?.formData.state ?? data.editUser.state;
-    console.log("selectedState", selectedState)
     let states = [
         {name: "active", friendlyName: "Active"},
         {name: "factor2resetneeded", friendlyName: "Factor 2 Reset Needed"},
