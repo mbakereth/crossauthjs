@@ -59,6 +59,7 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
 */
 export class PrismaUserStorage extends UserStorage {
     private userTable : string = "user";
+    private userSecretsTable : string = "userSecrets";
     private idColumn : string = "id";
     private prismaClient : PrismaClient;
     private includes : string[] = ["secrets"];
@@ -125,7 +126,7 @@ export class PrismaUserStorage extends UserStorage {
             CrossauthLogger.logger.debug(j({msg: "User must change password"}));
             throw new CrossauthError(ErrorCode.PasswordChangeNeeded);
         }
-        if (options?.skipActiveCheck!=true && prismaUser["state"] == UserState.passwordResetNeeded) {
+        if (options?.skipActiveCheck!=true && (prismaUser["state"] == UserState.passwordResetNeeded || prismaUser["state"] == UserState.passwordAndFactor2ResetNeeded)) {
             CrossauthLogger.logger.debug(j({msg: "User must reset password"}));
             throw new CrossauthError(ErrorCode.PasswordResetNeeded);
         }
@@ -220,25 +221,38 @@ export class PrismaUserStorage extends UserStorage {
                     data: userData,
                 });
             } else {
-                // @ts-ignore
-                await this.prismaClient[this.userTable].update({
-                            where: {
-                                [this.idColumn]: user.id,
-                            },
-                            data: {
-                    ...userData,
-                    secrets: {
-                        update: {
-                            where: {
-                                user_id: user.id,
-                            },
-                            data: secretsData,
-                        }
-                    }
-                    },
-                    include: {
-                    secrets: true,
-                    },
+                await this.prismaClient.$transaction(async (tx) =>{
+
+                    // @ts-ignore  (because types only exist when do prismaClient.table...)
+                    let existingSecrets = await tx[this.userSecretsTable].findUniqueOrThrow({
+                        where: {
+                            user_id: user.id
+                        },
+                    });
+                    let {userId: dummySecretsId, ...existingSecretsData} = existingSecrets??{};
+                    secretsData = {...existingSecretsData, ...secretsData}
+                    // @ts-ignore
+                    await tx[this.userTable].update({
+                        where: {
+                            [this.idColumn]: user.id,
+                        },
+                        data: {
+                            ...userData,
+                        },
+                    });
+
+                    // @ts-ignore
+                    await tx[this.userSecretsTable].upsert({
+                        where: {
+                            user_id: user.id,
+                        },
+                        update: 
+                            secretsData,
+                        create:
+                            {user_id: user.id,
+                            ...secretsData
+                            }
+                    });
                 });
             }
         } catch (e) {

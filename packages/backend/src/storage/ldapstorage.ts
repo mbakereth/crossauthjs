@@ -89,10 +89,10 @@ export class LdapUserStorage extends UserStorage {
      * @param secrets `password` for LDAP expected to be set here.
      * @returns the created user object, as it appears in local storage
      */
-    async createUser(user : UserInputFields, secrets : UserSecretsInputFields) 
+    async createUser(user : UserInputFields, secrets? : UserSecretsInputFields) 
         : Promise<User> {
 
-        if (!secrets.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
+        if (!secrets?.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
         const ldapUser = await this.getLdapUser(user.username, secrets.password);
         return await this.localStorage.createUser(this.createUserFn(user, ldapUser), {});
     }

@@ -63,6 +63,7 @@ export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions
  */
 export class LocalPasswordAuthenticator extends PasswordAuthenticator {
 
+    static NoPassword = "********";
     private secret : string|undefined = undefined;
 
     /** If true, the secret key will be added to the salt when hashing.  Default false */
@@ -185,6 +186,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      * @returns true if match, false otherwise
      */
     async passwordMatchesHash(password : string, passwordHash : string, secret? : string) {
+        if (passwordHash == LocalPasswordAuthenticator.NoPassword) return false;
         return await Crypto.passwordsEqual(password, passwordHash, secret);
     }
 
@@ -196,7 +198,9 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      *        `password` and is checked to match the one in `params`
      * @returns the newly created password in the `password` field.
      */
-    async createPersistentSecrets(_username : string, params: AuthenticationParameters, repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
+    async createPersistentSecrets(_username : string, 
+        params: AuthenticationParameters, 
+        repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         if (!params.password) throw new CrossauthError(ErrorCode.Unauthorized, "No password provided");
         if (repeatParams && repeatParams.password != params.password) {
             throw new CrossauthError(ErrorCode.PasswordMatch);

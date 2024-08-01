@@ -266,6 +266,15 @@ export class UserState {
      * upon login.
      */
     static readonly factor2ResetNeeded = "factor2resetneeded";
+
+    /**
+     * If the state is set to this, the user may not access any
+     * login-required functions unless he or she has reset their password
+     * and then resets factor2.
+     * 
+     * Upon login, the user is redirected to the reset password page.
+     */
+    static readonly passwordAndFactor2ResetNeeded = "passwordandfactor2resetneeded";
 }
 
 /**

@@ -86,7 +86,7 @@ export class InMemoryUserStorage extends UserStorage {
                 CrossauthLogger.logger.debug(j({msg: "Password change required"}));
                 throw new CrossauthError(ErrorCode.PasswordChangeNeeded);
             }
-            if (options?.skipActiveCheck!=true && user["state"]==UserState.passwordResetNeeded) {
+            if (options?.skipActiveCheck!=true && (user["state"]==UserState.passwordResetNeeded  || user["state"]==UserState.passwordAndFactor2ResetNeeded)) {
                 CrossauthLogger.logger.debug(j({msg: "Password reset required"}));
                 throw new CrossauthError(ErrorCode.PasswordResetNeeded);
             }

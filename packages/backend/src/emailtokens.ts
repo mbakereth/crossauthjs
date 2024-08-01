@@ -356,7 +356,7 @@ export class TokenEmailer {
         if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
         const {user} = await this.userStorage.getUserById(storedToken.userId, 
             {skipActiveCheck: true });
-        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded) {
+        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded && user.state != UserState.passwordAndFactor2ResetNeeded) {
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
         const now = new Date().getTime();
@@ -415,7 +415,7 @@ export class TokenEmailer {
         let {user} = await this.userStorage.getUserById(userId, {
             skipActiveCheck: true
         });
-        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded) {
+        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded && user.state != UserState.passwordAndFactor2ResetNeeded) {
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
         let email = (user.email??user.username).toLowerCase();

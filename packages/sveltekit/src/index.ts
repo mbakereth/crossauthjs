@@ -24,6 +24,8 @@ export type {
 export type {
     SearchUsersReturn,
     AdminUpdateUserReturn,
+    AdminCreateUserReturn,
+    ADminDeleteUserReturn,
 } from './sveltekitadminendpoints';
 
 export { SvelteKitServer } from './sveltekitserver';

@@ -1475,7 +1475,7 @@ export class FastifySessionServer {
                             });
                         }
 
-                    } else if (user.state == UserState.passwordResetNeeded) {
+                    } else if (user.state == UserState.passwordResetNeeded || user.state == UserState.passwordAndFactor2ResetNeeded) {
                         if (this.endpoints.includes("requestpasswordreset")) {
                             CrossauthLogger.logger.debug(j({msg: "Password reset needed - sending redirect"}));
                             return reply.redirect("/requestpasswordreset?required=true&next="+encodeURIComponent("login?next="+next));
@@ -1818,7 +1818,7 @@ export class FastifySessionServer {
                                 });                    
                             });
 
-                    } else if (user.state == UserState.passwordResetNeeded) {
+                    } else if (user.state == UserState.passwordResetNeeded || user.state == UserState.passwordAndFactor2ResetNeeded) {
                         const ce = new CrossauthError(ErrorCode.PasswordResetNeeded)
                         return this.handleError(ce, request, reply, (reply, error) => {
                             reply.status(this.errorStatus(ce)).header(...JSONHDR)

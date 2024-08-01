@@ -1,4 +1,5 @@
 import { SvelteKitSessionServer } from './sveltekitsession';
+import { SvelteKitServer } from './sveltekitserver';
 import type { SvelteKitSessionServerOptions, SveltekitEndpoint } from './sveltekitsession';
 import { 
     toCookieSerializeOptions,     
@@ -77,7 +78,7 @@ export type ResetPasswordReturn = {
     formData?: {[key:string]:string|undefined},
     error?: string,
     exception?: CrossauthError,
-    success: boolean
+    success: boolean,
 };
 
 export type RequestFactor2Return = {
@@ -625,7 +626,7 @@ export class SvelteKitUserEndpoints {
             return { user, formData, success: true };
 
         } catch (e) {
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't sign up");
             return {
                 error: ce.message,
                 exception: ce,
@@ -748,7 +749,10 @@ export class SvelteKitUserEndpoints {
                 await this.loginWithUser(user, true, event);
             }
 
-
+            // log user in if they are not already
+            if (!event.locals.user) {
+                return await this.loginWithUser(user, true, event);
+            }
             return {
                 success: true,
                 user: user,
@@ -938,7 +942,7 @@ export class SvelteKitUserEndpoints {
             return {
                 success: true,
                 user: user,
-                formData : {token}
+                formData : {token},
             }
 
         } catch (e) {
@@ -1023,9 +1027,18 @@ export class SvelteKitUserEndpoints {
             // check new and repeat secrets are valid and update the user
             const user1 = await this.sessionServer.sessionManager.resetSecret(token, 1, newSecrets, repeatSecrets);
             // log the user in
-            return this.loginWithUser(user1, true, event);
+            if (user1.state == UserState.active)
+                return await this.loginWithUser(user1, true, event);
+            else {
+                const sessionCookieValue = this.sessionServer.getSessionCookieValue(event);
+                const sessionId = this.sessionServer.sessionManager.getSessionId(sessionCookieValue??"");
+                await this.sessionServer.sessionManager.updateSessionData(sessionId, "factor2change", {username: user.username});
+                throw this.sessionServer.redirect(302, this.changeFactor2Url + "?required=true");
+
+            }
 
         } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
             return {
                 error: ce.message,
@@ -1438,11 +1451,14 @@ export class SvelteKitUserEndpoints {
             }
             if (formData.factor2 == "none" || formData.factor2 == "") {
                 newFactor2 = undefined;
-            }
+                if (!event.locals.user) {
+                    return await this.loginWithUser(user, true, event);
+                }
+                }
 
-        // get data to show user to finish 2FA setup
-        const userData = await this.sessionServer.sessionManager
-            .initiateTwoFactorSetup(user, newFactor2, event.locals.sessionId);
+            // get data to show user to finish 2FA setup
+            const userData = await this.sessionServer.sessionManager
+                .initiateTwoFactorSetup(user, newFactor2, event.locals.sessionId);
 
             if (newFactor2) {
                 return {
@@ -1692,7 +1708,7 @@ export class SvelteKitUserEndpoints {
                     if (!this.isSessionUser(event)) {
                         // as we create session data, user has to be logged in with cookies
                         if (this.sessionServer.unauthorizedUrl) {
-                            this.sessionServer.redirect(this.sessionServer.unauthorizedUrl)
+                            this.sessionServer.redirect(302, this.sessionServer.unauthorizedUrl)
                         }
                         this.sessionServer.error(401, "Unauthorized");
                     }

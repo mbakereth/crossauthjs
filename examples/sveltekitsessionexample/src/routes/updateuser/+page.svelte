@@ -13,9 +13,6 @@
         if (form?.formData.factor2 == data.allowedFactor2[i].name)  {
             factor2 = data.allowedFactor2[i].friendlyName;
         }
-    function cancel() {
-        goto("/account");
-    }
 </script>
 <svelte:head>
     <title>Update your Details</title>
@@ -71,6 +68,6 @@
 
         <button class="btn btn-primary" type="submit">Update Details</button>
         &nbsp;
-        <button type="button" class="btn btn-secondary" on:click={cancel}>Cancel</button>
+        <button type="button" class="btn btn-neutral" on:click={()=>goto("/account")}>Cancel</button>
     </form>
 {/if}

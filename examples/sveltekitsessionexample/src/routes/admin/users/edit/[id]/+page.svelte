@@ -10,6 +10,7 @@
         {name: "factor2resetneeded", friendlyName: "Factor 2 Reset Needed"},
         {name: "passwordchangeneeded", friendlyName: "Password Change Needed"},
         {name: "passwordresetneeded", friendlyName: "Password Reset Needed"},
+        {name: "passwordandfactor2resetneeded", friendlyName: "Password and Factor 2 Reset Needed"},
         {name: "inactive", friendlyName: "Inactive"},
     ];
     let factor2 = "none";
@@ -21,9 +22,6 @@
         if (form?.formData.factor2 == data.allowedFactor2[i].name || (data.allowedFactor2[i].name == "none" && form?.formData?.factor2 == ""))  {
             factor2 = data.allowedFactor2[i].name;
         }
-    function cancel() {
-        goto("/account");
-    }
 </script>
 <svelte:head>
     <title>Update Details for {data.editUser.username}</title>
@@ -90,6 +88,8 @@
 
         <button class="btn btn-primary" type="submit">Update Details</button>
         &nbsp;
-        <button type="button" class="btn btn-secondary" on:click={cancel}>Cancel</button>
+        <button type="button" class="btn btn-neutral" on:click={()=>goto("/account")}>Cancel</button>
+        &nbsp;
+        <button type="button" class="btn btn-error" on:click={()=>goto("/admin/users/delete/"+data.editUser.id)}>Delete User</button>
     </form>
 {/if}

@@ -7,16 +7,18 @@
 	export let form;
 </script>
 <svelte:head>
-    <title>Delete Your Account</title>
+    <title>Delete Account for {data?.username}</title>
 </svelte:head>
-<h1>Delete Your Account</h1>
+<h1>Delete Account for {data?.username}</h1>
 
 {#if form?.success}
-    <p class="bg-success p-2 rounded text-slate-900">Your account has been deleted</p>
+    <p class="bg-success p-2 rounded text-slate-900">The account has been deleted</p>
     <p><a href="/">Home</a></p>
+{:else if data?.error}
+    <p class="bg-error p-2 rounded text-slate-900">{data?.error}</p>
 {:else}
     {#if form?.error} 
-        <p class="bg-error p-2 rounded text-slate-900">Error: {form?.error}</p>
+        <p class="bg-error p-2 rounded text-slate-900">{form?.error}</p>
     {/if}
     <form method="POST">
         <input type="hidden" name="csrfToken" value={data.csrfToken} />

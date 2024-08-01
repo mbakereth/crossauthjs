@@ -3,15 +3,6 @@
 
     export let data;
 
-    function loginPage() {
-        goto("/login");
-    }
-    function logoutPage() {
-        goto("/logout");
-    }
-    function signupPage() {
-        goto("/signup");
-    }
 </script>
 
 <svelte:head>
@@ -26,13 +17,13 @@
         <p><a href="/admin">Admin page</a></p>
     {/if}
     <form method="POST" action="logout">
-        <button class="btn btn-primary" on:click={logoutPage}>Logout</button>
+        <button class="btn btn-primary" on:click={()=>goto("/logout")}>Logout</button>
     </form>
 {:else}
     <p>Not logged in</p>
     <p>
-        <button class="btn btn-primary" on:click={loginPage}>Login</button>
+        <button class="btn btn-primary" on:click={()=>goto("/login")}>Login</button>
         &nbsp;
-        <button class="btn btn-secondary" on:click={signupPage}>Signup</button>
+        <button class="btn btn-secondary" on:click={()=>goto("/signup")}>Signup</button>
     </p>
 {/if}

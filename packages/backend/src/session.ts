@@ -482,14 +482,15 @@ export class SessionManager {
     async createUser(user: UserInputFields,
         params: AuthenticationParameters,
         repeatParams?: AuthenticationParameters,
-        skipEmailVerification: boolean = false)
+        skipEmailVerification: boolean = false,
+        emptyPassword = false)
         : Promise<User> {
         if (!(this.authenticators[user.factor1])) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
         if (this.authenticators[user.factor1].skipEmailVerificationOnSignup() == true) {
             skipEmailVerification = true;
         }
-        let secrets = await this.authenticators[user.factor1].createPersistentSecrets(user.username, params, repeatParams);
-        const newUser = await this.userStorage.createUser(user, secrets);
+        let secrets = emptyPassword ? undefined : await this.authenticators[user.factor1].createPersistentSecrets(user.username, params, repeatParams);
+        const newUser = emptyPassword ? await this.userStorage.createUser(user) : await this.userStorage.createUser(user, secrets);
         if (!skipEmailVerification && this.enableEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(newUser.id, undefined);
         }
@@ -865,7 +866,7 @@ export class SessionManager {
         const {user} = await this.userStorage.getUserByEmail(email, {
             skipActiveCheck: true
         });
-        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded) {
+        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded && user.state != UserState.passwordAndFactor2ResetNeeded) {
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
         await this.tokenEmailer?.sendPasswordResetToken(user.id);
@@ -1011,8 +1012,9 @@ export class SessionManager {
         const user = await this.userForPasswordResetToken(token);
         const factor = factorNumber == 1 ? user.factor1 : user.factor2;
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration);
+        let newState = user.state == UserState.passwordAndFactor2ResetNeeded ? UserState.factor2ResetNeeded : UserState.active;
         await this.userStorage.updateUser(
-            {id: user.id, state: "active"},
+            {id: user.id, state: newState},
             await this.authenticators[factor].createPersistentSecrets(user.username, params, repeatParams),
         );
         //this.keyStorage.deleteKey(TokenEmailer.hashPasswordResetToken(token));

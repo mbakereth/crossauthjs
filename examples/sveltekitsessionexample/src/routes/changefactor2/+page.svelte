@@ -53,9 +53,9 @@
 
 
         <button class="btn btn-primary" type="submit">Change</button>&nbsp;
-        <button type="button" class="btn btn-secondary" on:click={() => goto("/account")}>Cancel</button>
+        <button type="button" class="btn btn-neutral" on:click={() => goto("/account")}>Cancel</button>
     </form>
 
-    <form method="POST" action="?/reconfigure"id = "reconfigureForm">
+    <form method="POST" action="?/reconfigure" id = "reconfigureForm">
     </form>
 {/if}

@@ -11,6 +11,7 @@ import {
 import type { Cookie, SessionManagerOptions } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus } from '@crossauth/common';
 import type { Key, User, UserInputFields } from '@crossauth/common';
+import { UserState } from '@crossauth/common';
 import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
@@ -631,8 +632,9 @@ export class SvelteKitSessionServer {
                 else {
                     const anonUser = await this.getSessionData(event, "user");
                     if (anonUser) {
-                        const resp = await this.userStorage.getUserByUsername(anonUser.username);
-                        user = resp.user;
+                        const resp = await this.userStorage.getUserByUsername(anonUser.username, {skipActiveCheck: true});
+                        if (resp.user.status == UserState.active || resp.user.state == UserState.factor2ResetNeeded)
+                            user = resp.user;
                     }
                 }
             }

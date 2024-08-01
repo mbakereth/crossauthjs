@@ -167,6 +167,9 @@ export class TotpAuthenticator extends Authenticator {
 
     /**
      * Creates and returns a `totpSecret`
+     * 
+     * `allowEmptySecrets` is ignored.
+     * 
      * @param username the user to create these for
      * @param _params ignored
      * @param _repeatParams  ignored

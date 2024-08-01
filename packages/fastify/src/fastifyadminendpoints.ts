@@ -854,7 +854,9 @@ export class FastifyAdminEndpoints {
 
         // call implementor-provided function to create the user object (or our default)
         let user = 
-            this.sessionServer.createUserFn(request, this.sessionServer.userStorage.userEditableFields);
+            this.sessionServer.createUserFn(request, 
+                {...this.sessionServer.userStorage.userEditableFields,
+                ...this.sessionServer.userStorage.adminEditableFields});
         if (user.factor2 && user.factor2 != "none") {
             user.state = UserState.factor2ResetNeeded;
             CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.factor2ResetNeeded}`, 

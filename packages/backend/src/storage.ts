@@ -48,7 +48,7 @@ export interface UserStorageOptions {
 export abstract class UserStorage {
     readonly userEditableFields : string[] = [];
     readonly adminEditableFields : string[] = [];
-
+    
     /**
      * Constructor
      * @param options See {@link UserStorageOptions}
@@ -107,7 +107,7 @@ export abstract class UserStorage {
      * @param _secrets will be put in the UserSecrets table
      * @returns the new user as a {@link @crossauth/common!User} object.
      */
-    createUser(_user : UserInputFields, _secrets : UserSecretsInputFields) 
+    createUser(_user : UserInputFields, _secrets? : UserSecretsInputFields) 
         : Promise<User> {
         throw new CrossauthError(ErrorCode.Configuration);
     }
