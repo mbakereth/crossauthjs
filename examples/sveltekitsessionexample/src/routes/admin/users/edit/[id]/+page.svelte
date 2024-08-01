@@ -4,66 +4,90 @@
     export let data;
 	/** @type {import('./$types').ActionData} */
 	export let form;
-    let factor2 = "None";
+    let selectedState = form?.formData.state ?? data.editUser.state;
+    console.log("selectedState", selectedState)
+    let states = [
+        {name: "active", friendlyName: "Active"},
+        {name: "factor2resetneeded", friendlyName: "Factor 2 Reset Needed"},
+        {name: "passwordchangeneeded", friendlyName: "Password Change Needed"},
+        {name: "passwordresetneeded", friendlyName: "Password Reset Needed"},
+        {name: "inactive", friendlyName: "Inactive"},
+    ];
+    let factor2 = "none";
     for (let i=0; i<data.allowedFactor2.length; ++i)
-        if (data.user?.factor2 == data.allowedFactor2[i].name)  {
-            factor2 = data.allowedFactor2[i].friendlyName;
+        if (data.editUser?.factor2 == data.allowedFactor2[i].name || (data.allowedFactor2[i].name == "none" && data.editUser?.factor2 == ""))  {
+            factor2 = data.allowedFactor2[i].name;
+        }
+    for (let i=0; i<data.allowedFactor2.length; ++i)
+        if (form?.formData.factor2 == data.allowedFactor2[i].name || (data.allowedFactor2[i].name == "none" && form?.formData?.factor2 == ""))  {
+            factor2 = data.allowedFactor2[i].name;
         }
     function cancel() {
         goto("/account");
     }
 </script>
 <svelte:head>
-    <title>Update your Details</title>
+    <title>Update Details for {data.editUser.username}</title>
 </svelte:head>
-<h1>Update your Details</h1>
+<h1>Update Details for {data.editUser.username}</h1>
 
 {#if form?.success}
-    {#if form?.emailVerificationNeeded}
-        <p class="bg-success p-2 rounded text-slate-900">
-            Please click on the link we emailed you to finish updating your details.
-        </p>
-    {:else}
-        <p class="bg-success p-2 rounded text-slate-900">Your details have been updated</p>
-    {/if}
-    <p><a href="/account">Your Account</a></p>
+    <p class="bg-success p-2 rounded text-slate-900">The user's details have been updated</p>
+    <p><a href="/admin/users">Users</a></p>
 {:else}
     {#if form?.error} 
         <p class="bg-error p-2 rounded text-slate-900">Error: {form?.error}</p>
     {/if}
     <form method="POST">
+
+        <!-- password-->
         <div class="form-control">
             <label class="label" for="password">
             <span class="label-text">Password</span>
             </label>
             <label class="input-group">
                 <input readonly type="text" id="password" name="password" class="input input-bordered w-full max-w-xs mb-4" value="******"/>
-                &nbsp;<a href="/changepassword">Change...</a><br>
+                &nbsp;<a href={"/admin/users/changepassword/"+data?.editUser.id}>Change...</a><br>
             </label>
         </div>
 
+        <!-- factor2-->
         {#if data.allowedFactor2.length > 1}
+        <p class="label-text">Second Factor</p>
+        {#each data.allowedFactor2 as item }
             <div class="form-control">
-                <label class="label" for="factor2">
-                <span class="label-text">Two-Factor Authentication</span>
-                </label>
-                <label class="input-group">
-                    <input readonly type="text" id="factor2" name="factor2" class="input input-bordered w-full max-w-xs mb-4" value={factor2}/>
-                    &nbsp;<a href="/changefactor2">Change...</a><br>
-                </label>
-                </div>
-        {/if}
+                <span class="align-text-bottom mb-2">
+                    <input type="radio" name="factor2" id={"factor2_"+item.name} value={item.name} class="radio align-middle" bind:group={factor2} /> 
+                    <span class="align-bottom ml-2 text-sm">{ item.friendlyName }
+                    </span>
+                </span>
+            </div>
+        {/each}
+    {/if}
 
         <input type="hidden" name="csrfToken" value={data.csrfToken} />
 
+        <!-- email -->
         <div class="form-control">
             <label class="label" for="user_email">
             <span class="label-text">Email</span>
             </label>
             <label class="input-group">
-                <input type="email" id="user_email" name="user_email" class="input input-bordered w-full max-w-xs mb-4" placeholder="Email" value={form?.formData?.user_email ?? data?.user?.email ?? ""}/><br>
+                <input type="email" id="user_email" name="user_email" class="input input-bordered w-full max-w-xs mb-4" placeholder="Email" value={form?.formData?.user_email ?? data?.editUser?.email ?? ""}/><br>
             </label>
         </div>
+
+        <!-- state-->
+        <p class="label-text">State</p>
+        {#each states as item }
+            <div class="form-control">
+                <span class="align-text-bottom mb-2">
+                    <input type="radio" name="state" id={"state_"+item.name} class="radio align-middle" value={item.name} bind:group={selectedState} /> 
+                    <span class="align-bottom ml-2 text-sm">{ item.friendlyName }
+                    </span>
+                </span>
+            </div>
+        {/each}
 
         <button class="btn btn-primary" type="submit">Update Details</button>
         &nbsp;

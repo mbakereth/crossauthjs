@@ -9,6 +9,10 @@
         if (data.user?.factor2 == data.allowedFactor2[i].name)  {
             factor2 = data.allowedFactor2[i].friendlyName;
         }
+    for (let i=0; i<data.allowedFactor2.length; ++i)
+        if (form?.formData.factor2 == data.allowedFactor2[i].name)  {
+            factor2 = data.allowedFactor2[i].friendlyName;
+        }
     function cancel() {
         goto("/account");
     }

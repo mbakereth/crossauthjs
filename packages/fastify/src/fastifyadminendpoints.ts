@@ -923,7 +923,8 @@ export class FastifyAdminEndpoints {
         user.state = request.body.state;
         user = this.sessionServer.updateUserFn(user,
             request,
-            this.sessionServer.userStorage.userEditableFields);
+            {...this.sessionServer.userStorage.userEditableFields,
+             ...this.sessionServer.userStorage.adminEditableFields});
         const factor2ResetNeeded = user.factor2 && user.factor2 != "none" && user.factor2 != oldFactor2;
         if (factor2ResetNeeded && !(user.state == oldState || user.state == "factor2ResetNeeded")) {
             throw new CrossauthError(ErrorCode.BadRequest, "Cannot change both factor2 and state at the same time");
@@ -942,7 +943,9 @@ export class FastifyAdminEndpoints {
 
         // update the user
         let emailVerificationNeeded = 
-            await this.sessionServer.sessionManager.updateUser(request.user, user);
+            // this surely isn't right
+            //await this.sessionServer.sessionManager.updateUser(request.user, user,);
+            await this.sessionServer.sessionManager.updateUser(user, user, true);
 
         return successFn(reply, request.user, emailVerificationNeeded);
     }

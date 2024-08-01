@@ -267,7 +267,7 @@ export class SvelteKitUserEndpoints {
                 }
             }
 
-            console.log("Got user", user)
+            console.log("Got user", user, user.state, user.factor2, this.sessionServer.allowedFactor2)
 
             if (user.state == UserState.passwordChangeNeeded) {
                 console.log("Redirecting to ", this.changePasswordUrl)
@@ -277,7 +277,7 @@ export class SvelteKitUserEndpoints {
                 this.sessionServer.redirect(302, this.requestPasswordResetUrl);
             } else if (this.sessionServer.allowedFactor2.length > 0 && 
                 user.state == UserState.factor2ResetNeeded || 
-                !this.sessionServer.allowedFactor2.includes(user.factor2?user.factor2:"none")) {
+                !this.sessionServer.allowedFactor2Names.includes(user.factor2?user.factor2:"none")) {
                     this.sessionServer.redirect(302, this.changeFactor2Url + "?required=true&next="+encodeURIComponent("login?next="+next));
             } else {
                 if (!user.factor2 || user.factor2 == "")

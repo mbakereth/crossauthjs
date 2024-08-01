@@ -109,4 +109,12 @@ export class SvelteKitServer {
 
     dummyLoad : (event : RequestEvent) => Promise<{[key:string]:any}> = async (_event) => {return {}};
     dummyActions : {[key:string]: (event : RequestEvent) => Promise<{[key:string]:any}>} = {};
+
+    static isSvelteKitRedirect(e : any) {
+        return (typeof e == "object" && e != null && "status" in e && "location" in e);
+    }
+
+    static isSvelteKitError(e : any, status : number) {
+        return (typeof e == "object" && e != null && "status" in e && "text" in e && "message" in e && e.status == status);
+    }
 }

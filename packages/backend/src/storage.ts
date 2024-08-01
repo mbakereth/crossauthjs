@@ -28,6 +28,11 @@ export interface UserStorageOptions {
      * update call that are not in this list will be ignored.
      */
 	userEditableFields? : string[],
+
+    /**
+     * Fields that admins are allowed to edit (in addition to `userEditableFields`)
+     */
+	adminEditableFields? : string[],
 }
 
 /**
@@ -42,6 +47,7 @@ export interface UserStorageOptions {
  */
 export abstract class UserStorage {
     readonly userEditableFields : string[] = [];
+    readonly adminEditableFields : string[] = [];
 
     /**
      * Constructor
@@ -49,6 +55,7 @@ export abstract class UserStorage {
      */
     constructor(options : UserStorageOptions = {}) {
         setParameter("userEditableFields", ParamType.JsonArray, this, options, "USER_EDITABLE_FIELDS");
+        setParameter("adminEditableFields", ParamType.JsonArray, this, options, "ADMIN_EDITABLE_FIELDS");
     }
 
     /**

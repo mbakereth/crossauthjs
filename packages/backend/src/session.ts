@@ -956,7 +956,7 @@ export class SessionManager {
      * @param newUser the new user details
      * @returns true if email verification is now needed, false otherwise
      */
-    async updateUser(currentUser: User, newUser : User) : Promise<boolean> {
+    async updateUser(currentUser: User, newUser : User, skipEmailVerification = false) : Promise<boolean> {
         let newEmail : string|undefined = undefined;
         if (!("id" in currentUser) || currentUser.id == undefined) {
             throw new CrossauthError(ErrorCode.UserNotExist, "Please specify a user id");
@@ -981,14 +981,14 @@ export class SessionManager {
                 TokenEmailer.validateEmail(newEmail);
             }
         }
-        if (this.enableEmailVerification && hasEmail) {
+        if (!skipEmailVerification && this.enableEmailVerification && hasEmail) {
             await this.tokenEmailer?.sendEmailVerificationToken(currentUser.id, newEmail);
         } else {
             if (email) rest.email = email;
             if (username) rest.username = username;
         }
         await this.userStorage.updateUser(rest)
-        return this.enableEmailVerification && hasEmail;
+        return !skipEmailVerification && this.enableEmailVerification && hasEmail;
     }
 
     /**

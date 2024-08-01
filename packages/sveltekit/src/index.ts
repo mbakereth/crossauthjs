@@ -23,6 +23,7 @@ export type {
 } from './sveltekituserendpoints';
 export type {
     SearchUsersReturn,
+    AdminUpdateUserReturn,
 } from './sveltekitadminendpoints';
 
 export { SvelteKitServer } from './sveltekitserver';
