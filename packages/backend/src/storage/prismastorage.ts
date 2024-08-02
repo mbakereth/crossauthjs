@@ -223,12 +223,15 @@ export class PrismaUserStorage extends UserStorage {
             } else {
                 await this.prismaClient.$transaction(async (tx) =>{
 
-                    // @ts-ignore  (because types only exist when do prismaClient.table...)
-                    let existingSecrets = await tx[this.userSecretsTable].findUniqueOrThrow({
-                        where: {
-                            user_id: user.id
-                        },
-                    });
+                    let existingSecrets : {[key:string]:any} = {}
+                    try {
+                        // @ts-ignore  (because types only exist when do prismaClient.table...)
+                        await tx[this.userSecretsTable].findUniqueOrThrow({
+                            where: {
+                                user_id: user.id
+                            },
+                        });
+                    } catch (e) {}
                     let {userId: dummySecretsId, ...existingSecretsData} = existingSecrets??{};
                     secretsData = {...existingSecretsData, ...secretsData}
                     // @ts-ignore

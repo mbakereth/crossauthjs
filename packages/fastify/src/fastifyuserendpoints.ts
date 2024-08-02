@@ -7,6 +7,7 @@ import {
     CrossauthLogger,
     j,
 } from '@crossauth/common';
+import { UserState } from '@crossauth/common';
 import type { User } from '@crossauth/common';
 import { FastifyServer } from './fastifyserver';
 import { FastifySessionServer,
@@ -15,7 +16,7 @@ import { FastifySessionServer,
 import {
     setParameter,
     ParamType,
-    Crypto } from '@crossauth/backend';
+    Crypto, } from '@crossauth/backend';
 import type {
     AuthenticationParameters } from '@crossauth/backend';
 import type {
@@ -1657,8 +1658,11 @@ export class FastifyUserEndpoints {
 
         // check new and repeat secrets are valid and update the user
         const user1 = await this.sessionServer.sessionManager.resetSecret(token, 1, newSecrets, repeatSecrets);
-        // log the user in
-        return this.sessionServer.loginWithUser(user1, true, request, reply, successFn);
+        if (user1.state != UserState.factor2ResetNeeded) {
+            // log the user in
+            return this.sessionServer.loginWithUser(user1, true, request, reply, successFn);
+        }
+        return successFn(reply);
     }
 
     private async verifyEmail(request : FastifyRequest<{ Params: VerifyTokenParamType }>, 

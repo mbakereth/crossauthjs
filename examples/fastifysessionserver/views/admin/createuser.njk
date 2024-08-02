@@ -48,8 +48,10 @@
                 <p>
                     <label for="state">Status</label><br>
                     <input type="radio" id="state_active", name="state" value="active" checked> <label for="state_active">Active</label>
-                    <input type="radio" id="state_factor2ResetNeeded", name="state" value="factor2ResetNeeded"> <label for="state_factor2ResetNeeded">Factor 2 Reset Needed</label>
-                    <input type="radio" id="state_inactive", name="state" value="inactive"> <label for="state_state_inactive">Inactive</label>
+                    <input type="radio" id="state_factor2resetneeded", name="state" value="factor2resetneeded"> <label for="state_factor2resetneeded">Factor 2 Reset Needed</label>
+                    <input type="radio" id="state_passwordresetneeded", name="state" value="passwordresetneeded"> <label for="state_passwordresetneeded">Password 2 Reset Needed</label>
+                    <input type="radio" id="state_passwordandfactor2resetneeded", name="state" value="passwordandfactor2resetneeded"> <label for="state_passwordandfactor2resetneeded">Password and Factor 2 Reset Needed</label>
+                    <input type="radio" id="state_inactive", name="state" value="inactive"> <label for="state_inactive">Inactive</label>
                 </p>
                 {% if allowedFactor2|length > 1 %}
                 <p>

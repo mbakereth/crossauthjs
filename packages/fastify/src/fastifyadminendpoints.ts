@@ -19,7 +19,8 @@ import type { FastifySessionServerOptions,
     import {
     setParameter,
     ParamType,
-    UserStorage } from '@crossauth/backend';
+    UserStorage,
+    TokenEmailer } from '@crossauth/backend';
 import type {
     AuthenticationParameters } from '@crossauth/backend';
 
@@ -857,27 +858,46 @@ export class FastifyAdminEndpoints {
             this.sessionServer.createUserFn(request, 
                 {...this.sessionServer.userStorage.userEditableFields,
                 ...this.sessionServer.userStorage.adminEditableFields});
-        if (user.factor2 && user.factor2 != "none") {
+
+        // find out of password was gfiven
+        const secretNames = this.sessionServer.authenticators[user.factor1].secretNames();
+        let hasSecrets = true;
+        for (let secret of secretNames) {
+            if (!request.body[secret] && !request.body["repeat_"+secret]) hasSecrets = false;
+        }
+
+        // ask the authenticator to validate the user-provided secret
+        let passwordErrors : string[] = [];
+        let repeatSecrets : AuthenticationParameters|undefined = {};
+        if (hasSecrets) {
+            passwordErrors = this.sessionServer.authenticators[user.factor1].validateSecrets(request.body);
+            // get the repeat secrets (secret names prefixed with repeat_)
+            for (let field in request.body) {
+                if (field.startsWith("repeat_")) {
+                    const name = field.replace(/^repeat_/, "");
+                    // @ts-ignore as it complains about request.body[field]
+                    if (secretNames.includes(name)) repeatSecrets[name] = 
+                        request.body[field];
+                }
+            }
+            if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
+        }
+        
+        if (!hasSecrets) {
+            if (user.factor2 && user.factor2 != "none") {
+                user.state = UserState.passwordAndFactor2ResetNeeded;
+                CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.passwordAndFactor2ResetNeeded}`, 
+                username: user.username}));
+            } else {
+                user.state = UserState.passwordResetNeeded;
+                CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.passwordResetNeeded}`, 
+                username: user.username}));
+            }
+        } else if (user.factor2 && user.factor2 != "none") {
             user.state = UserState.factor2ResetNeeded;
             CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.factor2ResetNeeded}`, 
             username: user.username}));
         } 
-        // ask the authenticator to validate the user-provided secret
-        let passwordErrors = 
-            this.sessionServer.authenticators[user.factor1].validateSecrets(request.body);
-
-        // get the repeat secrets (secret names prefixed with repeat_)
-        const secretNames = this.sessionServer.authenticators[user.factor1].secretNames();
-        let repeatSecrets : AuthenticationParameters|undefined = {};
-        for (let field in request.body) {
-            if (field.startsWith("repeat_")) {
-                const name = field.replace(/^repeat_/, "");
-                // @ts-ignore as it complains about request.body[field]
-                if (secretNames.includes(name)) repeatSecrets[name] = 
-                    request.body[field];
-            }
-        }
-        if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
 
         // call the implementor-provided hook to validate the user fields
         let userErrors = this.sessionServer.validateUserFn(user);
@@ -890,7 +910,19 @@ export class FastifyAdminEndpoints {
 
         const newUser = await this.sessionServer.sessionManager.createUser(user,
             request.body,
-            repeatSecrets, true);
+            repeatSecrets, true, !hasSecrets);
+
+        if (!hasSecrets) {
+            let email : string|number|undefined= request.body.username;
+            if ("user_email" in request.body) {
+                const email1 = request.body.user_email;
+                if (typeof email1 == "string") email = email1;
+            }
+            TokenEmailer.validateEmail(email);
+            if (!email) throw new CrossauthError(ErrorCode.FormEntry, "No password given but no email address found either");
+            await this.sessionServer.sessionManager.requestPasswordReset(email);
+
+        }
         return successFn(reply, {}, newUser);
     }
 
