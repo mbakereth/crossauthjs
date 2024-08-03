@@ -132,7 +132,7 @@ export class InMemoryUserStorage extends UserStorage {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
                 throw new CrossauthError(ErrorCode.EmailNotVerified);
             }
-            if (user['state'] != "active") {
+            if (options?.skipActiveCheck!=true && user['state'] != "active") {
                 CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }

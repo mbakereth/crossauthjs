@@ -1,7 +1,7 @@
 
 import { MockResolver, MockRequestEvent } from './sveltemocks';
 import { SvelteKitServer } from '../sveltekitserver';
-import { InMemoryKeyStorage, InMemoryUserStorage, LocalPasswordAuthenticator, DummyFactor2Authenticator, SessionCookie } from '@crossauth/backend';
+import { InMemoryKeyStorage, InMemoryUserStorage, LocalPasswordAuthenticator, DummyFactor2Authenticator, SessionCookie, EmailAuthenticator } from '@crossauth/backend';
 import type { Handle } from '@sveltejs/kit';
 
 export async function createUsers(userStorage: InMemoryUserStorage) {
@@ -22,8 +22,15 @@ export async function createUsers(userStorage: InMemoryUserStorage) {
             factor2: "dummyFactor2"}, {
             password: await authenticator.createPasswordHash("alicePass123")
             } ),
+        userStorage.createUser({
+            username: "admin", 
+            email: "admin@admin.com",
+            state: "active",
+            factor1: "localpassword",
+            admin: true}, {
+            password: await authenticator.createPasswordHash("adminPass123")
+            } ),
         ]);
-
 }
 
 export async function createSession(userId : string,
@@ -42,12 +49,14 @@ export async function makeServer() {
     const userStorage = new InMemoryUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
     let dummyFactor2Authenticator = new DummyFactor2Authenticator("0000");
+    let emailAuthenticator = new EmailAuthenticator();
 
     await createUsers(userStorage);
     const server = new SvelteKitServer(userStorage, {
         authenticators: {
             localpassword: authenticator,
             dummyFactor2: dummyFactor2Authenticator,
+            email: emailAuthenticator,
         },
         session: {
             keyStorage: keyStorage,

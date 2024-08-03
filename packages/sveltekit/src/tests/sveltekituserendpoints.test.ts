@@ -165,7 +165,7 @@ test('SvelteKitUserEndpoints.deleteUser', async () => {
     expect(resp1?.success).toBe(true);
     let found = false;
     try {
-        await userStorage.getUserByEmail("bob");
+        await userStorage.getUserByUsername("bob");
         found = true;
     } catch (e) {}
     expect(found).toBe(false);
