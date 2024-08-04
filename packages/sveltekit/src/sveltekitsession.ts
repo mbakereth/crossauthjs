@@ -22,43 +22,24 @@ import { SvelteKitServer } from './sveltekitserver'
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 
-export type InitiateFactor2Return = {
-    success: boolean,
-    factor2? : string,
-    error? : string,
-    exception? : CrossauthError,
-};
-
-export type CompleteFactor2Return = {
-    success: boolean,
-    error? : string,
-    factor2? : string,
-    formData?: {[key:string]:string},
-    exception? : CrossauthError,
-};
-
-export type CancelFactor2Return = {
-    success: boolean,
-    error? : string,
-    exception? : CrossauthError,
-};
-
 type Header = {
     name: string,
     value: string
 };
 
-/*export const svelteSessionHook: Handle = async function ({ event, resolve }){
-	const response = await resolve(event);
-    response.headers.append('set-cookie', "TESTCOOKIE=testvalue") 
-    	return response;
-}*/
-
+/**
+ * This is the type for endpoint objects that provide `load` and `action`
+ * exports for your pages.  See the {@link SvelteKitAdminEndpoints}
+ * and {@link SvelteKitAdminEndpoints} for more details.
+ */
 export type SveltekitEndpoint = {
     load?: (event : RequestEvent) => Promise<{[key:string]:any}>,
     actions?: {[key:string]: (event : RequestEvent) => Promise<{[key:string]:any}>},
 };
 
+/**
+ * Options for {@link SvelteKitSessionServer}.
+ */
 export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
 
     /**
@@ -351,7 +332,18 @@ function defaultUpdateUser(user: User,
 
 }
 
+/**
+ * The Sveltekit session server.
+ * 
+ * You shouldn't have to instantiate this directly.  It is created when
+ * you create a {@link SveltekitServer} object.
+ */
 export class SvelteKitSessionServer {
+
+    /**
+     * Hook to check if the user is logged in and set data in `locals`
+     * accordingly.
+     */
     readonly sessionHook : (input: {event: RequestEvent}, 
         //response: Response
     ) => /*MaybePromise<Response>*/ MaybePromise<{headers: Header[]}>;
@@ -411,13 +403,17 @@ export class SvelteKitSessionServer {
 
     /**
      * The set of allowed authenticators taken from the options during 
-     * construction.
+     * construction.  
+     * 
+     * The default is `[{name: "none", friendlyName: "none"}]`
      */
     readonly allowedFactor2 : {name: string, friendlyName: string, configurable: boolean}[] = [];
 
     /**
      * The set of allowed authenticators taken from the options during 
      * construction.
+     * 
+     * The default is `["none"]`.
      */
     readonly allowedFactor2Names : string[] = [];
 
@@ -457,7 +453,22 @@ export class SvelteKitSessionServer {
 
     private factor2Url : string = "/factor2";
 
+    /**
+     * Use these to access the `load` and `action` endpoints for functions
+     * provides by Crossauth.  These are the ones intended for users to 
+     * have access to.
+     * 
+     * See {@link SvelteKitUserEndpoints}
+     */
     readonly userEndpoints : SvelteKitUserEndpoints;
+
+    /**
+     * Use these to access the `load` and `action` endpoints for functions
+     * provides by Crossauth.  These are the ones intended for admins to 
+     * have access to.
+     * 
+     * See {@link SvelteKitAdminEndpoints}
+     */
     readonly adminEndpoints : SvelteKitAdminEndpoints;
 
     readonly redirect: any;
@@ -470,6 +481,14 @@ export class SvelteKitSessionServer {
      */
     readonly editUserScope? : string;
 
+    /**
+     * Constructor
+     * @param userStorage where users are stored
+     * @param keyStorage where session IDs, email verification and reset tokens are stored
+     * @param authenticators valid authenticators that can be in `factor1` or `factor2`
+     *    of the user.  See class documentation for {@link SvelteKitServer} for an example.
+     * @param options See {@link SvelteKitSessionServerOptions}.
+     */
     constructor(userStorage : UserStorage, keyStorage : KeyStorage, authenticators : {[key:string]: Authenticator}, options : SvelteKitSessionServerOptions = {}) {
 
         this.keyStorage = keyStorage;
@@ -790,6 +809,11 @@ export class SvelteKitSessionServer {
     //////////////
     // Helpers
 
+    /**
+     * Returns the session cookie value from the Sveltekit request event
+     * @param event the request event
+     * @returns the whole cookie value
+     */
     getSessionCookieValue(event : RequestEvent) : string|undefined{
         //let allCookies = event.cookies.getAll();
         if (event.cookies && event.cookies.get(this.sessionManager.sessionCookieName)) {       
@@ -798,6 +822,11 @@ export class SvelteKitSessionServer {
         return undefined;
     }
 
+    /**
+     * Returns the session cookie value from the Sveltekit request event
+     * @param event the request event
+     * @returns the whole cookie value
+     */
     getCsrfCookieValue(event : RequestEvent) : string|undefined {
         if (event.cookies) {  
             const cookie = event.cookies.get(this.sessionManager.csrfCookieName)     ;
@@ -807,27 +836,51 @@ export class SvelteKitSessionServer {
         return undefined;
     }
 
-    clearCookie(name : string, path : string, event : RequestEvent) {
+    private clearCookie(name : string, path : string, event : RequestEvent) {
         event.cookies.delete(name, {path});
     } 
 
+    /**
+     * Sets headers in the request event.
+     * 
+     * Used internally by {@link SveltekitServer}.  Shouldn't be necessary
+     * to call this directly.
+     * @param headers the headres to set
+     * @param resp the response object to set them in
+     */
     setHeaders(headers: Header[], resp: Response) {
         for (let header of headers) {
             resp.headers.append(header.name, header.value);
         }
     } 
 
+    /**
+     * Sets the CSRF cookie.
+     * 
+     * Used internally.  Shouldn't be necessary
+     * to call this directly.
+     * @param cookie the new cookie and parameters
+     * @param event the request event
+     */
     setCsrfCookie(cookie : Cookie, event: RequestEvent ) {
         event.cookies.set(cookie.name, cookie.value, toCookieSerializeOptions(cookie.options) );
     }
 
-    setHeader(name: string, value: string, headers: Header[]) {
+    private setHeader(name: string, value: string, headers: Header[]) {
         headers.push({
             name: name,
             value: value,
         });
     }
 
+    /**
+     * Returns a hash of the session cookie value.  
+     * 
+     * Used only in reporting, so that logs don't contain the actual session ID.
+     * 
+     * @param event the Sveltelkit request event
+     * @returns a stering hash of the cookie value
+     */
     getHashOfSessionCookie(event : RequestEvent) : string {
         const cookieValue = this.getSessionCookieValue(event);
         if (!cookieValue) return "";
@@ -837,6 +890,14 @@ export class SvelteKitSessionServer {
         return "";
     }
 
+    /**
+     * Returns a hash of the CSRF cookie value.  
+     * 
+     * Used only in reporting, so that logs don't contain the actual CSRF cookie value.
+     * 
+     * @param event the Sveltelkit request event
+     * @returns a stering hash of the cookie value
+     */
     getHashOfCsrfCookie(event : RequestEvent) : string {
         const cookieValue = this.getCsrfCookieValue(event);
         if (!cookieValue) return "";
@@ -846,6 +907,17 @@ export class SvelteKitSessionServer {
         return "";
     }
 
+    /**
+     * Returns a CSRF token if the CSRF cookie is valid.
+     * 
+     * Used internally.  Shouldn't be necessary
+     * to call this directly.
+     * 
+     * @param event the request event
+     * @param headers headers the token will be added to, as well as
+     *   adding it to locals
+     * @returns the string CSRF token for inclusion in forms
+     */
     async csrfToken(event : RequestEvent, headers : Header[]) {
         let token : string|undefined = undefined;
 
@@ -891,6 +963,17 @@ export class SvelteKitSessionServer {
         return token;
     }
 
+    /**
+     * Used internally to update an existing Sveltekit request object with
+     * a new body and headers.
+     * 
+     * Used when restoring a request that was interrupted for 2FA
+     * 
+     * @param event the request event
+     * @param params JSON params to add to the new body
+     * @param contentType the new content type
+     * @returns the updated request event
+     */
     static updateRequest(event: RequestEvent, params : {[key:string]:string}, contentType: string) {
         
         //const contentType = event.headers.get('content-type');
@@ -928,6 +1011,13 @@ export class SvelteKitSessionServer {
         return "";
     }
 
+    /**
+     * Returns the data stored along with the session server-side, with the
+     * given name
+     * @param event the Sveltekit request event
+     * @param name tjhe data name to return
+     * @returns an object or undefined.
+     */
     async getSessionData(event : RequestEvent, name : string) : Promise<{[key:string]: any}|undefined> {
         try {
             const data = event.locals.sessionId ? 
@@ -945,6 +1035,12 @@ export class SvelteKitSessionServer {
 
     }
 
+    /**
+     * Returns whether or not 2FA authentication was initiated as a result
+     * of visiting a page protected by it
+     * @param event the request event
+     * @returns true or false
+     */
     async factor2PageVisitStarted(event : RequestEvent) : Promise<boolean> {
         try {
             const pre2fa = this.getSessionData(event, "pre2fa");
@@ -961,6 +1057,15 @@ export class SvelteKitSessionServer {
     /////////////////////////////////////////////////////////////
     // login protected URLs
 
+    /**
+     * Returns whether a page being visited as part of a request event is
+     * configured to be protected by login.  
+     * 
+     * See {@link SvelteKitSessionServerOptions.loginProtectedPageEndpoints}.
+     * 
+     * @param event the request event
+     * @returns true or false
+     */
     isLoginPageProtected(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         let isProtected = false;
@@ -972,6 +1077,15 @@ export class SvelteKitSessionServer {
         //return (this.loginProtectedPageEndpoints.includes(url.pathname));
     }
  
+    /**
+     * Returns whether an API call is being visited as part of a request event is
+     * configured to be protected by login.  
+     * 
+     * See {@link SvelteKitSessionServerOptions.loginProtectedApiEndpoints}.
+     * 
+     * @param event the request event
+     * @returns true or false
+     */
     isLoginApiProtected(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         //return (this.loginProtectedApiEndpoints.includes(url.pathname));
@@ -982,6 +1096,15 @@ export class SvelteKitSessionServer {
             isProtected);
     }
 
+    /**
+     * Returns whether a page being visited as part of a request event is
+     * configured to be protected by 2FA.  
+     * 
+     * See {@link SvelteKitSessionServerOptions.factor2ProtectedPageEndpoints}.
+     * 
+     * @param event the request event
+     * @returns true or false
+     */
     isFactor2PageProtected(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         let isProtected = false;
@@ -993,6 +1116,15 @@ export class SvelteKitSessionServer {
         //return (this.loginProtectedPageEndpoints.includes(url.pathname));
     }
  
+    /**
+     * Returns whether an API call is being visited as part of a request event is
+     * configured to be protected by 2FA.  
+     * 
+     * See {@link SvelteKitSessionServerOptions.factor2ProtectedApiEndpoints}.
+     * 
+     * @param event the request event
+     * @returns true or false
+     */
     isFactor2ApiProtected(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         //return (this.loginProtectedApiEndpoints.includes(url.pathname));
@@ -1003,6 +1135,15 @@ export class SvelteKitSessionServer {
             isProtected);
     }
 
+    /**
+     * Returns whether a page being visited as part of a request event is
+     * configured to be protected as admin only.  
+     * 
+     * See {@link SvelteKitSessionServerOptions.adminPageEndpoints}.
+     * 
+     * @param event the request event
+     * @returns true or false
+     */
     isAdminPageEndpoint(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         //return (this.adminEndpoints.includes(url.pathname));
@@ -1013,6 +1154,15 @@ export class SvelteKitSessionServer {
             isAdmin);
     }
 
+    /**
+     * Returns whether an AP call being visited as part of a request event is
+     * configured to be protected as admin only.  
+     * 
+     * See {@link SvelteKitSessionServerOptions.adminApiEndpoints}.
+     * 
+     * @param event the request event
+     * @returns true or false
+     */
     isAdminApiEndpoint(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         //return (this.adminEndpoints.includes(url.pathname));
@@ -1064,38 +1214,15 @@ export class SvelteKitSessionServer {
         return sessionCookie.value;
     };
 
-    async initiateFactor2FromEmail(event: RequestEvent, email : string) : Promise<InitiateFactor2Return> {
-        try {
-            if (!this.isFactor2PageProtected(event)) return {success: true, factor2: ""};
-            
-            CrossauthLogger.logger.debug(j({msg:"Starting 2FA", email: email}));
-            if (this.enableCsrfProtection && !event.locals.csrfToken) {
-                throw new CrossauthError(ErrorCode.Forbidden, "CSRF token missing");
-            }
-            const bodyData = new JsonOrFormData();
-            await bodyData.loadData(event);
-            const {user} = await this.userStorage.getUserByEmail(email);
-            if (user.factor2 != "") {
-                const sessionCookieValue = await this.createAnonymousSession(event);
-                await this.sessionManager.initiateTwoFactorPageVisit(user, sessionCookieValue, bodyData.toObject(), event.request.url.replace(/\?.*$/,""));
-    
-            }
-            return {
-                success: true, 
-                factor2: user.factor2,
-            };
-    
-        } catch (e) {
-            const ce = CrossauthError.asCrossauthError(e);
-            return {
-                success: false,
-                error: ce.message,
-                exception: ce,
-            }
-        }
-
-    }
-
+    /**
+     * Sets locals based on session and CSRF cookies.  
+     * 
+     * Sets things like `locals.user`.  You can call this if you need them
+     * updated based on cookie settings and a page load hasn't been done
+     * (ie the hooks haven't run).
+     * 
+     * @param event the Sveltekit request event.
+     */
     async refreshLocals(event : RequestEvent) {
         try {
             const sessionCookieValue = this.getSessionCookieValue(event);

@@ -3,9 +3,6 @@ export { SvelteKitSessionServer } from './sveltekitsession';
 export type { 
     SvelteKitSessionServerOptions,
     SveltekitEndpoint,
-    InitiateFactor2Return,
-    CompleteFactor2Return,
-    CancelFactor2Return
 } from './sveltekitsession';
 export type {
     LoginReturn,
@@ -25,7 +22,7 @@ export type {
     SearchUsersReturn,
     AdminUpdateUserReturn,
     AdminCreateUserReturn,
-    ADminDeleteUserReturn,
+    AdminDeleteUserReturn as ADminDeleteUserReturn,
 } from './sveltekitadminendpoints';
 
 export { SvelteKitServer } from './sveltekitserver';

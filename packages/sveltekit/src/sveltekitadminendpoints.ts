@@ -8,6 +8,12 @@ import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@cross
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.updateUser}
+ * {@link SvelteKitAdminEndpoints.updateUserEndpoint} action. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
 export type AdminUpdateUserReturn = {
     user? : User,
     error?: string,
@@ -16,6 +22,12 @@ export type AdminUpdateUserReturn = {
     success: boolean,
 };
 
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.changePassword}
+ * {@link SvelteKitAdminEndpoints.changePasswordEndpoint} action. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
 export type AdminChangePasswordReturn = {
     user? : User,
     error?: string,
@@ -24,6 +36,12 @@ export type AdminChangePasswordReturn = {
     success: boolean
 };
 
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.createUser}
+ * {@link SvelteKitAdminEndpoints.createUserEndpoint} action. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
 export type AdminCreateUserReturn = {
     user? : UserInputFields,
     factor2Data?:  {
@@ -38,13 +56,25 @@ export type AdminCreateUserReturn = {
     success: boolean,
 };
 
-export type ADminDeleteUserReturn = {
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.deleteUser}
+ * {@link SvelteKitAdminEndpoints.deleteUserEndpoint} action. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export type AdminDeleteUserReturn = {
     user? : User,
     error?: string,
     exception?: CrossauthError,
     success: boolean
 };
 
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.searchUsers}
+ * {@link SvelteKitAdminEndpoints.searchUsersEndpoint} action. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
 export type SearchUsersReturn = {
     success : boolean,
     users?: User[],
@@ -57,6 +87,17 @@ export type SearchUsersReturn = {
     hasNext : boolean,
 };
 
+/**
+ * Default function for searching users.
+ * 
+ * Returns the user who's username exactly matches the search term
+ * 
+ * @param searchTerm the term to search for
+ * @param userStorage where users are stored
+ * @param skip skip this many matches from the start
+ * @param _take take this many results (ignored as always returns 0 or 1 matches)
+ * @returns matching users as an array
+ */
 async function defaultUserSearchFn(searchTerm: string,
     userStorage: UserStorage, skip = 0, _take = 10) : Promise<User[]> {
         let users : User[] = [];
@@ -91,9 +132,48 @@ async function defaultUserSearchFn(searchTerm: string,
  * Provides endpoints for users to login, logout and maintain their 
  * own account.
  * 
- * This class is not intended to be used outside of Crossauth.  For 
- * documentation about functiuons it provides, see
- * {@link SvelteKitSessionServer}.
+ * This is created automatically when {@link SveltekitServer} is instantiated.
+ * The endpoints are available through `SveltekitServer.sessionServer.adminEndpoints`.
+ * 
+ * The methods in this class are designed to be used in
+ * `+*_server.ts` files in the `load` and `actions` exports.  You can
+ * either use the low-level functions such as {@link updateUser} or use
+ * the `action` and `load` members of the endpoint objects.
+ * For example, for {@link updateUserEndpoint}
+ * 
+ * ```
+ * export const load = crossauth.sessionServer?.adminEndpoints.updateUserEndpoint.load ?? crossauth.dummyLoad;
+ * export const actions = crossauth.sessionServer?.adminEndpoints.updateUserEndpoint.actions ?? crossauth.dummyActions;
+ * ```
+ * The `?? crossauth.dummyLoad` and `?? crossauth.dummyActions` is to stop
+ * typescript complaining as the `sessionServer` member of the 
+ * {@link @crossauth/sveltekit/SveltekitServer} object may be undefined, because
+ * some application do not have a session server.
+ * 
+ * **Endpoints**
+ * 
+ * These endpoints can only be called if an admin user is logged in, as defined
+ * by the {@link SveltekitSessionServer.isAdminFn}.  If the user does not
+ * have this permission, a 401 error is raised.
+ * 
+ * | Name                       | Description                                                | PageData (returned by load)                                                      | ActionData (return by actions)                                   | Form fields expected by actions                             | URL param |
+ * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
+ * | baseEndpoint               | This PageData is returned by all endpoints' load function. | - `user` logged in {@link @crossauth/common!User}                                | *Not provided*                                                   |                                                             |           |
+ * |                            |                                                            | - `csrfToken` CSRF token if enabled                                              |                                                                  |                                                             |           |                                                                                  | loginPage                | 
+ * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
+ * | searchUsersEndpoint        | Returns a paginated set of users or those matchign search  | See return of {@link SvelteKitAdminEndpoints.searchUsers}                        | *Not provided*                                                   |                                                             |           |
+ * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
+ * | updateUserEndpoint         | Update a user's details                                    | - `allowedFactor2` see {@link SvelteKitAdminEndpoints}.`signupEndpoint`          | `default`:                                                       | `default`:                                                  | `id`      |
+ * |                            |                                                            | - `editUser` the {@link @crossauth/common!User} being edited                     |  - see {@link SveltekitAdminEndpoint.updateUser} return          |  - see {@link SveltekitAdminEndpoint.updateUser} event      |           |
+ * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
+ * | changePasswordEndpoint     | Update a user's password                                   | - `next` page to load on szccess                                                 | `default`:                                                       | `default`:                                                  | `id`      |
+ * |                            |                                                            | - `editUser` the {@link @crossauth/common!User} being edited                     |  - see {@link SveltekitAdminEndpoint.changePassword} return      |  - see {@link SveltekitAdminEndpoint.changePassword} event  |           |
+ * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
+ * | createUserEndpoint         | Creates a new user                                         | - `allowedFactor2` see {@link SvelteKitAdminEndpoints}.`signupEndpoint`          | `default`:                                                       | `default`:                                                  | `id`      |
+ * |                            |                                                            |                                                                                  |  - see {@link SveltekitAdminEndpoint.createUser} return          |  - see {@link SveltekitAdminEndpoint.createUser} event      |           |
+ * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
+ * | deleteUser                 | Deletes a user                                             | - `error` error message if user ID doesn't exist                                 | `default`:                                                       | `default`:                                                  | `id`      |
+ * |                            |                                                            |                                                                                  |  - see {@link SveltekitAdminEndpoint.deleteUser} return          |  - see {@link SveltekitAdminEndpoint.deleteUser} event      |           |
  */
 export class SvelteKitAdminEndpoints {
     private sessionServer : SvelteKitSessionServer;
@@ -235,7 +315,38 @@ export class SvelteKitAdminEndpoints {
 
     }
 
-    async updateUser(user : User, event: RequestEvent) {
+    /**
+     * Call this to update a user's details.
+     * 
+     * If you try updating factor2, the user will be asked to reset factor2
+     * upon next login.
+     * 
+     * If you do not set a password, user will be sent a password reset
+     * token to set a new one.
+     * 
+     * @param event the Sveltekit event.  The form fields used are
+     *   - `username` the desired username
+     *   - `factor2` the desiredf second factor
+     *   - `state` the desired state, which will be overridden if the
+     *     user has to reset password and/or factor2
+     *   - `user_*` anything prefixed with `user` that is also in
+     *     the `userEditableFields` or `adminEditableFields` options
+     *     passed when constructing the
+     *     user storage object will be added to the {@link @crossuath/common!User}
+     *     object (with `user_` removed).
+     * 
+     * @returns object with:
+     * 
+     *   - `success` true if creation and login were successful, 
+     *      false otherwise.
+     *     even if factor2 authentication is required, this will still
+     *     be true if there was no error.
+     *   - `formData` the form fields extracted from the request
+     *   - `error` an error message or undefined
+     *   - `exception` a {@link @crossauth/common!CrossauthError} if an
+     *     exception was raised
+     */
+    async updateUser(user : User, event: RequestEvent) : Promise<AdminUpdateUserReturn> {
 
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -564,7 +675,7 @@ export class SvelteKitAdminEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-        async deleteUser(event : RequestEvent) : Promise<ADminDeleteUserReturn> {
+        async deleteUser(event : RequestEvent) : Promise<AdminDeleteUserReturn> {
             CrossauthLogger.logger.debug(j({msg:"deleteUser"}));
             try {
     
