@@ -42,7 +42,7 @@ declare global {
                 authError?: string,
                 authErrorDescription?: string,
                 sessionId? : string,
-                scope? : string,
+                scope? : string[],
             }
             // interface PageData {}
             // interface PageState {}

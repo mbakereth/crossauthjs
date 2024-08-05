@@ -1,14 +1,17 @@
 import { SvelteKitSessionServer, type SvelteKitSessionServerOptions } from './sveltekitsession';
+import { SvelteKitApiKeyServer, type SvelteKitApiKeyServerOptions } from './sveltekitapikey';
 import { UserStorage, KeyStorage, Authenticator, setParameter, ParamType } from '@crossauth/backend';
 import { CrossauthError, ErrorCode, type User } from '@crossauth/common';
 import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
 
-export interface SvelteKitServerOptions extends SvelteKitSessionServerOptions {
+export interface SvelteKitServerOptions 
+    extends SvelteKitSessionServerOptions, 
+        SvelteKitApiKeyServerOptions
+     {
     /** User can set this to check if the user is an administrator.
      * By default, the admin booloean field in the user object is checked
      */
     isAdminFn?: (user : User) => boolean;
-
 }
 
 export type Resolver = (event: RequestEvent, opts?: ResolveOptions) => MaybePromise<Response>;
@@ -69,7 +72,7 @@ function defaultIsAdminFn(user : User) : boolean {
  *  - `user`: the logged in {@link @crossauth/common!User} or undefined,
  *  - `csrfToken` a CSRF token if the request is a `GET`, `HEAD` or `OPTIONS`,
  *  - `authType` authentication type, currently only `cookie`,
- *  - `apiKey` the valid API key if one was used (not currently supported),
+ *  - `apiKey` the valid API key if one was used,
  *  - `accessTokenPayload` payload for the OAuth access token (not currently supported),
  *  - `authError` string error during authentication process (not currently used)
  *  - `authErrorDescription` error during authentication (not currently used),
@@ -78,7 +81,7 @@ function defaultIsAdminFn(user : User) : boolean {
  *   
  * 
  * For instructions about how to use this class in your endpoints, see
- * {@link SvelktekitUserEndpoints} and {@link SveltekitAdminEndpoints}.
+ * {@link SvelkteKitUserEndpoints} and {@link SvelteKitAdminEndpoints}.
  */
 export class SvelteKitServer {
 
@@ -87,7 +90,9 @@ export class SvelteKitServer {
 
     /** The session server if one was requested during construction */
     readonly sessionServer? : SvelteKitSessionServer;
-    //private secret : String = "";
+
+    /** The api key server if one was requested during construction */
+    readonly apiKeyServer? : SvelteKitApiKeyServer;
 
     /** For adding in your `hooks.server.ts.  See class documentation
      * for details
@@ -119,6 +124,12 @@ export class SvelteKitServer {
      *     constructor are concatinated with the options defined in
      *     `session.options`, so that you can have global as well as
      *     session server-specific configuration.
+     *   - `apiKey` if passed, instantiate the session server (see class
+     *     documentation).  The value is an object with a `keyStorage` field
+     *     which must be present and should be the {@link KeyStorage} instance
+     *     where API keys are stored.  A field called `options` whose
+     *     value is an {@link SveltekitApiKeyServerOptions} may also be
+     *     provided.
      * 
      * @param options Configuration that applies to the whole application,
      *   not just the session server.
@@ -126,12 +137,18 @@ export class SvelteKitServer {
     constructor(userStorage: UserStorage, {
         authenticators,
         session,
+        apiKey,
     } : {
         authenticators?: {[key:string]: Authenticator}, 
         session? : {
             keyStorage: KeyStorage, 
             options?: SvelteKitSessionServerOptions,
-}
+        },
+        apiKey? : {
+            keyStorage: KeyStorage,
+            options? : SvelteKitApiKeyServerOptions
+
+        },
     }, options : SvelteKitServerOptions = {}) {
 
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL", false);
@@ -146,7 +163,21 @@ export class SvelteKitServer {
             this.sessionServer = new SvelteKitSessionServer(userStorage, session.keyStorage, authenticators, {...session.options, ...options});
         }
 
+        if (apiKey) {
+            this.apiKeyServer = new SvelteKitApiKeyServer(userStorage,
+                apiKey.keyStorage,
+                { ...options, ...apiKey.options });
+        }
+
         this.hooks = async ({event, resolve}) => {
+
+            // reset all locals
+            event.locals.user = undefined;
+            event.locals.sessionId = undefined;
+            event.locals.csrfToken = undefined;
+            event.locals.authType = undefined;
+            event.locals.scope = undefined;
+
             if (this.sessionServer) {
                 await this.sessionServer.sessionHook({event});
                 const ret = await this.sessionServer.twoFAHook({event});
@@ -174,6 +205,9 @@ export class SvelteKitServer {
                         return this.sessionServer.error(401, "Unauthorized");
                 }
                 if (ret.response) return ret.response;
+            }
+            if (this.apiKeyServer) {
+                await this.apiKeyServer.hook({event});
             }
             return await resolve(event);
 

@@ -1,7 +1,14 @@
 
 import { MockResolver, MockRequestEvent } from './sveltemocks';
 import { SvelteKitServer } from '../sveltekitserver';
-import { InMemoryKeyStorage, InMemoryUserStorage, LocalPasswordAuthenticator, DummyFactor2Authenticator, SessionCookie, EmailAuthenticator } from '@crossauth/backend';
+import {
+    InMemoryKeyStorage,
+    InMemoryUserStorage,
+    LocalPasswordAuthenticator,
+    DummyFactor2Authenticator,
+    SessionCookie,
+    EmailAuthenticator,
+    ApiKeyManager } from '@crossauth/backend';
 import type { Handle } from '@sveltejs/kit';
 
 export async function createUsers(userStorage: InMemoryUserStorage) {
@@ -44,7 +51,7 @@ export async function createSession(userId : string,
     return {key, cookie};
 }
 
-export async function makeServer() {
+export async function makeServer(makeSession=true, makeApiKey=false) {
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = new InMemoryUserStorage();
     const authenticator = new LocalPasswordAuthenticator(userStorage);
@@ -52,18 +59,23 @@ export async function makeServer() {
     let emailAuthenticator = new EmailAuthenticator();
 
     await createUsers(userStorage);
+    let session = makeSession ? {
+        keyStorage: keyStorage,
+        options:  {
+            allowedFactor2: ["none", "dummyFactor2"],
+        }
+        } : undefined;
+    let apiKey = makeApiKey ? {
+        keyStorage: keyStorage
+    } : undefined;
     const server = new SvelteKitServer(userStorage, {
         authenticators: {
             localpassword: authenticator,
             dummyFactor2: dummyFactor2Authenticator,
             email: emailAuthenticator,
         },
-        session: {
-            keyStorage: keyStorage,
-            options:  {
-                allowedFactor2: ["none", "dummyFactor2"],
-            }
-        }}, {
+        session: session,
+        apiKey : apiKey}, {
             secret: "ABCDEFG",
             loginProtectedPageEndpoints: ["/account"],
             factor2ProtectedPageEndpoints: ["/factor2protected"]
@@ -71,7 +83,10 @@ export async function makeServer() {
     const handle = server.hooks;
     const resolver = new MockResolver("Response");
 
-    return {server, resolver, handle, keyStorage, userStorage, authenticator};
+    const apiKeyManager = makeApiKey ? new ApiKeyManager(keyStorage, {secret: "ABCDEFG",}) : undefined;
+
+
+    return {server, resolver, handle, keyStorage, userStorage, authenticator, apiKeyManager};
 }
 
 export function getCookies(resp : Response) {
