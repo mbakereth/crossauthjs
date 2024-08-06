@@ -26,11 +26,12 @@ export const crossauth = new SvelteKitServer(userStorage, {
         options: {
             allowedFactor2: ["none", "totp"],
         }
-    }}, {
+    },
+    options: {
         loginProtectedPageEndpoints: ["/account"],
         factor2ProtectedPageEndpoints: ["/resetpassword/*"],
         adminPageEndpoints: ["/admin", "/admin/**"],
         unauthorizedUrl: "/401",
         redirect,
         error
-    });
+    }});

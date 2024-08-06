@@ -1,18 +1,39 @@
 import { SvelteKitSessionServer, type SvelteKitSessionServerOptions } from './sveltekitsession';
 import { SvelteKitApiKeyServer, type SvelteKitApiKeyServerOptions } from './sveltekitapikey';
-import { UserStorage, KeyStorage, Authenticator, setParameter, ParamType } from '@crossauth/backend';
+import { SvelteKitAuthorizationServer, type SvelteKitAuthorizationServerOptions } from './sveltekitoauthserver';
+import {
+    UserStorage,
+    KeyStorage,
+    Authenticator,
+    setParameter,
+    ParamType,
+    OAuthClientStorage
+ } from '@crossauth/backend';
 import { CrossauthError, ErrorCode, type User } from '@crossauth/common';
 import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
 
 export interface SvelteKitServerOptions 
     extends SvelteKitSessionServerOptions, 
-        SvelteKitApiKeyServerOptions
+        SvelteKitApiKeyServerOptions,
+        SvelteKitAuthorizationServerOptions
      {
     /** User can set this to check if the user is an administrator.
      * By default, the admin booloean field in the user object is checked
      */
     isAdminFn?: (user : User) => boolean;
 }
+
+/**
+ * This is the type for endpoint objects that provide `load` and `action`
+ * exports for your pages.  See the {@link SvelteKitAdminEndpoints}
+ * and {@link SvelteKitAdminEndpoints} for more details.
+ */
+export type SveltekitEndpoint = {
+    load?: (event : RequestEvent) => Promise<{[key:string]:any}>,
+    actions?: {[key:string]: (event : RequestEvent) => Promise<{[key:string]:any}>},
+    get?: (event: RequestEvent) => Promise<Response>,
+    post?: (event: RequestEvent) => Promise<Response>,
+};
 
 export type Resolver = (event: RequestEvent, opts?: ResolveOptions) => MaybePromise<Response>;
 
@@ -73,6 +94,8 @@ function defaultIsAdminFn(user : User) : boolean {
  *  - `csrfToken` a CSRF token if the request is a `GET`, `HEAD` or `OPTIONS`,
  *  - `authType` authentication type, currently only `cookie`,
  *  - `apiKey` the valid API key if one was used,
+ * - `oAuthAuthServer` OAuth authorization server.  See 
+ *    {@link SvelteKitAuthorizationServer}
  *  - `accessTokenPayload` payload for the OAuth access token (not currently supported),
  *  - `authError` string error during authentication process (not currently used)
  *  - `authErrorDescription` error during authentication (not currently used),
@@ -94,11 +117,14 @@ export class SvelteKitServer {
     /** The api key server if one was requested during construction */
     readonly apiKeyServer? : SvelteKitApiKeyServer;
 
+    /** The OAuth authorization server if one was requested */
+    readonly oAuthAuthServer? : SvelteKitAuthorizationServer;
+
     /** For adding in your `hooks.server.ts.  See class documentation
      * for details
      */
     readonly hooks : (Handle);
-    private loginUrl = "/";
+    private loginUrl = "/login";
 
     /**
      * User-defined function for determining whether a user is an admin.
@@ -130,14 +156,15 @@ export class SvelteKitServer {
      *     where API keys are stored.  A field called `options` whose
      *     value is an {@link SveltekitApiKeyServerOptions} may also be
      *     provided.
-     * 
-     * @param options Configuration that applies to the whole application,
-     *   not just the session server.
+     *   - `options` Configuration that applies to the whole application,
+     *     not just the session server.
      */
     constructor(userStorage: UserStorage, {
         authenticators,
         session,
         apiKey,
+        oAuthAuthServer,
+        options,
     } : {
         authenticators?: {[key:string]: Authenticator}, 
         session? : {
@@ -149,8 +176,14 @@ export class SvelteKitServer {
             options? : SvelteKitApiKeyServerOptions
 
         },
-    }, options : SvelteKitServerOptions = {}) {
+        oAuthAuthServer? : {
+            clientStorage: OAuthClientStorage,
+            keyStorage: KeyStorage,
+            options? : SvelteKitAuthorizationServerOptions,
+        },
+        options? : SvelteKitServerOptions}) {
 
+        if (!options) options = {};
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL", false);
         if (options.isAdminFn) SvelteKitServer.isAdminFn = options.isAdminFn;
 
@@ -168,6 +201,18 @@ export class SvelteKitServer {
                 apiKey.keyStorage,
                 { ...options, ...apiKey.options });
         }
+
+        if (oAuthAuthServer) {
+            let extraOptions : SvelteKitAuthorizationServerOptions = {};
+            if (this.loginUrl) extraOptions.loginUrl = this.loginUrl;
+            this.oAuthAuthServer = new SvelteKitAuthorizationServer(
+                this,
+                oAuthAuthServer.clientStorage,
+                oAuthAuthServer.keyStorage,
+                authenticators,
+                { ...extraOptions, ...options, ...oAuthAuthServer.options });
+        }
+    
 
         this.hooks = async ({event, resolve}) => {
 

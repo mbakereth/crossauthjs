@@ -28,16 +28,6 @@ type Header = {
 };
 
 /**
- * This is the type for endpoint objects that provide `load` and `action`
- * exports for your pages.  See the {@link SvelteKitAdminEndpoints}
- * and {@link SvelteKitAdminEndpoints} for more details.
- */
-export type SveltekitEndpoint = {
-    load?: (event : RequestEvent) => Promise<{[key:string]:any}>,
-    actions?: {[key:string]: (event : RequestEvent) => Promise<{[key:string]:any}>},
-};
-
-/**
  * Options for {@link SvelteKitSessionServer}.
  */
 export interface SvelteKitSessionServerOptions extends SessionManagerOptions {

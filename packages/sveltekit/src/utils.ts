@@ -61,11 +61,11 @@ export class JsonOrFormData {
         if (!event.request?.body) {
             return;
         }
-        const contentType = event.request.headers.get("content-type")
+        const contentType = event.request.headers.get("content-type");
         if (contentType == "application/json") {
             this.jsonData = this.clone ? await event.request?.clone()?.json() :
                 await event.request?.json();
-        } else if (contentType == "application/x-www-form-urlencoded" || contentType == "multipart/form-data") {
+        } else if (contentType == "application/x-www-form-urlencoded" || contentType?.startsWith("multipart/form-data")) {
             this.formData = this.clone ? await event.request.clone().formData() :
                 await event.request.formData();
         }

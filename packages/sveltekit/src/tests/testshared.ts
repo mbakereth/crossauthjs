@@ -4,11 +4,17 @@ import { SvelteKitServer } from '../sveltekitserver';
 import {
     InMemoryKeyStorage,
     InMemoryUserStorage,
+    InMemoryOAuthClientStorage,
     LocalPasswordAuthenticator,
+    Crypto,
     DummyFactor2Authenticator,
     SessionCookie,
     EmailAuthenticator,
     ApiKeyManager } from '@crossauth/backend';
+    import {
+        OAuthFlows
+    } from '@crossauth/common';
+    
 import type { Handle } from '@sveltejs/kit';
 
 export async function createUsers(userStorage: InMemoryUserStorage) {
@@ -51,9 +57,33 @@ export async function createSession(userId : string,
     return {key, cookie};
 }
 
-export async function makeServer(makeSession=true, makeApiKey=false) {
+export async function createClients(clientStorage : InMemoryOAuthClientStorage) {
+    const clientSecret = await Crypto.passwordHash("DEF", {
+        encode: true,
+        iterations: 1000,
+        keyLen: 32,
+    });
+    const client = {
+        clientId : "ABC",
+        clientSecret: clientSecret,
+        clientName: "Test",
+        confidential: true,
+        redirectUri: ["http://example.com/redirect"],
+        validFlow: OAuthFlows.allFlows(),
+    };
+    await clientStorage.createClient(client);
+}
+
+function redirect(status : number, location : string) {
+    throw {status, location}
+};
+
+export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthServer=false) {
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = new InMemoryUserStorage();
+    const clientStorage = new InMemoryOAuthClientStorage();
+    if (makeOAuthServer) await createClients(clientStorage);
+
     const authenticator = new LocalPasswordAuthenticator(userStorage);
     let dummyFactor2Authenticator = new DummyFactor2Authenticator("0000");
     let emailAuthenticator = new EmailAuthenticator();
@@ -68,6 +98,20 @@ export async function makeServer(makeSession=true, makeApiKey=false) {
     let apiKey = makeApiKey ? {
         keyStorage: keyStorage
     } : undefined;
+    let oAuthAuthServer = makeOAuthServer ? {
+            clientStorage,
+            keyStorage,
+            authenticators: {
+                localpassword: authenticator,
+                dummyFactor2: dummyFactor2Authenticator,
+                email: emailAuthenticator,
+            }, 
+            options: {
+                userStorage,
+            }
+               
+    } : undefined;
+
     const server = new SvelteKitServer(userStorage, {
         authenticators: {
             localpassword: authenticator,
@@ -75,11 +119,18 @@ export async function makeServer(makeSession=true, makeApiKey=false) {
             email: emailAuthenticator,
         },
         session: session,
-        apiKey : apiKey}, {
+        apiKey : apiKey,
+        oAuthAuthServer: oAuthAuthServer,
+        options: {
             secret: "ABCDEFG",
             loginProtectedPageEndpoints: ["/account"],
-            factor2ProtectedPageEndpoints: ["/factor2protected"]
-        });   
+            factor2ProtectedPageEndpoints: ["/factor2protected"],
+            validScopes: ["read", "write"],
+            jwtKeyType: "RS256",
+            jwtPublicKeyFile: "keys/rsa-public-key.pem",
+            jwtPrivateKeyFile: "keys/rsa-private-key.pem",
+            redirect,
+        }});   
     const handle = server.hooks;
     const resolver = new MockResolver("Response");
 

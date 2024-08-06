@@ -753,7 +753,7 @@ export class FastifyAuthorizationServer {
         let errorDescription : string|undefined;
         let code : string|undefined;
 
-        // Create an authorizatin code
+        // Create an authorization code
         if (authorized) {
             const resp = await this.authServer.authorizeGetEndpoint({
                 responseType,

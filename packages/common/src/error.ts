@@ -336,6 +336,19 @@ export class CrossauthError extends Error {
             
     }
 
+    get oauthErrorCode() {
+        switch (this.code) {
+            case ErrorCode.BadRequest: return "invalid_request";
+            case ErrorCode.UnauthorizedClient: return "unauthorized_client";
+            case ErrorCode.Unauthorized: return  "access_denied";
+            case ErrorCode.InvalidScope: return "invalid_scope";
+            case ErrorCode.Connection: return "temporarily_unavailable";
+            case ErrorCode.InvalidToken: return "invalid_token";
+            case ErrorCode.MfaRequired: return "mfa_required";
+            default: return "server_error";
+        }
+    }
+
     /**
      * If the passed object is a `CrossauthError` instance, simply returns
      * it.  

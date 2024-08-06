@@ -1,9 +1,6 @@
 // Sveltekit
 export { SvelteKitSessionServer } from './sveltekitsession';
-export type { 
-    SvelteKitSessionServerOptions,
-    SveltekitEndpoint,
-} from './sveltekitsession';
+export type { SvelteKitSessionServerOptions } from './sveltekitsession';
 export type {
     LoginReturn,
     LogoutReturn,
@@ -26,10 +23,20 @@ export type {
 } from './sveltekitadminendpoints';
 
 export { SvelteKitServer } from './sveltekitserver';
-export type { SvelteKitServerOptions, Resolver } from './sveltekitserver';
+export type { SvelteKitServerOptions, Resolver, SveltekitEndpoint } from './sveltekitserver';
 import type { User, ApiKey } from '@crossauth/common'
 export { JsonOrFormData } from './utils';
 
+export {  } from './sveltekitoauthserver';
+export { SvelteKitAuthorizationServer } from './sveltekitoauthserver';
+export type {
+    AuthorizeQueryType,
+    ReturnBase,
+    AuthorizePageData,
+    AuthorizeFormData,
+    MfaChallengeBodyType,
+    MfaChallengeReturn,
+    SvelteKitAuthorizationServerOptions } from './sveltekitoauthserver';
 declare global {
     namespace App {
             // interface Error {}

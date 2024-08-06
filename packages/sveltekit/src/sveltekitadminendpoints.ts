@@ -1,6 +1,6 @@
-import { SvelteKitServer } from './sveltekitserver';
+import { SvelteKitServer, type SveltekitEndpoint } from './sveltekitserver';
 import { SvelteKitSessionServer } from './sveltekitsession';
-import type { SvelteKitSessionServerOptions, SveltekitEndpoint } from './sveltekitsession';
+import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { TokenEmailer } from '@crossauth/backend';
 import type { UserStorage, AuthenticationParameters } from '@crossauth/backend';
 import type { User, UserInputFields } from '@crossauth/common';
