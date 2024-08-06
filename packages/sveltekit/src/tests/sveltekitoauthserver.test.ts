@@ -5,7 +5,7 @@ import {  makeServer, getCsrfToken, login } from './testshared';
 export var passwordResetData :  {token : string, extraData: {[key:string]: any}};
 
 test('SvelteKitOAuthServer.authorizeRedirectsToLogin', async () => {
-    const { server, resolver, handle, userStorage } = await makeServer(true, false, true);
+    const { server } = await makeServer(true, false, true);
 
     const redirect = encodeURIComponent("http://example.com/redirect")
 
@@ -17,8 +17,7 @@ test('SvelteKitOAuthServer.authorizeRedirectsToLogin', async () => {
     let authServer = server.oAuthAuthServer;
     let redirectTo : string|undefined = undefined;
     try {
-        const resp = await authServer?.authorizeEndpoint.load(event);
-
+        await authServer?.authorizeEndpoint.load(event);
     } catch (e) {
         
         redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
@@ -28,7 +27,7 @@ test('SvelteKitOAuthServer.authorizeRedirectsToLogin', async () => {
 });
 
 test('SvelteKitOAuthServer.getAccessTokenWhileLoggedIn', async () => {
-    const { server, resolver, handle, userStorage } = await makeServer(true, false, true);
+    const { server, resolver, handle } = await makeServer(true, false, true);
 
     // log in
     let resp = await login(server, resolver, handle);
@@ -50,6 +49,7 @@ test('SvelteKitOAuthServer.getAccessTokenWhileLoggedIn', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.user = user;
     let authServer = server.oAuthAuthServer;
+    if (!authServer) throw new Error("No auth server");
     let redirectTo : string|undefined = undefined;
     try {
         const resp = await authServer?.authorizeEndpoint.load(event);
@@ -84,12 +84,39 @@ test('SvelteKitOAuthServer.getAccessTokenWhileLoggedIn', async () => {
         event.locals.csrfToken = csrfToken;
         event.locals.sessionId = sessionId;
         try {
-            const resp = await authServer?.authorizeEndpoint.actions.default(event);
-            console.log(resp);
+            await authServer?.authorizeEndpoint.actions.default(event);
         } catch (e) {
             redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
         }
         expect(redirectTo).toContain("http://example.com/redirect");
+        const redirectUrl = new URL(redirectTo??"");
+        let code = redirectUrl.searchParams.get("code");
+
+        // token
+        postRequest = new Request("http://ex.com/token", {
+            method: "POST",
+            body: JSON.stringify({
+                grant_type: "authorization_code",
+                client_id : "ABC",
+                client_secret: "DEF",
+                scope: "read write",
+                code: code,
+            }),
+            headers: [
+                ["content-type", "application/json"],
+            ] 
+                });
+        event = new MockRequestEvent("1", postRequest, {});
+        let access_token : string|undefined = undefined;
+        try {
+            const resp = await authServer.tokenEndpoint.post(event);
+            access_token = (await resp.json()).access_token;
+        } catch (e) {
+            redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
+            console.log("Error", e);
+        }
+        expect(access_token).toBeDefined();
+    
     
 });
 

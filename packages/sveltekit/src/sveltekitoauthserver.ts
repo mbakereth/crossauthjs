@@ -795,7 +795,7 @@ export class SvelteKitAuthorizationServer {
         }
     }
 
-    readonly tokenEndpoint : SveltekitEndpoint = {
+    readonly tokenEndpoint = {
 
         post: async (event : RequestEvent) => {
             let formData : {[key:string]:string}|undefined = undefined;
@@ -926,12 +926,10 @@ export class SvelteKitAuthorizationServer {
     readonly mfaAuthenticatorsEndpoint : SveltekitEndpoint = {
 
         get: async (event : RequestEvent) => {
-            let formData : {[key:string]:string}|undefined = undefined;
             try {
                 // get form data
                 var data = new JsonOrFormData();
                 await data.loadData(event);
-                formData = data.toObject();
                 return json(await this.mfaAuthenticators(event));
 
             } catch (e) {
