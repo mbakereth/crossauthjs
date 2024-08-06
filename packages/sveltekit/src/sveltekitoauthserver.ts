@@ -367,8 +367,10 @@ export class SvelteKitAuthorizationServer {
             }));
             try {
                 OAuthClientManager.validateUri(redirectUri);
-                throw this.redirect(302, redirectUri); 
+                throw this.redirect(302, redirectUri + "?error=access_denied&error_description="+encodeURIComponent("Access was not granted")); 
             } catch (e) {
+                // hack - let Sveltekit redirect through
+                if (typeof e == "object" && e != null && "status" in e && "location" in e) throw e;
                 CrossauthLogger.logger.error(j({
                     msg: `Couldn't send error message ${ce.codeName} to ${redirectUri}}`}));
                 return {

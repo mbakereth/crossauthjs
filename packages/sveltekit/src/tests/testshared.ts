@@ -5,6 +5,7 @@ import {
     InMemoryKeyStorage,
     InMemoryUserStorage,
     InMemoryOAuthClientStorage,
+    InMemoryOAuthAuthorizationStorage,
     LocalPasswordAuthenticator,
     Crypto,
     DummyFactor2Authenticator,
@@ -82,6 +83,7 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = new InMemoryUserStorage();
     const clientStorage = new InMemoryOAuthClientStorage();
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
     if (makeOAuthServer) await createClients(clientStorage);
 
     const authenticator = new LocalPasswordAuthenticator(userStorage);
@@ -108,6 +110,7 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
             }, 
             options: {
                 userStorage,
+                authStorage,
             }
                
     } : undefined;
