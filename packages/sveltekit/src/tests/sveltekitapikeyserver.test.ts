@@ -24,7 +24,7 @@ test('SvelteApiKeyServer.validKeyAuthenticates', async () => {
             method: "GET",
             headers: {authorization: apiKeyManager.authScheme + " " + token }});
         let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
-        const resp = await handle({event: event, resolve: resolver.mockResolve});
+        await handle({event: event, resolve: resolver.mockResolve});
         expect(event.locals.user?.username).toBe("bob");
         expect(event.locals.apiKey).toBeDefined();    
     }

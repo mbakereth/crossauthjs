@@ -43,7 +43,7 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     /**
      * When using the BFF (backend-for-frontend) pattern, tokens are saved
      * in the `data` field of the session ID.  They are saved in the JSON
-     * object with this field name.  Default `oatuh`.
+     * object with this field name.  Default `oauth`.
      */
     sessionDataName? : string,
 

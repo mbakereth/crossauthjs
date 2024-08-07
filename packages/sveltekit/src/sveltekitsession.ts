@@ -1026,6 +1026,23 @@ export class SvelteKitSessionServer {
     }
 
     /**
+     * Updates or sets the given field in the session `data` field.
+     * 
+     * The `data` field in the session record is assumed to be JSON
+     * 
+     * @param event the Sveltekit request event
+     * @param name the name of the field to set
+     * @param value the value to set it to.
+     */
+    async updateSessionData(event : RequestEvent, 
+        name : string, 
+        value : {[key:string]:any}) {
+        if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
+            "No session present");
+            await this.sessionManager.updateSessionData(event.locals.sessionId, name, value);
+        }
+    
+    /**
      * Returns whether or not 2FA authentication was initiated as a result
      * of visiting a page protected by it
      * @param event the request event

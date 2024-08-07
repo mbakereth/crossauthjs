@@ -11,6 +11,7 @@ import {
  } from '@crossauth/backend';
 import { CrossauthError, ErrorCode, type User } from '@crossauth/common';
 import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
+import { SvelteKitOAuthClient } from './sveltekitoauthclient';
 
 export interface SvelteKitServerOptions 
     extends SvelteKitSessionServerOptions, 
@@ -133,6 +134,8 @@ export class SvelteKitServer {
      * {@link @crossauth/common!User} object.
      */
     static isAdminFn: (user : User) => boolean = defaultIsAdminFn;
+
+    readonly oauthClient? : SvelteKitOAuthClient;
 
     /**
      * Constructor.
@@ -296,7 +299,11 @@ export class SvelteKitServer {
      * @param e an exception
      * @returns true or false
      */
-    static isSvelteKitError(e : any, status : number) {
-        return (typeof e == "object" && e != null && "status" in e && "text" in e && "message" in e && e.status == status);
+    static isSvelteKitError(e : any, status? : number) {
+        if (status) {
+            return (typeof e == "object" && e != null && "status" in e && "text" in e && "message" in e && e.status == status);
+        } 
+        return (typeof e == "object" && e != null && "status" in e && "text" in e && "message" in e);
+
     }
 }
