@@ -1746,7 +1746,7 @@ export class SvelteKitUserEndpoints {
         }
     }
 
-    readonly signupEndpoint : SveltekitEndpoint = {
+    readonly signupEndpoint = {
         load: async (event : RequestEvent) => {
             let allowedFactor2 = this.sessionServer?.allowedFactor2 ??
                 [{name: "none", friendlyName: "None"}];
@@ -1757,7 +1757,7 @@ export class SvelteKitUserEndpoints {
         },
 
         actions: {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const resp = await this.signup(event);
                 delete resp?.exception;
                 return resp;
@@ -1765,7 +1765,7 @@ export class SvelteKitUserEndpoints {
         }
     };
 
-    readonly loginEndpoint : SveltekitEndpoint = {
+    readonly loginEndpoint = {
         load: async ( event : RequestEvent ) => {
             return {
                 next: "/",
@@ -1773,7 +1773,7 @@ export class SvelteKitUserEndpoints {
             };
         },
         actions: {
-            login: async ( event ) => {
+            login: async ( event : RequestEvent ) => {
                 const resp = await this.login(event);
                     if (resp?.success == true && !resp?.factor2Required) 
                       this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
@@ -1785,7 +1785,7 @@ export class SvelteKitUserEndpoints {
                         delete resp?.exception;
                         return resp;
             },
-            factor2: async ( event ) => {
+            factor2: async ( event : RequestEvent ) => {
                 const resp = await this.loginFactor2(event);
                 if (resp?.success == true && !resp?.factor2Required) this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
                 delete resp?.exception;
@@ -1795,8 +1795,8 @@ export class SvelteKitUserEndpoints {
         },
     };
 
-    readonly factor2Endpoint  : SveltekitEndpoint = {
-        load:  async (event) => {
+    readonly factor2Endpoint  = {
+        load:  async ( event : RequestEvent ) => {
             const resp = await this.requestFactor2(event);
             if (resp && !resp.error && event.url.searchParams.get("error"))
                 resp.error = event.url.searchParams.get("error") ?? undefined;
@@ -1804,35 +1804,35 @@ export class SvelteKitUserEndpoints {
         },
     };
 
-    readonly logoutEndpoint  : SveltekitEndpoint = {
+    readonly logoutEndpoint  = {
         actions : {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const resp = await this.logout(event);
                 delete resp?.exception;
                 return resp;
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             return {
                 ...this.baseEndpoint(event),
             }
         },
     };
 
-    readonly changeFactor2Endpoint  : SveltekitEndpoint = {
+    readonly changeFactor2Endpoint = {
         actions : {
-            change: async ( event ) => {
+            change: async ( event : RequestEvent ) => {
                 const resp = await this.changeFactor2(event);
                 delete resp?.exception;
                 return resp;
             },
-            reconfigure: async ( event ) => {
+            reconfigure: async ( event : RequestEvent ) => {
                 const resp = await this.reconfigureFactor2(event);
                 delete resp?.exception;
                 return resp;
             },
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
 
             let username = event.locals.user?.username;
 
@@ -1875,15 +1875,15 @@ export class SvelteKitUserEndpoints {
         },
     };
 
-    readonly changePasswordEndpoint  : SveltekitEndpoint = {
+    readonly changePasswordEndpoint = {
         actions : {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const resp = await this.changePassword(event);
                 delete resp?.exception;
                 return resp;
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             let data : {required?: boolean, next? : string} = {};
             let requiredString = event.url.searchParams.get("required");
             let required : boolean|undefined = undefined;
@@ -1907,45 +1907,45 @@ export class SvelteKitUserEndpoints {
         },
     };
 
-    readonly configureFactor2Endpoint  : SveltekitEndpoint = {
+    readonly configureFactor2Endpoint = {
         actions : {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const resp = await this.configureFactor2(event);
                 delete resp?.exception;
                 return resp;
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             return {
                 ...this.baseEndpoint(event),
             };
         },
     };
 
-    readonly deleteUserEndpoint  : SveltekitEndpoint = {
+    readonly deleteUserEndpoint = {
         actions : {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const resp = await this.deleteUser(event);
                 delete resp?.exception;
                 return resp;
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             return {
                 ...this.baseEndpoint(event),
             };
         },
     };
 
-    readonly resetPasswordEndpoint  : SveltekitEndpoint = {
+    readonly resetPasswordEndpoint  = {
         actions : {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const resp = await this.requestPasswordReset(event);
                 delete resp?.exception;
                 return resp;
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             let data : {required?: boolean, next? : string} = {};
             let requiredString = event.url.searchParams.get("required");
             let required : boolean|undefined = undefined;
@@ -1961,9 +1961,9 @@ export class SvelteKitUserEndpoints {
         },
     };
 
-    readonly passwordResetTokenEndpoint  : SveltekitEndpoint = {
+    readonly passwordResetTokenEndpoint  = {
         actions : {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent  ) => {
         
                 // we already visited this URL and used it to initiate 2FA
                 // - execute as normal to perform password reset
@@ -1972,7 +1972,7 @@ export class SvelteKitUserEndpoints {
                 return resp;    
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             try {
                 const resp = await this.validatePasswordResetToken(event);
                 if (!resp?.user) throw new CrossauthError(ErrorCode.InvalidToken, "The password reset token is invalid");

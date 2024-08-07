@@ -17,7 +17,6 @@ import type {
     Cookie,
  } from '@crossauth/backend';
 import { SvelteKitServer } from './sveltekitserver';
-import type { SveltekitEndpoint } from './sveltekitserver';
 import {
     CrossauthError,
     CrossauthLogger,
@@ -78,8 +77,9 @@ export interface AuthorizePageData extends ReturnBase {
         code_challenge?: string,
         code_challenge_method?: string,
         csrfToken?: string,
-    
-    }
+    },
+    user?: User,
+    csrfToken? : string,
 };
 
 export interface AuthorizeFormData extends ReturnBase {
@@ -205,7 +205,6 @@ export class SvelteKitAuthorizationServer {
     /** The underlying framework-independent authorization server */
     readonly authServer : OAuthAuthorizationServer;
     private svelteKitServer : SvelteKitServer;
-    private prefix : string = "/";
     private loginUrl : string = "/login";
     private clientStorage : OAuthClientStorage;
 
@@ -421,21 +420,30 @@ export class SvelteKitAuthorizationServer {
         );
     }
 
-    private requireParam(event : RequestEvent, name : string) : ReturnBase | undefined {
+    private requireGetParam(event : RequestEvent, name : string) : ReturnBase | undefined {
         const val = event.url.searchParams.get(name);
         if (!val) return {
             success: false,
             error: "invalid_request",
-            error_description: "response_type is required"
+            error_description: name + " is required"
+        };
+        return undefined;
+    }
+
+    private requireBodyParam(formData : {[key:string]:any}, name : string) : ReturnBase | undefined {
+        if (!(name in formData)) return {
+            success: false,
+            error: "invalid_request",
+            error_description: name + " is required"
         };
         return undefined;
     }
 
     private getAuthorizeQuery(event : RequestEvent) : {query?: AuthorizeQueryType, error: ReturnBase} {
-        let error = this.requireParam(event, "response_type"); if (error) return {error};
-        error = this.requireParam(event, "client_id"); if (error) return {error};
-        error = this.requireParam(event, "redirect_uri"); if (error) return {error};
-        error = this.requireParam(event, "state"); if (error) return {error};
+        let error = this.requireGetParam(event, "response_type"); if (error) return {error};
+        error = this.requireGetParam(event, "client_id"); if (error) return {error};
+        error = this.requireGetParam(event, "redirect_uri"); if (error) return {error};
+        error = this.requireGetParam(event, "state"); if (error) return {error};
         const response_type = event.url.searchParams.get("response_type") ?? "";
         const client_id = event.url.searchParams.get("client_id") ?? "";
         const redirect_uri = event.url.searchParams.get("redirect_uri") ?? "";
@@ -456,16 +464,19 @@ export class SvelteKitAuthorizationServer {
         return {query, error: {error: "Unknown error", error_description: "Unknown error", success: true}};
     }
 
-    private getMfaChallengeQuery(event : RequestEvent) : {query?: MfaChallengeBodyType, error: ReturnBase} {
-        let error = this.requireParam(event, "client_id"); if (error) return {error};
-        error = this.requireParam(event, "challenge_type"); if (error) return {error};
-        error = this.requireParam(event, "mfa_token"); if (error) return {error};
-        error = this.requireParam(event, "authenticator_id"); if (error) return {error};
-        const client_id = event.url.searchParams.get("client_id") ?? "";
-        const challenge_type = event.url.searchParams.get("challenge_type") ?? "";
-        const mfa_token = event.url.searchParams.get("mfa_token") ?? "";
-        const authenticator_id = event.url.searchParams.get("authenticator_id") ?? "";
-        const client_secret = event.url.searchParams.get("state") ?? undefined;
+    private async getMfaChallengeQuery(event : RequestEvent) : Promise<{query?: MfaChallengeBodyType, error: ReturnBase}> {
+        let form = new JsonOrFormData();
+        await form.loadData(event);
+        const formData = form.toObject();
+        let error = this.requireBodyParam(formData, "client_id"); if (error) return {error};
+        error = this.requireBodyParam(formData, "challenge_type"); if (error) return {error};
+        error = this.requireBodyParam(formData, "mfa_token"); if (error) return {error};
+        error = this.requireBodyParam(formData, "authenticator_id"); if (error) return {error};
+        const client_id = formData.client_id ?? "";
+        const challenge_type = formData.challenge_type ?? "";
+        const mfa_token = formData.mfa_token ?? "";
+        const authenticator_id = formData.authenticator_id ?? "";
+        const client_secret = formData.client_secret ?? undefined;
 
         let query : MfaChallengeBodyType = {
             client_id,
@@ -506,16 +517,9 @@ export class SvelteKitAuthorizationServer {
     private async mfaChallenge(event : RequestEvent) : 
         Promise<MfaChallengeReturn> {
 
-        let qresp = this.getMfaChallengeQuery(event);
+        let qresp = await this.getMfaChallengeQuery(event);
         if (!qresp.query) return qresp.error
         let query : MfaChallengeBodyType = qresp.query;
-        if (qresp.error) {
-            return {
-                error: qresp.error.error,
-                error_description: qresp.error.error_description,
-            }
-        }
-    
     
         const resp = 
             await this.authServer.mfaChallengeEndpoint(query.mfa_token,
@@ -539,19 +543,19 @@ export class SvelteKitAuthorizationServer {
         }
     }
 
-    readonly oidcConfigurationEndpoint : SveltekitEndpoint = {
+    readonly oidcConfigurationEndpoint = {
         get: async (_event : RequestEvent) => {
             return json({
-                authorizeEndpoint: this.prefix+"authorize", 
-                tokenEndpoint: this.prefix+"token", 
-                jwksUri: this.prefix+"jwks", 
+                authorizeEndpoint: this.authorizeEndpointUrl, 
+                tokenEndpoint: this.tokenEndpointUrl, 
+                jwksUri: this.jwksEndpointUrl, 
                 additionalClaims: []
                 }
             );
         },
     };
 
-    readonly jwksGetEndpoint : SveltekitEndpoint = {
+    readonly jwksGetEndpoint = {
 
         get: async (_event : RequestEvent) => {
             try {
@@ -568,7 +572,7 @@ export class SvelteKitAuthorizationServer {
         },
     }
 
-    readonly getCsrfTokenEndpoint : SveltekitEndpoint = {
+    readonly getCsrfTokenEndpoint = {
 
         get: async (event : RequestEvent) => {
             if (!this.csrfTokens) return json({
@@ -716,7 +720,8 @@ export class SvelteKitAuthorizationServer {
                             code_challenge_method: query.code_challenge_method,
                             csrfToken: event.locals.csrfToken,
     
-                        }
+                        },
+                        ...this.baseEndpoint,
                     };
                 } catch (e) {
                     const ce = e as CrossauthError;
@@ -925,7 +930,7 @@ export class SvelteKitAuthorizationServer {
         },
     }
 
-    readonly mfaAuthenticatorsEndpoint : SveltekitEndpoint = {
+    readonly mfaAuthenticatorsEndpoint = {
 
         get: async (event : RequestEvent) => {
             try {
@@ -967,7 +972,7 @@ export class SvelteKitAuthorizationServer {
         },
     };
 
-    readonly mfaChallengeEndpoint : SveltekitEndpoint = {
+    readonly mfaChallengeEndpoint = {
 
         post: async (event : RequestEvent) => {
             try {

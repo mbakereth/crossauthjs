@@ -113,7 +113,6 @@ test('SvelteKitOAuthServer.getAccessTokenWhileLoggedIn', async () => {
             access_token = (await resp.json()).access_token;
         } catch (e) {
             redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
-            console.log("Error", e);
         }
         expect(access_token).toBeDefined();
     
@@ -193,8 +192,7 @@ test('SvelteKitOAuthServer.alreadyAuthorized', async () => {
         event.locals.user = user;
         redirectTo = undefined;
         try {
-            const resp = await authServer?.authorizeEndpoint.load(event);
-            console.log("Resp", resp);
+            await authServer?.authorizeEndpoint.load(event);
         } catch (e) {
             redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
         }
@@ -271,3 +269,153 @@ test('SvelteKitOAuthServer.notAuthorized', async () => {
     
 });
 
+test('SvelteKitOAuthServer.oidcConfiguration', async () => {
+    const { server } = await makeServer(true, false, true);
+
+    let getRequest = new Request(`http://server.com/oidc-configuration`, {
+        method: "GET",
+        });
+    let event = new MockRequestEvent("1", getRequest, {});
+    let authServer = server.oAuthAuthServer;
+    const resp =await authServer?.oidcConfigurationEndpoint.get(event);
+    expect(resp?.status).toBe(200);
+    const body = await resp?.json();
+    expect(body?.authorizeEndpoint).toBe("/oauth/authorize");
+    expect(body?.tokenEndpoint).toBe("/oauth/token");
+    expect(body?.jwksUri).toBe("/oauth/jwks");
+});
+
+test('SvelteKitOAuthServer.jwks', async () => {
+    const { server } = await makeServer(true, false, true);
+
+    let getRequest = new Request(`http://server.com/jwks`, {
+        method: "GET",
+        });
+    let event = new MockRequestEvent("1", getRequest, {});
+    let authServer = server.oAuthAuthServer;
+    const resp =await authServer?.jwksGetEndpoint.get(event);
+    expect(resp?.status).toBe(200);
+    const body = await resp?.json();
+    expect(body.keys).toBeDefined();
+    expect(body.keys.length).toBe(1);
+});
+
+test('SvelteKitOAuthServer.getCsrfTokenJson', async () => {
+    const { server } = await makeServer(true, false, true);
+
+    let getRequest = new Request(`http://server.com/getcsrftoken`, {
+        method: "GET",
+        });
+    let event = new MockRequestEvent("1", getRequest, {});
+    let authServer = server.oAuthAuthServer;
+    const resp =await authServer?.getCsrfTokenEndpoint.get(event);
+    expect(resp?.status).toBe(200);
+    const body = await resp?.json();
+    expect(body.ok).toBe(false);
+});
+
+test('SvelteKitOAuthServer.getCsrfTokenCookie', async () => {
+    const { server } = await makeServer(true, false, true, {refreshTokenType: "cookie"});
+
+    let getRequest = new Request(`http://server.com/getcsrftoken`, {
+        method: "GET",
+        });
+    let event = new MockRequestEvent("1", getRequest, {});
+    let authServer = server.oAuthAuthServer;
+    const resp =await authServer?.getCsrfTokenEndpoint.get(event);
+    expect(resp?.status).toBe(200);
+    const body = await resp?.json();
+    expect(body.ok).toBe(true);
+    expect(body.csrfToken).toBeDefined();
+});
+
+test('SvelteKitOAuthServer.mfa', async () => {
+    const { server, resolver, handle } = await makeServer(true, false, true);
+
+    // log in
+    await login(server, resolver, handle);
+    
+
+    // authorize get endpoint
+    let authServer = server.oAuthAuthServer;
+    if (!authServer) throw new Error("No auth server");
+
+    // token
+    let postRequest = new Request("http://ex.com/token", {
+        method: "POST",
+        body: JSON.stringify({
+            grant_type: "password",
+            client_id : "ABC",
+            client_secret: "DEF",
+            scope: "read write",
+            username: "alice",
+            password: "alicePass123",
+            state: "ABCDEF",
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
+    let event = new MockRequestEvent("1", postRequest, {});
+    const resp2 = await authServer.tokenEndpoint.post(event);
+    const body2 = await resp2.json();
+    expect(body2.error).toBe("mfa_required");
+    const mfa_token = body2.mfa_token ?? "";
+
+    // authenticators
+    let getRequest = new Request(`http://server.com/authenticators`, {
+        method: "GET",
+        headers: {
+            'authorization': "Bearer " + mfa_token,
+        },
+        });
+    event = new MockRequestEvent("1", getRequest, {});
+    const resp3 = await authServer.mfaAuthenticatorsEndpoint.get(event);
+    const body3 = await resp3.json();
+    expect(Array.isArray(body3)).toBe(true);
+    expect(body3.length).toBe(1);
+
+    // challenge
+    postRequest = new Request("http://ex.com/mfachallenge", {
+        method: "POST",
+        body: JSON.stringify({
+            mfa_token: mfa_token,
+            client_id : "ABC",
+            client_secret: "DEF",
+            authenticator_id: "dummyFactor2",
+            challenge_type: "oob",
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
+    event = new MockRequestEvent("1", postRequest, {});
+    const resp4 = await authServer.mfaChallengeEndpoint.post(event);
+    const body4 = await resp4.json();
+    expect(body4.challenge_type).toBe("oob");
+    expect(body4.oob_code).toBeDefined();
+    const oob_code = body4.oob_code;
+    const oob = "0000";
+
+    // OOB
+    postRequest = new Request("http://ex.com/token", {
+        method: "POST",
+        body: JSON.stringify({
+            grant_type: "http://auth0.com/oauth/grant-type/mfa-oob",
+            client_id : "ABC",
+            scope: "read write",
+            client_secret: "DEF",
+            mfa_token: mfa_token,
+            oob_code: oob_code,
+            binding_code: oob
+    }),
+    headers: [
+        ["content-type", "application/json"],
+    ] 
+});
+    event = new MockRequestEvent("1", postRequest, {});
+    const resp5 = await authServer.tokenEndpoint.post(event);
+    const body5 = await resp5.json();
+    expect(body5.access_token).toBeDefined();
+    
+});

@@ -1,4 +1,4 @@
-import { SvelteKitServer, type SveltekitEndpoint } from './sveltekitserver';
+import { SvelteKitServer } from './sveltekitserver';
 import { SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { TokenEmailer } from '@crossauth/backend';
@@ -719,8 +719,8 @@ export class SvelteKitAdminEndpoints {
         }
     }
 
-    readonly searchUsersEndpoint  : SveltekitEndpoint = {
-        load: async ( event ) => {
+    readonly searchUsersEndpoint = {
+        load: async ( event: RequestEvent ) => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             const resp = await this.searchUsers(event);
             delete resp?.exception;
@@ -745,9 +745,9 @@ export class SvelteKitAdminEndpoints {
         }
     }
 
-    readonly updateUserEndpoint  : SveltekitEndpoint = {
+    readonly updateUserEndpoint  = {
         actions : {
-            default: async ( event ) =>  {
+            default: async ( event : RequestEvent ) =>  {
                 const getUserResp = await this.getUserFromParam(event);
                 if (getUserResp.exception || !getUserResp.user) {
                     return {
@@ -760,7 +760,7 @@ export class SvelteKitAdminEndpoints {
                 return resp;
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             let allowedFactor2 = this.sessionServer.allowedFactor2 ??
                 [{name: "none", friendlyName: "None"}];
@@ -781,9 +781,9 @@ export class SvelteKitAdminEndpoints {
         }
     };
 
-    readonly changePasswordEndpoint  : SveltekitEndpoint = {
+    readonly changePasswordEndpoint = {
         actions : {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const getUserResp = await this.getUserFromParam(event);
                 if (getUserResp.exception || !getUserResp.user) {
                     return {
@@ -796,7 +796,7 @@ export class SvelteKitAdminEndpoints {
                 return resp;
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             const getUserResp = await this.getUserFromParam(event);
             if (getUserResp.exception || !getUserResp.user) {
@@ -816,7 +816,7 @@ export class SvelteKitAdminEndpoints {
         },
     };
 
-    readonly createUserEndpoint : SveltekitEndpoint = {
+    readonly createUserEndpoint = {
         load: async (event : RequestEvent) => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             let allowedFactor2 = this.sessionServer?.allowedFactor2 ??
@@ -828,7 +828,7 @@ export class SvelteKitAdminEndpoints {
         },
 
         actions: {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const resp = await this.createUser(event);
                 delete resp?.exception;
                 return resp;
@@ -836,15 +836,15 @@ export class SvelteKitAdminEndpoints {
         }
     };
 
-    readonly deleteUserEndpoint  : SveltekitEndpoint = {
+    readonly deleteUserEndpoint  = {
         actions : {
-            default: async ( event ) => {
+            default: async ( event : RequestEvent ) => {
                 const resp = await this.deleteUser(event);
                 delete resp?.exception;
                 return resp;
             }
         },
-        load: async ( event ) => {
+        load: async ( event : RequestEvent ) => {
             const getUserResp = await this.getUserFromParam(event);
             if (getUserResp.exception || !getUserResp.user) {
                 return {

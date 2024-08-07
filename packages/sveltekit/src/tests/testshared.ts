@@ -79,7 +79,7 @@ function redirect(status : number, location : string) {
     throw {status, location}
 };
 
-export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthServer=false) {
+export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthServer=false, options={}) {
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = new InMemoryUserStorage();
     const clientStorage = new InMemoryOAuthClientStorage();
@@ -133,6 +133,7 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
             jwtPublicKeyFile: "keys/rsa-public-key.pem",
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
             redirect,
+            ...options,
         }});   
     const handle = server.hooks;
     const resolver = new MockResolver("Response");
