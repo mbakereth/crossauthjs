@@ -1,5 +1,4 @@
 import { jwtDecode } from "jwt-decode";
-import { type FastifyRequest, type FastifyReply } from 'fastify';
 import {
     CrossauthError,
     ErrorCode,
@@ -31,14 +30,10 @@ export type SvelteKitErrorFn = (server: SvelteKitServer,
  */
 export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 
-    /** The base URL for endpoints served by this class.
-     */
-    siteUrl: string,
-
     /** 
      * You will have to create a route for the redirect Uri, using
      * the `redirectUriEndpoint` load function.  But the URL for it
-     * here.  It can be an absolute URL or relative to siteUrl.
+     * here.  It should be an absolute URL.
      * 
      * It should be a fully qualified URL as it is called from
      * the browser in a redriect.
@@ -85,7 +80,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      */
     receiveTokenFn?: (oauthResponse: OAuthTokenResponse,
         client: SvelteKitOAuthClient,
-        event: RequestEvent) => Promise<Response|undefined>;
+        event: RequestEvent) => Promise<Response|TokenReturn|undefined>;
 
     /**
      * The function to call when there is an OAuth error and
@@ -154,6 +149,24 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 }
 
 ////////////////////////////////////////////////////////////////////////////
+// Interfaces
+
+export interface AuthorizationCodeFlowReturn {
+    success: boolean,
+    error? : string,
+    error_description? : string
+}
+
+
+export interface TokenReturn extends OAuthTokenResponse {
+    id_payload?: {[key:string]:any},
+}
+
+export interface RedirectUriReturn extends OAuthTokenResponse {
+    success: boolean,
+}
+
+////////////////////////////////////////////////////////////////////////////
 // DEFAULT FUNCTIONS
 
 async function jsonError(_server: SvelteKitServer,
@@ -173,7 +186,7 @@ async function jsonError(_server: SvelteKitServer,
 async function svelteKitError(server: SvelteKitServer,
     _event: RequestEvent,
     ce: CrossauthError) : Promise<Response> {
-        throw server.oauthClient?.error(ce.httpStatus, ce.message);
+        throw server.oAuthClient?.error(ce.httpStatus, ce.message);
 } 
 
 function decodePayload(token : string|undefined) : {[key:string]: any}|undefined {
@@ -263,6 +276,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
         }
 
 }
+
 async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     event: RequestEvent,
@@ -289,18 +303,82 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     }
 }
 
+async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
+    client: SvelteKitOAuthClient,
+    event: RequestEvent,
+    ) : Promise<TokenReturn|undefined> {
+    if (oauthResponse.error) {
+        const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
+            oauthResponse.error_description);
+        return {
+            error: oauthResponse.error,
+            error_description: oauthResponse.error_description
+        }
+    }
+
+    logTokens(oauthResponse);
+
+    try {
+        if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
+            await updateSessionData(oauthResponse, client, event);
+        }
+
+    return {
+        ...oauthResponse,
+        id_payload: decodePayload(oauthResponse.id_token)}
+    } catch (e) {
+        const ce = e as CrossauthError;
+        CrossauthLogger.logger.debug(j({err: ce}));
+        CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
+        return {
+            error: ce.oauthErrorCode,
+            error_description: ce.message,
+        }
+    }
+}
+
+async function sendInPage(oauthResponse: OAuthTokenResponse,
+    _client: SvelteKitOAuthClient,
+    _event: RequestEvent,
+    ) : Promise<TokenReturn|undefined> {
+    if (oauthResponse.error) {
+        const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
+            oauthResponse.error_description);
+        return {
+            error: oauthResponse.error,
+            error_description: oauthResponse.error_description
+        }
+    }
+
+    logTokens(oauthResponse);
+
+    try {
+
+        return {
+            ...oauthResponse,
+            id_payload: decodePayload(oauthResponse.id_token)}
+        } catch (e) {
+        const ce = e as CrossauthError;
+        CrossauthLogger.logger.debug(j({err: ce}));
+        CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
+        return {
+            error: ce.oauthErrorCode,
+            error_description: ce.message,
+        }
+    }
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // CLASSES
 export class SvelteKitOAuthClient extends OAuthClientBackend {
     server : SvelteKitServer;
-    private siteUrl : string = "/";
     sessionDataName : string = "oauth";
     private receiveTokenFn : 
         ( oauthResponse: OAuthTokenResponse,
             client: SvelteKitOAuthClient,
             event : RequestEvent) 
-            => Promise<Response|undefined> = sendJson;
+            => Promise<Response|TokenReturn|undefined> = sendJson;
     readonly errorFn : SvelteKitErrorFn = jsonError;
     private loginUrl : string = "/login";
     authorizedUrl : string = "";
@@ -344,7 +422,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         super(authServerBaseUrl, options);
         this.server = server;
         setParameter("sessionDataName", ParamType.String, this, options, "OAUTH_SESSION_DATA_NAME");
-        setParameter("siteUrl", ParamType.String, this, options, "SITE_URL", true);
         setParameter("tokenResponseType", ParamType.String, this, options, "OAUTH_TOKEN_RESPONSE_TYPE");
         setParameter("errorResponseType", ParamType.String, this, options, "OAUTH_ERROR_RESPONSE_TYPE");
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
@@ -357,20 +434,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         if (options.redirect) this.redirect = options.redirect;
         if (options.error) this.error = options.error;        
 
-        let redirectUri = this.redirectUri ?? "";
         try {
-            new URL(redirectUri);
-        } catch (e1) {
-            redirectUri = this.siteUrl;
-            if (!redirectUri.endsWith("/") && !this.redirectUri?.startsWith("/")) {
-                redirectUri += "/";
-            }
-            redirectUri += this.redirectUri;
-            try {
-                new URL(redirectUri);
-            } catch (e2) {
-                throw new CrossauthError(ErrorCode.Configuration, "Invalid redirect Uri " + this.redirectUri);
-            }
+            new URL(this.redirectUri ?? "");
+        } catch (e) {
+            throw new CrossauthError(ErrorCode.Configuration, "Invalid redirect Uri " + this.redirectUri);
         }
 
         if (options.tokenEndpoints) this.tokenEndpoints = options.tokenEndpoints;
@@ -397,11 +464,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         } else if (this.tokenResponseType == "sendJson") {
             this.receiveTokenFn = sendJson;
         } else if (this.tokenResponseType == "sendInPage") {
-            this.receiveTokenFn = sendJson; //TODO: correct sendInPage;
+            this.receiveTokenFn = sendInPage;
         } else if (this.tokenResponseType == "saveInSessionAndLoad") {
-            this.receiveTokenFn = sendJson; // TODO: correct saveInSessionAndLoad;
+            this.receiveTokenFn = sendJson; saveInSessionAndLoad;
         } else if (this.tokenResponseType == "saveInSessionAndRedirect") {
-            this.receiveTokenFn = sendJson; // TODO: correct saveInSessionAndRedirect;
+            this.receiveTokenFn = saveInSessionAndRedirect;
         }
         if ((this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "saveInSessionAndRedirect") &&
             this.authorizedUrl == "") {
@@ -420,7 +487,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         } else if (this.errorResponseType == "sendJson") {
             this.errorFn = jsonError;
         } else if (this.errorResponseType == "svelteKitError") {
-            this.errorFn = jsonError; // TODO: correct pageError;
+            this.errorFn = svelteKitError;
         }
 
         if (!options.redirect) throw new CrossauthError(ErrorCode.Configuration, "Must provide the SvelteKit redirect function");
@@ -438,7 +505,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     readonly authorizationCodeFlowEndpoint = {
 
         get: async (event : RequestEvent) => {
-            if (this.tokenResponseType == "saveInSessionAndLoad") {
+            if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use load not get");
                 return this.errorFn(this.server, event, ce);
             }
@@ -471,6 +538,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                 if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                console.log("Got error")
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug({err: e});
                 CrossauthLogger.logger.error({cerr: e});
@@ -482,12 +550,72 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
             }
         },
+
+        load: async (event : RequestEvent) : Promise<AuthorizationCodeFlowReturn> => {
+            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
+                return {
+                    success: false,
+                    error: ce.oauthErrorCode,
+                    error_description: ce.message,
+                }
+            }
+            try {
+
+                if (!(this.validFlows.includes(OAuthFlows.AuthorizationCode))) {
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
+                    return {
+                        success: false,
+                        error: ce.oauthErrorCode,
+                        error_description: ce.message,
+                    }
+                }
+
+                if (!event.locals.user && 
+                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
+                    throw this.redirect(302, 
+                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
+                }          
+                const scope = event.url.searchParams.get("scope") ?? undefined;
+                const {url, error, error_description} = 
+                    await this.startAuthorizationCodeFlow(scope);
+                if (error || !url) {
+                    const ce = CrossauthError.fromOAuthError(error??"server_error", 
+                        error_description);
+                    return {
+                        success: false,
+                        error: ce.oauthErrorCode,
+                        error_description: ce.message,
+                    }
+                }
+                CrossauthLogger.logger.debug(j({
+                    msg: `Authorization code flow: redirecting`,
+                    url: url
+                }));
+                throw this.redirect(302, url);
+
+            } catch (e) {
+                if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug({err: e});
+                CrossauthLogger.logger.error({cerr: e});
+                //throw this.error(ce.httpStatus, ce.message);
+                return {
+                    success: false,
+                    error: ce.oauthErrorCode,
+                    error_description: ce.message,
+                }
+
+            }
+        },
+
     };
 
     readonly authorizationCodeFlowWithPKCEEndpoint = {
 
         get: async (event : RequestEvent) => {
-            if (this.tokenResponseType == "saveInSessionAndLoad") {
+            if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use load not get");
                 return this.errorFn(this.server, event, ce);
             }
@@ -531,12 +659,71 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
             }
         },
+
+        load: async (event : RequestEvent) : Promise<AuthorizationCodeFlowReturn> => {
+            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+                const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use get not load");
+                return {
+                    success: false,
+                    error: ce.oauthErrorCode,
+                    error_description: ce.message,
+                }
+            }
+            try {
+
+                if (!(this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE))) {
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
+                    return {
+                        success: false,
+                        error: ce.oauthErrorCode,
+                        error_description: ce.message,
+                    }
+                    }
+
+                if (!event.locals.user && 
+                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
+                    throw this.redirect(302, 
+                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
+                }          
+                const scope = event.url.searchParams.get("scope") ?? undefined;
+                const {url, error, error_description} = 
+                    await this.startAuthorizationCodeFlow(scope, true);
+                if (error || !url) {
+                    const ce = CrossauthError.fromOAuthError(error??"server_error", 
+                        error_description);
+                        return {
+                            success: false,
+                            error: ce.oauthErrorCode,
+                            error_description: ce.message,
+                        }
+                        }
+                    CrossauthLogger.logger.debug(j({
+                        msg: `Authorization code flow: redirecting`,
+                        url: url
+                    }));
+                throw this.redirect(302, url);
+
+            } catch (e) {
+                if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug({err: e});
+                CrossauthLogger.logger.error({cerr: e});
+                //throw this.error(ce.httpStatus, ce.message);
+                return {
+                    success: false,
+                    error: ce.oauthErrorCode,
+                    error_description: ce.message,
+                }
+
+            }
+        },
     };
 
     readonly redirectUriEndpoint = {
 
         get: async (event : RequestEvent) => {
-            if (this.tokenResponseType == "saveInSessionAndLoad") {
+            if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use load not get");
                 return this.errorFn(this.server, event, ce);
             }
@@ -564,7 +751,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     state,
                     error,
                     error_description);
-                if (resp.error) throw new CrossauthError()
+                if (resp.error) return this.errorFn(this.server, event, CrossauthError.fromOAuthError(resp.error, resp.error_description));
 
                 if (resp.error) {
                     const ce = CrossauthError.fromOAuthError(resp.error, 
@@ -586,6 +773,99 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     error: ce.oauthErrorCode, 
                     error_description: ce.message
                 });
+
+            }
+        },
+
+        load: async (event : RequestEvent) : Promise<RedirectUriReturn> => {
+            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+                const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use get not load");
+                return {
+                    success: false,
+                    error: ce.oauthErrorCode,
+                    error_description: ce.message,
+                }
+            }
+            try {
+
+                if (!(this.validFlows.includes(OAuthFlows.AuthorizationCode) || 
+                    this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) ||
+                    this.validFlows.includes(OAuthFlows.OidcAuthorizationCode))) {
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flows are not supported");
+                    return {
+                        success: false,
+                        error: ce.oauthErrorCode,
+                        error_description: ce.message,
+                    }
+                }
+
+                if (!event.locals.user && 
+                    (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || 
+                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode))) {
+                    throw this.redirect(302, 
+                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
+                }    
+                
+                const code = event.url.searchParams.get("code") ?? "";
+                const state = event.url.searchParams.get("state") ?? undefined;
+                const error = event.url.searchParams.get("error") ?? undefined;
+                const error_description = event.url.searchParams.get("error") ?? undefined;
+                const resp =  await this.redirectEndpoint(code,
+                    state,
+                    error,
+                    error_description);
+                if (resp.error) return {
+                    success: false,
+                    error: resp.error,
+                    error_description: resp.error_description,
+                }
+
+
+                if (resp.error) {
+                    const ce = CrossauthError.fromOAuthError(resp.error, 
+                        resp.error_description);
+                    return {
+                        success: false,
+                        error: ce.oauthErrorCode,
+                        error_description: ce.message,
+                    }
+                }
+                const receiveTokenResp = await this.receiveTokenFn(resp, this, event);
+                if (receiveTokenResp instanceof Response) return {
+                    success: false,
+                    error: "server_error",
+                    error_description: "When using load, receiveTokenFn should return an object not a Response",
+
+                };
+                if (receiveTokenResp == undefined) return {
+                    success: false,
+                    error: "server_error",
+                    error_description: "No response received from receiveTokenFn",
+
+                };
+                if (receiveTokenResp.error) return {
+                    success: false,
+                    error: receiveTokenResp.error,
+                    error_description: receiveTokenResp.error_description,
+
+                }
+                return {
+                    success: true,
+                    ...receiveTokenResp,
+                }
+
+            } catch (e) {
+                if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug({err: e});
+                CrossauthLogger.logger.error({cerr: e});
+                //throw this.error(ce.httpStatus, ce.message);
+                return {
+                    success: false,
+                    error: ce.oauthErrorCode,
+                    error_description: ce.message,
+                }
 
             }
         },

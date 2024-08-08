@@ -141,7 +141,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * relative to the directory the
  * server is started in.  This can be overwritten by setting the `views` option.
  * 
- * Note that `views`, and the Nunjucls pages are not used by the API 
+ * Note that `views`, and the Nunjucks pages are not used by the API 
  * endpoints (those starting in /api).  These just return JSON.
  * 
  * **Component Servers**
@@ -155,7 +155,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link FastifyAuthorizationServer}
  * - `oAuthClient`     OAuth client.  See {@link FastifyOAuthClient}.
- * - `oAUthResServer`  OAuth resource server.  See 
+ * - `oAuthResServer`  OAuth resource server.  See 
  *                     {@link FastifyOAuthResourceServer}.
  * 
  * There is also an API key server which is not available as a variable as
@@ -207,7 +207,7 @@ export class FastifyServer {
     /**
      * Integrates fastify session, API key and OAuth servers
      * @param userStorage where to store users
-     * @param options object with entries as follow:
+     * @param config object with entries as follow:
      *     - `authenticators` pass in all supported authenticators, both for
      *       factor 1 and factor 2, keyed on the value that appears in
      *       the user record.  See the class documentation for more details.
@@ -244,7 +244,7 @@ export class FastifyServer {
      *       one optional parameter: `scope`, a string.  The client/user calling
      *       the endpoint must have authorized this scope to call this endpoint,
      *       otherwise an access denied error is returned. 
-     *     - `options` application-wide options of type
+     *  @param options application-wide options of type
      *       {@link FastifyServerOptions}.
      *
      */
@@ -255,23 +255,23 @@ export class FastifyServer {
                     keyStorage: KeyStorage, 
                     options?: FastifySessionServerOptions,
                 },
-                apiKey?: {
-                    keyStorage: KeyStorage,
-                    options? : FastifyApiKeyServerOptions
-                },
-                oAuthAuthServer? : {
-                    clientStorage: OAuthClientStorage,
-                    keyStorage: KeyStorage,
-                    options? : FastifyAuthorizationServerOptions,
-                },
-                oAuthClient? : {
-                    authServerBaseUrl: string,
-                    options? : FastifyOAuthClientOptions,
-                },
-                oAuthResServer? : {
-                    options? : FastifyOAuthResourceServerOptions,
-                }},
-                options: FastifyServerOptions = {}) {
+            apiKey?: {
+                keyStorage: KeyStorage,
+                options? : FastifyApiKeyServerOptions
+            },
+            oAuthAuthServer? : {
+                clientStorage: OAuthClientStorage,
+                keyStorage: KeyStorage,
+                options? : FastifyAuthorizationServerOptions,
+            },
+            oAuthClient? : {
+                authServerBaseUrl: string,
+                options? : FastifyOAuthClientOptions,
+            },
+            oAuthResServer? : {
+                options? : FastifyOAuthResourceServerOptions,
+            }},
+            options: FastifyServerOptions = {}) {
 
 
         setParameter("views", ParamType.String, this, options, "VIEWS");

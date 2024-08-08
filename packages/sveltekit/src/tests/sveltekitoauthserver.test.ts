@@ -315,7 +315,7 @@ test('SvelteKitOAuthServer.getCsrfTokenJson', async () => {
 });
 
 test('SvelteKitOAuthServer.getCsrfTokenCookie', async () => {
-    const { server } = await makeServer(true, false, true, {refreshTokenType: "cookie"});
+    const { server } = await makeServer(true, false, true, false, {refreshTokenType: "cookie"});
 
     let getRequest = new Request(`http://server.com/getcsrftoken`, {
         method: "GET",

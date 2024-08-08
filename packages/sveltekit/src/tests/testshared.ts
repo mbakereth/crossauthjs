@@ -1,6 +1,8 @@
 
 import { MockResolver, MockRequestEvent } from './sveltemocks';
 import { SvelteKitServer } from '../sveltekitserver';
+import { OAuthAuthorizationServer } from '@crossauth/backend';
+import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
 import {
     InMemoryKeyStorage,
     InMemoryUserStorage,
@@ -14,8 +16,9 @@ import {
     ApiKeyManager } from '@crossauth/backend';
     import {
         OAuthFlows
-    } from '@crossauth/common';
-    
+} from '@crossauth/common';
+import fs from 'node:fs';
+
 import type { Handle } from '@sveltejs/kit';
 
 export async function createUsers(userStorage: InMemoryUserStorage) {
@@ -58,7 +61,7 @@ export async function createSession(userId : string,
     return {key, cookie};
 }
 
-export async function createClients(clientStorage : InMemoryOAuthClientStorage) {
+export async function createClients(clientStorage : InMemoryOAuthClientStorage, secretRequired = true) {
     const clientSecret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
@@ -66,20 +69,25 @@ export async function createClients(clientStorage : InMemoryOAuthClientStorage) 
     });
     const client = {
         clientId : "ABC",
-        clientSecret: clientSecret,
+        clientSecret: secretRequired ? clientSecret : undefined,
         clientName: "Test",
-        confidential: true,
+        confidential: secretRequired,
         redirectUri: ["http://example.com/redirect"],
         validFlow: OAuthFlows.allFlows(),
     };
     await clientStorage.createClient(client);
+    return client;
 }
 
 function redirect(status : number, location : string) {
     throw {status, location}
 };
 
-export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthServer=false, options={}) {
+function error(status : number, text : string) {
+    throw {status, text, message: text};
+};
+
+export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthServer=false, makeOAuthClient=false, options={}) {
     const keyStorage = new InMemoryKeyStorage();
     const userStorage = new InMemoryUserStorage();
     const clientStorage = new InMemoryOAuthClientStorage();
@@ -114,6 +122,9 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
             }
                
     } : undefined;
+    let oAuthClient = makeOAuthClient ? {
+        authServerBaseUrl: "http://server.com",
+    } : undefined;
 
     const server = new SvelteKitServer(userStorage, {
         authenticators: {
@@ -124,6 +135,7 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
         session: session,
         apiKey : apiKey,
         oAuthAuthServer: oAuthAuthServer,
+        oAuthClient : oAuthClient,
         options: {
             secret: "ABCDEFG",
             loginProtectedPageEndpoints: ["/account"],
@@ -132,7 +144,14 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
             jwtKeyType: "RS256",
             jwtPublicKeyFile: "keys/rsa-public-key.pem",
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
+            tokenResponseType: "sendJson",
+            errorResponseType: "sendJson",
+            clientId: "ABC",
+            clientSecret: "DEF",
+            redirectUri: "http://example.com/redirect",
+            validFlows: ["all"], // activate all OAuth flows
             redirect,
+            error,
             ...options,
         }});   
     const handle = server.hooks;
@@ -141,7 +160,7 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
     const apiKeyManager = makeApiKey ? new ApiKeyManager(keyStorage, {secret: "ABCDEFG",}) : undefined;
 
 
-    return {server, resolver, handle, keyStorage, userStorage, authenticator, apiKeyManager};
+    return {server, resolver, handle, keyStorage, userStorage, authenticator, apiKeyManager, clientStorage};
 }
 
 export function getCookies(resp : Response) {
@@ -224,3 +243,95 @@ export async function loginFactor2(server : SvelteKitServer, resolver : MockReso
     return {event, ret};
 };
 
+export async function getAuthServer({
+    aud, 
+    persistAccessToken, 
+    emptyScopeIsValid, 
+    secretRequired,
+    rollingRefreshToken,
+    } : {
+    challenge?: boolean, 
+    aud?: string, 
+    persistAccessToken? : boolean, 
+    emptyScopeIsValid? : boolean, 
+    secretRequired? : boolean,
+    rollingRefreshToken? : boolean,
+} = {}) {
+    const clientStorage = new InMemoryOAuthClientStorage();
+    const client = await createClients(clientStorage, secretRequired == undefined || secretRequired == true);
+    const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
+    const userStorage = new InMemoryUserStorage();
+    await createUsers(userStorage);
+    const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
+    const dummyFactor2 = new DummyFactor2Authenticator("0000");
+    const authenticators = {
+        "localpassword": lpAuthenticator,
+        "dummyFactor2": dummyFactor2,
+    };
+    let options : OAuthAuthorizationServerOptions = {
+        jwtKeyType: "RS256",
+        jwtPrivateKey : privateKey,
+        jwtPublicKeyFile : "keys/rsa-public-key.pem",
+        validateScopes : true,
+        validScopes: ["read", "write"],
+        issueRefreshToken: true,
+        emptyScopeIsValid: emptyScopeIsValid,
+        validFlows: ["all"],
+        userStorage,
+    };
+    if (aud) options.audience = aud;
+    if (persistAccessToken) {
+        options.persistAccessToken = true;
+    }
+    if (rollingRefreshToken != undefined) options.rollingRefreshToken = rollingRefreshToken;
+    const keyStorage = new InMemoryKeyStorage();
+    const authServer = new OAuthAuthorizationServer(clientStorage, 
+        keyStorage, 
+        authenticators,
+        options);
+    return {client, clientStorage, authServer, keyStorage, userStorage};
+}
+
+export async function getAuthorizationCode({
+    challenge, 
+    aud, 
+    persistAccessToken,
+    rollingRefreshToken,
+} : {challenge?: boolean,
+     aud?: string, 
+     persistAccessToken? : boolean,
+     rollingRefreshToken? : boolean,
+    } = {}) {
+    const secretRequired = challenge == undefined;
+    const {client, clientStorage, authServer, keyStorage, userStorage} = await getAuthServer({challenge, aud, persistAccessToken, secretRequired, rollingRefreshToken});
+    const {user} = await userStorage.getUserByUsername("bob");
+    const inputState = "ABCXYZ";
+    let codeChallenge : string|undefined;
+    const codeVerifier = "ABC123";
+    if (challenge) codeChallenge = Crypto.hash(codeVerifier);
+    const {code, error, error_description} 
+        = await authServer.authorizeGetEndpoint({
+            responseType: "code", 
+            clientId: client.clientId, 
+            redirectUri: client.redirectUri[0], 
+            scope: "read write", 
+            state: inputState,
+            codeChallenge: codeChallenge,
+            user});
+    expect(error).toBeUndefined();
+    expect(error_description).toBeUndefined();
+    return {code, client, clientStorage, authServer, keyStorage};
+}
+
+
+export async function getAccessToken() {
+
+    const {authServer, client, code, clientStorage} = await getAuthorizationCode();
+    const {access_token, error, error_description, refresh_token, expires_in}
+        = await authServer.tokenEndpoint({
+            grantType: "authorization_code", 
+            clientId: client.clientId, 
+            code: code, 
+            clientSecret: "DEF"});
+    return {authServer, client, code, clientStorage, access_token, error, error_description, refresh_token, expires_in};
+};

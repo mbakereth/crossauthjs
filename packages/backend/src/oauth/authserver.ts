@@ -431,7 +431,6 @@ export class OAuthAuthorizationServer {
             error_description: scopeErrorDesciption
         };
 
-
         // validate flow type
         const flow = 
             this.inferFlowFromGet(responseType, scopes||[], codeChallenge);
@@ -447,7 +446,6 @@ export class OAuthAuthorizationServer {
                 error_description: "Client does not support " + flow,
             };
         }
-
         // validate state
         try {
             this.validateState(state);
@@ -1403,7 +1401,7 @@ export class OAuthAuthorizationServer {
             if (!codeChallengeMethod) codeChallengeMethod = "S256";
             if (codeChallengeMethod != "S256" && 
                 codeChallengeMethod != "plain") {
-                return {
+                    return {
                     error: "invalid_request",
                     error_description: "Code challenge method must be S256 or plain"
                 };

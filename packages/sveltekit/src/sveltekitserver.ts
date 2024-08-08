@@ -12,11 +12,13 @@ import {
 import { CrossauthError, ErrorCode, type User } from '@crossauth/common';
 import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
 import { SvelteKitOAuthClient } from './sveltekitoauthclient';
+import type { SvelteKitOAuthClientOptions } from './sveltekitoauthclient';
 
 export interface SvelteKitServerOptions 
     extends SvelteKitSessionServerOptions, 
         SvelteKitApiKeyServerOptions,
-        SvelteKitAuthorizationServerOptions
+        SvelteKitAuthorizationServerOptions,
+        SvelteKitOAuthClientOptions
      {
     /** User can set this to check if the user is an administrator.
      * By default, the admin booloean field in the user object is checked
@@ -73,11 +75,32 @@ function defaultIsAdminFn(user : User) : boolean {
  *         error
  *     }); 
  * ```
- * 
+ *
  * Note that we pass Sveltekit's `action` and `error` methods because, as
  * a module compiled without your Sveltekit application, this class has
  * no access to them otherwise, and they are use internally for things like
  * redirecting to your login page.
+ * 
+ * **Component Servers**
+ * 
+ * The above example creates a ccookie-based session server.  This class
+ * has several optional component servers which can be instantiated 
+ * individually or together.  They are:
+ * 
+ * - `sessionServer`   Session cookie management server.  Uses sesion ID
+ *                     and CSRF cookies.  See {@link SvelteKitSessionServer}.
+ * - `oAuthAuthServer` OAuth authorization server.  See 
+ *                     {@link SvelteKitAuthorizationServer}
+ * - `oAuthClient`     OAuth client.  See {@link SvelteKitOAuthClient}.
+ * - `oAuthResServer`  OAuth resource server.  See 
+ *                     {@link SvelteKitOAuthResourceServer}.
+ * 
+ * 
+ * There is also an API key server which is not available as a variable as
+ * it has no functions other than the hook it registers.
+ * See {@link SvelteKitApiKeyServer}.
+ * 
+ * **Hooks**
  * 
  * This class provides hooks which you can add to by putting the following
  * in your `hooks.server.ts`:
@@ -88,6 +111,8 @@ function defaultIsAdminFn(user : User) : boolean {
  * import { CrossauthLogger } from '@crossauth/common';
  * export const handle: Handle = crossauth.hooks; 
  * ```
+ * 
+ * **Locals**
  * 
  * This will set the following in `event.locals`:
  * 
@@ -103,9 +128,24 @@ function defaultIsAdminFn(user : User) : boolean {
  *  - `sessionId` session ID of logged in user, session ID for anonymous user, or undefined,
  *  - `scope` oAuth scope, not currently used,
  *   
+ * **Authenticators**
  * 
+ * One and two factor authentication is supported.  Authentication is provided
+ * by classes implementing {@link Authenticator}.  They are passed as an 
+ * object to this class, keyed on the name that appears in the user record
+ * as `factor1` or `factor2`.  
+ * 
+ * For example, if you have passwords in your user database, you can use
+ * {@link @crossauth/backend!LocalPasswordAuthenticator}.  If this method of authentication
+ * is called `password` in the `factor1` field of the user record,
+ * pass it in the `authenticators` parameter in the constructor with a key
+ * of `password`.
+ * 
+ * **Use in Pages**
+ *
  * For instructions about how to use this class in your endpoints, see
- * {@link SvelkteKitUserEndpoints} and {@link SvelteKitAdminEndpoints}.
+ * {@link SvelkteKitUserEndpoints} and {@link SvelteKitAdminEndpoints}
+ * for cookie-based session management.
  */
 export class SvelteKitServer {
 
@@ -135,7 +175,7 @@ export class SvelteKitServer {
      */
     static isAdminFn: (user : User) => boolean = defaultIsAdminFn;
 
-    readonly oauthClient? : SvelteKitOAuthClient;
+    readonly oAuthClient? : SvelteKitOAuthClient;
 
     /**
      * Constructor.
@@ -159,6 +199,20 @@ export class SvelteKitServer {
      *     where API keys are stored.  A field called `options` whose
      *     value is an {@link SveltekitApiKeyServerOptions} may also be
      *     provided.
+     *   - `oAuthAuthServer` if passed, instantiate the session server (see class
+     *      documentation).  The value is an object with a `keyStorage` field
+     *      which must be present and should be the {@link KeyStorage} instance
+     *      where authorization codes are stored.  This may be the same as
+     *      the table storing session IDs or may be different.  A field
+     *      called `clientStorage` with a value of type {@link OAuthClientStorage}
+     *      must be provided and is where OAuth client details are stored.
+     *      A field called `options` whose
+     *      value is an {@link SvelteKitAuthorizationServerOptions} may also be
+     *      provided.
+     *    - `oAuthClient` if present, an OAuth client will be created.
+     *      There must be a field called `authServerBaseUrl` and is the 
+     *      base URL for the authorization server.  When validating access
+     *      tokens, the `iss` claim must match this.
      *   - `options` Configuration that applies to the whole application,
      *     not just the session server.
      */
@@ -167,6 +221,7 @@ export class SvelteKitServer {
         session,
         apiKey,
         oAuthAuthServer,
+        oAuthClient,
         options,
     } : {
         authenticators?: {[key:string]: Authenticator}, 
@@ -183,6 +238,10 @@ export class SvelteKitServer {
             clientStorage: OAuthClientStorage,
             keyStorage: KeyStorage,
             options? : SvelteKitAuthorizationServerOptions,
+        },
+        oAuthClient? : {
+            authServerBaseUrl: string,
+            options? : SvelteKitOAuthClientOptions,
         },
         options? : SvelteKitServerOptions}) {
 
@@ -216,6 +275,11 @@ export class SvelteKitServer {
                 { ...extraOptions, ...options, ...oAuthAuthServer.options });
         }
     
+        if (oAuthClient) {
+            this.oAuthClient = new SvelteKitOAuthClient(this,
+                oAuthClient.authServerBaseUrl,
+                { ...options, ...oAuthClient.options });
+        }
 
         this.hooks = async ({event, resolve}) => {
 

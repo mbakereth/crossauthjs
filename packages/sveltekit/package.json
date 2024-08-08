@@ -34,7 +34,8 @@
 		"tsx": "^4.7.0",
 		"typescript": "^5.0.0 <=5.3.3",
 		"vite": "^5.0.3",
-		"vitest": "^1.2.0"
+		"vitest": "^1.2.0",
+		"vitest-fetch-mock": "^0.2.2"
 	},
 	"dependencies": {
 		"@crossauth/backend": "workspace:^",

@@ -1,14 +1,12 @@
 import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, beforeAll, afterAll, vi } from 'vitest';
 import { FastifyServer, type FastifyServerOptions } from '../fastifyserver';
-import { CSRFHEADER } from '../fastifysession';
 import fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
 import { type OpenIdConfiguration, type OAuthTokenResponse } from '@crossauth/common';
 import { getAccessToken, getAuthServer } from './oauthcommon';
 import { getTestUserStorage } from './inmemorytestdata';
 import { InMemoryKeyStorage, LocalPasswordAuthenticator, KeyStorage } from '@crossauth/backend';
 import { FastifyOAuthClient, } from '..';
-import { jwtDecode } from "jwt-decode";
 
 import path from 'path';
 
