@@ -147,6 +147,11 @@ export interface OAuthTokenResponse {
     error_description? : string,
     scope?: string,
     mfa_token? : string,
+    oob_channel? : string,
+    oob_code? : string,
+    challenge_type? : string,
+    binding_method? : string,
+    name? : string,
 }
 
 /**
@@ -603,7 +608,9 @@ export abstract class OAuthClientBase {
         CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
-            .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            .includes("http://auth0.com/oauth/grant-type/mfa-otp") &&
+            this.oidcConfig?.grant_types_supported
+            .includes("http://auth0.com/oauth/grant-type/mfa-oob")) {
             return {
                 error: "invalid_request",
                 error_description: "Server does not support password_mfa grant"
@@ -838,7 +845,7 @@ export abstract class OAuthClientBase {
         CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
-            .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
+            .includes("http://auth0.com/oauth/grant-type/mfa-oob")) {
             return {
                 error: "invalid_request",
                 error_description: "Server does not support password_mfa grant"

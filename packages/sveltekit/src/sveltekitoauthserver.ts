@@ -60,7 +60,6 @@ export interface ReturnBase {
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
 export interface AuthorizePageData extends ReturnBase {
-    result_type?: "authorized" | "authorizationNeeded";
     authorized?: {
         code : string,
         state : string,    
@@ -200,6 +199,63 @@ export interface SvelteKitAuthorizationServerOptions
 ///////////////////////////////////////////////////////////////////////////////
 // CLASS
 
+/**
+ * This class implements an OAuth authorization server, serving endpoints
+ * with SvelteKit.
+ * 
+ * You shouldn't have to instantiate this directly.  It is instantiated
+ * by {@link SvelteKitServer} if you enable the authorization server there.
+ * 
+ * **Endpoints**
+ * 
+ * | Name                       | Description                                                | PageData (returned by load) or JSON returned by get/post                     | ActionData (return by actions)                                   | Form fields expected by actions or post/get input data          | 
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | baseEndpoint               | This PageData is returned by all endpoints' load function. | - `user` logged in {@link @crossauth/common!User}                            | *Not provided*                                                   |                                                                 |  
+ * |                            |                                                            | - `csrfToken` CSRF token if enabled                                          |                                                                  |                                                                 |                                                                         | loginPage                | 
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | oidcConfigurationEndpoint  | Use this as your `.well-known/openid-configuration`.       | `get`:                                                                       |                                                                  |                                                                 | 
+ * |                            |                                                            |   - see {@link @crossauth/backend!OAuthAuthorizationServer.oidcConfiguration} |                                                                 |                                                                 | 
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | jwksGetEndpoint            | Use this as your `jwks` endpoint.                          | `get`:                                                                       |                                                                  |                                                                 |  
+ * |                            |                                                            |   - see {@link @crossauth/backend!OAuthAuthorizationServer.jwks}             |                                                                  |                                                                 |  
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | getCsrfTokenEndpoint       | Sends a CSRF token for use when refresh token is a cookie  | `get`:                                                                       |                                                                  |                                                                 | 
+ * |                            |                                                            |   - `ok` (true or false)                                                     |                                                                  |                                                                 |
+ * |                            |                                                            |   - `csrfToken`                                                              |                                                                  |                                                                 | 
+ * |                            |                                                            |   - `error`                                                                  |                                                                  |                                                                 | 
+ * |                            |                                                            |   - `error_description`                                                      |                                                                  |                                                                 | 
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | authorizeEndpoint          | The OAuth `authorize` endpoint                             | `load`:                                                                      | `default`:                                                       | `authorized` true if the user clicks authorized                 | 
+ * |                            |                                                            |   - `succcess` (true or false)                                               |   - `success`: true or false                                     | `response_type` OAuth response type (take from PageData)        | 
+ * |                            |                                                            |   - `authorizationNeeded`:                                                   |   - `formData`: fata submitted from in the form                  | `client_id` take from PageData                                  |  
+ * |                            |                                                            |     - `user`: the user object                                                |   - `error` an OAuth error type                                  | `redirect_uri` take from PageData                               |   
+ * |                            |                                                            |     - `response_type`: OAuth response type                                   |   - `error_description` text error description                   | `scope` take from PageData                                      |  
+ * |                            |                                                            |     - `client_id`:                                                           |                                                                  | `state` take from PageData                                      | 
+ * |                            |                                                            |     - `client_name`:                                                         |                                                                  | `code_challenge` take from PageData                             | 
+ * |                            |                                                            |     - `redirect_uri`:                                                        |                                                                  | `code_challenge_method` take from PageData                      | 
+ * |                            |                                                            |     - `scope`: as a string                                                   |                                                                  |                                                                 | 
+ * |                            |                                                            |     - `scopes`: as an array                                                  |                                                                  |                                                                 |
+ * |                            |                                                            |     - `state`:                                                               |                                                                  |                                                                 | 
+ * |                            |                                                            |     - `code_challenge`:                                                      |                                                                  |                                                                 |  
+ * |                            |                                                            |     - `code_challenge_method`:                                               |                                                                  |                                                                 |  
+ * |                            |                                                            |     - `csrfToken`:                                                           |                                                                  |                                                                 |  
+ * |                            |                                                            |   - `error`                                                                  |                                                                  |                                                                 |  
+ * |                            |                                                            |   - `error_description`                                                      |                                                                  |                                                                 |  
+ * |                            |                                                            |   See OAuth definition for more detials.                                     |                                                                  |                                                                 |  
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | tokenEndpoint              | The OAuth `token` endpoint                                 | `post`:                                                                      |                                                                  | See OAuth definition of `token` endpoint                        | 
+ * |                            |                                                            |   - See OAuth definition of `token` endpoint                                 |                                                                  |                                                                 |  
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | mfaAuthenticators          | For the Auth0 Password MFA authenticators                  | `get`:                                                                       |                                                                  | See OAuth definition of `token` endpoint                        | 
+ * |                            |                                                            |   - See Auth0 Password MFA documentation                                     |                                                                  |                                                                 | 
+ * |                            |                                                            | `post`:                                                                      |                                                                  |                                                                 | 
+ * |                            |                                                            |   - See Auth0 Password MFA documentation                                     |                                                                  | See OAuth definition of `token` endpoint                        |  
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | mfaChallengeEndpoint       | For the Auth0 Password MFA challenge                       | `post:                                                                       |                                                                  | See OAuth definition of `token` endpoint                        |
+ * |                            |                                                            |   - See Auth0 Password MFA documentation                                     |                                                                  |                                                                 | 
+ * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * 
+ */
 export class SvelteKitAuthorizationServer {
 
     /** The underlying framework-independent authorization server */
@@ -228,7 +284,7 @@ export class SvelteKitAuthorizationServer {
 
     /**
      * Constructor
-     * @param svelteKitServer the SelteKit server this belongs to
+     * @param svelteKitServer the SvelteKit server this belongs to
      * @param clientStorage where OAuth clients are stored
      * @param keyStorage where session IDs are stored
      * @param authenticators The authenticators (factor1 and factor2) to enable 
@@ -706,7 +762,6 @@ export class SvelteKitAuthorizationServer {
                     
                     return {
                         success: true,
-                        result_type: "authorizationNeeded",
                         authorizationNeeded: {
                             user: event.locals.user,
                             response_type: query.response_type,

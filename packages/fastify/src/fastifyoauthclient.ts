@@ -573,7 +573,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
  *      redirect Uri are displayed in the address bar, as the response
  *      is to the redirect to the redirect Uri.
  *    - saveInSessionAndRedirect` same as `saveInSessionAndLoad` except that 
- *      a rediret is done to the `authorizedUrl` rather than displaying
+ *      a redirect is done to the `authorizedUrl` rather than displaying
  *      `authorizedPage` template.
  *    - `sendInPage` the `token` endpoint response is not saved in the session
  *      but just sent as template arguments when rendering the
@@ -943,7 +943,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         user: request.user?.username
                     }));
 
-                    // if sessions are enabled, require a csrf token
+                // if sessions are enabled, require a csrf token
                 const {error, reply: reply1} = 
                     await server.errorIfCsrfInvalid(request,
                         reply,
@@ -966,6 +966,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     refreshToken = oauthData.refresh_token;
                 } 
                 if (!refreshToken) {
+                    // TODO: refresh token cookie - call with no refresh token?
                     const ce = new CrossauthError(ErrorCode.BadRequest,
                         "No refresh token supplied");
                     return await this.errorFn(this.server,
