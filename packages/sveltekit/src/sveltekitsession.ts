@@ -33,6 +33,19 @@ type Header = {
 export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
 
     /**
+     * If enabling user login, must provide the user storage
+     */
+    userStorage? : UserStorage,
+
+    /**
+     * Factor 1 and 2 authenticators.
+     * 
+     * The key is what appears in the `factor1` and `factor2` filed in the
+     * Users table.
+     */
+    authenticators? : {[key:string]: Authenticator}, 
+
+    /**
      * URL to call when factor2 authentication is required
      */
     factor2Url? : string,
@@ -356,7 +369,7 @@ export class SvelteKitSessionServer {
      * User storage taken from constructor args.
      * See {@link SvelteKitSessionServer.constructor}.
      */
-    readonly userStorage : UserStorage;
+    readonly userStorage? : UserStorage;
 
     /**
      * Funtion to validate users upon creation.  Taken from the options during 
@@ -479,12 +492,12 @@ export class SvelteKitSessionServer {
      *    of the user.  See class documentation for {@link SvelteKitServer} for an example.
      * @param options See {@link SvelteKitSessionServerOptions}.
      */
-    constructor(userStorage : UserStorage, keyStorage : KeyStorage, authenticators : {[key:string]: Authenticator}, options : SvelteKitSessionServerOptions = {}) {
+    constructor(keyStorage : KeyStorage, authenticators : {[key:string]: Authenticator}, options : SvelteKitSessionServerOptions = {}) {
 
         this.keyStorage = keyStorage;
-        this.userStorage = userStorage;
+        this.userStorage = options.userStorage;
         this.authenticators = authenticators;
-        this.sessionManager = new SessionManager(userStorage, keyStorage, authenticators, options);
+        this.sessionManager = new SessionManager(keyStorage, authenticators, options);
 
         this.redirect = options.redirect ?? redirect;
         this.error = options.error ?? error;
@@ -632,6 +645,7 @@ export class SvelteKitSessionServer {
         this.twoFAHook = async ({ event }) => {
             CrossauthLogger.logger.debug(j({msg: "twoFAHook" , username: event.locals.user?.username}) );
 
+            if (!this.userStorage) throw this.error(500, "No user storage defined"); // shouldn't happen as checked in FastifyServer
             const sessionCookieValue = this.getSessionCookieValue(event);
             const isFactor2PageProtected = this.isFactor2PageProtected(event);
             const isFactor2ApiProtected = this.isFactor2ApiProtected(event);

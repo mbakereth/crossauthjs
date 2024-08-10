@@ -133,18 +133,19 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
         emailTokenData = {otp, to}
         return "1";
     };
-    return {server: new FastifyServer(userStorage, {
-        authenticators: {
-            localpassword: lpAuthenticator,
-            totp: totpAuth,
-            email: emailAuth,
-        },
+    return {server: new FastifyServer({
         session: {
             keyStorage: keyStorage,
         },
         oAuthClient: {
             authServerBaseUrl: "http://server.com",
         }}, {
+        userStorage,
+        authenticators: {
+            localpassword: lpAuthenticator,
+            totp: totpAuth,
+            email: emailAuth,
+        },
         app: app,
         views: path.join(__dirname, '../views'),
         allowedFactor2: ["none"],

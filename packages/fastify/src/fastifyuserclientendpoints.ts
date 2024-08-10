@@ -318,6 +318,7 @@ export class FastifyUserClientEndpoints {
         this.sessionServer.app.get(this.prefix+'updateclient/:clientId', 
             async (request: FastifyRequest<{Params: UpdateClientParamType, Querystring: CreateClientQueryType }>,
                 reply: FastifyReply)  => {
+                if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
@@ -388,6 +389,7 @@ export class FastifyUserClientEndpoints {
         this.sessionServer.app.post(this.prefix+'updateclient/:clientId', 
             async (request: FastifyRequest<{Params: UpdateClientParamType, Body: UpdateClientBodyType }>,
                 reply: FastifyReply) => {
+                if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
                 CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'POST',
@@ -402,6 +404,7 @@ export class FastifyUserClientEndpoints {
                 }
                 let user : User|undefined = undefined;
                 try {
+                    if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
                     if (request.body.userId) {
                         let resp = await this.sessionServer.userStorage.getUserById(request.body.userId);
                         user = resp.user;
@@ -481,6 +484,7 @@ export class FastifyUserClientEndpoints {
                 }));
 
                 try {
+                    if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
                     if (request.body.userId) {
                         await this.sessionServer.userStorage.getUserById(request.body.userId);
                     }

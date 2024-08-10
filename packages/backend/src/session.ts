@@ -25,6 +25,12 @@ import { Crypto } from './crypto.ts';
  */
 export interface SessionManagerOptions extends TokenEmailerOptions {
 
+    /**
+     * If user login is enabled, you must provide the object where users
+     * are stored.
+     */
+    userStorage? : UserStorage,
+
     /** options for csrf cookie manager */
     doubleSubmitCookieOptions? : DoubleSubmitCsrfTokenOptions,
 
@@ -71,7 +77,7 @@ export interface SessionManagerOptions extends TokenEmailerOptions {
  * Class for managing sessions.
  */
 export class SessionManager {
-    userStorage : UserStorage;
+    userStorage? : UserStorage;
     keyStorage : KeyStorage;
     emailTokenStorage : KeyStorage;
     readonly csrfTokens : DoubleSubmitCsrfToken;
@@ -86,18 +92,16 @@ export class SessionManager {
 
     /**
      * Constructor
-     * @param userStorage the {@link UserStorage} instance to use, eg {@link PrismaUserStorage}.
      * @param keyStorage  the {@link KeyStorage} instance to use, eg {@link PrismaKeyStorage}.
      * @param authenticators authenticators used to validate users, eg {@link LocalPasswordAuthenticatorOptions }.
      * @param options optional parameters for authentication. See {@link SessionManagerOptions }.
      */
     constructor(
-        userStorage : UserStorage, 
         keyStorage : KeyStorage, 
         authenticators : {[key:string] : Authenticator},
         options : SessionManagerOptions = {}) {
 
-        this.userStorage = userStorage;
+        if (options.userStorage) this.userStorage = options.userStorage;
         this.keyStorage = keyStorage;
         this.authenticators = authenticators;
         for (let authenticationName in this.authenticators) {
@@ -105,14 +109,14 @@ export class SessionManager {
         }
 
 
-        this.session = new SessionCookie(this.userStorage, this.keyStorage, {...options?.sessionCookieOptions, ...options??{}});
+        this.session = new SessionCookie(this.keyStorage, {...options?.sessionCookieOptions, ...options??{}});
         this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options??{}});
 
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
         this.emailTokenStorage = this.keyStorage;
-        if (this.enableEmailVerification || this.enablePasswordReset) {
+        if (this.userStorage && (this.enableEmailVerification || this.enablePasswordReset)) {
             let keyStorage = this.keyStorage;
             if (options.emailTokenStorage) this.emailTokenStorage = options.emailTokenStorage;
             this.tokenEmailer = new TokenEmailer(this.userStorage, keyStorage, options);
@@ -189,6 +193,7 @@ export class SessionManager {
             secrets: UserSecrets,
         }> {
 
+        if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call login if no user storage provided");
         let secrets : UserSecrets;
         if (!user) {
             let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
@@ -485,6 +490,8 @@ export class SessionManager {
         skipEmailVerification: boolean = false,
         emptyPassword = false)
         : Promise<User> {
+        if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call createUser if no user storage provided");
+
         if (!(this.authenticators[user.factor1])) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
         if (this.authenticators[user.factor1].skipEmailVerificationOnSignup() == true) {
             skipEmailVerification = true;
@@ -502,6 +509,7 @@ export class SessionManager {
      * @param username user to delete
      */
     async deleteUserByUsername(username : string ) {
+        if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call deleteUser if no user storage provided");
         this.userStorage.deleteUserByUsername(username);
     }
 
@@ -527,7 +535,8 @@ export class SessionManager {
         sessionId : string,
         repeatParams? : AuthenticationParameters) : 
             Promise<{userId: string|number, userData : {[key:string] : any}}> {
-        if (!this.authenticators[user.factor1]) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
+            if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call initiateTwoFactorSignup if no user storage provided");
+            if (!this.authenticators[user.factor1]) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
         if (!this.authenticators[user.factor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
         const authenticator = this.authenticators[user.factor2];
         //const sessionId = this.session.unsignCookie(sessionCookieValue);
@@ -559,7 +568,8 @@ export class SessionManager {
         user : User, 
         newFactor2 : string|undefined,
         sessionId : string) : Promise<{[key:string] : any}> {
-        //const sessionId = this.session.unsignCookie(sessionCookieValue);
+            if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call initiateTwOFactorSetup if no user storage provided");
+            //const sessionId = this.session.unsignCookie(sessionCookieValue);
         if (newFactor2 && newFactor2 != "none") {
             if (!this.authenticators[newFactor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
             const authenticator = this.authenticators[newFactor2];
@@ -605,7 +615,8 @@ export class SessionManager {
             userData: { [key: string]: any },
             secrets: Partial<UserSecretsInputFields>
         }> {
-        const sessionData = (await this.dataForSessionId(sessionId))["2fa"];
+            if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call repeatTwoFactorSignup if no user storage provided");
+            const sessionData = (await this.dataForSessionId(sessionId))["2fa"];
         const username = sessionData.username;
         const factor2 = sessionData.factor2;
         //const sessionId = this.session.unsignCookie(sessionId);
@@ -637,7 +648,8 @@ export class SessionManager {
      */
     async completeTwoFactorSetup(params: AuthenticationParameters,
         sessionId: string) : Promise<User> {
-        let newSignup = false;
+            if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call completeTwoFactorSetup if no user storage provided");
+            let newSignup = false;
         let {user, key} = 
             await this.session.getUserForSessionId(sessionId, {
                 skipActiveCheck: true
@@ -760,6 +772,7 @@ export class SessionManager {
      */
     async completeTwoFactorPageVisit(params: AuthenticationParameters,
         sessionId: string) : Promise<void> {
+        if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call completeTwoFactorPageVisit if no user storage provided");
         let {key} = await this.session.getUserForSessionId(sessionId);
         if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
         let data = KeyStorage.decodeData(key.data);
@@ -825,7 +838,8 @@ export class SessionManager {
             csrfFormOrHeaderValue: string,
             user: User
         }> {
-        let {key} = await this.session.getUserForSessionId(sessionId);
+            if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call completeTwoFactorLogin if no user storage provided");
+            let {key} = await this.session.getUserForSessionId(sessionId);
         if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
         let data = KeyStorage.decodeData(key.data)["2fa"];
         //let data = getJsonData(key)["2fa"];
@@ -863,6 +877,7 @@ export class SessionManager {
      * @param email the user's email (where the token will be sent)
 .     */
     async requestPasswordReset(email : string) : Promise<void> {
+        if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call requestPasswordReset if no user storage provided");
         const {user} = await this.userStorage.getUserByEmail(email, {
             skipActiveCheck: true
         });
@@ -882,6 +897,7 @@ export class SessionManager {
      * @returns the new user record
      */
     async applyEmailVerificationToken(token : string) : Promise<User> {
+        if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call applyEmailVerificationToken if no user storage provided");
         CrossauthLogger.logger.debug(j({msg: "applyEmailVerificationToken"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Email verification not enabled");
         try {
@@ -929,7 +945,8 @@ export class SessionManager {
         newParams: AuthenticationParameters,
         repeatParams?: AuthenticationParameters,
         oldParams?: AuthenticationParameters) : Promise<User> {
-        let {user, secrets} = await this.userStorage.getUserByUsername(username);
+            if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call changeSecrets if no user storage provided");
+            let {user, secrets} = await this.userStorage.getUserByUsername(username);
         const factor = factorNumber == 1 ? user.factor1 : user.factor2;
         if (oldParams != undefined) {
             await this.authenticators[factor].authenticateUser(user, secrets, oldParams);
@@ -959,6 +976,7 @@ export class SessionManager {
      */
     async updateUser(currentUser: User, newUser : User, skipEmailVerification = false) : Promise<boolean> {
         let newEmail : string|undefined = undefined;
+        if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateUser if no user storage provided");
         if (!("id" in currentUser) || currentUser.id == undefined) {
             throw new CrossauthError(ErrorCode.UserNotExist, "Please specify a user id");
         }
@@ -1007,7 +1025,8 @@ export class SessionManager {
         factorNumber: 1 | 2,
         params: AuthenticationParameters,
         repeatParams?: AuthenticationParameters) : Promise<User> {
-        CrossauthLogger.logger.debug(j({msg:"resetSecret"}));
+            if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call resetSecret if no user storage provided");
+            CrossauthLogger.logger.debug(j({msg:"resetSecret"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
         const user = await this.userForPasswordResetToken(token);
         const factor = factorNumber == 1 ? user.factor1 : user.factor2;

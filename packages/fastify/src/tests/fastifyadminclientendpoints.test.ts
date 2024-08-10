@@ -16,7 +16,7 @@ afterEach(async () => {
 test('FastifyServer.admin.createClientNoUser', async () => {
     const {server, clientStorage} = await makeAppWithOptions();
     const {csrfCookie, csrfToken, sessionCookie} = await login(server);
-
+    
     let res;
     let body;
 

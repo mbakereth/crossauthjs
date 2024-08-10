@@ -55,7 +55,7 @@ export async function createSession(userId : string,
     keyStorage: InMemoryKeyStorage,
     options = {}) {
 
-    let sessionCookie = new SessionCookie(userStorage, keyStorage, options);
+    let sessionCookie = new SessionCookie(keyStorage, {userStorage, ...options});
     const key = await sessionCookie.createSessionKey(userId);
     const cookie = sessionCookie.makeCookie(key);
     return {key, cookie};
@@ -126,17 +126,18 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
         authServerBaseUrl: "http://server.com",
     } : undefined;
 
-    const server = new SvelteKitServer(userStorage, {
-        authenticators: {
-            localpassword: authenticator,
-            dummyFactor2: dummyFactor2Authenticator,
-            email: emailAuthenticator,
-        },
+    const server = new SvelteKitServer({
         session: session,
         apiKey : apiKey,
         oAuthAuthServer: oAuthAuthServer,
         oAuthClient : oAuthClient,
         options: {
+            userStorage, 
+            authenticators: {
+                localpassword: authenticator,
+                dummyFactor2: dummyFactor2Authenticator,
+                email: emailAuthenticator,
+            },
             secret: "ABCDEFG",
             loginProtectedPageEndpoints: ["/account"],
             factor2ProtectedPageEndpoints: ["/factor2protected"],
@@ -150,7 +151,6 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
             clientSecret: "DEF",
             redirectUri: "http://example.com/redirect",
             validFlows: ["all"], // activate all OAuth flows
-            enableCsrfProtection: false,
             bffEndpointName: "/bff",
             bffBaseUrl: "http://server.com",
             bffEndpoints: [

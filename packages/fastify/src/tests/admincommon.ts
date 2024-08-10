@@ -27,15 +27,16 @@ export async function makeAppWithOptions(options : FastifyServerOptions = {})
 
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
-    const server = new FastifyServer(userStorage, {
-        authenticators: {
-            localpassword: lpAuthenticator,
-            totp: totpAuthenticator,
-        },
+    const server = new FastifyServer({
         session: {
             keyStorage: keyStorage, 
         }}, {
-            app: app,
+            userStorage,
+            authenticators: {
+                localpassword: lpAuthenticator,
+                totp: totpAuthenticator,
+            },
+                app: app,
             views: path.join(__dirname, '../views'),
             secret: "ABCDEFG",
             allowedFactor2: ["none", "totp"],
@@ -44,7 +45,7 @@ export async function makeAppWithOptions(options : FastifyServerOptions = {})
             endpoints: ["all"],
             ...options,
         });
-    // @ts-ignore
+        // @ts-ignore
     app.decorateReply("view",  function(template, args) {
         return {template: template, args: args};
     });

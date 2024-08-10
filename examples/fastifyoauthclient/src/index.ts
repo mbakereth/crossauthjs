@@ -52,16 +52,17 @@ let authStorage = new PrismaOAuthAuthorizationStorage({prismaClient : prisma});
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
 
 // create the server, pointing it at the app we created and our nunjucks views directory
-const server = new FastifyServer(userStorage, {
-    authenticators: {
-        localpassword: lpAuthenticator,
-    },
+const server = new FastifyServer({
     session: {
         keyStorage: keyStorage,
     },
     oAuthClient: {
         authServerBaseUrl: process.env["AUTH_SERVER_BASE_URL"],
     }}, {
+    userStorage, 
+    authenticators: {
+        localpassword: lpAuthenticator,
+    },
     app: app,
     views: path.join(__dirname, '../views'),
     allowedFactor2: ["none"],

@@ -42,6 +42,19 @@ const JSONHDR : [string,string] =
 export interface FastifySessionServerOptions 
     extends SessionManagerOptions, OAuthClientManagerOptions {
 
+    /**
+     * If enabling user login, must provide the user storage
+     */
+    userStorage? : UserStorage,
+
+    /**
+     * Factor 1 and 2 authenticators.
+     * 
+     * The key is what appears in the `factor1` and `factor2` filed in the
+     * Users table.
+     */
+    authenticators? : {[key:string]: Authenticator}, 
+
     /** All endpoint URLs will be prefixed with this.  Default `/` */
     prefix? : string,
 
@@ -830,7 +843,7 @@ export class FastifySessionServer {
      * User storage taken from constructor args.
      * See {@link FastifySessionServer.constructor}.
      */
-    readonly userStorage : UserStorage;
+    readonly userStorage? : UserStorage;
 
     /**
      * The set of authenticators taken from constructor args.
@@ -889,14 +902,12 @@ export class FastifySessionServer {
      * Constructor
      * 
      * @param app the Fastify app
-     * @param userStorage where user records are stored
      * @param keyStorage where session IDs are stored
      * @param authenticators list of authenticators
      * @param options See {@link FastifySessionServerOptions}.
      */
     constructor(
         app: FastifyInstance<Server, IncomingMessage, ServerResponse>,
-        userStorage: UserStorage, 
         keyStorage: KeyStorage, 
         authenticators: {[key:string]: Authenticator}, 
         options: FastifySessionServerOptions = {}) {
@@ -973,9 +984,9 @@ export class FastifySessionServer {
 
         setParameter("endpoints", ParamType.JsonArray, this, options, "ENDPOINTS");
 
-        this.userStorage = userStorage;
+        if (options.userStorage) this.userStorage = options.userStorage;
         this.authenticators = authenticators;
-        this.sessionManager = new SessionManager(userStorage, keyStorage, authenticators, options);
+        this.sessionManager = new SessionManager(keyStorage, authenticators, options);
 
         ////////////////
         // hooks
@@ -2310,6 +2321,7 @@ export class FastifySessionServer {
         successFn : (res : FastifyReply, data: {[key:string]:any}, user? : User) 
         => void) {
             
+        if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call signup unless you provide a user stotage");
         // throw an error if the CSRF token is invalid
         //await this.validateCsrfToken(request);
         if (this.isSessionUser(request) && !request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);

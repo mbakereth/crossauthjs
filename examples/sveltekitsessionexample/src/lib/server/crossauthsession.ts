@@ -8,7 +8,6 @@ import {
 import { PrismaClient } from '@prisma/client'
 import { redirect, error } from '@sveltejs/kit';
 
-//export const crossauthSession = new SvelteKitSessionServer();
 export const prisma = new PrismaClient();
 const userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: ["email"]});
 const keyStorage = new PrismaKeyStorage({prismaClient : prisma});

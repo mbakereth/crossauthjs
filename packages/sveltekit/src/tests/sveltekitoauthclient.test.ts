@@ -418,7 +418,7 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
 });
 
 async function oauthLogin () {
-    const {server, keyStorage} = await makeServer(true, false, false, true, {tokenResponseType: "saveInSessionAndReturn"});
+    const {server, keyStorage} = await makeServer(true, false, false, true, {tokenResponseType: "saveInSessionAndReturn", enableCsrfProtection: false});
     const {authServer} = await getAccessToken();
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
@@ -513,7 +513,7 @@ test('SvelteKitClient.refreshIfExpired_post', async () => {
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
     const resp = await server.oAuthClient?.refreshTokensIfExpiredEndpoint.post(event);
     expect(resp).toBeDefined();
-    if (!resp || !(resp instanceof Response)) throw Error("Response unefined");
+    if (!resp || !(resp instanceof Response)) throw Error("Response undefined");
     const body = await resp.json();
     expect(body.access_token).toBeDefined();
 

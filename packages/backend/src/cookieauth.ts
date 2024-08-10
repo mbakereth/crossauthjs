@@ -250,6 +250,11 @@ export class DoubleSubmitCsrfToken {
  */
 export interface SessionCookieOptions extends CookieOptions, TokenEmailerOptions {
 
+    /**
+     * If user login is enabled, you must provide the user storage class
+     */
+    userStorage? : UserStorage,
+
     /** Name of cookie.  Defaults to "CSRFTOKEN" */
     cookieName? : string,
 
@@ -277,7 +282,7 @@ export interface SessionCookieOptions extends CookieOptions, TokenEmailerOptions
  */
 export class SessionCookie {
 
-    private userStorage : UserStorage;
+    private userStorage? : UserStorage;
     private keyStorage : KeyStorage;
 
     /** This is set from input options.  Number of seconds before an
@@ -304,16 +309,14 @@ export class SessionCookie {
     /**
      * Constructor.
      * 
-     * @param userStorage where to find users
      * @param keyStorage where to put session IDs
      * @param options configurable options.  See {@link SessionCookieOptions}.  The 
      *                expires option is ignored (cookies are session-only).
      */
-    constructor(userStorage : UserStorage, 
-        keyStorage : KeyStorage, 
+    constructor(keyStorage : KeyStorage, 
         options : SessionCookieOptions = {}) {
 
-        this.userStorage = userStorage;
+        if (options.userStorage) this.userStorage = options.userStorage;
         this.keyStorage = keyStorage;
 
         setParameter("idleTimeout", ParamType.Number, this, options, "SESSION_IDLE_TIMEOUT");
@@ -513,6 +516,7 @@ export class SessionCookie {
      */
     async getUserForSessionId(sessionId: string, options? : UserStorageGetOptions) : Promise<{user: User|undefined, key : Key}> {
         const key = await this.getSessionKey(sessionId);
+        if (!this.userStorage) return {key, user: undefined};
         if (key.userId) {
             let {user} = await this.userStorage.getUserById(key.userId, options);
             return {user, key};

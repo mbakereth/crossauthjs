@@ -214,7 +214,7 @@ export class FastifyAdminClientEndpoints {
         this.sessionServer.app.get(this.adminPrefix+'selectclient', 
             async (request: FastifyRequest<{ Querystring: SelectClientQueryType }>,
                 reply: FastifyReply)  => {
-                CrossauthLogger.logger.info(j({
+                    CrossauthLogger.logger.info(j({
                     msg: "Page visit",
                     method: 'GET',
                     url: this.adminPrefix + 'selectclient',
@@ -233,6 +233,7 @@ export class FastifyAdminClientEndpoints {
                     let userId : string|number|null = null;
                     let user : User|undefined = undefined;
                     if (request.query.userId) {
+                        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call selectclient with user unless a user storage is provided");
                         const resp =
                             await this.sessionServer.userStorage.getUserById(request.query.userId);
                         user = resp.user;
@@ -308,6 +309,7 @@ export class FastifyAdminClientEndpoints {
                 let user : User|undefined = undefined;
                 try {
                     if (request.query.userId) {
+                        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call createclient unless a user storage is provided");
                         let resp = await this.sessionServer.userStorage.getUserById(request.query.userId);
                         user = resp.user;
                     }
@@ -352,6 +354,7 @@ export class FastifyAdminClientEndpoints {
                 let user : User|undefined = undefined;
                 try {
                     if (request.body.userId) {
+                        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call createclient unless a user storage is provided");
                         let resp = await this.sessionServer.userStorage.getUserById(request.body.userId);
                         user = resp.user;
                     }
@@ -443,6 +446,7 @@ export class FastifyAdminClientEndpoints {
                 let user : User|undefined = undefined;
                 try {
                     if (client.userId) {
+                        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient with user unless a user storage is provided");
                         let resp = await this.sessionServer.userStorage.getUserById(client.userId);
                         user = resp.user;
                     }
@@ -498,6 +502,7 @@ export class FastifyAdminClientEndpoints {
                 let user : User|undefined = undefined;
                 try {
                     if (request.body.userId) {
+                        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient with user unless a user storage is provided");
                         let resp = await this.sessionServer.userStorage.getUserById(request.body.userId);
                         user = resp.user;
                     }
@@ -674,6 +679,7 @@ export class FastifyAdminClientEndpoints {
             let user : User|undefined = undefined;
             try {
                 if (request.body.userId) {
+                    if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call createclient with user unless a user storage is provided");
                     let resp = await this.sessionServer.userStorage.getUserById(request.body.userId);
                     user = resp.user;
                 }
@@ -723,6 +729,7 @@ export class FastifyAdminClientEndpoints {
 
                 try {
                     if (request.body.userId) {
+                        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient with user unless a user storage is provided");
                         await this.sessionServer.userStorage.getUserById(request.body.userId);
                     }
                     return await this.updateClient(request, reply, 

@@ -46,10 +46,11 @@ let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFiel
 let keyStorage = new PrismaKeyStorage({prismaClient : prisma, keyTable: "apiKey"});
 
 // create the server, pointing it at the app we created and our nunjucks views directory
-let server = new FastifyServer(userStorage, {
+let server = new FastifyServer({
     apiKey: {
         keyStorage: keyStorage,
     }}, {
+        userStorage, 
         app: app,
         views: path.join(__dirname, '../views'),
         siteUrl: `http://localhost:${port}`,

@@ -69,16 +69,17 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
     const userStorage = await getTestUserStorage();
     const keyStorage = new InMemoryKeyStorage();
     let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
-    return {server: new FastifyServer(userStorage, {
-        authenticators: {
-            localpassword: lpAuthenticator,
-        },
+    return {server: new FastifyServer({
         session: {
             keyStorage: keyStorage,
         },
         oAuthClient: {
             authServerBaseUrl: "http://server.com",
         }}, {
+        userStorage,
+        authenticators: {
+            localpassword: lpAuthenticator,
+        },
         app: app,
         views: path.join(__dirname, '../views'),
         allowedFactor2: ["none"],

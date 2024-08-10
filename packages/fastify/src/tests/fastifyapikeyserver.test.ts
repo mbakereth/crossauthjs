@@ -43,10 +43,11 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
 
     const apiKeyManager = new ApiKeyManager(keyStorage, {secret: "ABCDEFG",});
     
-    const server = new FastifyServer(userStorage, {
+    const server = new FastifyServer({
         apiKey: {
             keyStorage: keyStorage, 
         }}, {
+            userStorage, 
             app: app,
             views: path.join(__dirname, '../views'),
             secret: "ABCDEFG",

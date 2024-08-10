@@ -58,17 +58,18 @@ let emailAuthenticator = new EmailAuthenticator();
 let twilioAuthenticator = new TwilioAuthenticator();
 
 // create the server, pointing it at the app we created and our nunjucks views directory
-let server = new FastifyServer(userStorage, {
-    authenticators: {
-        localpassword: lpAuthenticator,
-        totp: totpAuthenticator,
-        email: emailAuthenticator,
-        sms: twilioAuthenticator,
-    },
+let server = new FastifyServer({
     session: {
         keyStorage: keyStorage,
     }}, {
-        app: app,
+        userStorage, 
+        authenticators: {
+            localpassword: lpAuthenticator,
+            totp: totpAuthenticator,
+            email: emailAuthenticator,
+            sms: twilioAuthenticator,
+        },
+            app: app,
         views: path.join(__dirname, '../views'),
         allowedFactor2: ["none", "totp", "email", "sms"],
         enableEmailVerification: false,

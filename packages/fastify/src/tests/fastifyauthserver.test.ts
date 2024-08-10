@@ -117,12 +117,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
 
     // create a fastify server and mock view to return its arguments
     const app = fastify({logger: false});
-    const server = new FastifyServer(userStorage, {
-        authenticators: {
-            localpassword: lpAuthenticator,
-            totp: totpAuth,
-            email: emailAuth,        
-        },
+    const server = new FastifyServer({
         session: {
             keyStorage: keyStorage, 
         },
@@ -130,6 +125,12 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             clientStorage,
             keyStorage,
         }}, {
+            userStorage,
+            authenticators: {
+                localpassword: lpAuthenticator,
+                totp: totpAuth,
+                email: emailAuth,        
+            },
             app: app,
             views: path.join(__dirname, '../views'),
             allowedFactor2: ["none", "totp", "email"],
@@ -138,7 +139,6 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             jwtPublicKeyFile: "keys/rsa-public-key.pem",
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
             siteUrl: `http://localhost:3000`,
-            userStorage,
             ...options,
         });
     // @ts-ignore

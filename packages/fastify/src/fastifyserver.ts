@@ -18,7 +18,6 @@ import {
     j } from '@crossauth/common';
 import type { Key } from '@crossauth/common';
 import {
-    UserStorage,
     KeyStorage,
     OAuthClientStorage,
     Authenticator,
@@ -101,6 +100,7 @@ export interface FastifyServerOptions extends
     views? : string,
 
     isAdminFn?: (user : User) => boolean;
+
 };
 
 /**
@@ -206,11 +206,7 @@ export class FastifyServer {
 
     /**
      * Integrates fastify session, API key and OAuth servers
-     * @param userStorage where to store users
      * @param config object with entries as follow:
-     *     - `authenticators` pass in all supported authenticators, both for
-     *       factor 1 and factor 2, keyed on the value that appears in
-     *       the user record.  See the class documentation for more details.
      *     - `session` if passed, instantiate the session server (see class
      *       documentation).  The value is an object with a `keyStorage` field
      *       which must be present and should be the {@link KeyStorage} instance
@@ -248,9 +244,7 @@ export class FastifyServer {
      *       {@link FastifyServerOptions}.
      *
      */
-    constructor(userStorage: UserStorage,
-        { authenticators, session, apiKey, oAuthAuthServer, oAuthClient, oAuthResServer } : {
-            authenticators? : {[key:string]: Authenticator}, 
+    constructor({ session, apiKey, oAuthAuthServer, oAuthClient, oAuthResServer } : {
             session?: {
                     keyStorage: KeyStorage, 
                     options?: FastifySessionServerOptions,
@@ -317,13 +311,15 @@ export class FastifyServer {
         this.app.decorateRequest('user', undefined);
         this.app.decorateRequest('csrfToken', undefined);
 
+        let authenticators : {[key:string]: Authenticator} = {};
+        if (options.authenticators) authenticators = options.authenticators; 
+
         if (session) { 
             if (!authenticators) {
                 throw new CrossauthError(ErrorCode.Configuration,
                     "If using session management, must also supply authenticators");
             }
             const sessionServer = new FastifySessionServer(this.app,
-                userStorage,
                 session.keyStorage,
                 authenticators,
                 { ...options, ...session.options });
@@ -331,8 +327,9 @@ export class FastifyServer {
         }
 
         if (apiKey) {
+            if (!options.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Need a user storage to user API server");
             new FastifyApiKeyServer(this.app,
-                userStorage,
+                options.userStorage,
                 apiKey.keyStorage,
                 { ...options, ...apiKey.options });
         }

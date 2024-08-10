@@ -63,13 +63,14 @@ function defaultIsAdminFn(user : User) : boolean {
  * const userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: ["email"]});
  * const keyStorage = new PrismaKeyStorage({prismaClient : prisma});
  * const passwordAuthenticator = new LocalPasswordAuthenticator(userStorage);
- * export const crossauth = new SvelteKitServer(userStorage, {
- *     authenticators: {
- *         localpassword: passwordAuthenticator,
- *     },
+ * export const crossauth = new SvelteKitServer({
  *     session: {
  *         keyStorage: keyStorage,
  *     }}, {
+ *         userStorage: userStorage,
+ *         authenticators: {
+ *            localpassword: passwordAuthenticator,
+ *         },
  *         loginProtectedPageEndpoints: ["/account"],
  *         redirect,
  *         error
@@ -150,7 +151,7 @@ function defaultIsAdminFn(user : User) : boolean {
 export class SvelteKitServer {
 
     /** The User storage that was passed during construction */
-    readonly userStorage : UserStorage;
+    readonly userStorage? : UserStorage;
 
     /** The session server if one was requested during construction */
     readonly sessionServer? : SvelteKitSessionServer;
@@ -180,13 +181,7 @@ export class SvelteKitServer {
     /**
      * Constructor.
      * 
-     * @param userStorage where users are stored
-     * 
      * @param config an object with configuration:
-     *   - `authenticators` an object of authenticator objects that are
-     *     used either for factor 1 or factor 2 authentication, keyed on the
-     *     name you refer to them with in the user's `factor1` and `factor2`
-     *     fields.  See the example in the class documentation.
      *   - `session` if you want a session (session cookie-based
      *     authentication), include this.  See the class documentation for
      *     details.  Note that the options in the third parameter of this
@@ -216,15 +211,13 @@ export class SvelteKitServer {
      *   - `options` Configuration that applies to the whole application,
      *     not just the session server.
      */
-    constructor(userStorage: UserStorage, {
-        authenticators,
+    constructor({
         session,
         apiKey,
         oAuthAuthServer,
         oAuthClient,
         options,
     } : {
-        authenticators?: {[key:string]: Authenticator}, 
         session? : {
             keyStorage: KeyStorage, 
             options?: SvelteKitSessionServerOptions,
@@ -249,17 +242,21 @@ export class SvelteKitServer {
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL", false);
         if (options.isAdminFn) SvelteKitServer.isAdminFn = options.isAdminFn;
 
-        this.userStorage = userStorage;
+        let authenticators : {[key:string]: Authenticator} = {};
+        if (options.authenticators) authenticators = options.authenticators;
+
+        this.userStorage = options.userStorage;
         if (session) {
             if (!authenticators) {
                 throw new CrossauthError(ErrorCode.Configuration,
                     "If using session management, must supply authenticators")
             }
-            this.sessionServer = new SvelteKitSessionServer(userStorage, session.keyStorage, authenticators, {...session.options, ...options});
+            this.sessionServer = new SvelteKitSessionServer(session.keyStorage, authenticators, {...session.options, ...options});
         }
 
         if (apiKey) {
-            this.apiKeyServer = new SvelteKitApiKeyServer(userStorage,
+            if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must define a user storage if using API keys");
+            this.apiKeyServer = new SvelteKitApiKeyServer(this.userStorage,
                 apiKey.keyStorage,
                 { ...options, ...apiKey.options });
         }
@@ -292,8 +289,8 @@ export class SvelteKitServer {
 
             if (this.sessionServer) {
                 await this.sessionServer.sessionHook({event});
-                const ret = await this.sessionServer.twoFAHook({event});
-                if (!ret.twofa && !event.locals.user) {
+                const ret = this.userStorage ?  await this.sessionServer.twoFAHook({event}) : undefined;
+                if (!(ret && ret.twofa) && !event.locals.user) {
                     if (this.sessionServer.isLoginPageProtected(event))  {
                         if (this.loginUrl) {
                             return new Response(null, {status: 302, headers: {location: this.loginUrl}});
@@ -304,7 +301,7 @@ export class SvelteKitServer {
                     if (this.sessionServer.isLoginApiProtected(event)) 
                         return this.sessionServer.error(401, "Unauthorized");
                 }
-                if (!ret.twofa && this.sessionServer.isAdminPageEndpoint(event) &&
+                if (!(ret && ret.twofa) && this.sessionServer.isAdminPageEndpoint(event) &&
                     (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))
                 ) {
                         if (this.sessionServer.unauthorizedUrl) {
@@ -312,11 +309,11 @@ export class SvelteKitServer {
                         }
                         return this.sessionServer.error(401, "Unauthorized");
                 }
-                if (!ret.twofa && this.sessionServer.isAdminApiEndpoint(event) &&
+                if (!(ret && ret.twofa) && this.sessionServer.isAdminApiEndpoint(event) &&
                     (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))) {
                         return this.sessionServer.error(401, "Unauthorized");
                 }
-                if (ret.response) return ret.response;
+                if (ret?.response) return ret.response;    
             }
             if (this.apiKeyServer) {
                 await this.apiKeyServer.hook({event});

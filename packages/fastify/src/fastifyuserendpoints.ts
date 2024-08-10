@@ -1167,6 +1167,7 @@ export class FastifyUserEndpoints {
                         this.prefix+"deleteuser");
                 }
                 try {
+                    if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call delete user unless a user storage is provided");
                     const resp = await this.sessionServer.userStorage.getUserById(request.user.id);
                     user = resp.user;
                 } catch (e) {
@@ -1321,6 +1322,7 @@ export class FastifyUserEndpoints {
             username: request.user.username,
             state: "active",
         };
+        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateUser unless a user storage is provided");
         user = this.sessionServer.updateUserFn(user,
             request,
             this.sessionServer.userStorage.userEditableFields);
@@ -1343,6 +1345,7 @@ export class FastifyUserEndpoints {
         successFn : (res : FastifyReply, data: {[key:string]:any}, user? : User) 
         => void) {
             
+        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call changeFactor2 unless a user storage is provided");
         /*// this can only be called for logged in users
         const sessionValue = this.getSessionCookieValue(request);
         if (!sessionValue || !request.user || !this.sessionUser(request)) {
@@ -1419,6 +1422,7 @@ export class FastifyUserEndpoints {
     private async changePassword(request : FastifyRequest<{ Body: ChangePasswordBodyType }>, 
         reply : FastifyReply, 
         successFn : (res : FastifyReply, user? : User) => void) {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call changePassword unless a user storage is provided");
 
         // can only call this if logged in and CSRF token is valid,
         // or else if login has been initiated but a password change is
@@ -1686,6 +1690,7 @@ export class FastifyUserEndpoints {
         reply : FastifyReply, 
         successFn : (res : FastifyReply) => FastifyReply) {
             
+        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call deleteUser unless a user storage is provided");
         // throw an error if the CSRF token is invalid
         if (this.sessionServer.isSessionUser(request) && !request.csrfToken) {
             throw new CrossauthError(ErrorCode.InvalidCsrf);
