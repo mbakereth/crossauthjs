@@ -13,13 +13,18 @@ import { CrossauthError, ErrorCode, type User } from '@crossauth/common';
 import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
 import { SvelteKitOAuthClient } from './sveltekitoauthclient';
 import type { SvelteKitOAuthClientOptions } from './sveltekitoauthclient';
+import {
+    SvelteKitOAuthResourceServer,
+    type SvelteKitOAuthResourceServerOptions } from './sveltekitresserver';
+import { OAuthTokenConsumer } from '@crossauth/backend';
 
 export interface SvelteKitServerOptions 
     extends SvelteKitSessionServerOptions, 
         SvelteKitApiKeyServerOptions,
         SvelteKitAuthorizationServerOptions,
-        SvelteKitOAuthClientOptions
-     {
+        SvelteKitOAuthClientOptions,
+        SvelteKitOAuthResourceServerOptions 
+{
     /** User can set this to check if the user is an administrator.
      * By default, the admin booloean field in the user object is checked
      */
@@ -176,7 +181,13 @@ export class SvelteKitServer {
      */
     static isAdminFn: (user : User) => boolean = defaultIsAdminFn;
 
+    /**
+     * OAuth client instance
+     */
     readonly oAuthClient? : SvelteKitOAuthClient;
+
+    /** OAuth resource server instance */
+    readonly oAuthResServer? : SvelteKitOAuthResourceServer;
 
     /**
      * Constructor.
@@ -208,6 +219,8 @@ export class SvelteKitServer {
      *      There must be a field called `authServerBaseUrl` and is the 
      *      base URL for the authorization server.  When validating access
      *      tokens, the `iss` claim must match this.
+     *    - `oAuthResServer`  OAuth resource server.  See 
+     *       {@link SvelteKitOAuthResourceServer}.
      *   - `options` Configuration that applies to the whole application,
      *     not just the session server.
      */
@@ -216,6 +229,7 @@ export class SvelteKitServer {
         apiKey,
         oAuthAuthServer,
         oAuthClient,
+        oAuthResServer,
         options,
     } : {
         session? : {
@@ -235,6 +249,9 @@ export class SvelteKitServer {
         oAuthClient? : {
             authServerBaseUrl: string,
             options? : SvelteKitOAuthClientOptions,
+        },
+        oAuthResServer? : {
+            options? : SvelteKitOAuthResourceServerOptions,
         },
         options? : SvelteKitServerOptions}) {
 
@@ -278,6 +295,13 @@ export class SvelteKitServer {
                 { ...options, ...oAuthClient.options });
         }
 
+        if (oAuthResServer) {
+            this.oAuthResServer = new SvelteKitOAuthResourceServer( 
+                [new OAuthTokenConsumer(options)],
+                {...oAuthResServer.options, ...options}
+            )
+        }
+
         this.hooks = async ({event, resolve}) => {
 
             // reset all locals
@@ -288,7 +312,11 @@ export class SvelteKitServer {
             event.locals.scope = undefined;
 
             if (this.sessionServer) {
+
+                // session hook
                 await this.sessionServer.sessionHook({event});
+
+                // two FA hook
                 const ret = this.userStorage ?  await this.sessionServer.twoFAHook({event}) : undefined;
                 if (!(ret && ret.twofa) && !event.locals.user) {
                     if (this.sessionServer.isLoginPageProtected(event))  {
@@ -315,9 +343,18 @@ export class SvelteKitServer {
                 }
                 if (ret?.response) return ret.response;    
             }
+
+            // API server hook
             if (this.apiKeyServer) {
                 await this.apiKeyServer.hook({event});
             }
+
+            // OAuth res server hook
+            if (this.oAuthResServer?.hook) {
+                const resp = await this.oAuthResServer.hook({event});
+                if (resp) return resp;
+            }
+            
             return await resolve(event);
 
         }
