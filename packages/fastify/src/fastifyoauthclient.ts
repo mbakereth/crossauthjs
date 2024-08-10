@@ -551,7 +551,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
 /**
  * The Fastify implementation of the OAuth client.
  * 
- * Makes requests to an authorization server, using a cofigurable set
+ * Makes requests to an authorization server, using a configurable set
  * of flows, which sends back errors or tokens,
  * 
  * When constructing this class, you define what happens with tokens that
@@ -685,7 +685,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     private bffEndpointName = "bff";
     private bffBaseUrl? : string;
     private tokenEndpoints : ("access_token"|"refresh_token"|"id_token"|
-        "have_access_token"|"have_refresh"|"have_id")[] = [];
+        "have_access_token"|"have_refresh_token"|"have_id_token")[] = [];
 
     /**
      * Constructor

@@ -152,17 +152,26 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 ////////////////////////////////////////////////////////////////////////////
 // Interfaces
 
+/**
+ * Returned by the authorize endpoint
+ */
 export interface AuthorizationCodeFlowReturn {
     success: boolean,
     error? : string,
     error_description? : string
 }
 
-
+/**
+ * Returned by the token endpoint
+ */
 export interface TokenReturn extends OAuthTokenResponse {
+    success: boolean,
     id_payload?: {[key:string]:any},
 }
 
+/**
+ * Returned by the redirect URI endpoint
+ */
 export interface RedirectUriReturn extends OAuthTokenResponse {
     success: boolean,
 }
@@ -340,6 +349,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     ) : Promise<TokenReturn|undefined> {
     if (oauthResponse.error) {
         return {
+            success: false,
             error: oauthResponse.error,
             error_description: oauthResponse.error_description
         }
@@ -353,6 +363,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
         }
 
     return {
+        success: true,
         ...oauthResponse,
         id_payload: decodePayload(oauthResponse.id_token)}
     } catch (e) {
@@ -360,6 +371,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
         return {
+            success: false,
             error: ce.oauthErrorCode,
             error_description: ce.message,
         }
@@ -373,6 +385,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
     ) : Promise<TokenReturn|undefined> {
     if (oauthResponse.error) {
         return {
+            success: false, 
             error: oauthResponse.error,
             error_description: oauthResponse.error_description
         }
@@ -383,6 +396,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
     try {
 
         return {
+            success: true,
             ...oauthResponse,
             id_payload: decodePayload(oauthResponse.id_token)}
         } catch (e) {
@@ -390,6 +404,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
         return {
+            success: false,
             error: ce.oauthErrorCode,
             error_description: ce.message,
         }
@@ -402,7 +417,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
 /**
  * The SvelteKit version of the OAuth client.
  * 
- * Makes requests to an authorization server, using a cofigurable set
+ * Makes requests to an authorization server, using a configurable set
  * of flows, which sends back errors or tokens,
  * 
  * When constructing this class, you define what happens with tokens that
@@ -415,7 +430,9 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  *   - `sendJson` the token response is sent as-is as a JSON Response.  
  *      In addition to the `token` endpoint response fields,
  *      `success: true` and `id_payload` with the decoded 
- *      payload of the ID token are retruned.
+ *      payload of the ID token are retruned.  
+ *      This method should be used
+ *      with `get`/ `post` endpoints, not `load`/`actions`.
  *   - `saveInSessionAndLoad` the response fields are saved in the `data`
  *      field of the session ID in key storage.  In addition, `expires_at` is 
  *      set to the number of seconds since Epoch that the access token expires
@@ -438,9 +455,10 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  *      not saved in the session.  Use the `load`/`actions` function in your
  *      `+page.server.ts`.
  *    - `custom` the function in 
- *       {@link FastifyOAuthClientOptions.receiveTokenFn} is called.  Use
- *       `get` or `load` depending on whether your function is returning
- *       a Response or object.
+ *       {@link FastifyOAuthClientOptions.receiveTokenFn} is called.  If
+ *       using `get` or `post` methods, your functiin should return
+ *       a Response.  If using `load` and `actions` ir shouls ewruen
+ *       an object for passing in `data` or `form` exports.
  *      
  * **{@link FastifyOAuthClientOptions.errorResponseType}**
  * 
@@ -451,33 +469,96 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  *      provided in the options to {@link SvelteKitServe}).
  *    - `custom` {@link SvelteKitOAuthClientOptions.errorFn} is called.
  * 
- *    Note that this parameter is only used when you are using the `get`
- *    endpoints, not the `load` ones.  The latter return the error in 
+ *    Note that this parameter is only used when you are using the `get`/`post`
+ *    endpoints, not the `load`/ `actions` ones.  The latter return the error in 
  *    the PageData from the load.
  * 
  * **Backend-for-Frontend (BFF)**
  * 
- * This class supports the backend-for-frontend (BFF) model.  You create an
- * endpoint for every resource server endpoint you want to be able to call, by
- * setting them in {@link SvelteKitOAuthClientOptions.bffEbdpoints}.  You set the
- * {@link SvelteKitOAuthClientOptions.tokenResponseType} to `saveInSessionAndLoad`,
- * `saveInSessionAndRedirect` or `saveInSessionAndReturn` so that tokens are
- * saved in the session.  
- * You also set `bffBaseUrl` to the base URL of the resource server.
- * When you want to call a resource server endpoint, you call
- * `bffEndpointName` + *`url`*. The client will
- * pull the access token from the session, put it in the `Authorization` header
- * and called `bffBaseUrl` + *`url`* using fetch, and return the
- * response verbatim.  
- * 
+ * This class supports the backend-for-frontend (BFF) model.  
  * This pattern avoids you having to store the access token in the frontend.
+
+ * For this to work
+ * you should set @link SvelteKitOAuthClientOptions.tokenResponseType} to
+ * `saveInSessionAndLoad` or `saveInSessionAndRedirect`.  Then to call
+ * your resource server functions, you call then on a URL on this client
+ * rather than the resource server directly.  The client backend will 
+ * attach the access token, and also refresh the token automatically if
+ * expired.
+ * 
+ * You need to provide the following options:
+ *   - `bffBaseUrl` - the resource server URL, eg `http://resserver.com`
+ *   - `bffEndpointName` - the prefix for BFF endpoints on this server.
+ *     Eg if your BFF URL on this server is in `routes/bff` then 
+ *     set `bffEndpointName` to `/bff`.
+ * 
+ * You may optionally also se `bffEndpoints`.
+ * 
+ * To sue BFF, first set `tokenResponseType` to 
+ * `saveInSessionAndLoad` or `saveInSessionAndRedirect` and set `bffBaseUrl`
+ * and `bffEndpointName`.  THen create a route in your `routes` called
+ * *bffEndpointName*`/`*someMethod* with a `+server.ts`.  In that `+server.ts`,
+ * create a `GET` and/or `POST` endpoint with
+ * `bffEndpoint.get` or `bffEndpoint.post`.  The request will be forwarded
+ * to *bffBaseUrl*`/`*someMethod* with the the body and query parameters
+ * taken from your query and with the access token attached as the
+ * `Authorization` header.  The resulting JSON and HTTP status will be returned.
+ * 
+ * If you have a lot of endpoints, you may instead prefer to create a single
+ * one, eg as `routes/[...method]` and use `allBffEndpoint.get` or `.post` .
+ * Put all valid BFF endpoints in the `bffEndpoints` option.  If, for one
+ * of these endpoints, eg `method`, you set `matchSubUrls` to true, then
+ * `method/XXX`, `method/YYY` will match as well as `method`.
  * 
  * **Endpoints provided by this class**
  * 
- * In addition to the BFF endpoints above, which are implemented in the hook,
- * this class provides the following 
- * endpoints. As noted above, you should either use the endpoint's `load`
- * or `get`/`put` depending on the value of `tokenResponseType`. 
+ * | Name                                  | Description                                                  | PageData (returned by load) or JSON returned by get/post                     | ActionData (return by actions)                                   | Form fields expected by actions or post/get input data          | 
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | authorizationCodeFlowEndpoint         | Starts the authorization code flow.                          | None - redirects to `redirectUri`                                            | *Not provided*                                                   | - `scope`                                                       |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | authorizationCodeFlowWithPKCEEndpoint | Starts the authorization code flow with PKCE.                | None - redirects to `redirectUri`                                            | *Not provided*                                                   | - `scope`                                                       |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | redirectUriEndpoint                   | Redirect Uri for authorization code flows                    | See {@link OAuthTokenResponse}                                               | *Not provided*                                                   | As per OAuth Authorization Code Flow spec                       |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | clientCredentialsFlowEndpoint         | Executes the client credentials flow                         | *Not provided*                                                               | See {@link OAuthTokenResponse}                                   | As per OAuth Client Credentials Flow spec                       |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | refreshTokenFlowEndpoint              | Executes the refresh token flow                              | *Not provided*                                                               | See {@link OAuthTokenResponse}                                   | As per OAuth Refresh Token Flow spec                            |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | refreshTokensIfExpiredEndpoint        | Executes the refresh token flow only if access token expired | *Not provided*                                                               | See {@link OAuthTokenResponse}                                   | As per OAuth Refresh Token Flow spec or nothing                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | autoRefreshTokensIfExpiredEndpoint    | Same as refreshTokensIfExpiredEndpoint but only returns an object, no redirect | *Not provided*                                             | See {@link OAuthTokenResponse}                                   | As per OAuth Refresh Token Flow spec or nothing                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | refreshTokensIfExpiredEndpoint        | Same as refreshTokenFlowEndpoint but only returns an object, no redirect | *Not provided*                                                   | See {@link OAuthTokenResponse}                                   | As per OAuth Refresh Token Flow spec or nothing                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | passwordFlowEndpoint                  |                                                              | *Not provided*                                                               | `password`                                                       |                                                                 |  
+ * |                                       | Executes the password flow only with out without MFA         |                                                                              |   -  See {@link OAuthTokenResponse}.  Returns password flow response if no MFA, MFA challenge response if user has 2FA | See OAuth password flow or Auth0 Password with MFA password flow specs |  
+ * |                                       |                                                              |                                                                              | `passwordOtp`                                                                                                          |                                                                        |  
+ * |                                       |  Pass OTP for Password MFA flow                              |                                                                              |   -  See {@link OAuthTokenResponse}.  Returns Password MFA challenge response if user has 2FA                          | See Auth0 Password with MFA password flow specs                        |  
+ * |                                       |                                                              |                                                                              | `passwordOob`                                                                                                          |                                                                        |  
+ * |                                       |  Pass OOB for Password MFA flow                              |                                                                              |   -  See {@link OAuthTokenResponse}.  Returns Password MFA challenge response if user has 2FA                          | See Auth0 Password with MFA password flow specs                        |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | 
+ * | passwordOtp Endpoint                  | `post` is same as `passwordOtp` action above                 | *Not provided*                                                               | See {@link OAuthTokenResponse}.  Returns MFA challenge response if user has 2FA                                        | See OAuth password flow or Auth0 Password with MFA password flow specs |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | 
+ * | passwordOob Endpoint                  | `post` is same as `passwordOob` action above                 | *Not provided*                                                               | See {@link OAuthTokenResponse}.  Returns MFA challenge response if user has 2FA                                        | See OAuth password flow or Auth0 Password with MFA password flow specs |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | 
+ * | bffEndpoint                           | BFF resource server request.  See class documentation        | As per the corresponding resource server endpoint                            | As per the correspoinding resource server endpoint               | As per the corresponding resource server endpoint               |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | allBffEndpoint                        | BFF resource server request.  See class documentation        | As per the corresponding resource server endpoint                            | As per the correspoinding resource server endpoint               | As per the corresponding resource server endpoint               |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | accessTokenEndpoint                   | For BFF only, return the access token payload or error       | JSON of the access token payload                                             | *Not provided*                                                   |                                                                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | refreshTokenEndpoint                  | For BFF only, return the refresh token payload or error      | JSON of the refresh token payload                                            | *Not provided*                                                   |                                                                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | idTokenEndpoint                       | For BFF only, return the id token payload or error           | JSON of the id token payload                                                 | *Not provided*                                                   |                                                                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | havAeccessTokenEndpoint               | For BFF only, return whether access token present            | `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | haveRefreshTokenEndpoint              | For BFF only, return whether refresh token present           | `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | haveIdTokenEndpoint                   | For BFF only, return whether id token present                | `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | tokensEndpoint                        | For BFF only, a JSON object of all of the above              | All of the above, keyed on `access_token`, `have_access_token`, etc.         | *Not provided*                                                   |                                                                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  */
 export class SvelteKitOAuthClient extends OAuthClientBackend {
     server : SvelteKitServer;
@@ -784,7 +865,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         return resp;
     }
 
-    async refresh(mode: "silent"|"post"|"page", event: RequestEvent,
+    private async refresh(mode: "silent"|"post"|"page", event: RequestEvent,
         onlyIfExpired : boolean,
         refreshToken?: string,
         expiresAt?: number) 
@@ -883,12 +964,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         try {
             if (!this.server.sessionServer) {
                 return {
+                    success: false,
                     error: "server_error",
                     error_description: "Refresh tokens if expired or silent refresh only available if sessions are enabled",
                 };
             }
             if (this.server.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
                 return {
+                    success: false,
                     error: "access_denied",
                     error_description: "No CSRF token found"
                 }; 
@@ -914,10 +997,13 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 if (resp instanceof Response) {
                     throw new CrossauthError(ErrorCode.Configuration, "Unexpected error: refresh: mode is silent but didn't receive an object")
                 }
-                return {expires_at: resp?.expires_at};
+                return {success: true, expires_at: resp?.expires_at};
             } else if (mode == "post") {
                 if (resp == undefined) return this.receiveTokenFn({}, this, event, false);
-                if (resp != undefined) return resp;
+                if (resp != undefined) {
+                    if (resp instanceof Response) return resp;
+                    throw new CrossauthError(ErrorCode.Configuration, "refreshTokenFn for post should return Response not object");
+                }
             }
     
         } catch (e) {
@@ -928,6 +1014,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             CrossauthLogger.logger.error({cerr: ce});
             if (mode == "page") return this.errorFn(this.server, event, ce);
             else return {
+                success: false,
                 error: ce.oauthErrorCode,
                 error_description: ce.message,
             };
@@ -1054,6 +1141,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
     }
 
+    /**
+     * Ordinarily you would not call this directly but use `bffEndpoint`.
+     * 
+     * However you can use this if you need to pass custom headers.
+     * @param event the Sveltekit request event
+     * @param opts additional data to put in resource server request
+     * @returns resource server response
+     */
     async bff(event : RequestEvent, opts: {headers? : Headers} = {}) : Promise<Response> {
         try {
             if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
@@ -1128,6 +1223,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
     }
 
+    /**
+     * Ordinarily you would not call this directly but use `allBffEndpoint`.
+     * 
+     * However you can use this if you need to pass custom headers.
+     * @param event the Sveltekit request event
+     * @param opts additional data to put in resource server request
+     * @returns resource server response
+     */
     async allBff(event : RequestEvent, opts: {headers? : Headers} = {}) : Promise<Response> {
         try {
             CrossauthLogger.logger.debug(j({msg: "Called allBff", url: event.url.toString()}));
@@ -1588,7 +1691,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
                 }
                 return {
-                    success: true,
                     ...receiveTokenResp,
                 }
 

@@ -37,6 +37,17 @@ export type {
     MfaChallengeBodyType,
     MfaChallengeReturn,
     SvelteKitAuthorizationServerOptions } from './sveltekitoauthserver';
+
+export { SvelteKitOAuthClient } from './sveltekitoauthclient';
+export type { 
+    SvelteKitErrorFn,
+    SvelteKitOAuthClientOptions,
+    AuthorizationCodeFlowReturn,
+    TokenReturn,
+    RedirectUriReturn,
+
+} from './sveltekitoauthclient';
+
 declare global {
     namespace App {
             // interface Error {}
