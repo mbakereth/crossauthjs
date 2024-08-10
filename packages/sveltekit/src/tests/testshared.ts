@@ -150,6 +150,19 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
             clientSecret: "DEF",
             redirectUri: "http://example.com/redirect",
             validFlows: ["all"], // activate all OAuth flows
+            enableCsrfProtection: false,
+            bffEndpointName: "/bff",
+            bffBaseUrl: "http://server.com",
+            bffEndpoints: [
+                {url: "method1", methods: ["GET"], matchSubUrls: false},
+                {url: "method2", methods: ["GET"], matchSubUrls: true},
+            ],
+            tokenEndpoints: [
+                "access_token",
+                "have_access_token",
+                "id_token",
+                "have_id_token"
+            ],
             redirect,
             error,
             ...options,

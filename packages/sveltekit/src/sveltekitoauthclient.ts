@@ -50,7 +50,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
     sessionDataName? : string,
 
     /**
-     * If the {@link FastifyOAuthClientOptions.tokenResponseType} is
+     * If the {@link SvelteKitOAuthClientOptions.tokenResponseType} is
      * `saveInSessionAndRedirect`, this is the relative URL that the usder
      * will be redirected to after authorization is complete.
      */
@@ -80,7 +80,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      */
     receiveTokenFn?: (oauthResponse: OAuthTokenResponse,
         client: SvelteKitOAuthClient,
-        event: RequestEvent) => Promise<Response|TokenReturn|undefined>;
+        event: RequestEvent, silent: boolean) => Promise<Response|TokenReturn|undefined>;
 
     /**
      * The function to call when there is an OAuth error and
@@ -98,6 +98,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
         "sendJson" | 
         "saveInSessionAndLoad" | 
         "saveInSessionAndRedirect" | 
+        "saveInSessionAndReturn" | 
         "sendInPage" | 
         "custom";
 
@@ -139,7 +140,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * See {@link FastifyOAuthClient} class documentation for full description.
      */
     tokenEndpoints? : ("access_token"|"refresh_token"|"id_token"|
-        "have_access_token"|"have_refresh"|"have_id")[],
+        "have_access_token"|"have_refresh_token"|"have_id_token")[],
 
     /** Pass the Sveltekit redirect function */
     redirect? : any,
@@ -180,7 +181,7 @@ async function jsonError(_server: SvelteKitServer,
             errorMessages: ce.messages,
             errorCode: ce.code,
             errorCodeName: ce.codeName
-    });
+    }, {status: ce.httpStatus});
 }
 
 async function svelteKitError(server: SvelteKitServer,
@@ -280,6 +281,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
 async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     event: RequestEvent,
+    silent: boolean
     ) : Promise<Response|undefined> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
@@ -294,7 +296,35 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
             await updateSessionData(oauthResponse, client, event);
         }
 
-        return client.redirect(302, client.authorizedUrl);
+        if (!silent) return client.redirect(302, client.authorizedUrl);
+    } catch (e) {
+        const ce = e as CrossauthError;
+        CrossauthLogger.logger.debug(j({err: ce}));
+        CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
+        client.errorFn(client.server, event, ce);
+    }
+}
+
+async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
+    client: SvelteKitOAuthClient,
+    event: RequestEvent,
+    silent: boolean
+    ) : Promise<Response|undefined> {
+    if (oauthResponse.error) {
+        const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
+            oauthResponse.error_description);
+        return client.errorFn(client.server, event, ce);
+    }
+
+    logTokens(oauthResponse);
+
+    try {
+        if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
+            await updateSessionData(oauthResponse, client, event);
+        }
+
+        return json({success: true, ...oauthResponse});
+        if (!silent) return client.redirect(302, client.authorizedUrl);
     } catch (e) {
         const ce = e as CrossauthError;
         CrossauthLogger.logger.debug(j({err: ce}));
@@ -306,10 +336,9 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
 async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     event: RequestEvent,
+    _silent : boolean
     ) : Promise<TokenReturn|undefined> {
     if (oauthResponse.error) {
-        const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
-            oauthResponse.error_description);
         return {
             error: oauthResponse.error,
             error_description: oauthResponse.error_description
@@ -340,10 +369,9 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
 async function sendInPage(oauthResponse: OAuthTokenResponse,
     _client: SvelteKitOAuthClient,
     _event: RequestEvent,
+    _silent: boolean,
     ) : Promise<TokenReturn|undefined> {
     if (oauthResponse.error) {
-        const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
-            oauthResponse.error_description);
         return {
             error: oauthResponse.error,
             error_description: oauthResponse.error_description
@@ -367,7 +395,6 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
         }
     }
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // CLASSES
@@ -403,6 +430,10 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  *      a redirect is done to the `authorizedUrl`.  Instead of using the `load`
  *      or `actions` method in a `+page.server.ts`, you should use the `get` 
  *      or `post` method in a `+server.ts`.
+ *    - saveInSessionAndReturn` same as `saveInSessionAndLoad` except that 
+ *      a JSON response is returned`.  Instead of using the `load`
+ *      or `actions` method in a `+page.server.ts`, you should use the `get` 
+ *      or `post` method in a `+server.ts`.
  *    - `sendInPage` same as `saveinSessionAndLoad` except the tokens are
  *      not saved in the session.  Use the `load`/`actions` function in your
  *      `+page.server.ts`.
@@ -429,8 +460,9 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * This class supports the backend-for-frontend (BFF) model.  You create an
  * endpoint for every resource server endpoint you want to be able to call, by
  * setting them in {@link SvelteKitOAuthClientOptions.bffEbdpoints}.  You set the
- * {@link SvelteKitOAuthClientOptions.tokenResponseType} to `saveInSessionAndLoad`
- * or `saveInSessionAndRedirect` so that tokens are saved in the session.  
+ * {@link SvelteKitOAuthClientOptions.tokenResponseType} to `saveInSessionAndLoad`,
+ * `saveInSessionAndRedirect` or `saveInSessionAndReturn` so that tokens are
+ * saved in the session.  
  * You also set `bffBaseUrl` to the base URL of the resource server.
  * When you want to call a resource server endpoint, you call
  * `bffEndpointName` + *`url`*. The client will
@@ -453,7 +485,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     private receiveTokenFn : 
         ( oauthResponse: OAuthTokenResponse,
             client: SvelteKitOAuthClient,
-            event : RequestEvent) 
+            event : RequestEvent,
+            silet: boolean) 
             => Promise<Response|TokenReturn|undefined> = sendJson;
     readonly errorFn : SvelteKitErrorFn = jsonError;
     private loginUrl : string = "/login";
@@ -470,6 +503,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         "sendJson" | 
         "saveInSessionAndLoad" | 
         "saveInSessionAndRedirect" | 
+        "saveInSessionAndLoad" | 
+        "saveInSessionAndReturn" | 
         "sendInPage" | 
         "custom" = "sendJson";
     private errorResponseType :  
@@ -479,12 +514,12 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     private bffEndpoints: {
         url: string,
         methods: ("GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD")[],
+        methodsString: string[],
         matchSubUrls?: boolean
         }[] = [];
     private bffEndpointName = "bff";
     private bffBaseUrl? : string;
-    private tokenEndpoints : ("access_token"|"refresh_token"|"id_token"|
-        "have_access_token"|"have_refresh"|"have_id")[] = [];
+    private tokenEndpoints : string[] = [];
     
     /**
      * Constructor
@@ -507,6 +542,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         setParameter("redirectUri", ParamType.String, this, options, "OAUTH_REDIRECTURI", true);
         setParameter("authorizedUrl", ParamType.String, this, options, "AUTHORIZED_URL", false);
 
+        if (this.bffEndpointName && !this.bffEndpointName.startsWith("/")) this.bffEndpointName = "/" + this.bffEndpointName;
+        if (this.bffEndpointName && this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
+        if (this.bffBaseUrl && this.bffBaseUrl.endsWith("/")) this.bffBaseUrl = this.bffBaseUrl.substring(0, this.bffBaseUrl.length-1);
+
         if (options.redirect) this.redirect = options.redirect;
         if (options.error) this.error = options.error;        
 
@@ -519,7 +558,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         if (options.tokenEndpoints) this.tokenEndpoints = options.tokenEndpoints;
 
         if (this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
-        if (options.bffEndpoints) this.bffEndpoints = options.bffEndpoints;
+        if (options.bffEndpoints) this.bffEndpoints = options.bffEndpoints.map((ep) => {
+            return {...ep, methodsString: ep.methods.map((m) => m)};
+        });
+        if (this.bffEndpoints) {
+            for (let endpoint of this.bffEndpoints) {
+                if (!endpoint.url.startsWith("/")) endpoint.url = "/" + endpoint.url;
+            }
+        }
 
         if (this.loginProtectedFlows.length == 1 && 
             this.loginProtectedFlows[0] == OAuthFlows.All) {
@@ -545,6 +591,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             this.receiveTokenFn = sendJson; saveInSessionAndLoad;
         } else if (this.tokenResponseType == "saveInSessionAndRedirect") {
             this.receiveTokenFn = saveInSessionAndRedirect;
+        } else if (this.tokenResponseType == "saveInSessionAndReturn") {
+            this.receiveTokenFn = saveInSessionAndReturn;
         }
         if ((this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "saveInSessionAndRedirect") &&
             this.authorizedUrl == "") {
@@ -582,7 +630,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 await this.passwordFlow(formData.username,
                     formData.password,
                     formData.scope);
-            if (resp.error == "mfa_required" && 
+                if (resp.error == "mfa_required" && 
                 resp.mfa_token &&
                 this.validFlows.includes(OAuthFlows.PasswordMfa)) {
                 const mfa_token = resp.mfa_token;
@@ -736,22 +784,28 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         return resp;
     }
 
-    async refresh(silent: boolean, event: RequestEvent,
+    async refresh(mode: "silent"|"post"|"page", event: RequestEvent,
         onlyIfExpired : boolean,
         refreshToken?: string,
         expiresAt?: number) 
-        : Promise<{
-            success: boolean,
+        : Promise<Response|{
             refresh_token?: string,
             access_token?: string,
             expires_in?: number,
             expires_at?: number,
             error?: string,
             error_description?: string
-        }|undefined> {
-            if (!expiresAt || !refreshToken) {
-                return undefined;
-            }
+            }|undefined> {
+
+        if (!expiresAt || !refreshToken) {
+            if (mode != "silent") {
+                return await this.receiveTokenFn({},
+                    this,
+                    event, 
+                    true);
+            } 
+            return undefined;
+        }
 
         if (!onlyIfExpired || expiresAt <= Date.now()) {
             try {
@@ -761,18 +815,17 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     resp.error_description = "Unexpectedly did not receive error or access token";
                 }
                 if (!resp.error) {
-                    /*const resp1 = await this.receiveTokenFn(resp,
+                    const resp1 = await this.receiveTokenFn(resp,
                         this,
-                        request,
-                        silent ? undefined : reply);
-                    if (!silent) return resp1;*/
-                    return {success: true, ...resp};
+                        event,
+                        mode == "silent");
+                    if (mode != "silent") return resp1;
                 } 
-                if (!silent) {
+                if (mode != "silent") {
                     const ce = CrossauthError.fromOAuthError(resp.error??"server_error", 
                         resp.error_description);
+                        if (mode == "page") return this.errorFn(this.server, event, ce);
                         return {
-                            success: false,
                             error: ce.oauthErrorCode,
                             error_description: ce.message,
                         };                    
@@ -789,7 +842,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const expires_at = 
                     (new Date().getTime() + (expires_in*1000));
                 return {
-                    success: true,
                     access_token: resp.access_token,
                     refresh_token: resp.refresh_token,
                     expires_in: resp.expires_in,
@@ -798,22 +850,23 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     error_description: resp.error_description
                 };
             } catch(e) {
+                if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                if (SvelteKitServer.isSvelteKitError(e)) throw e;
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.error(j({
                     cerr: e,
                     msg: "Failed refreshing access token"
                 }));
-                if (!silent) {
+                if (mode != "silent") {
                     const ce = CrossauthError.asCrossauthError(e);
+                    if (mode == "page") return this.errorFn(this.server, event, ce);
                     return {
-                        success: false,
                         error: ce.oauthErrorCode,
                         error_description: ce.message,
                     };                    
                 }
 
                 return {
-                    success: false,
                     error:  "server_error",
                     error_description: "Failed refreshing access token",
                 };                    
@@ -823,51 +876,374 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         return undefined;
     }
 
-    // TODO: can only call if sessions enabled?
     private async refreshTokens(event : RequestEvent,
-        silent: boolean,
-        onlyIfExpired : boolean,
-        csrfToken : string|undefined) {
-        if (!csrfToken) {
-            return {
-                error: "access_denied",
-                error_description: "No CSRF token given"
-            }; // TODO: check this becfre calling - is better
-        }
-        const oauthData = await this.server.sessionServer?.getSessionData(event, "oauth");
-        if (!oauthData?.refresh_token) {
-            if (silent) {
-                return {};
-            } else {
-                const ce = new CrossauthError(ErrorCode.InvalidSession,
-                    "No tokens found in session");
+        mode: "silent" | "post" | "page",
+        onlyIfExpired : boolean) : Promise<(TokenReturn&{expires_at?: number})|Response|undefined> {
+
+        try {
+            if (!this.server.sessionServer) {
                 return {
-                    success: false,
-                    error: ce.oauthErrorCode,
-                    error_description: ce.message,
-                    exception: ce
+                    error: "server_error",
+                    error_description: "Refresh tokens if expired or silent refresh only available if sessions are enabled",
+                };
+            }
+            if (this.server.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+                return {
+                    error: "access_denied",
+                    error_description: "No CSRF token found"
+                }; 
+            }
+            const oauthData = await this.server.sessionServer.getSessionData(event, "oauth");
+            if (!oauthData?.refresh_token) {
+                if (mode == "silent") {
+                    return new Response(null, {status: 204});
+                } else {
+                    const ce = new CrossauthError(ErrorCode.InvalidSession,
+                        "No tokens found in session");
+                    throw ce;
                 }
             }
-        }
-
-        const resp = 
-            await this.refresh(silent, event,
-                onlyIfExpired,
-                oauthData.refresh_token,
-                //onlyIfExpired ? oauthData.expires_at : undefined
-                oauthData.expires_at
-            );
-        if (!silent) {
-            if (resp == undefined) return this.receiveTokenFn({}, this, event);
-            if (resp != undefined) return resp; // XXX
-        }
-        return {
-            success: true,
-            expires_at: resp?.expires_at,
+    
+            const resp = 
+                await this.refresh(mode, event,
+                    onlyIfExpired,
+                    oauthData.refresh_token,
+                    oauthData.expires_at
+                );
+            if (mode == "silent") {
+                if (resp instanceof Response) {
+                    throw new CrossauthError(ErrorCode.Configuration, "Unexpected error: refresh: mode is silent but didn't receive an object")
+                }
+                return {expires_at: resp?.expires_at};
+            } else if (mode == "post") {
+                if (resp == undefined) return this.receiveTokenFn({}, this, event, false);
+                if (resp != undefined) return resp;
+            }
+    
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+            if (SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: ce});
+            CrossauthLogger.logger.error({cerr: ce});
+            if (mode == "page") return this.errorFn(this.server, event, ce);
+            else return {
+                error: ce.oauthErrorCode,
+                error_description: ce.message,
+            };
         }
     };
 
+    private async passwordFlow_post(event : RequestEvent, passwordFn : (event : RequestEvent, formData: {[key:string]:string}) => Promise<OAuthTokenResponse>) {
+        if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
+            const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
+            return this.errorFn(this.server, event, ce);
+        }
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+
+            if (!(this.validFlows.includes(OAuthFlows.Password) ||
+                this.validFlows.includes(OAuthFlows.PasswordMfa))) {
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Password flow is not supported");
+                return this.errorFn(this.server, event, ce);
+            }
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            if (!event.locals.user && 
+                (this.loginProtectedFlows.includes(OAuthFlows.Password) ||
+                this.loginProtectedFlows.includes(OAuthFlows.PasswordMfa))) {
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use password flow");
+
+                return this.errorFn(this.server, event, ce);
+            }    
+
+            // if the session server and CSRF protection enabled, require a valid CSRF token
+            if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+                try {
+                    const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
+                    if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+               }
+               catch (e) {
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
+                    return this.errorFn(this.server, event, ce);
+               }
+
+            }
+
+            const resp = 
+                await passwordFn(event, formData);
+            if (!resp) throw new CrossauthError(ErrorCode.UnknownError, "Password flow returned no data");
+            const resp2 = await this.receiveTokenFn(resp, this, event, false) ;
+            if (resp && resp2 instanceof Response) return resp2;
+            throw new CrossauthError(ErrorCode.UnknownError, "Receive token function did not return a Response");
+
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+            if (SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: e});
+            CrossauthLogger.logger.error({cerr: e});
+            //throw this.error(ce.httpStatus, ce.message);
+            return this.errorFn(this.server, event, ce);
+
+        }
+    }
+
+    private async passwordFlow_action( event : RequestEvent, passwordFn : (event : RequestEvent, formData: {[key:string]:string}) => Promise<OAuthTokenResponse> ) {
+        if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+            const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
+            throw ce;
+        }
+
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+
+            if (!(this.validFlows.includes(OAuthFlows.Password) ||
+                 this.validFlows.includes(OAuthFlows.PasswordMfa))) {
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Refresh token flow is not supported");
+                return this.errorFn(this.server, event, ce);
+            }
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            if (!event.locals.user && 
+                (this.loginProtectedFlows.includes(OAuthFlows.Password) ||
+                this.loginProtectedFlows.includes(OAuthFlows.PasswordMfa))) {
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token");
+                throw ce;
+            }    
+            
+            // if the session server and CSRF protection enabled, require a valid CSRF token
+            if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+                try {
+                    const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
+                    if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+                }
+                catch (e) {
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
+                    throw ce;
+                }
+
+            }
+
+            const resp = 
+                await passwordFn(event, formData);
+            if (!resp) throw new CrossauthError(ErrorCode.UnknownError, "Password flow returned no data");
+
+            const resp2 = await this.receiveTokenFn(resp, this, event, false) ?? {};
+            if (resp2 instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Refresh token flow should return an object not Response");
+            return resp2;
+            
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+            if (SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: e});
+            CrossauthLogger.logger.error({cerr: e});
+            //throw this.error(ce.httpStatus, ce.message);
+            return { 
+                success: false,
+                error: ce.oauthErrorCode, 
+                error_description: ce.message
+            };
+
+        }
+
+    }
+
+    async bff(event : RequestEvent, opts: {headers? : Headers} = {}) : Promise<Response> {
+        try {
+            if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
+            if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
+            if (!this.bffBaseUrl) throw new CrossauthError(ErrorCode.Configuration, "Must set bffBaseUrl to use bff()");
+            if (!this.bffEndpointName) throw new CrossauthError(ErrorCode.Configuration, "Must set bffEndpointName to use bff()");
     
+            if (!event.url.pathname.startsWith(this.bffEndpointName)) throw new CrossauthError(ErrorCode.Unauthorized, "Attempt to call BFF url with the wrong prefix");
+            const path = event.url.pathname.substring(this.bffEndpointName.length);
+            let query = event.url.searchParams?.toString() ?? undefined;
+            if (query && query != "") query = "?" + query;
+            const url = new URL(this.bffBaseUrl + path + query);
+            if (!opts.headers) {
+                opts.headers = new Headers();
+            }
+            const oauthData = 
+                await this.server.sessionServer.getSessionData(event, 
+                    "oauth");
+            if (!oauthData) {
+                throw new CrossauthError(ErrorCode.Unauthorized, "No access token found");
+            }
+            let access_token = oauthData.access_token;
+            if (oauthData && oauthData.access_token) {
+                const resp = 
+                    await this.server.oAuthClient.refresh("silent",
+                        event,
+                        true,
+                        oauthData.refresh_token,
+                        oauthData.expires_at);
+                // following shouödn't happen but TS doesn't know that
+                if (resp instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Expected object when refreshing tokens, not Response");
+                if (resp?.access_token) {
+                    access_token = resp.access_token;
+                }
+            }
+
+            opts.headers.set("accept", "application/json");
+            opts.headers.set("content-type", "application/json");
+            if (access_token) opts.headers.set("authorization", "Bearer " + access_token);
+
+            let resp : Response;
+            let body : {[key:string]:any} | undefined = undefined;
+            if (event.request.body) {
+                var data = new JsonOrFormData();
+                await data.loadData(event);
+                body = data.toObject();
+            }
+            CrossauthLogger.logger.debug(j({msg: "Calling BFF URL", url: url, method: event.request.method}))
+            if (body) {
+                resp = await fetch(url, {
+                    headers:opts.headers,
+                    method: event.request.method,
+                    body: JSON.stringify(body??"{}"),
+                });    
+            } else {
+                resp = await fetch(url, {
+                    headers:opts.headers,
+                    method: event.request.method,
+                });    
+            }
+            return resp;
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: ce});
+            CrossauthLogger.logger.error({cerr: ce});
+            return json({
+                error: ce.oauthErrorCode,
+                error_description: ce.message,
+            }, {status: ce.httpStatus});
+        }
+
+    }
+
+    async allBff(event : RequestEvent, opts: {headers? : Headers} = {}) : Promise<Response> {
+        try {
+            CrossauthLogger.logger.debug(j({msg: "Called allBff", url: event.url.toString()}));
+            if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
+            if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
+            if (!this.bffBaseUrl) throw new CrossauthError(ErrorCode.Configuration, "Must set bffBaseUrl to use bff()");
+            if (!this.bffEndpointName) throw new CrossauthError(ErrorCode.Configuration, "Must set bffEndpointName to use bff()");
+    
+            if (!this.bffEndpoints || this.bffEndpoints.length == 0) throw new CrossauthError(ErrorCode.Unauthorized, "Invalid BFF endpoint");
+            if (!event.url.pathname.startsWith(this.bffEndpointName)) throw new CrossauthError(ErrorCode.Unauthorized, "Attempt to call BFF url with the wrong prefix");
+            const path = event.url.pathname.substring(this.bffEndpointName.length);
+
+            let idx = undefined;
+            for (let i=0; i < this.bffEndpoints.length; ++i) {
+                let endpoint = this.bffEndpoints[i];
+                if (endpoint.matchSubUrls) {
+                    let url = endpoint.url;
+                    let urlWithSlash = endpoint.url;
+                    if (!urlWithSlash.endsWith("/")) urlWithSlash += "/";
+                    if (endpoint.methodsString.includes(event.request.method) && (path.startsWith(urlWithSlash) || path == url))  {
+                        idx = i;
+                        break;
+                    }
+                } else {
+                    let url = endpoint.url;
+                    if (endpoint.methodsString.includes(event.request.method) && (path == url))  {
+                        idx = i;
+                        break;
+                    }
+                }
+            }
+
+            if (idx != undefined) return await this.bff(event, opts);
+            else {
+                throw new CrossauthError(ErrorCode.Unauthorized, "Illegal BFF URL called " + event.url.toString());
+            }
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: ce});
+            CrossauthLogger.logger.error({cerr: ce});
+            return json({
+                error: ce.oauthErrorCode,
+                error_description: ce.message,
+            }, {status: ce.httpStatus});
+        }
+
+    }
+
+    private tokenPayload(token : string, oauthData : {[key:string]:any}) : {[key:string]:any}|undefined {
+        let isHave = false;
+        if (token.startsWith("have_")) {
+            isHave = true;
+            token = token.substring(5)
+        }
+        if (!(token in oauthData)) {
+            return isHave ? {ok: false} : undefined;
+        }
+        const payload = decodePayload(oauthData[token]);
+        return isHave ? {ok: true} : payload;
+    }
+
+    async tokens(event : RequestEvent, token: string|string[]) : Promise<Response> {
+        try {
+            if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
+            if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
+
+            if (!this.tokenEndpoints || this.tokenEndpoints.length == 0)
+                throw new CrossauthError(ErrorCode.Unauthorized, "No tokens have been made available");
+
+            let tokens = Array.isArray(token) ? token : [token];
+
+            const oauthData = 
+                await this.server.sessionServer.getSessionData(event, 
+                    "oauth");
+            if (!oauthData) {
+                throw new CrossauthError(ErrorCode.Unauthorized, "No access token found");
+            }
+            let tokensReturning : {
+                access_token?: {[key:string]:any},
+                have_access_token?: {[key:string]:any},
+                refresh_token?: {[key:string]:any},
+                have_refresh_token?: {[key:string]:any},
+                id_token?: {[key:string]:any},
+                have_id_token?: {[key:string]:any},
+            } = {};
+            let lastTokenPayload : ({[key:string]:any}|undefined) = undefined;
+            for (let t of tokens) {
+                if (!this.tokenEndpoints.includes(t)) throw new CrossauthError(ErrorCode.Unauthorized, "Token type " + t + " may not be returned");
+                let payload = this.tokenPayload(t, oauthData);
+                // @ts-ignore because t is a string
+                if (payload) tokensReturning[t] = payload;
+                lastTokenPayload = payload;
+            }
+            if (!Array.isArray(token)) {
+                if (!lastTokenPayload) {
+                    if (token.startsWith("have_")) return json({ok: false});
+                    else return new Response(null, {status: 204});
+                }
+                return json(lastTokenPayload);
+            } else {
+                return json(tokensReturning);
+            }
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: ce});
+            CrossauthLogger.logger.error({cerr: ce});
+            return json({
+                error: ce.oauthErrorCode,
+                error_description: ce.message,
+            }, {status: ce.httpStatus});
+        }
+
+    }
+
     ////////////////////////////////////////////////////////////////
     // Endpoints
 
@@ -917,7 +1293,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
 
         load: async (event : RequestEvent) : Promise<AuthorizationCodeFlowReturn> => {
-            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
                 return {
                     success: false,
@@ -1020,13 +1396,13 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 return json({ 
                     error: ce.oauthErrorCode, 
                     error_description: ce.message
-                });
+                }, {status: ce.httpStatus});
 
             }
         },
 
         load: async (event : RequestEvent) : Promise<AuthorizationCodeFlowReturn> => {
-            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use get not load");
                 return {
                     success: false,
@@ -1125,7 +1501,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         event,
                         ce);
                 }
-                return await this.receiveTokenFn(resp, this, event);
+                return await this.receiveTokenFn(resp, this, event, false);
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1140,7 +1516,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
 
         load: async (event : RequestEvent) : Promise<RedirectUriReturn> => {
-            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use get not load");
                 return {
                     success: false,
@@ -1192,7 +1568,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         error_description: ce.message,
                     }
                 }
-                const receiveTokenResp = await this.receiveTokenFn(resp, this, event);
+                const receiveTokenResp = await this.receiveTokenFn(resp, this, event, false);
                 if (receiveTokenResp instanceof Response) return {
                     success: false,
                     error: "server_error",
@@ -1264,7 +1640,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         event,
                         ce);
                 }
-                return await this.receiveTokenFn(resp, this, event);
+                return await this.receiveTokenFn(resp, this, event, false);
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1280,7 +1656,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
         actions: {
             default: async ( event : RequestEvent ) => {
-                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                     const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
                     throw ce;
                 }
@@ -1311,7 +1687,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                             resp.error_description);
                         throw ce;
                     }
-                    return await this.receiveTokenFn(resp, this, event) ?? {};
+                    return await this.receiveTokenFn(resp, this, event, false) ?? {};
     
                 } catch (e) {
                     if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1392,7 +1768,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const resp = 
                     await this.refreshTokenFlow(refreshToken);
             
-                const resp2 = await this.receiveTokenFn(resp, this, event) ;
+                const resp2 = await this.receiveTokenFn(resp, this, event, false) ;
                 if (resp && resp2 instanceof Response) return resp2;
                 throw new CrossauthError(ErrorCode.UnknownError, "Receive token function did not return a Response");
 
@@ -1410,7 +1786,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
         actions: {
             default: async ( event : RequestEvent ) => {
-                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                     const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
                     throw ce;
                 }
@@ -1467,7 +1843,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const resp = 
                         await this.refreshTokenFlow(refreshToken);
 
-                    const resp2 = await this.receiveTokenFn(resp, this, event) ?? {};
+                    const resp2 = await this.receiveTokenFn(resp, this, event, false) ?? {};
                     if (resp2 instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Refresh token flow should return an object not Response");
                     return resp2;
 
@@ -1488,128 +1864,148 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     
             }        
         }
+    
     };
 
-    readonly passwordFlowEndpoint = {
+    readonly refreshTokensIfExpiredEndpoint = {
 
         post: async (event : RequestEvent) => {
             if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
                 return this.errorFn(this.server, event, ce);
             }
-            let formData : {[key:string]:string}|undefined = undefined;
-            try {
-
-                if (!(this.validFlows.includes(OAuthFlows.Password) ||
-                    this.validFlows.includes(OAuthFlows.PasswordMfa))) {
-                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Password flow is not supported");
-                    return this.errorFn(this.server, event, ce);
-                }
-                var data = new JsonOrFormData();
-                await data.loadData(event);
-                formData = data.toObject();
-
-                if (!event.locals.user && 
-                    (this.loginProtectedFlows.includes(OAuthFlows.Password) ||
-                    this.loginProtectedFlows.includes(OAuthFlows.PasswordMfa))) {
-                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use password flow");
-
-                    return this.errorFn(this.server, event, ce);
-                }    
-
-                // if the session server and CSRF protection enabled, require a valid CSRF token
-                if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
-                    try {
-                        const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                        if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
-                   }
-                   catch (e) {
-                        const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
-                        return this.errorFn(this.server, event, ce);
-                   }
-    
-                }
-
-                const resp = 
-                    await this.passwordPost(event, formData);
-                if (!resp) throw new CrossauthError(ErrorCode.UnknownError, "Password flow returned no data");
-                const resp2 = await this.receiveTokenFn(resp, this, event) ;
-                if (resp && resp2 instanceof Response) return resp2;
-                throw new CrossauthError(ErrorCode.UnknownError, "Receive token function did not return a Response");
-
-            } catch (e) {
-                if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
-                if (SvelteKitServer.isSvelteKitError(e)) throw e;
-                const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.debug({err: e});
-                CrossauthLogger.logger.error({cerr: e});
-                //throw this.error(ce.httpStatus, ce.message);
-                return this.errorFn(this.server, event, ce);
-
-            }
+            return this.refreshTokens(event, "post", true);
         },
 
         actions: {
             default: async ( event : RequestEvent ) => {
-                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson") {
+                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                     const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
                     throw ce;
                 }
+                return this.refreshTokens(event, "page", true);
 
-                let formData : {[key:string]:string}|undefined = undefined;
-                try {
+            }
+        },
     
-                    if (!(this.validFlows.includes(OAuthFlows.RefreshToken))) {
-                        const ce = new CrossauthError(ErrorCode.Unauthorized, "Refresh token flow is not supported");
-                        return this.errorFn(this.server, event, ce);
-                    }
-                    var data = new JsonOrFormData();
-                    await data.loadData(event);
-                    formData = data.toObject();
-    
-                    if (!event.locals.user && 
-                        (this.loginProtectedFlows.includes(OAuthFlows.RefreshToken))) {
-                        const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token");
-                        throw ce;
-                    }    
-                    
-                    // if the session server and CSRF protection enabled, require a valid CSRF token
-                    if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
-                        try {
-                            const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                            if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
-                        }
-                        catch (e) {
-                            const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
-                            throw ce;
-                        }
+    };
+
+    readonly autoRefreshTokensIfExpiredEndpoint = {
+
+        post: async (event : RequestEvent) => {
+            if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
+                const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
+                return this.errorFn(this.server, event, ce);
+            }
+            return this.refreshTokens(event, "silent", true);
+        },
+    };
+
+    readonly autoRefreshTokensEndpoint = {
+
+        post: async (event : RequestEvent) => {
+            if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
+                const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
+                return this.errorFn(this.server, event, ce);
+            }
+            return this.refreshTokens(event, "silent", false);
+        },
+    };
+
+
+    readonly passwordFlowEndpoint = {
+
+        post: async (event : RequestEvent) => 
+            await this.passwordFlow_post(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordPost(e, formData)),
         
-                    }
 
-                    const resp = 
-                        await this.passwordPost(event, formData);
-                    if (!resp) throw new CrossauthError(ErrorCode.UnknownError, "Password flow returned no data");
+        actions: {
+            password: async ( event : RequestEvent ) => 
+                await this.passwordFlow_action(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordPost(e, formData)),
+            
+            passwordOtp: async ( event : RequestEvent ) => 
+                await this.passwordFlow_action(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordOtp(e, formData)),
 
-                    const resp2 = await this.receiveTokenFn(resp, this, event) ?? {};
-                    if (resp2 instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Refresh token flow should return an object not Response");
-                    return resp2;
-                    
-                } catch (e) {
-                    if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
-                    if (SvelteKitServer.isSvelteKitError(e)) throw e;
-                    const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.debug({err: e});
-                    CrossauthLogger.logger.error({cerr: e});
-                    //throw this.error(ce.httpStatus, ce.message);
-                    return { 
-                        success: false,
-                        error: ce.oauthErrorCode, 
-                        error_description: ce.message
-                    };
-    
-                }
-    
-            }        
+            passwordOob: async ( event : RequestEvent ) => 
+                await this.passwordFlow_action(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordOob(e, formData)),
+
         }
     };
+
+    readonly passwordOtpEndpoint = {
+
+        post: async (event : RequestEvent) => 
+            await this.passwordFlow_post(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordOtp(e, formData)),
+        
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.passwordFlow_action(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordOtp(e, formData)),
+        }
+    };
+
+    readonly passwordOobEndpoint = {
+
+        post: async (event : RequestEvent) => 
+            await this.passwordFlow_post(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordOob(e, formData)),
+        
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.passwordFlow_action(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordOob(e, formData)),
+        }
+    };
+
+    readonly bffEndpoint = {
+
+        post: async (event : RequestEvent) => await this.bff(event),
+        get: async (event : RequestEvent) => await this.bff(event),
+        put: async (event : RequestEvent) => await this.bff(event),
+        head: async (event : RequestEvent) => await this.bff(event),
+        options: async (event : RequestEvent) => await this.bff(event),
+        delete: async (event : RequestEvent) => await this.bff(event),
+        patch: async (event : RequestEvent) => await this.bff(event),
+        
+        
+    };
+
+    readonly allBffEndpoint = {
+
+        post: async (event : RequestEvent) => await this.allBff(event),
+        get: async (event : RequestEvent) => await this.allBff(event),
+        put: async (event : RequestEvent) => await this.allBff(event),
+        head: async (event : RequestEvent) => await this.allBff(event),
+        options: async (event : RequestEvent) => await this.allBff(event),
+        delete: async (event : RequestEvent) => await this.allBff(event),
+        patch: async (event : RequestEvent) => await this.allBff(event),
+        
+        
+    };
+
+    readonly accessTokenEndpoint = {
+        get: async (event : RequestEvent) => await this.tokens(event, "access_token"),
+    }
+
+    readonly haveAccessTokenEndpoint = {
+        get: async (event : RequestEvent) => await this.tokens(event, "have_access_token"),
+    }
+
+    readonly refreshTokenEndpoint = {
+        get: async (event : RequestEvent) => await this.tokens(event, "refresh_token"),
+    }
+
+    readonly haveRefreshTokenEndpoint = {
+        get: async (event : RequestEvent) => await this.tokens(event, "have_refresh_token"),
+    }
+
+    readonly idTokenEndpoint = {
+        get: async (event : RequestEvent) => await this.tokens(event, "id_token"),
+    }
+
+    readonly haveIdTokenEndpoint = {
+        get: async (event : RequestEvent) => await this.tokens(event, "have_id_token"),
+    }
+
+    readonly tokensEndpoint = {
+        get: async (event : RequestEvent) => await this.tokens(event, this.tokenEndpoints),
+    }
+
 }

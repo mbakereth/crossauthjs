@@ -187,7 +187,7 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
      * See {@link FastifyOAuthClient} class documentation for full description.
      */
     tokenEndpoints? : ("access_token"|"refresh_token"|"id_token"|
-        "have_access_token"|"have_refresh"|"have_id")[],
+        "have_access_token"|"have_refresh_token"|"have_id_token")[],
 }
 
 
