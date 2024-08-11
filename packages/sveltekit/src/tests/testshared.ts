@@ -3,6 +3,9 @@ import { MockResolver, MockRequestEvent } from './sveltemocks';
 import { SvelteKitServer } from '../sveltekitserver';
 import { OAuthAuthorizationServer } from '@crossauth/backend';
 import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
+import { type OpenIdConfiguration } from '@crossauth/common';
+import createFetchMock from 'vitest-fetch-mock';
+
 import {
     InMemoryKeyStorage,
     InMemoryUserStorage,
@@ -20,6 +23,24 @@ import {
 import fs from 'node:fs';
 
 import type { Handle } from '@sveltejs/kit';
+
+export const oidcConfiguration : OpenIdConfiguration = {
+    issuer: "http://server.com",
+    authorization_endpoint: "http://server.com/authorize",
+    token_endpoint: "http://server.com/token",
+    token_endpoint_auth_methods_supported: ["client_secret_post"],
+    jwks_uri: "http://server.com/jwks",
+    response_types_supported: ["code"],
+    response_modes_supported: ["query"],
+    grant_types_supported: ["authorization_code", "client_credentials", "password", "refresh_token", "http://auth0.com/oauth/grant-type/mfa-otp", "http://auth0.com/oauth/grant-type/mfa-oob"],
+    token_endpoint_auth_signing_alg_values_supported: ["RS256"],
+    subject_types_supported: ["public"],
+    id_token_signing_alg_values_supported: ["RS256"],
+    claims_supported: ["iss", "sub", "aud", "jti", "iat", "type"],
+    request_uri_parameter_supported: true,
+    require_request_uri_registration: true,
+}
+
 
 export async function createUsers(userStorage: InMemoryUserStorage) {
     let authenticator = new LocalPasswordAuthenticator(userStorage, {pbkdf2Iterations: 1_000});
@@ -347,4 +368,56 @@ export async function getAccessToken() {
             code: code, 
             clientSecret: "DEF"});
     return {authServer, client, code, clientStorage, access_token, error, error_description, refresh_token, expires_in};
+};
+
+export const fetchMocker = createFetchMock(vi);
+
+export async function oauthLogin () {
+    const {server, keyStorage, userStorage} = await makeServer(true, false, false, true, {tokenResponseType: "saveInSessionAndReturn", enableCsrfProtection: false});
+    const {authServer} = await getAccessToken();
+
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    // @ts-ignore
+    //fetchMocker.mockResponseOnce((request) => {return JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())})});
+    fetchMocker.mockResponseOnce(async (request) => {
+        // call token with password flow
+        const body = JSON.parse(request.body?.toString() ?? "{}");
+        const firstTokenResponse = await authServer.tokenEndpoint({
+            grantType: body.grant_type, 
+            clientId : body.client_id, 
+            scope : body.scope, 
+            clientSecret : body.client_secret,
+            username: body.username,
+            password: body.password,
+        });
+        return new Response(JSON.stringify(firstTokenResponse), {headers: {"content-type": "application/json"}});
+    });
+
+    // password flow post endpoint
+    let postRequest = new Request(`http://server.com/passwordFlowFlow`, {
+        method: "POST",
+        body: JSON.stringify({
+            scope: "read write",
+            username: "bob",
+            password: "bobPass123",
+         }),
+         headers: {"content-type": "application/json"},
+    });
+    let event = new MockRequestEvent("1", postRequest, {});
+    if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
+    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    expect(resp.status).toBe(200);
+    const body = await resp.json();
+    expect(body.success).toBe(true);
+    expect(body.access_token).toBeDefined();
+    expect(body.refresh_token).toBeDefined();
+    const access_token = body.access_token;
+    const refresh_token = body.refresh_token;
+
+    let sessionCookieValue = event.cookies.get("SESSIONID");
+    let sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
+
+
+    return {server, authServer, sessionCookieValue, sessionId, access_token, refresh_token, keyStorage, userStorage};
 };

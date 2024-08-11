@@ -85,7 +85,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
         super(tokenConsumers, options);
 
         setParameter("errorBody", ParamType.Json, this, options, "OAUTH_RESSERVER_ACCESS_DENIED_BODY");
-        this.userStorage = this.userStorage;
+        this.userStorage = options.userStorage;
 
         if (options.protectedEndpoints) {
             const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;
@@ -214,14 +214,16 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
             if (header && header.startsWith("Bearer ")) {
                 const parts = header.split(" ");
                 if (parts.length == 2) {
+                    let user : User|undefined = undefined;
                     const resp = await this.accessTokenAuthorized(parts[1]);
                     if (resp) {
                         if (resp.sub && this.userStorage) {
-                            const {user} = 
+                            const userResp =
                                 await this.userStorage.getUserByUsername(resp.sub);
+                            if (userResp) user = userResp.user;
                             request.user = user;
                         }
-                                return {authorized: true, tokenPayload: resp};
+                        return {authorized: true, tokenPayload: resp, user: user};
                     } else {
                         return {authorized: false};
                     }

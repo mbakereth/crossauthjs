@@ -87,7 +87,7 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
         super(tokenConsumers, options);
 
         setParameter("errorBody", ParamType.Json, this, options, "OAUTH_RESSERVER_ACCESS_DENIED_BODY");
-        this.userStorage = this.userStorage;
+        this.userStorage = options.userStorage;
 
         if (options.protectedEndpoints) {
             const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;
@@ -213,12 +213,15 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
      * If there is no bearer token, returns `undefinerd`.  If there is a
      * bearer token and it is a valid access token, returns the token
      * payload.  If there was an error, returns it in OAuth form.
-     * @param request the Fastify request
-     * @returns an objuect with the following fiekds
+     * 
+     * @param event the SvelteKit request event
+     * @returns an object with the following fiekds
      *   - `authorized` : `true` or `false`
      *   - `tokenPayload` : the token payload if the token is valid
      *   - `error` : if the token is not valid
      *   - `error_description` : if the token is not valid
+     *   - `user` set if `sub` is defined in the token, a userStorage has
+     *     been defined and it matches
      */
     async authorized(event : RequestEvent) : Promise<{
         authorized: boolean, 
@@ -226,29 +229,32 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
         user? : User,
         error? : string, 
         error_description?: string}|undefined> {
+
         try {
             const header = event.request.headers.get("authorization");
             if (header && header.startsWith("Bearer ")) {
                 const parts = header.split(" ");
                 if (parts.length == 2) {
+                    let user : User|undefined = undefined;
                     const resp = await this.accessTokenAuthorized(parts[1]);
                     if (resp) {
                         if (resp.sub && this.userStorage) {
-                            const {user} = 
+                            const userResp = 
                                 await this.userStorage.getUserByUsername(resp.sub);
-                            event.locals.user = user;
+                            if (userResp) user = userResp.user;
                         }
-                                return {authorized: true, tokenPayload: resp};
+                        return {authorized: true, tokenPayload: resp, user: user};
                     } else {
                         return {authorized: false};
                     }
                 }
-
             }    
         } catch (e) {
             const ce = e as CrossauthError;
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.error(j({cerr: ce}));
+            event.locals.authError = "server_error";
+            event.locals.authErrorDescription = ce.message;
             return {authorized: false, error: "server_error", error_description: ce.message};
         }
         return undefined;
