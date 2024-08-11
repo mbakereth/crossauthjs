@@ -48,6 +48,9 @@ export type {
 
 } from './sveltekitoauthclient';
 
+export { SvelteKitOAuthResourceServer } from './sveltekitresserver';
+export type { SvelteKitOAuthResourceServerOptions } from './sveltekitresserver';
+
 declare global {
     namespace App {
             // interface Error {}
