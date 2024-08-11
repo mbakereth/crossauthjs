@@ -1,7 +1,6 @@
 import { MockRequestEvent } from './sveltemocks';
 import { SvelteKitOAuthResourceServer } from '../sveltekitresserver';
-import { type OpenIdConfiguration } from '@crossauth/common';
-import {  makeServer, getAccessToken, oauthLogin, oidcConfiguration, fetchMocker } from './testshared';
+import { oauthLogin, oidcConfiguration, fetchMocker } from './testshared';
 import { OAuthTokenConsumer } from '@crossauth/backend';
 
 fetchMocker.enableMocks();
