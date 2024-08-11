@@ -2,6 +2,7 @@ import { minimatch } from 'minimatch';
 import {
     KeyStorage,
     UserStorage,
+    OAuthClientStorage,
     SessionManager,
     Authenticator,
     Crypto,
@@ -10,13 +11,14 @@ import {
     toCookieSerializeOptions } from '@crossauth/backend';
 import type { Cookie, SessionManagerOptions } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus } from '@crossauth/common';
-import type { Key, User, UserInputFields } from '@crossauth/common';
+import type { Key, User, UserInputFields, OAuthClient } from '@crossauth/common';
 import { UserState } from '@crossauth/common';
 import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
 import { SvelteKitAdminEndpoints} from './sveltekitadminendpoints';
+import { SvelteKitUserClientEndpoints} from './sveltekituserclientendpoints';
 
 import { SvelteKitServer } from './sveltekitserver'
 
@@ -36,6 +38,11 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * If enabling user login, must provide the user storage
      */
     userStorage? : UserStorage,
+
+    /**
+     * If enabling client endpoints, must provide the client storage
+     */
+    clientStorage? : OAuthClientStorage,
 
     /**
      * Factor 1 and 2 authenticators.
@@ -241,14 +248,25 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
 
     /**
      * Admin pages provide functionality for searching for users.  By
-     * default the search string must exactly match a username or
-     * email address (depending on the storage, after normalizing
+     * default the search string must exactly match the client name
+     * (after normalizing
      * and lowercasing).  Override this behaviour with this function
      * @param searchTerm the search term 
      * @param userStorage the user storage to search
      * @returns array of matching users
      */
     userSearchFn? : (searchTerm : string, userStorage : UserStorage, skip? : number, take? : number) => Promise<User[]>;
+
+    /**
+     * Admin pages provide functionality for searching for OAuth clients.  By
+     * default the search string must exactly match the clientName exactly.  
+     * Override this behaviour with this function
+     * @param searchTerm the search term 
+     * @param clientStorage the client storage to search
+     * @returns array of matching users
+     */
+    clientSearchFn? : 
+        (searchTerm : string, clientStorage : OAuthClientStorage, skip: number, take: number, userId? : string|number|null) => Promise<OAuthClient[]>;
 
     /** Pass the Sveltekit redirect function */
     redirect? : any,
@@ -372,6 +390,12 @@ export class SvelteKitSessionServer {
     readonly userStorage? : UserStorage;
 
     /**
+     * User storage taken from constructor args.
+     * See {@link SvelteKitSessionServer.constructor}.
+     */
+    readonly clientStorage? : OAuthClientStorage;
+
+    /**
      * Funtion to validate users upon creation.  Taken from the options during 
      * construction or the default value.
      * See {@link FastifySessionServerOptions}.
@@ -458,12 +482,22 @@ export class SvelteKitSessionServer {
 
     /**
      * Use these to access the `load` and `action` endpoints for functions
-     * provides by Crossauth.  These are the ones intended for users to 
+     * provided by Crossauth.  These are the ones intended for users to 
      * have access to.
      * 
      * See {@link SvelteKitUserEndpoints}
      */
     readonly userEndpoints : SvelteKitUserEndpoints;
+
+    /**
+     * Use these to access the `load` and `action` endpoints for functions
+     * provided by Crossauth that relate to manipulating OAuth clients in the
+     * database.  These are the ones intended for users to 
+     * have access to.
+     * 
+     * See {@link SvelteKitUserEndpoints}
+     */
+    readonly userClientEndpoints : SvelteKitUserClientEndpoints;
 
     /**
      * Use these to access the `load` and `action` endpoints for functions
@@ -486,7 +520,6 @@ export class SvelteKitSessionServer {
 
     /**
      * Constructor
-     * @param userStorage where users are stored
      * @param keyStorage where session IDs, email verification and reset tokens are stored
      * @param authenticators valid authenticators that can be in `factor1` or `factor2`
      *    of the user.  See class documentation for {@link SvelteKitServer} for an example.
@@ -496,6 +529,7 @@ export class SvelteKitSessionServer {
 
         this.keyStorage = keyStorage;
         this.userStorage = options.userStorage;
+        this.clientStorage = options.clientStorage;
         this.authenticators = authenticators;
         this.sessionManager = new SessionManager(keyStorage, authenticators, options);
 
@@ -544,6 +578,7 @@ export class SvelteKitSessionServer {
 
         this.userEndpoints = new SvelteKitUserEndpoints(this, options);
         this.adminEndpoints = new SvelteKitAdminEndpoints(this, options);
+        this.userClientEndpoints = new SvelteKitUserClientEndpoints(this, options);
 
         this.sessionHook = async ({ event}/*, response*/) => {
             CrossauthLogger.logger.debug("Session hook");

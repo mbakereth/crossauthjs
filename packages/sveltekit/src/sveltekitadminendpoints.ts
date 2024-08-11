@@ -235,6 +235,8 @@ export class SvelteKitAdminEndpoints {
 
         try {
 
+        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
+
         // can only call this if logged in as admin
         if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) {
             this.sessionServer.error(401);
@@ -350,6 +352,8 @@ export class SvelteKitAdminEndpoints {
 
         let formData : {[key:string]:string}|undefined = undefined;
         try {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
+
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
@@ -563,6 +567,8 @@ export class SvelteKitAdminEndpoints {
 
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         try {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
+
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
@@ -677,6 +683,7 @@ export class SvelteKitAdminEndpoints {
      */
         async deleteUser(event : RequestEvent) : Promise<AdminDeleteUserReturn> {
             CrossauthLogger.logger.debug(j({msg:"deleteUser"}));
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             try {
     
                 const userId = event.params.id;
@@ -738,6 +745,7 @@ export class SvelteKitAdminEndpoints {
 
         }
         try {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             const resp = await this.sessionServer.userStorage.getUserById(userId);
             return {user: resp.user};
         } catch (e) {

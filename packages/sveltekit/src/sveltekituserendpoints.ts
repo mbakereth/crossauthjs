@@ -12,6 +12,9 @@ import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@cross
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 
+//////////////////////////////////////////////////////////////////////
+// Return types
+
 /**
  * Return type for {@link SvelteKitUserEndpoints.login},
  * {@link SvelteKitUserEndpoints.loginFactor2} and the
@@ -201,6 +204,9 @@ export type UpdateUserReturn = {
     emailVerificationNeeded: boolean,
     success: boolean
 };
+
+//////////////////////////////////////////////////////////////////////
+// Class
 
 /**
  * Provides endpoints for users to login, logout and maintain their 
@@ -612,6 +618,7 @@ export class SvelteKitUserEndpoints {
 
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         try {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
@@ -802,6 +809,7 @@ export class SvelteKitUserEndpoints {
     async verifyEmail(event : RequestEvent) : Promise<VerifyEmailReturn> {
         try {
 
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             const token = event.params.token;
             if (!token) throw new CrossauthError(ErrorCode.InvalidToken, "Invalid email verification token");
 
@@ -1259,6 +1267,7 @@ export class SvelteKitUserEndpoints {
         CrossauthLogger.logger.debug(j({msg:"changePassword"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
@@ -1393,6 +1402,8 @@ export class SvelteKitUserEndpoints {
         CrossauthLogger.logger.debug(j({msg:"deleteUser"}));
         try {
 
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
+
             // throw an error if the CSRF token is invalid
             if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
@@ -1450,6 +1461,8 @@ export class SvelteKitUserEndpoints {
         CrossauthLogger.logger.debug(j({msg:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
+
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
@@ -1532,6 +1545,8 @@ export class SvelteKitUserEndpoints {
         CrossauthLogger.logger.debug(j({msg:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
+
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
@@ -1648,6 +1663,8 @@ export class SvelteKitUserEndpoints {
         CrossauthLogger.logger.debug(j({msg:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
+            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
+
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);

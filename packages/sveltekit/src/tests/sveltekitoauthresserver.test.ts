@@ -1,8 +1,10 @@
 import { MockRequestEvent } from './sveltemocks';
 import { SvelteKitOAuthResourceServer } from '../sveltekitresserver';
-import { oauthLogin, oidcConfiguration, fetchMocker } from './testshared';
+import {  oidcConfiguration, makeServer, getAccessToken } from './testshared';
 import { OAuthTokenConsumer } from '@crossauth/backend';
+import createFetchMock from 'vitest-fetch-mock';
 
+let fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
 
 beforeAll(async () => {
@@ -12,6 +14,56 @@ beforeAll(async () => {
 afterEach(async () => {
     vi.restoreAllMocks();
 });
+
+export async function oauthLogin () {
+    const {server, keyStorage, userStorage} = await makeServer(true, false, false, true, {tokenResponseType: "saveInSessionAndReturn", enableCsrfProtection: false});
+    const {authServer} = await getAccessToken();
+
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    // @ts-ignore
+    //fetchMocker.mockResponseOnce((request) => {return JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())})});
+    fetchMocker.mockResponseOnce(async (request) => {
+        // call token with password flow
+        const body = JSON.parse(request.body?.toString() ?? "{}");
+        const firstTokenResponse = await authServer.tokenEndpoint({
+            grantType: body.grant_type, 
+            clientId : body.client_id, 
+            scope : body.scope, 
+            clientSecret : body.client_secret,
+            username: body.username,
+            password: body.password,
+        });
+        return new Response(JSON.stringify(firstTokenResponse), {headers: {"content-type": "application/json"}});
+    });
+
+    // password flow post endpoint
+    let postRequest = new Request(`http://server.com/passwordFlowFlow`, {
+        method: "POST",
+        body: JSON.stringify({
+            scope: "read write",
+            username: "bob",
+            password: "bobPass123",
+         }),
+         headers: {"content-type": "application/json"},
+    });
+    let event = new MockRequestEvent("1", postRequest, {});
+    if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
+    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    expect(resp.status).toBe(200);
+    const body = await resp.json();
+    expect(body.success).toBe(true);
+    expect(body.access_token).toBeDefined();
+    expect(body.refresh_token).toBeDefined();
+    const access_token = body.access_token;
+    const refresh_token = body.refresh_token;
+
+    let sessionCookieValue = event.cookies.get("SESSIONID");
+    let sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
+
+
+    return {server, authServer, sessionCookieValue, sessionId, access_token, refresh_token, keyStorage, userStorage};
+};
 
 test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_authorized', async () => {
     // login using password flow

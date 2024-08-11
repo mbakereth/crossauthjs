@@ -3,8 +3,7 @@ import { MockResolver, MockRequestEvent } from './sveltemocks';
 import { SvelteKitServer } from '../sveltekitserver';
 import { OAuthAuthorizationServer } from '@crossauth/backend';
 import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
-import { type OpenIdConfiguration } from '@crossauth/common';
-import createFetchMock from 'vitest-fetch-mock';
+import { type OpenIdConfiguration, type OAuthClient } from '@crossauth/common';
 
 import {
     InMemoryKeyStorage,
@@ -88,7 +87,7 @@ export async function createClients(clientStorage : InMemoryOAuthClientStorage, 
         iterations: 1000,
         keyLen: 32,
     });
-    const client = {
+    let client : OAuthClient = {
         clientId : "ABC",
         clientSecret: secretRequired ? clientSecret : undefined,
         clientName: "Test",
@@ -96,8 +95,21 @@ export async function createClients(clientStorage : InMemoryOAuthClientStorage, 
         redirectUri: ["http://example.com/redirect"],
         validFlow: OAuthFlows.allFlows(),
     };
+    const retClient = client;
     await clientStorage.createClient(client);
-    return client;
+
+    client = {
+        clientId : "bob_ABC",
+        clientSecret: secretRequired ? clientSecret : undefined,
+        clientName: "Test",
+        confidential: secretRequired,
+        redirectUri: ["http://example.com/redirect"],
+        validFlow: OAuthFlows.allFlows(),
+        userId: "bob",
+    };
+    await clientStorage.createClient(client);
+
+    return retClient;
 }
 
 function redirect(status : number, location : string) {
@@ -120,6 +132,7 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
     let emailAuthenticator = new EmailAuthenticator();
 
     await createUsers(userStorage);
+    await createClients(clientStorage);
     let session = makeSession ? {
         keyStorage: keyStorage,
         options:  {
@@ -154,6 +167,7 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
         oAuthClient : oAuthClient,
         options: {
             userStorage, 
+            clientStorage,
             authenticators: {
                 localpassword: authenticator,
                 dummyFactor2: dummyFactor2Authenticator,
@@ -198,6 +212,20 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
 }
 
 export function getCookies(resp : Response) {
+    let cookies : {[key:string]:string} = {};
+    for (let pair of resp.headers) {
+        if (pair[0] == "set-cookie") {
+            const parts = pair[1].split("=", 2);
+            const semiColon = parts[1].indexOf(";");
+            if (semiColon > -1) {
+                const value = parts[1].substring(0, semiColon).trim();
+                if (value.length > 0) cookies[parts[0]] = value;
+            } else {
+                cookies[parts[0]] = parts[1];
+            }
+        }
+    }
+    /*
     const cookieHeaders = resp.headers.getSetCookie();
     let cookies : {[key:string]:string} = {};
     for (let cookie of cookieHeaders) {
@@ -209,7 +237,7 @@ export function getCookies(resp : Response) {
         } else {
             cookies[parts[0]] = parts[1];
         }
-    }
+    }*/
     return cookies;
 }
 
@@ -240,7 +268,6 @@ export async function getCsrfToken(server : SvelteKitServer, resolver : MockReso
 
 export async function login(server : SvelteKitServer, resolver : MockResolver, handle : Handle, user : string="bob", password : string="bobPass123") {
     const {csrfToken, csrfCookieValue} = await getCsrfToken(server, resolver, handle);
-
     const postRequest = new Request("http://ex.com/test", {
         method: "POST",
         body: "csrfToken="+csrfToken+"&username=" + user + "&password=" + password,
@@ -370,54 +397,4 @@ export async function getAccessToken() {
     return {authServer, client, code, clientStorage, access_token, error, error_description, refresh_token, expires_in};
 };
 
-export const fetchMocker = createFetchMock(vi);
 
-export async function oauthLogin () {
-    const {server, keyStorage, userStorage} = await makeServer(true, false, false, true, {tokenResponseType: "saveInSessionAndReturn", enableCsrfProtection: false});
-    const {authServer} = await getAccessToken();
-
-    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
-
-    // @ts-ignore
-    //fetchMocker.mockResponseOnce((request) => {return JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())})});
-    fetchMocker.mockResponseOnce(async (request) => {
-        // call token with password flow
-        const body = JSON.parse(request.body?.toString() ?? "{}");
-        const firstTokenResponse = await authServer.tokenEndpoint({
-            grantType: body.grant_type, 
-            clientId : body.client_id, 
-            scope : body.scope, 
-            clientSecret : body.client_secret,
-            username: body.username,
-            password: body.password,
-        });
-        return new Response(JSON.stringify(firstTokenResponse), {headers: {"content-type": "application/json"}});
-    });
-
-    // password flow post endpoint
-    let postRequest = new Request(`http://server.com/passwordFlowFlow`, {
-        method: "POST",
-        body: JSON.stringify({
-            scope: "read write",
-            username: "bob",
-            password: "bobPass123",
-         }),
-         headers: {"content-type": "application/json"},
-    });
-    let event = new MockRequestEvent("1", postRequest, {});
-    if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
-    expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.success).toBe(true);
-    expect(body.access_token).toBeDefined();
-    expect(body.refresh_token).toBeDefined();
-    const access_token = body.access_token;
-    const refresh_token = body.refresh_token;
-
-    let sessionCookieValue = event.cookies.get("SESSIONID");
-    let sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
-
-
-    return {server, authServer, sessionCookieValue, sessionId, access_token, refresh_token, keyStorage, userStorage};
-};
