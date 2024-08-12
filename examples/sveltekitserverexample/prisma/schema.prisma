@@ -25,6 +25,9 @@ model User {
     session             Key[]
     apiKey              ApiKey[]
     secrets             UserSecrets?
+    // delete the following two lines if you are not adding OAuth tables below
+    authorization       OAuthAuthorization[]
+    oauthClients        OAuthClient[]
 
     @@index([id])
     @@index([username])
@@ -66,3 +69,63 @@ model ApiKey {
     @@index([user_id])
     @@unique([user_id, name], name: "userIdName")
 }
+
+/////////////////////
+// These tables are only needed if you want endpoints to add and remove
+// OAuth clients
+
+model OAuthClient {
+    clientId       String                    @id @unique
+    confidential   Boolean                   @default(true)
+    clientName     String
+    clientSecret   String?
+    user_id        Int?
+
+    redirectUri    OAuthClientRedirectUri[]
+    validFlow      OAuthClientValidFlow[]
+    authorization  OAuthAuthorization[]
+    user           User?     @relation(references: [id], fields: [user_id], onDelete: Cascade)
+
+    @@index([clientId])
+    @@index([user_id])
+}
+
+model OAuthClientRedirectUri {
+    id             Int         @id @unique @default(autoincrement())
+    client_id      String 
+    uri            String
+
+    client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
+
+    @@index([id])
+    @@index([client_id])
+    @@unique([client_id, uri], name: "redirectUriUnique")
+    //@@unique([redirect_uri], name: "redirectUriUnique") // use this to ensure only one client has any given redirect uri
+}
+
+model OAuthClientValidFlow {
+    id             Int         @id @unique @default(autoincrement())
+    client_id      String 
+    flow           String
+
+    client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
+
+    @@index([id])
+    @@index([client_id])
+    @@unique([client_id, flow], name: "flowUnique")
+}
+
+
+model OAuthAuthorization {
+    id             Int           @id @unique @default(autoincrement())
+    client_id      String    
+    user_id        Int?
+    user           User?         @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    Client         OAuthClient?  @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
+    scope          String?
+
+    @@index([id])
+    @@index([client_id, user_id])
+    @@unique([client_id, user_id, scope], name: "clientUserScope")
+}
+

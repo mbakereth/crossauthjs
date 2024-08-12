@@ -19,6 +19,7 @@ import { JsonOrFormData } from './utils';
 import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
 import { SvelteKitAdminEndpoints} from './sveltekitadminendpoints';
 import { SvelteKitUserClientEndpoints} from './sveltekituserclientendpoints';
+import { SvelteKitAdminClientEndpoints} from './sveltekitadminclientendpoints';
 
 import { SvelteKitServer } from './sveltekitserver'
 
@@ -501,6 +502,16 @@ export class SvelteKitSessionServer {
 
     /**
      * Use these to access the `load` and `action` endpoints for functions
+     * provided by Crossauth that relate to manipulating OAuth clients in the
+     * database as admin.  These are the ones intended for users to 
+     * have access to.
+     * 
+     * See {@link SvelteKitAdminEndpoints}
+     */
+    readonly adminClientEndpoints : SvelteKitAdminClientEndpoints;
+
+    /**
+     * Use these to access the `load` and `action` endpoints for functions
      * provides by Crossauth.  These are the ones intended for admins to 
      * have access to.
      * 
@@ -576,9 +587,11 @@ export class SvelteKitSessionServer {
         if (options.addToSession) this.addToSession = options.addToSession;
         if (options.validateSession) this.validateSession = options.validateSession;
 
+
         this.userEndpoints = new SvelteKitUserEndpoints(this, options);
         this.adminEndpoints = new SvelteKitAdminEndpoints(this, options);
         this.userClientEndpoints = new SvelteKitUserClientEndpoints(this, options);
+        this.adminClientEndpoints = new SvelteKitAdminClientEndpoints(this, options);
 
         this.sessionHook = async ({ event}/*, response*/) => {
             CrossauthLogger.logger.debug("Session hook");

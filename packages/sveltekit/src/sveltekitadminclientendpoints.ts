@@ -14,11 +14,10 @@ import { JsonOrFormData } from './utils';
 import type { SearchClientsReturn } from './sveltekitsharedclientendpoints';
 import { SvelteKitSharedClientEndpoints, defaultClientSearchFn } from './sveltekitsharedclientendpoints';
 
-
 //////////////////////////////////////////////////////////////////////
 // Class
 
-export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints {
+export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoints {
 
     constructor(sessionServer : SvelteKitSessionServer,
         options : SvelteKitSessionServerOptions
@@ -55,6 +54,8 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
      * @param search overrides the search term from the query.
      * @param skip overrides the skip term from the query
      * @param take overrides the take term from the query
+     * @param userId if given, only clients for this user will be returned.
+     *        otherwise all clients will be returned
      * 
      * @return an object with the following members:
      *   - `success` true or false depending on whether there was an error
@@ -70,26 +71,16 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
      *   - `hasPrevious` whether there are more results before the ones that
      *      were returned.
      */
-    async searchClients(event : RequestEvent, searchTerm? : string, skip? : number, take? : number)
+    async searchClients(event : RequestEvent, searchTerm? : string, skip? : number, take? : number, userId? : number|string)
         : Promise<SearchClientsReturn> {
 
-        if (!event.locals.user) 
-            throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
-        return this.searchClients_internal(event, searchTerm, skip, take, event.locals.user?.id)
+        if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+            throw this.error(401, "Unauthorized");
+        
+        return this.searchClients_internal(event, searchTerm, skip, take, userId)
 
     }
 
     /////////////////////////////////////////////////////////////////
     // Endpoints
-
-    readonly searchClientsEndpoint = {
-        load: async ( event: RequestEvent ) => {
-            const resp = await this.searchClients(event);
-            delete resp?.exception;
-            return {
-                ...this.baseEndpoint(event),
-                ...resp,
-            };
-        },
-    };
 };

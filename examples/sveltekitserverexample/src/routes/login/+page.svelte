@@ -19,12 +19,12 @@
 <h1>Login</h1>
 
 {#if form?.factor2Required}
-    <form method="POST" action="/login?/factor2">
+    <form method="POST" action="?/factor2">
         <Totp data={data} error={form?.error}/>
     </form>
 {:else}
 
-    <form method="POST" action="/login?/login">
+    <form method="POST" action="?/login">
         <input type="hidden" name="csrfToken" value={data.csrfToken} />
         <input type="hidden" name="next" value={data.next ?? "/"} />
         {#if form?.error} 

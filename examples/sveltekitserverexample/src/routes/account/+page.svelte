@@ -10,4 +10,5 @@
 
 <p><a href="/updateuser">Update your account</a></p>
 <p><a href="/deleteuser">Delete your account</a></p>
+<p><a href="/oauth/clients">OAuth Clients</a></p>
 <p><a href="/">Home</a></p>

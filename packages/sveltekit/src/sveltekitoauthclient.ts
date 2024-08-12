@@ -26,7 +26,7 @@ export type SvelteKitErrorFn = (server: SvelteKitServer,
 // OPTIONS
 
 /**
- * Options for {@link FastifyOAuthClient}.
+ * Options for {@link SvelteKitOAuthClient}.
  */
 export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 

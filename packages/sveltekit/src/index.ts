@@ -51,6 +51,11 @@ export type {
 export { SvelteKitOAuthResourceServer } from './sveltekitresserver';
 export type { SvelteKitOAuthResourceServerOptions } from './sveltekitresserver';
 
+export { SvelteKitSharedClientEndpoints, defaultClientSearchFn } from './sveltekitsharedclientendpoints';
+export type { SearchClientsReturn } from './sveltekitsharedclientendpoints';
+export { SvelteKitUserClientEndpoints } from './sveltekituserclientendpoints';
+export { SvelteKitAdminClientEndpoints } from './sveltekitadminclientendpoints';
+
 declare global {
     namespace App {
             // interface Error {}

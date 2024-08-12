@@ -221,7 +221,7 @@ export class PrismaUserStorage extends UserStorage {
                     data: userData,
                 });
             } else {
-                await this.prismaClient.$transaction(async (tx) =>{
+                await this.prismaClient.$transaction(async (tx: any) =>{
 
                     let existingSecrets : {[key:string]:any} = {}
                     try {
@@ -404,7 +404,7 @@ export class PrismaUserStorage extends UserStorage {
  */
 export interface PrismaKeyStorageOptions {
     keyTable? : string,
-    prismaClient? : any; // PrismaClient,
+    prismaClient? : PrismaClient,
     transactionTimeout? : number,
 }
 
@@ -696,7 +696,7 @@ export class PrismaKeyStorage extends KeyStorage {
     async updateData(keyName : string, dataName: string, value: any|undefined) : Promise<void> {
         try {
 
-            await this.prismaClient.$transaction(async (tx) =>{
+            await this.prismaClient.$transaction(async (tx: any) =>{
                 const key = await this.getKeyWithTransaction(keyName, tx);
                 let data : {[key:string] : any};
                 if (!key.data || key.data == "") {
@@ -743,7 +743,7 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
     redirectUriTable? : string,
 
     /** A Prisma client to use.  If not provided, one will be created */
-    prismaClient? : PrismaClient,
+    prismaClient? : any; // PrismaClient,
 
     /** In milliseconds.. Default 5000 */
     transactionTimeout? : number,
@@ -776,7 +776,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private clientTable : string = "oAuthClient";
     private redirectUriTable : string = "OAuthClientRedirectUri";
     private validFlowTable : string = "OAuthClientValidFlow";
-    private prismaClient : PrismaClient;
+    private prismaClient : any;// PrismaClient;
     private transactionTimeout = 5_000;
     private updateMode = "DeleteAndInsert";
 
@@ -865,7 +865,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
      */
     async createClient(client : OAuthClient) : Promise<OAuthClient> {
         try {
-            return this.prismaClient.$transaction(async (tx) => {
+            return this.prismaClient.$transaction(async (tx: any) => {
                 return await this.createClientWithTransaction(client, tx);
             }, {timeout: this.transactionTimeout});
         } catch (e) {
@@ -997,7 +997,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     async deleteClient(clientId : string) : Promise<void> {
         try {
             //return await this.updateClientWithTransaction(client, this.prismaClient);
-                return this.prismaClient.$transaction(async (tx) => {
+                return this.prismaClient.$transaction(async (tx: any) => {
             return await this.deleteClientWithTransaction(clientId, tx);
         }, {timeout: this.transactionTimeout});
         } catch (e) {
@@ -1032,7 +1032,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     async updateClient(client : Partial<OAuthClient>) : Promise<void> {
         try {
             //return await this.updateClientWithTransaction(client, this.prismaClient);
-                return this.prismaClient.$transaction(async (tx) => {
+                return this.prismaClient.$transaction(async (tx:any) => {
             return this.updateMode == "Update" ? 
                  await this.updateClientWithTransaction_update(client, tx) :
                  await this.updateClientWithTransaction_deleteAndInsert(client, tx);
@@ -1229,7 +1229,7 @@ export interface PrismaOAuthAuthorizationStorageOptions extends OAuthClientStora
     authorizationTable? : string,
 
     /** A Prisma client to use.  If not provided, one will be created */
-    prismaClient? : PrismaClient,
+    prismaClient? : any; // PrismaClient,
 
     transactionTimeout? : number,
 }
@@ -1240,7 +1240,7 @@ export interface PrismaOAuthAuthorizationStorageOptions extends OAuthClientStora
  */
 export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
     private authorizationTable : string = "oAuthAuthorization";
-    private prismaClient : PrismaClient;
+    private prismaClient : any;// PrismaClient;
     private transactionTimeout : number = 5_000;
 
     /**
@@ -1280,7 +1280,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
     }
 
     async updateAuthorizations(clientId : string, userId : string|number|undefined, scopes : string[]) : Promise<void> {
-        return this.prismaClient.$transaction(async (tx) => {
+        return this.prismaClient.$transaction(async (tx:any) => {
             return await this.updateAuthorizationsWithTransaction(clientId, userId, scopes, tx);
         }, {timeout: this.transactionTimeout});
     }
