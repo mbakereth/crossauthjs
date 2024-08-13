@@ -137,6 +137,29 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
     }
 
+    async emptyClient(event : RequestEvent)
+        : Promise<UpdateClientPageData> {
+
+        if (!event.locals.user) 
+            throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
+
+
+        return this.emptyClient_internal(event, false)
+
+    }
+
+    async createClient(event : RequestEvent)
+        : Promise<UpdateClientFormData> {
+
+        if (!event.locals.user) 
+            throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
+
+
+        return this.createClient_internal(event, false)
+
+    }
+
+
     /////////////////////////////////////////////////////////////////
     // Endpoints
 
@@ -168,4 +191,23 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
             }
         }
     };
+
+    readonly createClientEndpoint = {
+        load: async ( event: RequestEvent ) => {
+            const resp = await this.emptyClient(event);
+            delete resp?.exception;
+            return {
+                ...this.baseEndpoint(event),
+                ...resp,
+            };
+        },
+        actions: {
+            default: async (event : RequestEvent) => {
+                let resp = await this.createClient(event);
+                delete resp?.exception;
+                return resp;
+            }
+        }
+    };
+
 };

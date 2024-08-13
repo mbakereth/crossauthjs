@@ -89,7 +89,7 @@ export class JsonOrFormData {
         const val = this.get(param);
         if (val == undefined) return undefined;
         const l = val.toLowerCase();
-        return l == "t" || l == "true" || l == "1" || l == "y" || l == "yes";
+        return l == "t" || l == "true" || l == "1" || l == "y" || l == "yes" || l == "on";
     }
 
     getAsNumber(param : string) : number|undefined {

@@ -43,6 +43,7 @@ export type UpdateClientPageData = {
     success: boolean,
     client?: OAuthClient,
     clientId?: string;
+    clientUsername? : string,
     error? : string,
     exception?: CrossauthError,
     validFlows: string[],
@@ -62,6 +63,36 @@ export type UpdateClientFormData = {
     exception?: CrossauthError,
     formData?: {[key:string]:string},
     plaintextSecret? : string,
+};
+
+/**
+ * Return type for {@link SvelteKitUserClientEndpoints.updateClient}
+ *  {@link SvelteKitAdminClientEndpoints.updateClient} load.
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export type CreateClientPageData = {
+    success: boolean,
+    clientUserId? : string|number,
+    clientUsername? : string,
+    error? : string,
+    exception?: CrossauthError,
+    validFlows: string[],
+    validFlowNames: {[key:string]:string},
+};
+
+/**
+ * Return type for {@link SvelteKitUserClientEndpoints.updateClient}
+ *  {@link SvelteKitAdminClientEndpoints.updateClient} actions.
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export type CreateClientFormData = {
+    success : boolean,
+    client?: OAuthClient,
+    error? : string,
+    exception?: CrossauthError,
+    formData?: {[key:string]:string},
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -275,13 +306,15 @@ export class SvelteKitSharedClientEndpoints {
             if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
             if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
             const client = await this.clientStorage.getClientById(clientId);
-
+            const userResp  = client.userId == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(client.userId);
+            const clientUsername = userResp?.user?.username;
             return {
                 success: true,
                 client: client,
                 validFlows: this.validFlows,
                 validFlowNames: this.validFlowNames,
                 clientId,
+                clientUsername,
             }
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
@@ -346,10 +379,15 @@ export class SvelteKitSharedClientEndpoints {
         
         const clientUpdate : Partial<OAuthClient> = {}
         clientUpdate.clientName = formData.clientName;
-        clientUpdate.confidential = formData.confidential == "true";
+        clientUpdate.confidential = data.getAsBoolean("confidential") ?? false;
         clientUpdate.validFlow = validFlows;
         clientUpdate.redirectUri = redirectUris;
         if (isAdmin) {
+            let userId : string|number|undefined = formData.userId ?? undefined;
+            if (userId && this.sessionServer?.userStorage) {
+                const {user} = await this.sessionServer?.userStorage.getUserById(userId);
+                userId = user.id;
+            }
             clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
 
         }
@@ -364,13 +402,152 @@ export class SvelteKitSharedClientEndpoints {
             client: newClient,
             formData: formData,
             //plaintextSecret: resetSecret ? formData.clientSecret : undefined,
-            plaintextSecret: newSecret ? formData.clientSecret : undefined,
+            plaintextSecret: newSecret && newClient.clientSecret ? newClient.clientSecret : undefined,
 
         }
 
         } catch (e) {
-            // hack - let Sveltekit redirect through
-            if (typeof e == "object" && e != null && "status" in e && "location" in e) throw e
+            if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                formData,
+            }
+        } 
+    }
+
+    protected async emptyClient_internal(event : RequestEvent, isAdmin : boolean) : Promise<CreateClientPageData> {
+        try {
+            // get client user id and username
+
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+
+            let clientUserId : string|number|undefined = undefined;
+            if (isAdmin) {
+                const clientUserIdString = event.url.searchParams.get("userid");
+                if (clientUserIdString && this.sessionServer?.userStorage) {
+                    const {user} = await this.sessionServer?.userStorage.getUserById(clientUserIdString);
+                    clientUserId = user.id;
+                }
+    
+                const formClientUserId = data.get("userId");
+                if (formClientUserId  && this.sessionServer?.userStorage) {
+                        const {user} = await this.sessionServer?.userStorage.getUserById(formClientUserId);
+                        clientUserId = user.id;
+                }
+                    
+            } else {
+                if (!event.locals.user) throw new CrossauthError(ErrorCode.Unauthorized)
+                clientUserId = event.locals.user.id;
+            }
+
+            if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
+            const userResp  = clientUserId == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(clientUserId);
+            const clientUsername = userResp?.user?.username;
+
+            return {
+                success: true,
+                validFlows: this.validFlows,
+                validFlowNames: this.validFlowNames,
+                clientUserId,
+                clientUsername,
+            }
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                validFlows: this.validFlows,
+                validFlowNames: this.validFlowNames,
+            }
+        }
+    }
+
+    protected async createClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<CreateClientFormData> {
+        
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+
+            // get client user id 
+            let clientUserId : string|number|undefined = undefined;
+            if (isAdmin) {
+                const clientUserIdString = data.get("userId");
+                if (clientUserIdString  && this.sessionServer?.userStorage) {
+                    const {user} = await this.sessionServer?.userStorage.getUserById(clientUserIdString);
+                    clientUserId = user.id;
+                }
+            } else {
+                if (!event.locals.user) throw new CrossauthError(ErrorCode.Unauthorized)
+                    clientUserId = event.locals.user.id;
+            }
+
+            if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
+            if (clientUserId) await this.sessionServer?.userStorage?.getUserById(clientUserId); // just to make it throw an exception if user doesn't exist
+
+            // throw an error if the CSRF token is invalid
+            if (this.sessionServer.enableCsrfProtection && event.locals.authType == "cookie" && !event.locals.csrfToken) {
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+            }
+
+            const redirectUris = formData.redirectUris.trim().length == 0 ? 
+                [] : formData.redirectUris.trim().split(/,?[ \t\n]+/);
+
+            // validate redirect uris
+            let redirectUriErrors : string[] = [];
+            for (let uri of redirectUris) {
+                try {
+                    OAuthClientManager.validateUri(uri);
+                }
+                catch (e) {
+                    CrossauthLogger.logger.error(j({err: e}));
+                    redirectUriErrors.push("["+uri+"]");
+                }
+            }
+            if (redirectUriErrors.length > 0) {
+                throw new CrossauthError(ErrorCode.BadRequest, 
+                    "The following redirect URIs are invalid: " 
+                        + redirectUriErrors.join(" "));
+            }
+
+            // get flows from booleans in body
+            let validFlows = [];
+            for (let flow of this.validFlows) {
+                if (flow in formData)
+                validFlows.push(flow);
+            }
+            
+            const clientUpdate : Partial<OAuthClient> = {}
+            clientUpdate.clientName = formData.clientName;
+            clientUpdate.confidential = data.getAsBoolean("confidential")
+            clientUpdate.validFlow = validFlows;
+            clientUpdate.redirectUri = redirectUris;
+            if (isAdmin) {
+                clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
+            }
+            
+            const newClient = 
+                await this.clientManager.createClient(formData.clientName,
+                    redirectUris,
+                    validFlows,
+                    data.getAsBoolean("confidential") ?? false,
+                    clientUserId );
+            return {
+                success: true,
+                client: newClient,
+                formData: formData,
+            }
+
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
             return {
                 error: ce.message,

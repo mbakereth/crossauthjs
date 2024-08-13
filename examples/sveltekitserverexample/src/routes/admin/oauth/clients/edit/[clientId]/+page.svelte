@@ -12,5 +12,5 @@
 </svelte:head>
 <h1>Update OAuth Client</h1>
 
-<EditClient isAdmin={false} data={data} form={form} />
+<EditClient isAdmin={true} data={data} form={form} back={".."}/>
 

@@ -866,7 +866,7 @@ export class FastifyAdminClientEndpoints {
         }
 
         // get flows from booleans in body
-        let validFlows = [];
+        /*let validFlows = [];
         if (request.body[OAuthFlows.AuthorizationCode]) validFlows.push(OAuthFlows.AuthorizationCode);
         if (request.body[OAuthFlows.AuthorizationCodeWithPKCE]) validFlows.push(OAuthFlows.AuthorizationCodeWithPKCE);
         if (request.body[OAuthFlows.ClientCredentials]) validFlows.push(OAuthFlows.ClientCredentials);
@@ -874,7 +874,14 @@ export class FastifyAdminClientEndpoints {
         if (request.body[OAuthFlows.DeviceCode]) validFlows.push(OAuthFlows.DeviceCode);
         if (request.body[OAuthFlows.Password]) validFlows.push(OAuthFlows.Password);
         if (request.body[OAuthFlows.PasswordMfa]) validFlows.push(OAuthFlows.PasswordMfa);
-        if (request.body[OAuthFlows.OidcAuthorizationCode]) validFlows.push(OAuthFlows.OidcAuthorizationCode);
+        if (request.body[OAuthFlows.OidcAuthorizationCode]) validFlows.push(OAuthFlows.OidcAuthorizationCode);*/
+        // get flows from booleans in body
+        let validFlows = [];
+        for (let flow of this.validFlows) {
+            if (flow in request.body)
+                validFlows.push(flow);
+            }
+        
 
         const client = 
             await this.clientManager.createClient(clientName,

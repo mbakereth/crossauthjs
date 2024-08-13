@@ -99,6 +99,25 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
 
     }
 
+    async emptyClient(event : RequestEvent)
+    : Promise<UpdateClientPageData> {
+
+    if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+        throw this.error(401, "Unauthorized");
+    return this.emptyClient_internal(event, true)
+
+}
+
+async createClient(event : RequestEvent)
+    : Promise<UpdateClientFormData> {
+
+    if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+        throw this.error(401, "Unauthorized");
+    return this.updateClient_internal(event, true)
+
+}
+
+
     /////////////////////////////////////////////////////////////////
     // Endpoints
 
@@ -136,4 +155,23 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
             }
         }
     };
+
+    readonly createClientEndpoint = {
+        load: async ( event: RequestEvent ) => {
+            const resp = await this.emptyClient(event);
+            delete resp?.exception;
+            return {
+                ...this.baseEndpoint(event),
+                ...resp,
+            };
+        },
+        actions: {
+            default: async (event : RequestEvent) => {
+                let resp = await this.createClient(event);
+                delete resp.exception;
+                return resp;
+            }
+        }
+    };
+
 };
