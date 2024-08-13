@@ -5,10 +5,11 @@ import {
     toCookieSerializeOptions,     
     setParameter,
     ParamType,
+    OAuthClientManager,
  } from '@crossauth/backend';
 import type { AuthenticationParameters, OAuthClientStorage } from '@crossauth/backend';
 import type { User, UserInputFields, OAuthClient } from '@crossauth/common';
-import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, ErrorCode, OAuthFlows } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 
@@ -111,6 +112,9 @@ export class SvelteKitSharedClientEndpoints {
         defaultClientSearchFn;
     protected redirect : any;
     protected error: any;
+    protected validFlows : {name: string, friendlyName: string}[];
+    protected clientManager : OAuthClientManager;
+    protected clientStorage? : OAuthClientStorage;
 
     constructor(sessionServer : SvelteKitSessionServer,
         options : SvelteKitSessionServerOptions
@@ -120,6 +124,17 @@ export class SvelteKitSharedClientEndpoints {
         if (options.clientSearchFn) this.clientSearchFn = options.clientSearchFn;
         this.redirect = options.redirect;
         this.error = options.error;
+
+        let tmp : {validFlows: string[]} = {validFlows: ["all"]};
+        setParameter("validFlows", ParamType.JsonArray, tmp, options, "OAUTH_VALID_FLOWS");
+        if (tmp.validFlows.length == 1 &&
+            tmp.validFlows[0] == OAuthFlows.All) {
+                tmp.validFlows = OAuthFlows.allFlows();
+        }
+        this.validFlows = tmp.validFlows.map((x) => {return {name: x, friendlyName: OAuthFlows.flowName[x]}});
+        this.clientManager = new OAuthClientManager(options);
+        this.clientStorage = options.clientStorage;
+
     }
 
     ///////////////////////////////////////////////////////////////////
@@ -266,8 +281,8 @@ export class SvelteKitSharedClientEndpoints {
             throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
-        const redirectUris = request.body.redirectUris.trim().length == 0 ? 
-            [] : request.body.redirectUris.trim().split(/,?[ \t\n]+/);
+        const redirectUris = formData.redirectUris.trim().length == 0 ? 
+            [] : formData.redirectUris.trim().split(/,?[ \t\n]+/);
 
         // validate redirect uris
         let redirectUriErrors : string[] = [];
@@ -288,18 +303,22 @@ export class SvelteKitSharedClientEndpoints {
 
         // get flows from booleans in body
         let validFlows = [];
+        let validFlowKeys = [];
         for (let flow of this.validFlows) {
-            if (flow in request.body) validFlows.push(flow);
+            if (flow.name in formData)8
+             validFlows.push(flow);
+             validFlowKeys.push(flow.name);
         }
+        
 
         const clientUpdate : Partial<OAuthClient> = {}
-        clientUpdate.clientName = request.body.clientName;
-        clientUpdate.confidential = request.body.confidential == "true";
-        clientUpdate.validFlow = validFlows;
+        clientUpdate.clientName = formData.clientName;
+        clientUpdate.confidential = formData.confidential == "true";
+        clientUpdate.validFlow = validFlowKeys;
         clientUpdate.redirectUri = redirectUris;
-        clientUpdate.userId = request.body.userId;
+        clientUpdate.userId = formData.userId;
         if (clientUpdate.userId == undefined) clientUpdate.userId = null;
-        const resetSecret = request.body.resetSecret == "true";
+        const resetSecret = formData.resetSecret == "true";
         
         const {client, newSecret} = 
             await this.clientManager.updateClient(request.params.clientId,
