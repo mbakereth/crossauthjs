@@ -1,18 +1,16 @@
-import { SvelteKitServer, type SveltekitEndpoint } from './sveltekitserver';
 import { SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { 
-    toCookieSerializeOptions,     
     setParameter,
     ParamType,
  } from '@crossauth/backend';
-import type { AuthenticationParameters, OAuthClientStorage } from '@crossauth/backend';
-import type { User, UserInputFields, OAuthClient } from '@crossauth/common';
-import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
-import { JsonOrFormData } from './utils';
-import type { SearchClientsPageData } from './sveltekitsharedclientendpoints';
-import { SvelteKitSharedClientEndpoints, defaultClientSearchFn } from './sveltekitsharedclientendpoints';
+import type {
+    SearchClientsPageData,
+    UpdateClientPageData,
+    UpdateClientFormData 
+} from './sveltekitsharedclientendpoints';
+import { SvelteKitSharedClientEndpoints } from './sveltekitsharedclientendpoints';
 
 
 //////////////////////////////////////////////////////////////////////
@@ -79,6 +77,24 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
     }
 
+    async loadClient(event : RequestEvent)
+        : Promise<UpdateClientPageData> {
+
+        if (!event.locals.user) 
+            throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
+        return this.loadClient_internal(event)
+
+    }
+
+    async updateClient(event : RequestEvent)
+        : Promise<UpdateClientFormData> {
+
+        if (!event.locals.user) 
+            throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
+        return this.updateClient_internal(event)
+
+    }
+
     /////////////////////////////////////////////////////////////////
     // Endpoints
 
@@ -91,5 +107,21 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
                 ...resp,
             };
         },
+    };
+
+    readonly updateClientEndpoint = {
+        load: async ( event: RequestEvent ) => {
+            const resp = await this.loadClient(event);
+            delete resp?.exception;
+            return {
+                ...this.baseEndpoint(event),
+                ...resp,
+            };
+        },
+        actions: {
+            default: async (event : RequestEvent) => {
+                return await this.updateClient(event);
+            }
+        }
     };
 };

@@ -41,11 +41,12 @@ export type SearchClientsPageData = {
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
 export type EditClientPageData = {
-    sauccess: boolean,
+    success: boolean,
     client?: OAuthClient,
     error? : string,
     exception?: CrossauthError,
-    validFlows: ({name: string, friendlyName: string})[],
+    validFlows: string[],
+    validFlowNames: {[key:string]:string},
 };
 
 /**
@@ -54,11 +55,13 @@ export type EditClientPageData = {
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type EditClientPageAction = {
+export type EditClientFormData = {
     success : boolean,
+    client?: OAuthClient,
     error? : string,
     exception?: CrossauthError,
-    formData?: {[key:string]:string}
+    formData?: {[key:string]:string},
+    plaintextSecret? : string,
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -112,7 +115,8 @@ export class SvelteKitSharedClientEndpoints {
         defaultClientSearchFn;
     protected redirect : any;
     protected error: any;
-    protected validFlows : {name: string, friendlyName: string}[];
+    protected validFlows : string[] = ["all"];
+    protected validFlowNames : {[key:string]:string};
     protected clientManager : OAuthClientManager;
     protected clientStorage? : OAuthClientStorage;
 
@@ -125,13 +129,12 @@ export class SvelteKitSharedClientEndpoints {
         this.redirect = options.redirect;
         this.error = options.error;
 
-        let tmp : {validFlows: string[]} = {validFlows: ["all"]};
-        setParameter("validFlows", ParamType.JsonArray, tmp, options, "OAUTH_VALID_FLOWS");
-        if (tmp.validFlows.length == 1 &&
-            tmp.validFlows[0] == OAuthFlows.All) {
-                tmp.validFlows = OAuthFlows.allFlows();
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+        if (this.validFlows.length == 1 &&
+            this.validFlows[0] == OAuthFlows.All) {
+                this.validFlows = OAuthFlows.allFlows();
         }
-        this.validFlows = tmp.validFlows.map((x) => {return {name: x, friendlyName: OAuthFlows.flowName[x]}});
+        this.validFlowNames = OAuthFlows.flowNames(this.validFlows);
         this.clientManager = new OAuthClientManager(options);
         this.clientStorage = options.clientStorage;
 
@@ -266,7 +269,32 @@ export class SvelteKitSharedClientEndpoints {
 
     }
 
-    protected async updateClient_internal(event : RequestEvent) : Promise<EditClientPageData> {
+    protected async loadClient_internal(event : RequestEvent) : Promise<EditClientPageData> {
+        try {
+            const clientId = event.params.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
+            if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
+            const client = await this.clientStorage.getClientById(clientId);
+
+            return {
+                success: true,
+                client: client,
+                validFlows: this.validFlows,
+                validFlowNames: this.validFlowNames,
+            }
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                validFlows: this.validFlows,
+                validFlowNames: this.validFlowNames,
+            }
+        }
+    }
+
+    protected async editClient_internal(event : RequestEvent) : Promise<EditClientFormData> {
         
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -274,7 +302,6 @@ export class SvelteKitSharedClientEndpoints {
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
-            const username = data.get('username') ?? "";
 
         // throw an error if the CSRF token is invalid
         if (this.sessionServer.enableCsrfProtection && event.locals.authType == "cookie" && !event.locals.csrfToken) {
@@ -303,28 +330,32 @@ export class SvelteKitSharedClientEndpoints {
 
         // get flows from booleans in body
         let validFlows = [];
-        let validFlowKeys = [];
         for (let flow of this.validFlows) {
-            if (flow.name in formData)8
+            if (flow in formData)8
              validFlows.push(flow);
-             validFlowKeys.push(flow.name);
         }
         
-
         const clientUpdate : Partial<OAuthClient> = {}
         clientUpdate.clientName = formData.clientName;
         clientUpdate.confidential = formData.confidential == "true";
-        clientUpdate.validFlow = validFlowKeys;
+        clientUpdate.validFlow = validFlows;
         clientUpdate.redirectUri = redirectUris;
         clientUpdate.userId = formData.userId;
         if (clientUpdate.userId == undefined) clientUpdate.userId = null;
         const resetSecret = formData.resetSecret == "true";
         
         const {client, newSecret} = 
-            await this.clientManager.updateClient(request.params.clientId,
+            await this.clientManager.updateClient(formData.clientId,
                 clientUpdate,
                 resetSecret);
-        return successFn(reply, client, newSecret);
+        return {
+            success: true,
+            client: client,
+            formData: formData,
+            //plaintextSecret: resetSecret ? formData.clientSecret : undefined,
+            plaintextSecret: newSecret ? formData.clientSecret : undefined,
+
+        }
 
         } catch (e) {
             // hack - let Sveltekit redirect through

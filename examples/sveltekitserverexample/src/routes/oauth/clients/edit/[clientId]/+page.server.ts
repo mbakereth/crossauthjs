@@ -1,4 +1,4 @@
 import { crossauth } from '$lib/server/crossauthsession';
 
-export const load = crossauth.sessionServer?.adminEndpoints.updateUserEndpoint.load ?? crossauth.dummyLoad;
-export const actions = crossauth.sessionServer?.adminEndpoints.updateUserEndpoint.actions ?? crossauth.dummyActions;
+export const load = crossauth.sessionServer?.userClientEndpoints.updateClientEndpoint.load ?? crossauth.dummyLoad;
+export const actions = crossauth.sessionServer?.userClientEndpoints.updateClientEndpoint.actions ?? crossauth.dummyActions;

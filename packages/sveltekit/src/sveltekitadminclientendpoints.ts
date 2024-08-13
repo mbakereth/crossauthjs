@@ -1,18 +1,17 @@
-import { SvelteKitServer, type SveltekitEndpoint } from './sveltekitserver';
+import { SvelteKitServer } from './sveltekitserver';
 import { SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { 
-    toCookieSerializeOptions,     
     setParameter,
     ParamType,
  } from '@crossauth/backend';
-import type { AuthenticationParameters, OAuthClientStorage } from '@crossauth/backend';
-import type { User, UserInputFields, OAuthClient } from '@crossauth/common';
-import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
-import { JsonOrFormData } from './utils';
-import type { SearchClientsReturn } from './sveltekitsharedclientendpoints';
-import { SvelteKitSharedClientEndpoints, defaultClientSearchFn } from './sveltekitsharedclientendpoints';
+import { SvelteKitSharedClientEndpoints } from './sveltekitsharedclientendpoints';
+import type {
+    SearchClientsPageData,
+    UpdateClientPageData,
+    UpdateClientFormData 
+} from './sveltekitsharedclientendpoints';
 
 //////////////////////////////////////////////////////////////////////
 // Class
@@ -72,7 +71,7 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
      *      were returned.
      */
     async searchClients(event : RequestEvent, searchTerm? : string, skip? : number, take? : number, userId? : number|string)
-        : Promise<SearchClientsReturn> {
+        : Promise<SearchClientsPageData> {
 
         if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
             throw this.error(401, "Unauthorized");
@@ -81,6 +80,51 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
 
     }
 
+    async loadClient(event : RequestEvent)
+        : Promise<UpdateClientPageData> {
+
+        if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+            throw this.error(401, "Unauthorized");
+        return this.loadClient_internal(event)
+
+    }
+
+    async updateClient(event : RequestEvent)
+        : Promise<UpdateClientFormData> {
+
+        if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+            throw this.error(401, "Unauthorized");
+        return this.updateClient_internal(event)
+
+    }
+
     /////////////////////////////////////////////////////////////////
     // Endpoints
+
+    readonly searchClientsEndpoint = {
+        load: async ( event: RequestEvent ) => {
+            const resp = await this.searchClients(event);
+            delete resp?.exception;
+            return {
+                ...this.baseEndpoint(event),
+                ...resp,
+            };
+        },
+    };
+
+    readonly updateClientEndpoint = {
+        load: async ( event: RequestEvent ) => {
+            const resp = await this.loadClient(event);
+            delete resp?.exception;
+            return {
+                ...this.baseEndpoint(event),
+                ...resp,
+            };
+        },
+        actions: {
+            default: async (event : RequestEvent) => {
+                return await this.updateClient(event);
+            }
+        }
+    };
 };

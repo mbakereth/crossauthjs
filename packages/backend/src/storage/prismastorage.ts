@@ -404,7 +404,7 @@ export class PrismaUserStorage extends UserStorage {
  */
 export interface PrismaKeyStorageOptions {
     keyTable? : string,
-    prismaClient? : PrismaClient,
+    prismaClient? : any,
     transactionTimeout? : number,
 }
 
