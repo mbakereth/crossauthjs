@@ -35,12 +35,12 @@ export type SearchClientsPageData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.editClient}
- *  {@link SvelteKitAdminClientEndpoints.editClient} load.
+ * Return type for {@link SvelteKitUserClientEndpoints.updateClient}
+ *  {@link SvelteKitAdminClientEndpoints.updateClient} load.
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type EditClientPageData = {
+export type UpdateClientPageData = {
     success: boolean,
     client?: OAuthClient,
     error? : string,
@@ -50,12 +50,12 @@ export type EditClientPageData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.editClient}
- *  {@link SvelteKitAdminClientEndpoints.editClient} actions.
+ * Return type for {@link SvelteKitUserClientEndpoints.updateClient}
+ *  {@link SvelteKitAdminClientEndpoints.updateClient} actions.
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type EditClientFormData = {
+export type UpdateClientFormData = {
     success : boolean,
     client?: OAuthClient,
     error? : string,
@@ -269,7 +269,7 @@ export class SvelteKitSharedClientEndpoints {
 
     }
 
-    protected async loadClient_internal(event : RequestEvent) : Promise<EditClientPageData> {
+    protected async loadClient_internal(event : RequestEvent) : Promise<UpdateClientPageData> {
         try {
             const clientId = event.params.clientId;
             if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
@@ -294,7 +294,7 @@ export class SvelteKitSharedClientEndpoints {
         }
     }
 
-    protected async editClient_internal(event : RequestEvent) : Promise<EditClientFormData> {
+    protected async updateClient_internal(event : RequestEvent) : Promise<UpdateClientFormData> {
         
         let formData : {[key:string]:string}|undefined = undefined;
         try {
