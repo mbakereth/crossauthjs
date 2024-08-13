@@ -4,20 +4,10 @@
     export let form;
     export let isAdmin;
     console.log("Edit Client Data", data);
-    let redirectUri = form?.formData?.redirectUri ?? data?.client.redirectUri ?? data?.client?.redirectUri.join(" ") ?? "";
-    console.log("Redirect uri", redirectUri);   
-    let validFlows = form?.formData?.validFlow ?? data?.client.validFlow ?? [];
-    console.log("Valid flows", validFlows)
+    console.log("Edit Client Form", form);
+    let redirectUri = form?.formData?.redirectUri ?? data?.client?.redirectUri ?? data?.client?.redirectUri.join(" ") ?? "";
+    let validFlows = form?.formData?.validFlow ?? data?.client?.validFlow ?? [];
 </script>
-
-<svelte:head>
-    <title>Update Client</title>
-</svelte:head>
-<h1>Update OAuth Client
-    {#if isAdmin && data.client.user}
-        for { data.client.user?.username}
-    {/if}
-</h1>
 
 {#if form?.success}
     <p class="bg-success p-2 rounded text-slate-900">
@@ -44,8 +34,8 @@
                 {/if}
             </tr>
             <tr>
-                <th>Friendly Name</th>
-                <td>{form.client.friendlyName}</td>
+                <th>Client Name</th>
+                <td>{form.client.clientName}</td>
             </tr>
             <tr>
                 <th>Confidential</th>
@@ -56,21 +46,15 @@
                 <td>{form.plaintextSecret ?? "******"}</td>
             </tr>
             <tr>
-                <th>Friendly Name</th>
-                <td>
-                    {form.client.friendlyName}
-                </td>
-            </tr>
-            <tr>
                 <th>Redirect URIs</th>
                 <td>
-                    {data?.client.redirectUri?.join("<br>") ?? "None"}
+                    {form?.client.redirectUri?.join("<br>") ?? "None"}
                 </td>
             </tr>
             <tr>
                 <th>Valid Flows</th>
                 <td>
-                    {#each data?.client.validFlow as item }
+                    {#each form?.client.validFlow as item }
                         { data?.validFlowNames[item] }<br>
                     {/each}
                 </td>
@@ -80,7 +64,7 @@
         </table>
     </div>
     
-
+    <p><a href="..">Back to clients</a></p>
 {:else}
 
     <!-- edit the client -->
@@ -93,13 +77,16 @@
 
     <form method="POST">
 
+        <!-- user id - ignored if not an admin endpoint --> 
+        <input type="hidden" name="userId" value={data?.client.userId} />
+
         <!-- client id-->
         <div class="form-control">
             <label class="label" for="clientId">
             <span class="label-text">Client ID</span>
             </label>
             <label class="input-group">
-                <input readonly type="text" id="clientId" name="clientId" class="input input-bordered w-full max-w-xs mb-4" value="{data?.client.clientId}"/>
+                <input readonly type="text" id="clientId" name="clientId" class="input input-bordered w-full max-w-xs mb-4" value="{data?.clientId}"/>
             </label>
         </div>
 
@@ -115,13 +102,13 @@
             </div>
         {/if}
       
-        <!-- friendly name -->
+        <!-- client name -->
         <div class="form-control">
-            <label class="label" for="friendlyName">
-            <span class="label-text">Friendly Name</span>
+            <label class="label" for="clientName">
+            <span class="label-text">Client Name</span>
             </label>
             <label class="input-group">
-                <input type="email" id="friendlyName" name="friendlyName" class="input input-bordered w-full max-w-xs mb-4" placeholder="Client name" value={form?.formData?.friendlyName ?? data?.client?.clientName ?? ""}/><br>
+                <input type="text" id="clientName" name="clientName" class="input input-bordered w-full max-w-xs mb-4" placeholder="Client name" value={form?.formData?.clientName ?? data?.client?.clientName ?? ""}/><br>
             </label>
         </div>
         <input type="hidden" name="csrfToken" value={data.csrfToken} />
@@ -130,7 +117,7 @@
         <div class="form-control text-left">
             <label class="label cursor-pointer" for="confidential">
                 <span>
-                    <input type="checkbox" id="confidential" name="confidential" checked={form?.formData?.confidential ?? data?.client.confidential ?? false} class="checkbox align-middle" />
+                    <input type="checkbox" id="confidential" name="confidential" checked={form?.formData?.confidential ?? data?.client?.confidential ?? false} class="checkbox align-middle" />
                     <span class="align-middle ml-2 text-left">Confidential</span>
     
                 </span>
@@ -140,7 +127,7 @@
         <!-- client secret -->
         <div class="form-control">
             <label class="label" for="clientSecret">
-            <span class="label-text">Client ID</span>
+            <span class="label-text">Client Seceret</span>
             </label>
             <label class="input-group">
                 <input readonly type="text" id="clientId" name="clientId" class="input input-bordered w-full max-w-xs mb-4" value="******"/>
@@ -168,13 +155,16 @@
         {#each data?.validFlows as item }
             <div class="form-control">
                 <span class="align-text-bottom mb-2">
-                    <input type="checkbox" name={"flow_"+item} id={"flow_"+item} class="checkbox align-middle" value={item} checked={validFlows.includes(item)}/> 
+                    <input type="checkbox" name={item} id={item} class="checkbox align-middle" value={item} checked={validFlows.includes(item)}/> 
                     <span class="align-middle ml-2 text-sm">{ data?.validFlowNames[item] }
                     </span>
                 </span>
             </div>
         {/each}
-        
+
+        <button type="submit" class="btn btn-primary mt-4">Save</button>
+        &nbsp;<button type="button" class="btn btn-neutral mt-4"  on:click={() => goto("..")}>Cancel</button>&nbsp;
+
     </form>
 
 {/if}

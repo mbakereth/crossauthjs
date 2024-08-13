@@ -10,7 +10,7 @@
 <svelte:head>
     <title>Update Client</title>
 </svelte:head>
-<h1>Update OAuth Client
-</h1>
+<h1>Update OAuth Client</h1>
 
 <EditClient isAdmin={false} data={data} form={form} />
+

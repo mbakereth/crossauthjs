@@ -1,14 +1,13 @@
-import { SvelteKitServer, type SveltekitEndpoint } from './sveltekitserver';
+import { SvelteKitServer } from './sveltekitserver';
 import { SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { 
-    toCookieSerializeOptions,     
     setParameter,
     ParamType,
     OAuthClientManager,
  } from '@crossauth/backend';
-import type { AuthenticationParameters, OAuthClientStorage } from '@crossauth/backend';
-import type { User, UserInputFields, OAuthClient } from '@crossauth/common';
+import type {  OAuthClientStorage } from '@crossauth/backend';
+import type {  OAuthClient } from '@crossauth/common';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, OAuthFlows } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
@@ -43,6 +42,7 @@ export type SearchClientsPageData = {
 export type UpdateClientPageData = {
     success: boolean,
     client?: OAuthClient,
+    clientId?: string;
     error? : string,
     exception?: CrossauthError,
     validFlows: string[],
@@ -190,7 +190,7 @@ export class SvelteKitSharedClientEndpoints {
             // can only call this if logged in 
             if (!event.locals.user) 
                 throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
-
+            
             let clients : OAuthClient[] = [];
             let prevClients : OAuthClient[] = [];
             let nextClients : OAuthClient[] = [];
@@ -270,8 +270,8 @@ export class SvelteKitSharedClientEndpoints {
     }
 
     protected async loadClient_internal(event : RequestEvent) : Promise<UpdateClientPageData> {
+        const clientId = event.params.clientId;
         try {
-            const clientId = event.params.clientId;
             if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
             if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
             const client = await this.clientStorage.getClientById(clientId);
@@ -281,6 +281,7 @@ export class SvelteKitSharedClientEndpoints {
                 client: client,
                 validFlows: this.validFlows,
                 validFlowNames: this.validFlowNames,
+                clientId,
             }
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
@@ -290,18 +291,26 @@ export class SvelteKitSharedClientEndpoints {
                 success: false,
                 validFlows: this.validFlows,
                 validFlowNames: this.validFlowNames,
+                clientId,
             }
         }
     }
 
-    protected async updateClient_internal(event : RequestEvent) : Promise<UpdateClientFormData> {
+    protected async updateClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<UpdateClientFormData> {
         
         let formData : {[key:string]:string}|undefined = undefined;
         try {
+            const clientId = event.params.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
+
+            // get client
+            //const client = await this.clientStorage?.getClientById(clientId);
+            //if (!client) throw new CrossauthError(ErrorCode.InvalidClientId, "Client does not exist");
 
         // throw an error if the CSRF token is invalid
         if (this.sessionServer.enableCsrfProtection && event.locals.authType == "cookie" && !event.locals.csrfToken) {
@@ -331,7 +340,7 @@ export class SvelteKitSharedClientEndpoints {
         // get flows from booleans in body
         let validFlows = [];
         for (let flow of this.validFlows) {
-            if (flow in formData)8
+            if (flow in formData)
              validFlows.push(flow);
         }
         
@@ -340,17 +349,19 @@ export class SvelteKitSharedClientEndpoints {
         clientUpdate.confidential = formData.confidential == "true";
         clientUpdate.validFlow = validFlows;
         clientUpdate.redirectUri = redirectUris;
-        clientUpdate.userId = formData.userId;
-        if (clientUpdate.userId == undefined) clientUpdate.userId = null;
+        if (isAdmin) {
+            clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
+
+        }
         const resetSecret = formData.resetSecret == "true";
         
-        const {client, newSecret} = 
-            await this.clientManager.updateClient(formData.clientId,
+        const {client: newClient, newSecret} = 
+            await this.clientManager.updateClient(clientId,
                 clientUpdate,
                 resetSecret);
         return {
             success: true,
-            client: client,
+            client: newClient,
             formData: formData,
             //plaintextSecret: resetSecret ? formData.clientSecret : undefined,
             plaintextSecret: newSecret ? formData.clientSecret : undefined,

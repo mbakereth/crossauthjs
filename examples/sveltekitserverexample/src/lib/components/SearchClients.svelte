@@ -16,11 +16,6 @@
     }
 </script>
 
-<svelte:head>
-    <title>Clients</title>
-</svelte:head>
-<h1>Clients</h1>
-
 {#if data?.error} 
 <p class="bg-error p-2 rounded text-slate-900">{data?.error}</p>
 {/if}

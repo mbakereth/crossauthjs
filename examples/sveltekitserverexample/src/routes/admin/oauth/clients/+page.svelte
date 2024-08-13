@@ -12,4 +12,4 @@
 <h1>Clients</h1>
 
 <SearchClients data={data} isAdmin={false} />
-<p><a href="/account">My Account</a></p>
+<p><a href="..">Admin Page</a></p>

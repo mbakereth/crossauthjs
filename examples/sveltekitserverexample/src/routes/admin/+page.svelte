@@ -11,6 +11,7 @@
 <h4>Logged in as {data.user?.username}</h4>
 
 <p><a href="/admin/users">Users</a></p>
+<p><a href="/admin/oauth/clients">OAuth Clients</a></p>
 <p><a href="/">Home</a></p>
 
 <form method="POST" action="logout">

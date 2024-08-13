@@ -4,7 +4,8 @@ import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { 
     setParameter,
     ParamType,
- } from '@crossauth/backend';
+} from '@crossauth/backend';
+import { CrossauthLogger, j} from '@crossauth/common'
 import type { RequestEvent } from '@sveltejs/kit';
 import { SvelteKitSharedClientEndpoints } from './sveltekitsharedclientendpoints';
 import type {
@@ -94,7 +95,7 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
 
         if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
             throw this.error(401, "Unauthorized");
-        return this.updateClient_internal(event)
+        return this.updateClient_internal(event, true)
 
     }
 
@@ -103,7 +104,13 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
 
     readonly searchClientsEndpoint = {
         load: async ( event: RequestEvent ) => {
-            const resp = await this.searchClients(event);
+            let userId : number|undefined = undefined;
+                try {
+                    userId = event.url.searchParams.get("userid") ? Number(event.url.searchParams.get("userid")) : undefined;
+                } catch (e) {
+                    CrossauthLogger.logger.warn(j({msg: "Invalid userId " + event.url.searchParams.get("userid")}));
+                }
+            const resp = await this.searchClients(event, undefined, undefined, undefined, userId);
             delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
@@ -123,7 +130,9 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
         },
         actions: {
             default: async (event : RequestEvent) => {
-                return await this.updateClient(event);
+                let resp = await this.updateClient(event);
+                delete resp.exception;
+                return resp;
             }
         }
     };

@@ -1,3 +1,4 @@
+import { SvelteKitServer } from './sveltekitserver';
 import { SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { 
@@ -11,6 +12,7 @@ import type {
     UpdateClientFormData 
 } from './sveltekitsharedclientendpoints';
 import { SvelteKitSharedClientEndpoints } from './sveltekitsharedclientendpoints';
+import { CrossauthError, j, CrossauthLogger, ErrorCode } from '@crossauth/common';
 
 
 //////////////////////////////////////////////////////////////////////
@@ -82,6 +84,27 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
         if (!event.locals.user) 
             throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
+
+        // check user owns client
+        try {
+            const clientId = event.params.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client = await this.clientStorage?.getClientById(clientId);
+            if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: e}));
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+                validFlows: this.validFlows,
+                validFlowNames: this.validFlowNames,
+            }
+        }
+
         return this.loadClient_internal(event)
 
     }
@@ -91,7 +114,26 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
         if (!event.locals.user) 
             throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
-        return this.updateClient_internal(event)
+ 
+        // check user owns client
+        try {
+            const clientId = event.params.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client = await this.clientStorage?.getClientById(clientId);
+            if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: e}));
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+            }
+        }
+ 
+        return this.updateClient_internal(event, false)
 
     }
 
@@ -120,7 +162,9 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         },
         actions: {
             default: async (event : RequestEvent) => {
-                return await this.updateClient(event);
+                let resp = await this.updateClient(event);
+                delete resp?.exception;
+                return resp;
             }
         }
     };

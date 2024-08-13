@@ -86,6 +86,8 @@
             </div>
         {/each}
 
+        <p><a href={"/admin/oauth/clients?userid="+data.editUser.id}>OAuth Clients</a></p>
+        
         <button class="btn btn-primary" type="submit">Update Details</button>
         &nbsp;
         <button type="button" class="btn btn-neutral" on:click={()=>goto("/account")}>Cancel</button>
