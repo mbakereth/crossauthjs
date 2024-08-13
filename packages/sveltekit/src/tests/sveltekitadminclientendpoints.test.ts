@@ -10,7 +10,7 @@ test('SvelteKitAdminClientEndpoints.selectClients_user', async () => {
     const { server, resolver, handle, clientStorage } = await makeServer();
 
     // log in
-    let resp = await login(server, resolver, handle);
+    let resp = await login(server, resolver, handle, "admin", "adminPass123");
     let loginEvent = resp.event;
     loginEvent = resp.event;
 
@@ -44,7 +44,7 @@ test('SvelteKitAdminClientEndpoints.selectClients_all', async () => {
     const { server, resolver, handle, clientStorage } = await makeServer();
 
     // log in
-    let resp = await login(server, resolver, handle);
+    let resp = await login(server, resolver, handle, "admin", "adminPass123");
     let loginEvent = resp.event;
     loginEvent = resp.event;
 

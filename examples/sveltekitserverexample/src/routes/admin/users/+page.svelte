@@ -33,7 +33,7 @@
 <p class="bg-error p-2 rounded text-slate-900">{data?.error}</p>
 {/if}
 
-<form method="POST" action="?/login">
+<form method="GET">
     <input type="text" 
         id="search" 
         name="search" 
@@ -69,6 +69,8 @@
     </table>
 </div>
   
+<button type="button" class="btn btn-neutral mt-4" disabled={!data?.hasPrevious} on:click={() => goto("users?skip="+(skip+take)+"&take="+take+searchParam)}>Prev</button>&nbsp;
+<button type="button" class="btn btn-secondary mt-4" disabled={!data?.hasNext} on:click={() => goto("users?skip="+(skip-take)+"&take="+take+searchParam)}>Next</button>&nbsp;
 <button type="button" class="btn btn-secondary" on:click={() => goto("/admin/users/create")}>New User</button>
 
 <p><a href="/admin">Admin Home</a></p>

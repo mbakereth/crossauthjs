@@ -16,12 +16,12 @@ import { JsonOrFormData } from './utils';
 // Return types
 
 /**
- * Return type for {@link SvelteKitAdminEndpoints.searchUsers}
- * {@link SvelteKitAdminEndpoints.searchUsersEndpoint} action. 
+ * Return type for {@link SvelteKitUserClientEndpoints.searchClients}
+ *  {@link SvelteKitAdminClientEndpoints.searchClients} load.
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type SearchClientsReturn = {
+export type SearchClientsPageData = {
     success : boolean,
     clients?: OAuthClient[],
     skip : number,
@@ -31,6 +31,33 @@ export type SearchClientsReturn = {
     exception?: CrossauthError,
     hasPrevious : boolean,
     hasNext : boolean,
+};
+
+/**
+ * Return type for {@link SvelteKitUserClientEndpoints.editClient}
+ *  {@link SvelteKitAdminClientEndpoints.editClient} load.
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export type EditClientPageData = {
+    sauccess: boolean,
+    client?: OAuthClient,
+    error? : string,
+    exception?: CrossauthError,
+    validFlows: ({name: string, friendlyName: string})[],
+};
+
+/**
+ * Return type for {@link SvelteKitUserClientEndpoints.editClient}
+ *  {@link SvelteKitAdminClientEndpoints.editClient} actions.
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export type EditClientPageAction = {
+    success : boolean,
+    error? : string,
+    exception?: CrossauthError,
+    formData?: {[key:string]:string}
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -135,7 +162,7 @@ export class SvelteKitSharedClientEndpoints {
      *      were returned.
      */
     async searchClients_internal(event : RequestEvent, searchTerm? : string, skip? : number, take? : number, userId?: string|number)
-        : Promise<SearchClientsReturn> {
+        : Promise<SearchClientsPageData> {
 
         try {
 
@@ -222,6 +249,75 @@ export class SvelteKitSharedClientEndpoints {
             }
         }
 
+    }
+
+    protected async updateClient_internal(event : RequestEvent) : Promise<EditClientPageData> {
+        
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+            // get form data
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+            const username = data.get('username') ?? "";
+
+        // throw an error if the CSRF token is invalid
+        if (this.sessionServer.enableCsrfProtection && event.locals.authType == "cookie" && !event.locals.csrfToken) {
+            throw new CrossauthError(ErrorCode.InvalidCsrf);
+        }
+
+        const redirectUris = request.body.redirectUris.trim().length == 0 ? 
+            [] : request.body.redirectUris.trim().split(/,?[ \t\n]+/);
+
+        // validate redirect uris
+        let redirectUriErrors : string[] = [];
+        for (let uri of redirectUris) {
+            try {
+                OAuthClientManager.validateUri(uri);
+            }
+            catch (e) {
+                CrossauthLogger.logger.error(j({err: e}));
+                redirectUriErrors.push("["+uri+"]");
+            }
+        }
+        if (redirectUriErrors.length > 0) {
+            throw new CrossauthError(ErrorCode.BadRequest, 
+                "The following redirect URIs are invalid: " 
+                    + redirectUriErrors.join(" "));
+        }
+
+        // get flows from booleans in body
+        let validFlows = [];
+        for (let flow of this.validFlows) {
+            if (flow in request.body) validFlows.push(flow);
+        }
+
+        const clientUpdate : Partial<OAuthClient> = {}
+        clientUpdate.clientName = request.body.clientName;
+        clientUpdate.confidential = request.body.confidential == "true";
+        clientUpdate.validFlow = validFlows;
+        clientUpdate.redirectUri = redirectUris;
+        clientUpdate.userId = request.body.userId;
+        if (clientUpdate.userId == undefined) clientUpdate.userId = null;
+        const resetSecret = request.body.resetSecret == "true";
+        
+        const {client, newSecret} = 
+            await this.clientManager.updateClient(request.params.clientId,
+                clientUpdate,
+                resetSecret);
+        return successFn(reply, client, newSecret);
+
+        } catch (e) {
+            // hack - let Sveltekit redirect through
+            if (typeof e == "object" && e != null && "status" in e && "location" in e) throw e
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                formData,
+            }
+        } 
     }
 
     /////////////////////////////////////////////////////////////////

@@ -11,7 +11,7 @@ import type { User, UserInputFields, OAuthClient } from '@crossauth/common';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
-import type { SearchClientsReturn } from './sveltekitsharedclientendpoints';
+import type { SearchClientsPageData } from './sveltekitsharedclientendpoints';
 import { SvelteKitSharedClientEndpoints, defaultClientSearchFn } from './sveltekitsharedclientendpoints';
 
 
@@ -71,7 +71,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
      *      were returned.
      */
     async searchClients(event : RequestEvent, searchTerm? : string, skip? : number, take? : number)
-        : Promise<SearchClientsReturn> {
+        : Promise<SearchClientsPageData> {
 
         if (!event.locals.user) 
             throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
