@@ -114,11 +114,11 @@
 
         <!-- redirect URIs -->
         <div class="form-control">
-            <label class="label" for="redirectUris">
+            <label class="label" for="redirectUri">
             <span class="label-text">Redirect URIs (space-separated)</span>
             </label>
             <label class="input-group">
-                <input type="text" id="redirectUris" name="redirectUris" class="input input-bordered w-full max-w-xs mb-4" placeholder="eg http://me.com/oauth/redirect" value={redirectUri}/><br>
+                <input type="text" id="redirectUri" name="redirectUri" class="input input-bordered w-full max-w-xs mb-4" placeholder="eg http://me.com/oauth/redirect" value={redirectUri}/><br>
             </label>
         </div>
 

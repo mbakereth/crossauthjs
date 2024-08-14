@@ -380,12 +380,12 @@ export class SvelteKitSharedClientEndpoints {
             throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
-        const redirectUris = formData.redirectUris.trim().length == 0 ? 
-            [] : formData.redirectUris.trim().split(/,?[ \t\n]+/);
+        const redirectUri = !formData.redirectUri || formData.redirectUri.trim().length == 0 ? 
+            [] : formData.redirectUri.trim().split(/,?[ \t\n]+/);
 
         // validate redirect uris
         let redirectUriErrors : string[] = [];
-        for (let uri of redirectUris) {
+        for (let uri of redirectUri) {
             try {
                 OAuthClientManager.validateUri(uri);
             }
@@ -411,7 +411,7 @@ export class SvelteKitSharedClientEndpoints {
         clientUpdate.clientName = formData.clientName;
         clientUpdate.confidential = data.getAsBoolean("confidential") ?? false;
         clientUpdate.validFlow = validFlows;
-        clientUpdate.redirectUri = redirectUris;
+        clientUpdate.redirectUri = redirectUri;
         if (isAdmin) {
             let userId : string|number|undefined = formData.userId ?? undefined;
             if (userId && this.sessionServer?.userStorage) {
@@ -528,12 +528,12 @@ export class SvelteKitSharedClientEndpoints {
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
             }
 
-            const redirectUris = formData.redirectUris.trim().length == 0 ? 
-                [] : formData.redirectUris.trim().split(/,?[ \t\n]+/);
+            const redirectUri = !formData.redirectUri || formData.redirectUri.trim().length == 0 ? 
+                [] : formData.redirectUri.trim().split(/,?[ \t\n]+/);
 
             // validate redirect uris
             let redirectUriErrors : string[] = [];
-            for (let uri of redirectUris) {
+            for (let uri of redirectUri) {
                 try {
                     OAuthClientManager.validateUri(uri);
                 }
@@ -559,14 +559,14 @@ export class SvelteKitSharedClientEndpoints {
             clientUpdate.clientName = formData.clientName;
             clientUpdate.confidential = data.getAsBoolean("confidential")
             clientUpdate.validFlow = validFlows;
-            clientUpdate.redirectUri = redirectUris;
+            clientUpdate.redirectUri = redirectUri;
             if (isAdmin) {
                 clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
             }
             
             const newClient = 
                 await this.clientManager.createClient(formData.clientName,
-                    redirectUris,
+                    redirectUri,
                     validFlows,
                     data.getAsBoolean("confidential") ?? false,
                     clientUserId );
@@ -628,7 +628,7 @@ export class SvelteKitSharedClientEndpoints {
             const client = await this.clientStorage?.getClientById(clientId);
 
             if (!isAdmin) {
-                if (client.useId != event.locals.user?.id) throw this.error(401, "Unauthorized");
+                if (client.userId != event.locals.user?.id) throw this.error(401, "Unauthorized");
             }
         
         await this.clientStorage.deleteClient(clientId);
