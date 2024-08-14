@@ -31,6 +31,7 @@ export type SearchClientsPageData = {
     exception?: CrossauthError,
     hasPrevious : boolean,
     hasNext : boolean,
+    clientUserId? : string|number,
 };
 
 /**
@@ -93,6 +94,33 @@ export type CreateClientFormData = {
     error? : string,
     exception?: CrossauthError,
     formData?: {[key:string]:string},
+};
+
+/**
+ * Return type for {@link SvelteKitUserClientEndpoints.deleteClient}
+ *  {@link SvelteKitAdminClientEndpoints.deleteClient} load.
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export type DeleteClientPageData = {
+    success: boolean,
+    client?: OAuthClient,
+    clientId?: string;
+    clientUsername? : string,
+    error? : string,
+    exception?: CrossauthError,
+};
+
+/**
+ * Return type for {@link SvelteKitUserClientEndpoints.deleteClient}
+ *  {@link SvelteKitAdminClientEndpoints.deleteClient} actions.
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export type DeleteClientFormData = {
+    success : boolean,
+    error? : string,
+    exception?: CrossauthError,
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -278,7 +306,8 @@ export class SvelteKitSharedClientEndpoints {
                 take,
                 hasPrevious: prevClients.length > 0,
                 hasNext: nextClients.length > 0,
-                search: searchTerm
+                search: searchTerm,
+                clientUserId : userId,
             }
 
         } catch (e) {
@@ -295,6 +324,7 @@ export class SvelteKitSharedClientEndpoints {
                 skip: skip ?? 0, 
                 take: take ?? 10,
                 search: searchTerm,
+                clientUserId : userId,
             }
         }
 
@@ -317,7 +347,7 @@ export class SvelteKitSharedClientEndpoints {
                 clientUsername,
             }
         } catch (e) {
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't load client");
             return {
                 error: ce.message,
                 exception: ce,
@@ -408,7 +438,7 @@ export class SvelteKitSharedClientEndpoints {
 
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't update client");
             return {
                 error: ce.message,
                 exception: ce,
@@ -425,7 +455,6 @@ export class SvelteKitSharedClientEndpoints {
             var data = new JsonOrFormData();
             await data.loadData(event);
 
-            console.log("emptyClient_internal");
             let clientUserId : string|number|undefined = undefined;
             if (isAdmin) {
                 const clientUserIdString = event.url.searchParams.get("userid");
@@ -441,7 +470,6 @@ export class SvelteKitSharedClientEndpoints {
                 }
                     
             } else {
-                console.log("not admin");
                 if (!event.locals.user) throw new CrossauthError(ErrorCode.Unauthorized)
                 clientUserId = event.locals.user.id;
             }
@@ -458,7 +486,7 @@ export class SvelteKitSharedClientEndpoints {
                 clientUsername,
             }
         } catch (e) {
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't initialize new client");
             return {
                 error: ce.message,
                 exception: ce,
@@ -536,7 +564,6 @@ export class SvelteKitSharedClientEndpoints {
                 clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
             }
             
-            console.log("Creating client", data.getAsBoolean("confidential") ?? false)
             const newClient = 
                 await this.clientManager.createClient(formData.clientName,
                     redirectUris,
@@ -551,12 +578,71 @@ export class SvelteKitSharedClientEndpoints {
 
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't create client");
             return {
                 error: ce.message,
                 exception: ce,
                 success: false,
                 formData,
+            }
+        } 
+    }
+
+    protected async loadDeleteClient_internal(event : RequestEvent) : Promise<DeleteClientPageData> {
+        const clientId = event.params.clientId;
+        try {
+            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
+            if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
+            const client = await this.clientStorage.getClientById(clientId);
+            const userResp  = client.userId == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(client.userId);
+            const clientUsername = userResp?.user?.username;
+            return {
+                success: true,
+                client: client,
+                clientId,
+                clientUsername,
+            }
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't load client");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
+                clientId,
+            }
+        }
+    }
+
+    protected async deleteClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<DeleteClientFormData> {
+        
+        try {
+            // throw an error if the CSRF token is invalid
+            if (this.sessionServer.enableCsrfProtection && event.locals.authType == "cookie" && !event.locals.csrfToken) {
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+            }
+
+            const clientId = event.params.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+
+            if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
+            const client = await this.clientStorage?.getClientById(clientId);
+
+            if (!isAdmin) {
+                if (client.useId != event.locals.user?.id) throw this.error(401, "Unauthorized");
+            }
+        
+        await this.clientStorage.deleteClient(clientId);
+        return {
+            success: true,
+        }
+
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't delete client");
+            return {
+                error: ce.message,
+                exception: ce,
+                success: false,
             }
         } 
     }

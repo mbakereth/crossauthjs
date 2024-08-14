@@ -60,4 +60,4 @@
   
 <button type="button" class="btn btn-neutral mt-4" disabled={!data?.hasPrevious} on:click={() => goto("clients?skip="+(skip+take)+"&take="+take+searchParam)}>Prev</button>&nbsp;
 <button type="button" class="btn btn-secondary mt-4" disabled={!data?.hasNext} on:click={() => goto("clients?skip="+(skip-take)+"&take="+take+searchParam)}>Next</button>&nbsp;
-<button type="button" class="btn btn-secondary mt-4" on:click={() => goto("clients/create")}>New Client</button>
+<button type="button" class="btn btn-secondary mt-4" on:click={() => goto("clients/create"+(data?.clientUserId ? "?userid="+data?.clientUserId : ""))}>New Client</button>

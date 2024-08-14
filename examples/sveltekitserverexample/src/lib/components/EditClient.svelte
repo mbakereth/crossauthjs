@@ -4,8 +4,6 @@
     export let form;
     export let isAdmin;
     export let back;
-    console.log("Edit Client Data", data);
-    console.log("Edit Client Form", form);
     let redirectUri = form?.formData?.redirectUri ?? data?.client?.redirectUri?.join(" ") ?? "";
     let validFlows = form?.formData?.validFlow ?? data?.client?.validFlow ?? [];
     let confidential = form?.formData?.confidential ?? data?.client?.confidential ?? false;
@@ -170,6 +168,7 @@
 
         <button type="submit" class="btn btn-primary mt-4">Save</button>
         &nbsp;<button type="button" class="btn btn-neutral mt-4"  on:click={() => goto(back??"..")}>Cancel</button>&nbsp;
+        &nbsp;<button type="button" class="btn btn-error mt-4"  on:click={() => goto("../delete/"+data?.clientId)}>Delete</button>&nbsp;
 
     </form>
 

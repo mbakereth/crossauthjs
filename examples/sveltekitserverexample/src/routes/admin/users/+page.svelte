@@ -7,14 +7,6 @@
     let searchTerm = data?.search ?? "";
     $: searchParam = data?.search ? "&search=" + encodeURIComponent(data?.search) : "";
 
-    function next() {
-        if (data?.hasNext) goto("/admin/users?skip="+(skip+take)+"&take="+take+searchParam);
-    }
-
-    function previous() {
-        if (data?.hasPrevious) goto("/admin/users?skip="+(skip-take)+"&take="+take+searchParam);
-    }
-
     // @ts-ignore
     function search(e) {
         if (e.keyCode == 13) {

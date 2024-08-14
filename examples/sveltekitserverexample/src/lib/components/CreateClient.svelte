@@ -4,8 +4,6 @@
     export let form;
     export let isAdmin;
     export let back;
-    console.log("Create Client Data", data);
-    console.log("Create Client Form", form);
     let redirectUri = form?.formData?.redirectUri ?? "";
     let validFlows = form?.formData?.validFlow ?? [];
     let userId = form?.formData?.userId ?? data?.clientUserId;

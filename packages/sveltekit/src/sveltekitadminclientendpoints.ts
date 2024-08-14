@@ -11,7 +11,9 @@ import { SvelteKitSharedClientEndpoints } from './sveltekitsharedclientendpoints
 import type {
     SearchClientsPageData,
     UpdateClientPageData,
-    UpdateClientFormData 
+    UpdateClientFormData,
+    DeleteClientPageData,
+    DeleteClientFormData,
 } from './sveltekitsharedclientendpoints';
 
 //////////////////////////////////////////////////////////////////////
@@ -102,21 +104,38 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
     async emptyClient(event : RequestEvent)
     : Promise<UpdateClientPageData> {
 
-    if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
-        throw this.error(401, "Unauthorized");
-    return this.emptyClient_internal(event, true)
+        if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+            throw this.error(401, "Unauthorized");
+        return this.emptyClient_internal(event, true)
 
-}
+    }
 
-async createClient(event : RequestEvent)
-    : Promise<UpdateClientFormData> {
+    async createClient(event : RequestEvent)
+        : Promise<UpdateClientFormData> {
 
-    if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
-        throw this.error(401, "Unauthorized");
-    return this.createClient_internal(event, true)
+        if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+            throw this.error(401, "Unauthorized");
+        return this.createClient_internal(event, true)
 
-}
+    }
 
+    async loadDeleteClient(event : RequestEvent)
+        : Promise<DeleteClientPageData> {
+
+        if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+            throw this.error(401, "Unauthorized");
+        return this.loadDeleteClient_internal(event)
+
+    }
+
+    async deleteClient(event : RequestEvent)
+        : Promise<DeleteClientFormData> {
+
+        if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
+            throw this.error(401, "Unauthorized");
+        return this.deleteClient_internal(event, true)
+
+    }
 
     /////////////////////////////////////////////////////////////////
     // Endpoints
@@ -158,7 +177,6 @@ async createClient(event : RequestEvent)
 
     readonly createClientEndpoint = {
         load: async ( event: RequestEvent ) => {
-            console.log("admin createClientEndpoint.load")
             const resp = await this.emptyClient(event);
             delete resp?.exception;
             return {
@@ -175,4 +193,21 @@ async createClient(event : RequestEvent)
         }
     };
 
+    readonly deleteClientEndpoint = {
+        load: async ( event: RequestEvent ) => {
+            const resp = await this.loadDeleteClient(event);
+            delete resp?.exception;
+            return {
+                ...this.baseEndpoint(event),
+                ...resp,
+            };
+        },
+        actions: {
+            default: async (event : RequestEvent) => {
+                let resp = await this.deleteClient(event);
+                delete resp.exception;
+                return resp;
+            }
+        }
+    };
 };

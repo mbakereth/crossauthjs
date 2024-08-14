@@ -291,7 +291,7 @@ export class SvelteKitAdminEndpoints {
                     }
                 }
 
-            return {
+                return {
                 success: true,
                 users,
                 skip,

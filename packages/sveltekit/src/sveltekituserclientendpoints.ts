@@ -9,7 +9,9 @@ import type { RequestEvent } from '@sveltejs/kit';
 import type {
     SearchClientsPageData,
     UpdateClientPageData,
-    UpdateClientFormData 
+    UpdateClientFormData,
+    DeleteClientPageData,
+    DeleteClientFormData,
 } from './sveltekitsharedclientendpoints';
 import { SvelteKitSharedClientEndpoints } from './sveltekitsharedclientendpoints';
 import { CrossauthError, j, CrossauthLogger, ErrorCode } from '@crossauth/common';
@@ -137,6 +139,63 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
     }
 
+    async loadDeleteClient(event : RequestEvent)
+    : Promise<DeleteClientPageData> {
+
+    if (!event.locals.user) 
+        throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
+
+    // check user owns client
+    try {
+        const clientId = event.params.clientId;
+        if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+        const client = await this.clientStorage?.getClientById(clientId);
+        if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+    } catch (e) {
+        if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
+        const ce = CrossauthError.asCrossauthError(e);
+        CrossauthLogger.logger.debug(j({err: e}));
+        CrossauthLogger.logger.error(j({cerr: e}));
+        return {
+            success: false,
+            error: ce.message,
+            exception: ce,
+        }
+    }
+
+    return this.loadDeleteClient_internal(event)
+
+}
+
+async deleteClient(event : RequestEvent)
+    : Promise<DeleteClientFormData> {
+
+    if (!event.locals.user) 
+        throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
+
+    // check user owns client
+    try {
+        const clientId = event.params.clientId;
+        if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+        const client = await this.clientStorage?.getClientById(clientId);
+        if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+    } catch (e) {
+        if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
+        const ce = CrossauthError.asCrossauthError(e);
+        CrossauthLogger.logger.debug(j({err: e}));
+        CrossauthLogger.logger.error(j({cerr: e}));
+        return {
+            success: false,
+            error: ce.message,
+            exception: ce,
+        }
+    }
+
+    return this.deleteClient_internal(event, false)
+
+}
+
+
     async emptyClient(event : RequestEvent)
         : Promise<UpdateClientPageData> {
 
@@ -158,7 +217,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         return this.createClient_internal(event, false)
 
     }
-
 
     /////////////////////////////////////////////////////////////////
     // Endpoints
@@ -194,7 +252,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
     readonly createClientEndpoint = {
         load: async ( event: RequestEvent ) => {
-            console.log("user createClientEndpoint.load")
             const resp = await this.emptyClient(event);
             delete resp?.exception;
             return {
@@ -211,4 +268,21 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         }
     };
 
+    readonly deleteClientEndpoint = {
+        load: async ( event: RequestEvent ) => {
+            const resp = await this.loadDeleteClient(event);
+            delete resp?.exception;
+            return {
+                ...this.baseEndpoint(event),
+                ...resp,
+            };
+        },
+        actions: {
+            default: async (event : RequestEvent) => {
+                let resp = await this.deleteClient(event);
+                delete resp?.exception;
+                return resp;
+            }
+        }
+    };
 };
