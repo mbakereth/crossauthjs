@@ -194,6 +194,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
     readonly createClientEndpoint = {
         load: async ( event: RequestEvent ) => {
+            console.log("user createClientEndpoint.load")
             const resp = await this.emptyClient(event);
             delete resp?.exception;
             return {

@@ -75,8 +75,9 @@ export class OAuthClientManager {
         userId? : string|number) : Promise<OAuthClient> {
         const clientId = OAuthClientManager.randomClientId();
         let clientSecret : string|undefined = undefined;
+        let plaintext : string|undefined = undefined;
         if (confidential) {
-            const plaintext = OAuthClientManager.randomClientSecret();
+            plaintext = OAuthClientManager.randomClientSecret();
             clientSecret = await Crypto.passwordHash(plaintext, {
                 encode: true,
                 iterations: this.oauthPbkdf2Iterations,
@@ -99,7 +100,9 @@ export class OAuthClientManager {
             validFlow: validFlow,
             userId: userId,
         }
-        return await this.clientStorage.createClient(client);
+        const newClient = await this.clientStorage.createClient(client);
+        if (newClient.clientSecret && plaintext) newClient.clientSecret = plaintext;
+        return newClient;
     }
 
     /**

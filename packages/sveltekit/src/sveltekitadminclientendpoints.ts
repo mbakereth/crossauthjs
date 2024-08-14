@@ -113,7 +113,7 @@ async createClient(event : RequestEvent)
 
     if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
         throw this.error(401, "Unauthorized");
-    return this.updateClient_internal(event, true)
+    return this.createClient_internal(event, true)
 
 }
 
@@ -158,6 +158,7 @@ async createClient(event : RequestEvent)
 
     readonly createClientEndpoint = {
         load: async ( event: RequestEvent ) => {
+            console.log("admin createClientEndpoint.load")
             const resp = await this.emptyClient(event);
             delete resp?.exception;
             return {

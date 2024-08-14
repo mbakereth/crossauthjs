@@ -391,7 +391,7 @@ export class SvelteKitSharedClientEndpoints {
             clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
 
         }
-        const resetSecret = formData.resetSecret == "true";
+        const resetSecret = data.getAsBoolean("resetSecret");
         
         const {client: newClient, newSecret} = 
             await this.clientManager.updateClient(clientId,
@@ -425,6 +425,7 @@ export class SvelteKitSharedClientEndpoints {
             var data = new JsonOrFormData();
             await data.loadData(event);
 
+            console.log("emptyClient_internal");
             let clientUserId : string|number|undefined = undefined;
             if (isAdmin) {
                 const clientUserIdString = event.url.searchParams.get("userid");
@@ -440,6 +441,7 @@ export class SvelteKitSharedClientEndpoints {
                 }
                     
             } else {
+                console.log("not admin");
                 if (!event.locals.user) throw new CrossauthError(ErrorCode.Unauthorized)
                 clientUserId = event.locals.user.id;
             }
@@ -534,6 +536,7 @@ export class SvelteKitSharedClientEndpoints {
                 clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
             }
             
+            console.log("Creating client", data.getAsBoolean("confidential") ?? false)
             const newClient = 
                 await this.clientManager.createClient(formData.clientName,
                     redirectUris,

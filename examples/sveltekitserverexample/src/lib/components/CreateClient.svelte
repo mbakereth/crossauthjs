@@ -4,8 +4,8 @@
     export let form;
     export let isAdmin;
     export let back;
-    console.log("Edit Client Data", data);
-    console.log("Edit Client Form", form);
+    console.log("Create Client Data", data);
+    console.log("Create Client Form", form);
     let redirectUri = form?.formData?.redirectUri ?? "";
     let validFlows = form?.formData?.validFlow ?? [];
     let userId = form?.formData?.userId ?? data?.clientUserId;
@@ -14,9 +14,11 @@
 
 {#if form?.success}
     <p class="bg-success p-2 rounded text-slate-900">
-        The client was updated.
-        Make sure you note down the client secret.  If 
-        you lose it, you will have to reset it again.
+        The client was created.
+        {#if form?.client.confidential}
+            Make sure you note down the client secret.  If 
+            you lose it, you will have to reset it.
+       {/if} 
     </p>
 
     <!-- display client -->
@@ -38,7 +40,7 @@
                 <th>Client Name</th>
                 <td>{form.client.clientName}</td>
             </tr>
-            {#if !form.client.confidential}
+            {#if form.client.confidential}
                 <tr>
                     <th>Client Secret</th>
                     <td>{form.client?.clientSecret}</td>
@@ -63,7 +65,7 @@
         </table>
     </div>
     
-    <p><a href={back??".."}>Back</a></p>
+    <p><a href={back??"clients"}>Back</a></p>
 {:else}
 
     <!-- edit the client -->
@@ -77,7 +79,7 @@
     <form method="POST">
 
         <!-- user - ignored if not an admin endpoint-->
-        <input readonly type="text" id="userId" name="userId" class="input input-bordered w-full max-w-xs mb-4" value={userId ?? ""}/>
+        <input readonly type="hidden" id="userId" name="userId" class="input input-bordered w-full max-w-xs mb-4" value={userId ?? ""}/>
 
          {#if isAdmin}
             <div class="form-control">
@@ -135,7 +137,7 @@
         {/each}
 
         <button type="submit" class="btn btn-primary mt-4">Save</button>
-        &nbsp;<button type="button" class="btn btn-neutral mt-4"  on:click={() => goto(back??"..")}>Cancel</button>&nbsp;
+        &nbsp;<button type="button" class="btn btn-neutral mt-4"  on:click={() => goto(back??"clients")}>Cancel</button>&nbsp;
 
     </form>
 
