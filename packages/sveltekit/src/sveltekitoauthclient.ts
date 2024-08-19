@@ -307,10 +307,11 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
 
         if (!silent) return client.redirect(302, client.authorizedUrl);
     } catch (e) {
-        const ce = e as CrossauthError;
+        if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+        const ce = CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
-        client.errorFn(client.server, event, ce);
+        return client.errorFn(client.server, event, ce);
     }
 }
 
@@ -335,10 +336,11 @@ async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
         return json({success: true, ...oauthResponse});
         if (!silent) return client.redirect(302, client.authorizedUrl);
     } catch (e) {
-        const ce = e as CrossauthError;
+        if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+        const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
-        client.errorFn(client.server, event, ce);
+        return client.errorFn(client.server, event, ce);
     }
 }
 
@@ -367,7 +369,8 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
         ...oauthResponse,
         id_payload: decodePayload(oauthResponse.id_token)}
     } catch (e) {
-        const ce = e as CrossauthError;
+        if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+        const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
         return {
@@ -400,7 +403,8 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
             ...oauthResponse,
             id_payload: decodePayload(oauthResponse.id_token)}
         } catch (e) {
-        const ce = e as CrossauthError;
+            if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+            const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
         return {
@@ -734,6 +738,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             //return await this.receiveTokenFn(resp, this, event);
             return resp;
         } catch (e) {
+            if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.error(j({
                 msg: "Error receiving token",
@@ -1053,7 +1058,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
                }
                catch (e) {
-                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
+                if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
                     return this.errorFn(this.server, event, ce);
                }
 
@@ -1110,6 +1116,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
                 }
                 catch (e) {
+                    if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
                     throw ce;
                 }
@@ -1149,7 +1156,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
      * @param opts additional data to put in resource server request
      * @returns resource server response
      */
-    async bff(event : RequestEvent, opts: {headers? : Headers} = {}) : Promise<Response> {
+    async bff(event : RequestEvent, opts: {method?: "GET"|"POST"|"PUT"|"HEAD"|"OPTIONS"|"PATCH"|"DELETE", headers? : Headers} = {}) : Promise<Response> {
         try {
             if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
             if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
@@ -1200,18 +1207,19 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             if (body) {
                 resp = await fetch(url, {
                     headers:opts.headers,
-                    method: event.request.method,
+                    method: opts.method ?? event.request.method,
                     body: JSON.stringify(body??"{}"),
                 });    
             } else {
                 resp = await fetch(url, {
                     headers:opts.headers,
-                    method: event.request.method,
+                    method: opts.method ?? event.request.method,
                 });    
             }
             return resp;
 
         } catch (e) {
+            if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug({err: ce});
             CrossauthLogger.logger.error({cerr: ce});
@@ -1223,6 +1231,22 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
     }
 
+    async unpack(resp : Response) : Promise<{status: number, body: {[key:string]:any}, error? : string, error_description? : string}> {
+        if (resp.status == 204)  {
+            return {status: 204, body: {}};
+        } else {
+            try {
+                return {status: resp.status, body: await resp.json()};
+            } catch (e) {
+                if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug({err: ce});
+                CrossauthLogger.logger.error({cerr: ce});
+                return {status: resp.status, body: {}, error: ce.oauthErrorCode, error_description: ce.message}
+            }
+        }
+    }
+
     /**
      * Ordinarily you would not call this directly but use `allBffEndpoint`.
      * 
@@ -1231,7 +1255,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
      * @param opts additional data to put in resource server request
      * @returns resource server response
      */
-    async allBff(event : RequestEvent, opts: {headers? : Headers} = {}) : Promise<Response> {
+    async allBff(event : RequestEvent, opts: {method?: "GET"|"POST"|"PUT"|"HEAD"|"OPTIONS"|"PATCH"|"DELETE", headers? : Headers} = {}) : Promise<Response> {
         try {
             CrossauthLogger.logger.debug(j({msg: "Called allBff", url: event.url.toString()}));
             if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
@@ -1269,6 +1293,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             }
 
         } catch (e) {
+            if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug({err: ce});
             CrossauthLogger.logger.error({cerr: ce});
@@ -1293,7 +1318,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         return isHave ? {ok: true} : payload;
     }
 
-    async tokens(event : RequestEvent, token: string|string[]) : Promise<Response> {
+    async tokens(event : RequestEvent, token: string|string[]) : Promise<{status: number, body?: {[key:string]:any}}> {
         try {
             if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
             if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
@@ -1327,24 +1352,31 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             }
             if (!Array.isArray(token)) {
                 if (!lastTokenPayload) {
-                    if (token.startsWith("have_")) return json({ok: false});
-                    else return new Response(null, {status: 204});
+                    if (token.startsWith("have_")) return {status: 200, body: {ok: false}};
+                    else return {status: 204};
                 }
-                return json(lastTokenPayload);
+                return {status: 200, body: lastTokenPayload};
             } else {
-                return json(tokensReturning);
+                return {status: 200, body: tokensReturning};
             }
 
         } catch (e) {
+            if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug({err: ce});
             CrossauthLogger.logger.error({cerr: ce});
-            return json({
+            return {status: ce.httpStatus, body: {
                 error: ce.oauthErrorCode,
                 error_description: ce.message,
-            }, {status: ce.httpStatus});
+            }};
         }
 
+    }
+
+    async tokensResponse(event : RequestEvent, token: string|string[]) : Promise<Response> {
+        const resp = await this.tokens(event, token);
+        if (resp.body) return json(resp.body, {status: resp.status});
+        return json(null, {status: resp.status});
     }
 
     ////////////////////////////////////////////////////////////////
@@ -1405,7 +1437,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }
             }
             try {
-
                 if (!(this.validFlows.includes(OAuthFlows.AuthorizationCode))) {
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
                     return {
@@ -1586,7 +1617,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
                 }    
-                
+
                 const code = event.url.searchParams.get("code") ?? "";
                 const state = event.url.searchParams.get("state") ?? undefined;
                 const error = event.url.searchParams.get("error") ?? undefined;
@@ -1595,12 +1626,12 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     state,
                     error,
                     error_description);
-                if (resp.error) return this.errorFn(this.server, event, CrossauthError.fromOAuthError(resp.error, resp.error_description));
+                    if (resp.error) return this.errorFn(this.server, event, CrossauthError.fromOAuthError(resp.error, resp.error_description));
 
-                if (resp.error) {
-                    const ce = CrossauthError.fromOAuthError(resp.error, 
+                    if (resp.error) {
+                        const ce = CrossauthError.fromOAuthError(resp.error, 
                         resp.error_description);
-                    return await this.errorFn(this.server,
+                        return await this.errorFn(this.server,
                         event,
                         ce);
                 }
@@ -1842,7 +1873,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
                    }
                    catch (e) {
-                        const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
+                    if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
                         return this.errorFn(this.server, event, ce);
                    }
     
@@ -1917,6 +1949,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                             if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
                     }
                     catch (e) {
+                        if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                         const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
                         throw ce;
                     }
@@ -2066,7 +2099,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         delete: async (event : RequestEvent) => await this.bff(event),
         patch: async (event : RequestEvent) => await this.bff(event),
         
-        
+        actions: {
+            get: async ( event : RequestEvent ) => 
+                await this.unpack(await this.bff(event)),
+        },
+
     };
 
     readonly allBffEndpoint = {
@@ -2077,37 +2114,78 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         head: async (event : RequestEvent) => await this.allBff(event),
         options: async (event : RequestEvent) => await this.allBff(event),
         delete: async (event : RequestEvent) => await this.allBff(event),
-        patch: async (event : RequestEvent) => await this.allBff(event),
-        
-        
+        patch: async (event : RequestEvent) => await this.allBff(event),        
+
+        actions: {
+            get: async ( event : RequestEvent ) => 
+                await this.unpack(await this.allBff(event, {method: "GET"})),
+            gpostet: async ( event : RequestEvent ) => 
+                await this.unpack(await this.allBff(event, {method: "POST"})),
+            put: async ( event : RequestEvent ) => 
+                await this.unpack(await this.allBff(event, {method: "PUT"})),
+            options: async ( event : RequestEvent ) => 
+                await this.unpack(await this.allBff(event, {method: "OPTIONS"})),
+            delete: async ( event : RequestEvent ) => 
+                await this.unpack(await this.allBff(event, {method: "DELETE"})),
+            patch: async ( event : RequestEvent ) => 
+                await this.unpack(await this.allBff(event, {method: "PATCH"})),
+        },
     };
 
     readonly accessTokenEndpoint = {
         get: async (event : RequestEvent) => await this.tokens(event, "access_token"),
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.tokens(event, "access_token"),
+        },
     }
 
     readonly haveAccessTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokens(event, "have_access_token"),
+        get: async (event : RequestEvent) => await this.tokensResponse(event, "have_access_token"),
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.tokens(event, "have_access_token"),
+        },
     }
 
     readonly refreshTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokens(event, "refresh_token"),
+        get: async (event : RequestEvent) => await this.tokensResponse(event, "refresh_token"),
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.tokens(event, "refresh_token"),
+        },
     }
 
     readonly haveRefreshTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokens(event, "have_refresh_token"),
+        get: async (event : RequestEvent) => await this.tokensResponse(event, "have_refresh_token"),
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.tokens(event, "have_refresh_token"),
+        },
     }
 
     readonly idTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokens(event, "id_token"),
+        get: async (event : RequestEvent) => await this.tokensResponse(event, "id_token"),
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.tokens(event, "id_token"),
+        },
     }
 
     readonly haveIdTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokens(event, "have_id_token"),
+        get: async (event : RequestEvent) => await this.tokensResponse(event, "have_id_token"),
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.tokens(event, "have_id_token"),
+        },
     }
 
     readonly tokensEndpoint = {
-        get: async (event : RequestEvent) => await this.tokens(event, this.tokenEndpoints),
+        get: async (event : RequestEvent) => await this.tokensResponse(event, this.tokenEndpoints),
+        actions: {
+            default: async ( event : RequestEvent ) => 
+                await this.tokens(event,this.tokenEndpoints),
+        },
     }
 
 }

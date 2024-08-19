@@ -762,8 +762,8 @@ test('SvelteKitClient.accessToken', async () => {
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
     const resp = await server.oAuthClient?.accessTokenEndpoint.get(event);
     expect(resp.status).toBe(200);
-    const body = await resp.json();
-    expect(body.jti).toBeDefined();
+    const body = await resp.body;
+    expect(body?.jti).toBeDefined();
 });
 
 test('SvelteKitClient.haveAccessToken', async () => {

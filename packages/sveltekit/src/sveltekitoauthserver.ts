@@ -108,7 +108,7 @@ export interface MfaChallengeReturn {
 // OPTIONS
 
 /**
- * Options for {@link FastifyAuthorizationServer}
+ * Options for {@link SvelteKitAuthorizationServer}
  */
 export interface SvelteKitAuthorizationServerOptions 
     extends OAuthAuthorizationServerOptions {
@@ -173,14 +173,14 @@ export interface SvelteKitAuthorizationServerOptions
      * 
      * The default is '/oauth/authozize`
      */
-    authorizeEndpoint? : string,
+    authorizeEndpointUrl? : string,
 
     /**
      * Set this to the route where you create your authorize endpoint.
      * 
      * The default is '/oauth/token`
      */
-    tokenEndpoint? : string,
+    tokenEndpointUrl? : string,
 
     /**
      * Set this to the route where you create your jwks endpoint.
@@ -246,7 +246,7 @@ export interface SvelteKitAuthorizationServerOptions
  * | tokenEndpoint              | The OAuth `token` endpoint                                 | `post`:                                                                      |                                                                  | See OAuth definition of `token` endpoint                        | 
  * |                            |                                                            |   - See OAuth definition of `token` endpoint                                 |                                                                  |                                                                 |  
  * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | mfaAuthenticators          | For the Auth0 Password MFA authenticators                  | `get`:                                                                       |                                                                  | See OAuth definition of `token` endpoint                        | 
+ * | mfaAuthenticatorsEndpoint  | For the Auth0 Password MFA authenticators                  | `get`:                                                                       |                                                                  | See OAuth definition of `token` endpoint                        | 
  * |                            |                                                            |   - See Auth0 Password MFA documentation                                     |                                                                  |                                                                 | 
  * |                            |                                                            | `post`:                                                                      |                                                                  |                                                                 | 
  * |                            |                                                            |   - See Auth0 Password MFA documentation                                     |                                                                  | See OAuth definition of `token` endpoint                        |  
@@ -317,17 +317,9 @@ export class SvelteKitAuthorizationServer {
         setParameter("refreshTokenCookiePath", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_PATH");
         setParameter("refreshTokenCookieSecure", ParamType.Boolean, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SECURE");
         setParameter("refreshTokenCookieSameSite", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_SAMESITE");
-        let tmp : {[key:string]:string} = {
-            authorizeEndpoint: this.authorizeEndpointUrl,
-            tokenEndpoint: this.tokenEndpointUrl,
-            jwksEndpoint: this.jwksEndpointUrl,
-        };
-        setParameter("authorizeEndpoint", ParamType.String, tmp, options, "OAUTH_AUTHORIZE_ENDPOINT");
-        setParameter("tokenEndpoint", ParamType.String, tmp, options, "OAUTH_TOKEN_ENDPOINT");
-        setParameter("jwksEndpoint", ParamType.String, tmp, options, "OAUTH_JWKS_ENDPOINT");
-        this.authorizeEndpointUrl = tmp.authorizeEndpoint;
-        this.tokenEndpointUrl = tmp.tokenEndpoint;
-        this.jwksEndpointUrl = tmp.jwksEndpoint;
+        setParameter("authorizeEndpointUrl", ParamType.String, this, options, "OAUTH_AUTHORIZE_ENDPOINT");
+        setParameter("tokenEndpointUrl", ParamType.String, this, options, "OAUTH_TOKEN_ENDPOINT");
+        setParameter("jwksEndpointUrl", ParamType.String, this, options, "OAUTH_JWKS_ENDPOINT");
 
         if (this.refreshTokenType != "json") {
             if (this.svelteKitServer.sessionServer?.enableCsrfProtection == true) {
@@ -601,13 +593,13 @@ export class SvelteKitAuthorizationServer {
 
     readonly oidcConfigurationEndpoint = {
         get: async (_event : RequestEvent) => {
-            return json({
+            return json(this.authServer.oidcConfiguration({
                 authorizeEndpoint: this.authorizeEndpointUrl, 
                 tokenEndpoint: this.tokenEndpointUrl, 
                 jwksUri: this.jwksEndpointUrl, 
                 additionalClaims: []
                 }
-            );
+            ));
         },
     };
 

@@ -55,7 +55,7 @@ async function main() {
         clientSecret: clientSecret,
         clientName: "Client1",
         confidential: true,
-        redirectUri: ["http://localhost:5173/oauth/redirect"],
+        redirectUri: ["http://localhost:5174/authcode"],
         validFlow: OAuthFlows.allFlows(),
         userId: undefined,
     });
@@ -65,7 +65,7 @@ async function main() {
         clientSecret: clientSecret,
         clientName: "Client2",
         confidential: true,
-        redirectUri: ["http://localhost:5173/oauth/redirect"],
+        redirectUri: ["http://localhost:5174/authcode"],
         validFlow: OAuthFlows.allFlows(),
         userId: user1.id,
     });
@@ -80,6 +80,7 @@ main()
     .catch(async (e) => {
         console.error(e)
         await prisma.$disconnect()
+        // @ts-ignore
         process.exit(1)
     })
 

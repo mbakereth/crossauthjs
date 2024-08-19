@@ -1785,7 +1785,7 @@ export class SvelteKitUserEndpoints {
     readonly loginEndpoint = {
         load: async ( event : RequestEvent ) => {
             return {
-                next: "/",
+                next: event.url.searchParams.get("next") ?? this.loginRedirectUrl,
                 ...this.baseEndpoint(event),
             };
         },

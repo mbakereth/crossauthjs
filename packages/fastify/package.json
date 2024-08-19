@@ -17,9 +17,9 @@
     "test": "dotenv -e .env.unittest vitest",
     "testonce": "dotenv -e .env.unittest vitest run",
     "doc": "typedoc",
-    "preinstall": "bash ../../removeprismaclient.sh",
-    "postinstall": "bash ../../copyprismaclient.sh && bash ../../ifdotenv.sh -e .env.unittest prisma generate",
-    "prisma": "dotenv -e .env.unittest pnpm exec prisma"
+    "preinstall": "echo 'prisma not needed in this module'",
+    "postinstall": "echo 'prisma not needed in this module'",
+    "prisma": "echo 'prisma not needed in this module'"
   },
   "devDependencies": {
     "@types/node": "^20.10.8",

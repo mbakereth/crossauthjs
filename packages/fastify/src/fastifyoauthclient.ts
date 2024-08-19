@@ -389,7 +389,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
                 {...oauthResponse,
                     id_payload: decodePayload(oauthResponse.id_token)} );
         } catch (e) {
-            const ce = e as CrossauthError;
+            const ce =CrossauthError.asCrossauthError(e);
             return reply.status(ce.httpStatus)
                 .view(client.errorPage, {
                     status: ce.httpStatus,
@@ -441,7 +441,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
                     id_payload: decodePayload(oauthResponse.id_token)} );
         }
     } catch (e) {
-        const ce = e as CrossauthError;
+        const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
         if (reply) {
@@ -531,7 +531,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
             return reply.redirect(client.authorizedUrl);
         }
     } catch (e) {
-        const ce = e as CrossauthError;
+        const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
         if (reply) {

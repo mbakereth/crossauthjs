@@ -11,15 +11,16 @@ import type {  OAuthClient } from '@crossauth/common';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, OAuthFlows } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
+import { error, redirect } from '@sveltejs/kit';
 
 //////////////////////////////////////////////////////////////////////
 // Return types
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.searchClients}
- *  {@link SvelteKitAdminClientEndpoints.searchClients} load.
+ * Return type for {@link SvelteKitUserClientEndpoints.searchClient}
+ *  {@link SvelteKitAdminClientEndpoints.searchClient} load.
  * 
- * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type SearchClientsPageData = {
     success : boolean,
@@ -35,10 +36,10 @@ export type SearchClientsPageData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.updateClient}
- *  {@link SvelteKitAdminClientEndpoints.updateClient} load.
+ * Return type for {@link SvelteKitUserClientEndpoints.updateClientEndpoint}
+ *  {@link SvelteKitAdminClientEndpoints.updateClientEndpoint} load.
  * 
- * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type UpdateClientPageData = {
     success: boolean,
@@ -52,10 +53,10 @@ export type UpdateClientPageData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.updateClient}
- *  {@link SvelteKitAdminClientEndpoints.updateClient} actions.
+ * Return type for {@link SvelteKitUserClientEndpoints.updateClientEndpoint}
+ *  {@link SvelteKitAdminClientEndpoints.updateClienEndpoint} actions.
  * 
- * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type UpdateClientFormData = {
     success : boolean,
@@ -67,10 +68,10 @@ export type UpdateClientFormData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.updateClient}
- *  {@link SvelteKitAdminClientEndpoints.updateClient} load.
+ * Return type for {@link SvelteKitUserClientEndpoints.createClientEndpoints}
+ *  {@link SvelteKitAdminClientEndpoints.createClient} load.
  * 
- * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type CreateClientPageData = {
     success: boolean,
@@ -83,10 +84,10 @@ export type CreateClientPageData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.updateClient}
- *  {@link SvelteKitAdminClientEndpoints.updateClient} actions.
+ * Return type for {@link SvelteKitUserClientEndpoints.createClientEndpoint}
+ *  {@link SvelteKitAdminClientEndpoints.createClientEndpoint} actions.
  * 
- * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type CreateClientFormData = {
     success : boolean,
@@ -97,10 +98,10 @@ export type CreateClientFormData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.deleteClient}
- *  {@link SvelteKitAdminClientEndpoints.deleteClient} load.
+ * Return type for {@link SvelteKitUserClientEndpoints.deleteClientEndpoint}
+ *  {@link SvelteKitAdminClientEndpoints.deleteClientEndpoint} load.
  * 
- * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type DeleteClientPageData = {
     success: boolean,
@@ -112,10 +113,10 @@ export type DeleteClientPageData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.deleteClient}
- *  {@link SvelteKitAdminClientEndpoints.deleteClient} actions.
+ * Return type for {@link SvelteKitUserClientEndpoints.deleteClientEndpoint}
+ *  {@link SvelteKitAdminClientEndpoints.deleteClientEndpoint} actions.
  * 
- * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type DeleteClientFormData = {
     success : boolean,
@@ -166,27 +167,81 @@ export async function defaultClientSearchFn(searchTerm: string,
 //////////////////////////////////////////////////////////////////////
 // Class
 
+/**
+ * Base class for user and admin endpoints that manipulate the OAuth
+ * clients table
+ */
 export class SvelteKitSharedClientEndpoints {
+
+    /**
+     * The session server that instantiated this.  
+     * 
+     * Set in the constructor
+     */
     protected sessionServer : SvelteKitSessionServer;
+
+    /**
+     * The login URL taken from the {@link SvelteKitSessionServerOptions}
+     * in the constructor.
+     */
     protected loginUrl = "/login";
+
+    /**
+     * Function for searching the client table.  Default is to make
+     * an exact match search on `clientName`.
+     */
     protected clientSearchFn : 
         (searchTerm : string, clientStorage : OAuthClientStorage, skip: number, take: number, userId? : string|number|null) => Promise<OAuthClient[]> =
         defaultClientSearchFn;
+    
+    /**
+     * The redirect function taken from the {@link SvelteKitSessionServerOptions}
+     * in the constructor.
+     */
     protected redirect : any;
+
+    /**
+     * The error function taken from the {@link SvelteKitSessionServerOptions}
+     * in the constructor.
+     */
     protected error: any;
+
+    /**
+     * Taken from the {@link SvelteKitSessionServerOptions}
+     * in the constructor.
+     */
     protected validFlows : string[] = ["all"];
+
+    /**
+     * Friendly names for `validFlows`
+     */
     protected validFlowNames : {[key:string]:string};
+
+    /**
+     * The OAuth client manager instantiated during construction
+     */
     protected clientManager : OAuthClientManager;
+
+    /**
+     * Taken from the {@link SvelteKitSessionServerOptions}
+     * in the constructor.
+     */
     protected clientStorage? : OAuthClientStorage;
 
+    /**
+     * Constructor
+     * 
+     * @param sessionServer the session server to add these endpoints to
+     * @param options See {@link SvelteKitSessionServerOptions}
+     */
     constructor(sessionServer : SvelteKitSessionServer,
         options : SvelteKitSessionServerOptions
     ) {
         this.sessionServer = sessionServer;
         setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
         if (options.clientSearchFn) this.clientSearchFn = options.clientSearchFn;
-        this.redirect = options.redirect;
-        this.error = options.error;
+        this.redirect = options.redirect ?? redirect;
+        this.error = options.error ?? error;
 
         setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
         if (this.validFlows.length == 1 &&
@@ -330,6 +385,13 @@ export class SvelteKitSharedClientEndpoints {
 
     }
 
+    /**
+     * The base class of the load function for updating an OAuth client.
+     * 
+     * @param event the Sveltekit request event.  The following are taken:
+     *   - `clientId` from the URL path parameters
+     * @returns {@see UpdateClientPageData}
+     */
     protected async loadClient_internal(event : RequestEvent) : Promise<UpdateClientPageData> {
         const clientId = event.params.clientId;
         try {
@@ -359,6 +421,18 @@ export class SvelteKitSharedClientEndpoints {
         }
     }
 
+    /**
+     * The base class of the actions function for updating an OAuth client.
+     * 
+     * @param event the Sveltekit request event.  The following are taken:
+     *   - `clientId` from the URL path parameters
+     *   - `clientName` from the body form data
+     *   - `redirectUri` from the body form data (space-separated)
+     *   - `confidential` from the body form data: 1, `on`, `yes` or `true` are true
+     *   _ `resetSecret` if true (1, `on`, `yes` or `true`), create and return a new secret.  Ignored if not confidential
+     *   - Flow names from {@link @crossauth/common/OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
+     * @returns {@see UpdateClientFormData}.  If a new secret was created, it will be placed as plaintext in the client that is returned.
+     */
     protected async updateClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<UpdateClientFormData> {
         
         let formData : {[key:string]:string}|undefined = undefined;
@@ -448,6 +522,14 @@ export class SvelteKitSharedClientEndpoints {
         } 
     }
 
+    /**
+     * The base class of the load function for creating an OAuth client.
+     * 
+     * @param event the Sveltekit request event.  The following are taken:
+     *   - `userid` from the body parameters parameters.  Ignored if `isAdmin` is false.  Can be undefined
+     *   - 
+     * @returns {@see CreateClientPageData}.  
+     */
     protected async emptyClient_internal(event : RequestEvent, isAdmin : boolean) : Promise<CreateClientPageData> {
         try {
             // get client user id and username
@@ -497,6 +579,17 @@ export class SvelteKitSharedClientEndpoints {
         }
     }
 
+    /**
+     * The base class of the actions function for creating an OAuth client.
+     * 
+     * @param event the Sveltekit request event.  The following are taken:
+     *   - `userid` from the URL query parameters.  Ignored if `isAdmin` is false.  Can be undefined
+     *   - `clientName` from the body form data
+     *   - `redirectUri` from the body form data (space-separated)
+     *   - `confidential` from the body form data: 1, `on`, `yes` or `true` are true
+     *   - Flow names from {@link @crossauth/common/OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
+     * @returns {@see UpdateClientFormData}.  If a secret was created, it will be placed as plaintext in the client that is returned.  A random `clientId` is created.
+     */
     protected async createClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<CreateClientFormData> {
         
         let formData : {[key:string]:string}|undefined = undefined;
@@ -588,6 +681,13 @@ export class SvelteKitSharedClientEndpoints {
         } 
     }
 
+    /**
+     * The base class of the load function for deleting an OAuth client.
+     * 
+     * @param event the Sveltekit request event.  The following are taken:
+     *   - `clientId` from the URL path parameters
+     * @returns {@see DeleteClientPageData}
+     */
     protected async loadDeleteClient_internal(event : RequestEvent) : Promise<DeleteClientPageData> {
         const clientId = event.params.clientId;
         try {
@@ -613,6 +713,13 @@ export class SvelteKitSharedClientEndpoints {
         }
     }
 
+    /**
+     * The base class of the actions function for deleting an OAuth client.
+     * 
+     * @param event the Sveltekit request event.  The following are taken:
+     *   - `clientId` from the URL path parameters
+     * @returns {@see DeleteClientFormData}
+     */
     protected async deleteClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<DeleteClientFormData> {
         
         try {

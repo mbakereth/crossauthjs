@@ -380,6 +380,16 @@ export class SvelteKitServer {
     dummyActions : {[key:string]: (event : RequestEvent) => Promise<{[key:string]:any}>} = {};
 
     /**
+     * See class documentation for {@link SvelteKitUserEndpoints}.
+     * 
+     * This is an empty `bff action` which serves no purpose other than to stop
+     * Typescript complaining that the action may be undefined.
+     * @param _event Sveltekit event object
+     * @returns an empty object
+     */
+    dummyBff : (event : RequestEvent) => Promise<{[key:string]:any}> = async (_event) => {return {status: 500, body: {error: "Unimplemented"}}};
+
+    /**
      * It is not possible to get any meaninfgul info about an exception class
      * with `typeof` or `instanceof`.  This method heuristically determines
      * if an exception is a Sveltekit redirect.  It is used internally

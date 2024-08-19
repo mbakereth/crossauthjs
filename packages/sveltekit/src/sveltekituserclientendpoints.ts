@@ -20,8 +20,42 @@ import { CrossauthError, j, CrossauthLogger, ErrorCode } from '@crossauth/common
 //////////////////////////////////////////////////////////////////////
 // Class
 
+/**
+ * Endpoints for manipulating the OAuth client table, for use by users.
+ * 
+ * You do not instantiate this directly - it is created when you create
+ * a {@link SvelteKitServer}.
+ * 
+ * **Endpoints**
+ * 
+ * These endpoints can only be called if an admin user is logged in, as defined
+ * by the {@link SveltekitSessionServer.isAdminFn}.  If the user does not
+ * have this permission, a 401 error is raised.
+ * 
+ * | Name                       | Description                                                 | PageData (returned by load)                                                      | ActionData (return by actions)                                   | Form fields expected by actions                                  | URL param |
+ * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
+ * | baseEndpoint               | This PageData is returned by all endpoints' load function.  | - `user` logged in {@link @crossauth/common!User}                                | *Not provided*                                                   |                                                                  |           |
+ * |                            |                                                             | - `csrfToken` CSRF token if enabled                                              |                                                                  |                                                                  |           |                                                                                  | loginPage                | 
+ * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
+ * | searchClientsEndpoint      | Returns a paginated set of clients or those matching search | See {@link SearchClientsPageData}                                                | *Not provided*                                                   |                                                                  |           |
+ * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
+ * | updateClientEndpoint       | Updates a client                                            | See {@link UpdateClientsPageData}                                                | `default`:                                                       |                                                                  |           |
+ * |                            |                                                             |                                                                                  | See {@link UpdateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | clientId  |
+ * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
+ * | createClientEndpoint       | Creates a new client                                        | See {@link CreateClientsPageData}                                                | `default`:                                                       |                                                                  |           |
+ * |                            |                                                             |                                                                                  | See {@link CreateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | clientId  |
+ * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
+ * | deleteClientEndpoint       | Deletes a client                                            | See {@link DeleteClientsPageData}                                                | `default`:                                                       |                                                                  |           |
+ * |                            |                                                             |                                                                                  | See {@link DeleteClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | clientId  |
+ * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
+ */
 export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints {
 
+    /**
+     * Constructor
+     * @param sessionServer the session server which will have these endpoints
+     * @param options See {@link SvelteKitSessionServerOptions}.
+     */
     constructor(sessionServer : SvelteKitSessionServer,
         options : SvelteKitSessionServerOptions
     ) {
@@ -37,40 +71,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
     // Functions callable from apps
 
     /**
-     * Returns either a list of all clients for the user matching a search term.
-     * 
-     * The returned list is pagenaed using the `skip` and `take` parameters.
-     * 
-     * The searching is done with `clientSearchFn` that was passed in the
-     * options (see {@link SvelteKitSessionServerOptions }).  THe default
-     * is an exact username match.
-     * 
-     * By default, the searh and pagination parameters are taken from 
-     * the query parameters in the request but can be overridden.
-     * 
-     * @param event the Sveltekit request event.  The following query parameters
-     *        are read:
-     *   - `search` the search term which is ignored if it is undefined, null
-     *      or the empty string.
-     *   - `skip` the number to start returning from.  0 if not defined
-     *   - `take` the maximum number to return.  10 if not defined.
-     * @param search overrides the search term from the query.
-     * @param skip overrides the skip term from the query
-     * @param take overrides the take term from the query
-     * 
-     * @return an object with the following members:
-     *   - `success` true or false depending on whether there was an error
-     *   - `clients` the matching array of clients
-     *   - `error` error message if `success` is false
-     *   - `exception` a {@link @crossauth/common!CrossauthError} if there was
-     *      an error.
-     *   - `search` the search term that was used
-     *   - `skip` the skip term that was used
-     *   - `take` the take term that was used
-     *   - `hasNext` whether there are still more results after the ones that
-     *      were returned
-     *   - `hasPrevious` whether there are more results before the ones that
-     *      were returned.
+     * See {@link SvelteKitSharedClientEndpoints.searchClients_internal}
      */
     async searchClients(event : RequestEvent, searchTerm? : string, skip? : number, take? : number)
         : Promise<SearchClientsPageData> {
@@ -81,6 +82,9 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
     }
 
+    /**
+     * See {@link SvelteKitSharedClientEndpoints.loadClient_internal}
+     */
     async loadClient(event : RequestEvent)
         : Promise<UpdateClientPageData> {
 
@@ -111,6 +115,9 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
     }
 
+    /**
+     * See {@link SvelteKitSharedClientEndpoints.updateClient_internal}
+     */
     async updateClient(event : RequestEvent)
         : Promise<UpdateClientFormData> {
 
@@ -139,63 +146,72 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
     }
 
+    /**
+     * See {@link SvelteKitSharedClientEndpoints.loadDeleteClient_internal}
+     */
     async loadDeleteClient(event : RequestEvent)
-    : Promise<DeleteClientPageData> {
+        : Promise<DeleteClientPageData> {
 
-    if (!event.locals.user) 
-        throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
+        if (!event.locals.user) 
+            throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
 
-    // check user owns client
-    try {
-        const clientId = event.params.clientId;
-        if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
-        const client = await this.clientStorage?.getClientById(clientId);
-        if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
-    } catch (e) {
-        if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
-        const ce = CrossauthError.asCrossauthError(e);
-        CrossauthLogger.logger.debug(j({err: e}));
-        CrossauthLogger.logger.error(j({cerr: e}));
-        return {
-            success: false,
-            error: ce.message,
-            exception: ce,
+        // check user owns client
+        try {
+            const clientId = event.params.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client = await this.clientStorage?.getClientById(clientId);
+            if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: e}));
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+            }
         }
+
+        return this.loadDeleteClient_internal(event)
+
     }
 
-    return this.loadDeleteClient_internal(event)
+    /**
+     * See {@link SvelteKitSharedClientEndpoints.deleteClient_internal}
+     */
+    async deleteClient(event : RequestEvent)
+        : Promise<DeleteClientFormData> {
 
-}
+        if (!event.locals.user) 
+            throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
 
-async deleteClient(event : RequestEvent)
-    : Promise<DeleteClientFormData> {
-
-    if (!event.locals.user) 
-        throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
-
-    // check user owns client
-    try {
-        const clientId = event.params.clientId;
-        if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
-        const client = await this.clientStorage?.getClientById(clientId);
-        if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
-    } catch (e) {
-        if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
-        const ce = CrossauthError.asCrossauthError(e);
-        CrossauthLogger.logger.debug(j({err: e}));
-        CrossauthLogger.logger.error(j({cerr: e}));
-        return {
-            success: false,
-            error: ce.message,
-            exception: ce,
+        // check user owns client
+        try {
+            const clientId = event.params.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client = await this.clientStorage?.getClientById(clientId);
+            if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: e}));
+            return {
+                success: false,
+                error: ce.message,
+                exception: ce,
+            }
         }
+
+        return this.deleteClient_internal(event, false)
+
     }
 
-    return this.deleteClient_internal(event, false)
 
-}
-
-
+    /**
+     * See {@link SvelteKitSharedClientEndpoints.emptyClient_internal}
+     */
     async emptyClient(event : RequestEvent)
         : Promise<UpdateClientPageData> {
 
@@ -207,6 +223,9 @@ async deleteClient(event : RequestEvent)
 
     }
 
+    /**
+     * See {@link SvelteKitSharedClientEndpoints.createClient_internal}
+     */
     async createClient(event : RequestEvent)
         : Promise<UpdateClientFormData> {
 
@@ -221,6 +240,9 @@ async deleteClient(event : RequestEvent)
     /////////////////////////////////////////////////////////////////
     // Endpoints
 
+    /**
+     * See class documentation.
+     */
     readonly searchClientsEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.searchClients(event);
@@ -232,6 +254,9 @@ async deleteClient(event : RequestEvent)
         },
     };
 
+    /**
+     * See class documentation.
+     */
     readonly updateClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.loadClient(event);
@@ -250,6 +275,9 @@ async deleteClient(event : RequestEvent)
         }
     };
 
+    /**
+     * See class documentation.
+     */
     readonly createClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.emptyClient(event);
@@ -268,6 +296,9 @@ async deleteClient(event : RequestEvent)
         }
     };
 
+    /**
+     * See class documentation.
+     */
     readonly deleteClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.loadDeleteClient(event);

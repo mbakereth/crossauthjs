@@ -292,8 +292,8 @@ export abstract class OAuthClientBase {
 
         let resp : Response|undefined = undefined;
         try {
-            const url = new URL("/.well-known/openid-configuration",
-                this.authServerBaseUrl);
+            const url = new URL(
+                this.authServerBaseUrl + "/.well-known/openid-configuration");
             CrossauthLogger.logger.debug(j({msg: `Fetching OIDC config from ${url}`}))
             let options : {[key:string]:any} = {headers: this.authServerHeaders};
             if (this.authServerMode) options.mode = this.authServerMode;

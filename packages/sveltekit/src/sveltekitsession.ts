@@ -93,6 +93,17 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      */
     changeFactor2Url? : string,
 
+    /** OAuth to support.  A comma-separated list from {@link @crossauth/common!OAuthFlows}.  
+     * If [`all`], there must be none other in the list.  
+     * 
+     * This is needed not only by the authorization server but also the 
+     * session server if you are creating endpoints for manipulating
+     * the OAuth client table.
+     * 
+     * Default ['all']
+     */
+    validFlows? : string[],
+
     /** Function that throws a {@link @crossauth/common!CrossauthError} 
      *  with {@link @crossauth/common!ErrorCode} `FormEntry` if the user 
      * doesn't confirm to local rules.  Doesn't validate passwords  */

@@ -3,6 +3,7 @@ import {
     PrismaKeyStorage,
     PrismaUserStorage,
     PrismaOAuthClientStorage,
+    PrismaOAuthAuthorizationStorage,
     LocalPasswordAuthenticator,
     EmailAuthenticator,
     TotpAuthenticator } from '@crossauth/backend';
@@ -13,8 +14,8 @@ import { redirect, error } from '@sveltejs/kit';
 export const prisma = new PrismaClient();
 const userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: ["email"]});
 const keyStorage = new PrismaKeyStorage({prismaClient : prisma});
-// @ts-ignore
 const clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
+const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient : prisma});
 const passwordAuthenticator = new LocalPasswordAuthenticator(userStorage);
 const totpAuthenticator = new TotpAuthenticator("Sveltekit Example")
 const emailAuthenticator = new EmailAuthenticator();
@@ -27,6 +28,19 @@ try {
                 allowedFactor2: ["none", "totp"],
             }
         },
+        oAuthAuthServer: {
+            clientStorage,
+            keyStorage,
+            options: {
+                authStorage,
+            }
+        },
+        oAuthResServer: {
+            options: {
+                protectedEndpoints: {"/resource": {scope: ["read", "write"]}},
+                errorBody: {ok: false},
+            },
+        },
         options: {
             userStorage,
             clientStorage,
@@ -38,7 +52,9 @@ try {
             loginProtectedPageEndpoints: ["/account"],
             factor2ProtectedPageEndpoints: ["/resetpassword/*"],
             adminPageEndpoints: ["/admin", "/admin/**"],
-            unauthorizedUrl: "/401",
+            loginUrl: "/login",
+            loginRedirectUrl: "/",
+            validFlows: ['all'],
             redirect,
             error
         }});
