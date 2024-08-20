@@ -459,12 +459,12 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  *      not saved in the session.  Use the `load`/`actions` function in your
  *      `+page.server.ts`.
  *    - `custom` the function in 
- *       {@link FastifyOAuthClientOptions.receiveTokenFn} is called.  If
+ *       {@link SvelteKitOAuthClientOptions.receiveTokenFn} is called.  If
  *       using `get` or `post` methods, your functiin should return
  *       a Response.  If using `load` and `actions` ir shouls ewruen
  *       an object for passing in `data` or `form` exports.
  *      
- * **{@link FastifyOAuthClientOptions.errorResponseType}**
+ * **{@link SvelteKitOAuthClientOptions.errorResponseType}**
  * 
  *    - `sendJson` a JSON response is sent with fields
  *       `status`, `errorMessage`,

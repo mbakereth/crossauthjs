@@ -42,7 +42,11 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
     codeChallengeMethod? : "plain" | "S256"
 
     /**
-     * Set of flows to enable (see {@link @crossauth/common!OAuthFlows})
+     * Set of flows to enable (see {@link @crossauth/common!OAuthFlows}).
+     * 
+     * Defaults to empty, though the default is overridden to `['all]` 
+     * in the SvelteKit client as this one needs flow endpoints to be
+     * explicitly written anyway.
      */
     validFlows? : string[],
 }
