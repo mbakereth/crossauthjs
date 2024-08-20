@@ -280,9 +280,9 @@ test('SvelteKitOAuthServer.oidcConfiguration', async () => {
     const resp =await authServer?.oidcConfigurationEndpoint.get(event);
     expect(resp?.status).toBe(200);
     const body = await resp?.json();
-    expect(body?.authorizeEndpoint).toBe("/oauth/authorize");
-    expect(body?.tokenEndpoint).toBe("/oauth/token");
-    expect(body?.jwksUri).toBe("/oauth/jwks");
+    expect(body?.authorization_endpoint).toBe("http://localhost:3000/oauth/authorize");
+    expect(body?.token_endpoint).toBe("http://localhost:3000/oauth/token");
+    expect(body?.jwks_uri).toBe("http://localhost:3000/oauth/jwks");
 });
 
 test('SvelteKitOAuthServer.jwks', async () => {

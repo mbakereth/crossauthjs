@@ -188,6 +188,13 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
      */
     tokenEndpoints? : ("access_token"|"refresh_token"|"id_token"|
         "have_access_token"|"have_refresh_token"|"have_id_token")[],
+
+    /**
+     * Set of flows to enable (see {@link @crossauth/common!OAuthFlows}).
+     * 
+     * Defaults to empty.
+     */
+    validFlows? : string[],
 }
 
 
@@ -659,6 +666,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             => Promise<FastifyReply|undefined> = sendJson;
     private errorFn : FastifyErrorFn = jsonError;
     private loginUrl : string = "/login";
+    private validFlows : string[] = [];
 
     /** 
      * See {@link FastifyOAuthClientOptions}
@@ -717,7 +725,16 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         setParameter("mfaOobPage", ParamType.String, this, options, "OAUTH_MFA_OOB_PAGE");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
-        
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+
+        if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
+            this.validFlows = OAuthFlows.allFlows();
+        } else {
+            if (!OAuthFlows.areAllValidFlows(this.validFlows)) {
+                throw new CrossauthError(ErrorCode.Configuration, "Invalid flows specificied in " + this.validFlows.join(","));
+            }
+        }
+
         if (options.tokenEndpoints) this.tokenEndpoints = options.tokenEndpoints;
 
         if (this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);

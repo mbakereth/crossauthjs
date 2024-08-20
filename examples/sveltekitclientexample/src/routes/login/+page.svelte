@@ -14,9 +14,9 @@
     });*/
 </script>
 <svelte:head>
-    <title>Login</title>
+    <title>Client Login</title>
 </svelte:head>
-<h1>Login</h1>
+<h1>Client Login</h1>
 
 {#if form?.factor2Required}
     <form method="POST" action="?/factor2">

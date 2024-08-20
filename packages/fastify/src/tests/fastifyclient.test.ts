@@ -10,6 +10,8 @@ import { FastifyOAuthClient, } from '..';
 
 import path from 'path';
 
+export const CSRFHEADER = "X-CROSSAUTH-CSRF";
+
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
 
@@ -150,6 +152,7 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
     let res;
 
     res = await server.app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
+    console.log(res);
     const authUrl = res.headers?.location;
     expect(authUrl).toBeDefined();
     const state = get("state", authUrl??"");
@@ -426,7 +429,6 @@ test('FastifyOAuthClient.refreshIfExpiredEndpoint_Interactive', async () => {
 
 });
 
-/*
 test('FastifyOAuthClient.refreshIfExpiredEndpoint_NonInteractive', async () => { 
     const { server, access_token, refresh_token, sessionCookie, authServer } = await getAccessTokenThroughClient({
         tokenResponseType: "saveInSessionAndLoad",
@@ -542,4 +544,3 @@ test('FastifyOAuthClient.bffPost', async () => {
     const requestBody = JSON.parse(body.body);
     expect(requestBody.param).toBe("value");
 });
-*/

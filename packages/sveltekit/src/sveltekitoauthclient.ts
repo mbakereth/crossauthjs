@@ -65,6 +65,11 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * All flows listed here will require the user to login (here at the client).
      * If if a flow is not listed here, there does not need to be a user
      * logged in here at the client.
+     * 
+     * In most cases you can ignore this and use 
+     * {@link SvelteKitSessionServerOptions.loginProtectedPageEndpoints}
+     * to protect the endpoints that begin the flows.
+     * 
      * See {@link @crossauth/common!OAuthFlows}.
      */
     loginProtectedFlows? : string[],
@@ -92,7 +97,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 
     /**
      * What to do when receiving tokens.
-     * See {@link FastifyOAuthClient} class documentation for full description.
+     * See {@link SvelteKitOAuthClient} class documentation for full description.
      */
     tokenResponseType? : 
         "sendJson" | 
@@ -147,6 +152,16 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 
     /** Pass the Sveltekit error function */
     error? : any,
+
+    /**
+     * Set of flows to enable (see {@link @crossauth/common!OAuthFlows}).
+     * 
+     * Defaults to all flows, as they must be created manually in
+     * your `routes`.  However, be aware that the Password and Password MFA
+     * flows are on the same endpoint, so if you want to support one and
+     * not the other, set this variable.
+     */
+    validFlows? : string[],
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -575,6 +590,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             => Promise<Response|TokenReturn|undefined> = sendJson;
     readonly errorFn : SvelteKitErrorFn = jsonError;
     private loginUrl : string = "/login";
+    private validFlows : string[] = [OAuthFlows.All];
     authorizedUrl : string = "";
 
     readonly redirect : any;
@@ -621,11 +637,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         setParameter("tokenResponseType", ParamType.String, this, options, "OAUTH_TOKEN_RESPONSE_TYPE");
         setParameter("errorResponseType", ParamType.String, this, options, "OAUTH_ERROR_RESPONSE_TYPE");
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
-        setParameter("loginProtectedFlows", ParamType.JsonArray, this, options, "OAUTH_LOGIN_PROTECTED_FLOWS");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
         setParameter("redirectUri", ParamType.String, this, options, "OAUTH_REDIRECTURI", true);
         setParameter("authorizedUrl", ParamType.String, this, options, "AUTHORIZED_URL", false);
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
 
         if (this.bffEndpointName && !this.bffEndpointName.startsWith("/")) this.bffEndpointName = "/" + this.bffEndpointName;
         if (this.bffEndpointName && this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
@@ -633,6 +649,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
         if (options.redirect) this.redirect = options.redirect;
         if (options.error) this.error = options.error;        
+
+        if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
+            this.validFlows = OAuthFlows.allFlows();
+        } else {
+            if (!OAuthFlows.areAllValidFlows(this.validFlows)) {
+                throw new CrossauthError(ErrorCode.Configuration, "Invalid flows specificied in " + this.validFlows.join(","));
+            }
+        }
 
         try {
             new URL(this.redirectUri ?? "");

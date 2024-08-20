@@ -1,7 +1,6 @@
-import { OAuthClientBase, OAuthFlows } from '@crossauth/common';
+import { OAuthClientBase } from '@crossauth/common';
 import { Crypto } from '../crypto';
 import { setParameter, ParamType } from '../utils';
-import { CrossauthError, ErrorCode  } from '@crossauth/common';
 import {
     OAuthTokenConsumer,
     type OAuthTokenConsumerOptions } from './tokenconsumer';
@@ -40,15 +39,6 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
      * Type of code challenge for PKCE
      */
     codeChallengeMethod? : "plain" | "S256"
-
-    /**
-     * Set of flows to enable (see {@link @crossauth/common!OAuthFlows}).
-     * 
-     * Defaults to empty, though the default is overridden to `['all]` 
-     * in the SvelteKit client as this one needs flow endpoints to be
-     * explicitly written anyway.
-     */
-    validFlows? : string[],
 }
 
 /**
@@ -60,7 +50,6 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
  * is let out of there and added in here.
  */
 export class OAuthClientBackend extends OAuthClientBase {
-    protected validFlows : string[] = [];
 
     /**
      * Constructor
@@ -87,16 +76,8 @@ export class OAuthClientBackend extends OAuthClientBase {
         setParameter("verifierLength", ParamType.String, this, options, "OAUTH_VERIFIER_LENGTH");
         setParameter("clientSecret", ParamType.String, tmp, options, "OAUTH_CLIENT_SECRET");
         setParameter("codeChallengeMethod", ParamType.String, this, options, "OAUTH_CODE_CHALLENGE_METHOD");
-        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
         if (tmp.clientSecret) this.clientSecret = tmp.clientSecret;
 
-        if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
-            this.validFlows = OAuthFlows.allFlows();
-        } else {
-            if (!OAuthFlows.areAllValidFlows(this.validFlows)) {
-                throw new CrossauthError(ErrorCode.Configuration, "Invalid flows specificied in " + this.validFlows.join(","));
-            }
-        }
     }
 
     /**
