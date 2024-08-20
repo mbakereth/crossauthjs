@@ -14,7 +14,7 @@
 <svelte:head>
     <title>Logout</title>
 </svelte:head>
-<h1>Login</h1>
+<h1>Logout</h1>
 
 {#if form?.error} 
     <p class="bg-error p-2 rounded text-slate-900">Error: {form?.error}</p>

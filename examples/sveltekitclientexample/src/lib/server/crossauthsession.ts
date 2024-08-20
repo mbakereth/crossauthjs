@@ -34,7 +34,7 @@ try {
                 bffEndpoints: [{url: "/resource", methods: ["GET"]}],
                 bffBaseUrl: "http://localhost:5173",
                 tokenEndpoints: ["id_token", "access_token", "refresh_token", "have_access_token", "have_id_token", "have_refresh_token"],
-                loginProtectedFlows: [OAuthFlows.AuthorizationCode],
+                loginProtectedFlows: [OAuthFlows.AuthorizationCode, OAuthFlows.AuthorizationCodeWithPKCE],
             },
         }, 
         options: {
@@ -43,12 +43,11 @@ try {
             authenticators: {
                 localpassword: passwordAuthenticator,
             },
-            loginProtectedPageEndpoints: ["/account", "/oauth/flows/authzcodeflow"],
+            loginProtectedPageEndpoints: ["/account", "/flows/authzcodeflow"],
             factor2ProtectedPageEndpoints: ["/resetpassword/*"],
             adminPageEndpoints: ["/admin", "/admin/**"],
             loginUrl: "/login",
             loginRedirectUrl: "/",
-            loginProtectedFlows: [OAuthFlows.AuthorizationCode, OAuthFlows.AuthorizationCodeWithPKCE],
             redirect,
             error
         }});
