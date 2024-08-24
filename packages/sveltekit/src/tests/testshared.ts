@@ -196,7 +196,7 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
                 "access_token",
                 "have_access_token",
                 "id_token",
-                "have_id_token"
+                "have_id_token",
             ],
             redirect,
             error,

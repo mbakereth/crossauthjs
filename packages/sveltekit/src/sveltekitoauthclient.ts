@@ -1434,9 +1434,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 have_id_token?: boolean,
             } = {};
             let lastTokenPayload : ({[key:string]:any}|undefined) = undefined;
+            let isHave = false;
             for (let t of tokens) {
                 if (!this.tokenEndpoints.includes(t)) throw new CrossauthError(ErrorCode.Unauthorized, "Token type " + t + " may not be returned");
-                let isHave = false;
+                isHave = false;
                 let tokenName : string = t;
                 if (t.startsWith("have_")) {
                     tokenName = t.replace("have_", "");
@@ -1445,6 +1446,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 let payload = this.tokenPayload(tokenName, oauthData);
                 // @ts-ignore because t is a string
                 if (payload) tokensReturning[t] = isHave ? true : payload;
+                else if (isHave) tokensReturning[t] = false;
                 lastTokenPayload = payload;
             }
             if (!Array.isArray(token)) {
@@ -1452,6 +1454,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     if (token.startsWith("have_")) return {status: 200, body: {ok: false}};
                     else return {status: 204};
                 }
+                if (isHave) return  {status: 200, body: {ok: true}};
                 return {status: 200, body: lastTokenPayload};
             } else {
                 return {status: 200, body: tokensReturning};
@@ -2127,7 +2130,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         post: async (event : RequestEvent) => {
             if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
-                console.log(ce);
                 return this.errorFn(this.server, event, ce);
             }
             return this.pack(await this.refreshTokens(event, "silent", true));

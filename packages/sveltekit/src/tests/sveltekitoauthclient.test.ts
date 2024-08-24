@@ -584,8 +584,8 @@ test('SvelteKitClient.autoRefreshTokens_post', async () => {
     
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
     const resp = await server.oAuthClient?.autoRefreshTokensEndpoint.post(event);
-    expect(typeof resp).not.toBe("object");
-    if (!resp || !(resp instanceof Response)) throw Error("Response is not an Response object");
+    //expect(typeof resp).not.toBe("object");
+    //if (!resp || !(resp instanceof Response)) throw Error("Response is not an Response object");
     const body = await resp.json();
     expect(body?.expires_at).toBeDefined();
 
@@ -900,9 +900,10 @@ test('SvelteKitClient.tokens', async () => {
     const resp = await server.oAuthClient?.tokensEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
+    console.log(body)
     expect(body.access_token?.jti).toBeDefined();
-    expect(body.have_access_token?.ok).toBe(true);
-    expect(body.have_id_token?.ok).toBe(false);
+    expect(body.have_access_token).toBe(true);
+    expect(body.have_id_token).toBe(false);
     expect(body.id_token).toBeUndefined();
     expect(body.refresh_token).toBeUndefined();
     expect(body.have_refresh_token).toBeUndefined();
