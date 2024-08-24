@@ -584,9 +584,10 @@ test('SvelteKitClient.autoRefreshTokens_post', async () => {
     
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
     const resp = await server.oAuthClient?.autoRefreshTokensEndpoint.post(event);
-    expect(typeof resp).toBe("object");
-    if (!resp || (resp instanceof Response)) throw Error("Response is not an object");
-    expect(resp.expires_at).toBeDefined();
+    expect(typeof resp).not.toBe("object");
+    if (!resp || !(resp instanceof Response)) throw Error("Response is not an Response object");
+    const body = await resp.json();
+    expect(body?.expires_at).toBeDefined();
 
 });
 
@@ -760,7 +761,7 @@ test('SvelteKitClient.accessToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.accessTokenEndpoint.get(event);
+    const resp = await server.oAuthClient?.accessTokenEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.body;
     expect(body?.jti).toBeDefined();
@@ -783,7 +784,7 @@ test('SvelteKitClient.haveAccessToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.haveAccessTokenEndpoint.get(event);
+    const resp = await server.oAuthClient?.haveAccessTokenEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(true);
@@ -806,7 +807,7 @@ test('SvelteKitClient.refreshTokenNotAllowed', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.refreshTokenEndpoint.get(event);
+    const resp = await server.oAuthClient?.refreshTokenEndpoint.post(event);
     expect(resp.status).toBe(401);
     const body = await resp.json();
     expect(body.jti).toBeUndefined();
@@ -829,7 +830,7 @@ test('SvelteKitClient.dontHaveRefreshToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.haveRefreshTokenEndpoint.get(event);
+    const resp = await server.oAuthClient?.haveRefreshTokenEndpoint.post(event);
     expect(resp.status).toBe(401);
     const body = await resp.json();
     expect(body.ok).toBeUndefined();
@@ -852,7 +853,7 @@ test('SvelteKitClient.dontHaveIdToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.haveIdTokenEndpoint.get(event);
+    const resp = await server.oAuthClient?.haveIdTokenEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(false);
@@ -875,7 +876,7 @@ test('SvelteKitClient.idToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.idTokenEndpoint.get(event);
+    const resp = await server.oAuthClient?.idTokenEndpoint.post(event);
     expect(resp.status).toBe(204);
 });
 
@@ -896,7 +897,7 @@ test('SvelteKitClient.tokens', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.tokensEndpoint.get(event);
+    const resp = await server.oAuthClient?.tokensEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.access_token?.jti).toBeDefined();

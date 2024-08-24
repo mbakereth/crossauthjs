@@ -1222,6 +1222,54 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             });
         }
 
+        this.server.app.post(this.prefix+"tokens", 
+            async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
+                CrossauthLogger.logger.info(j({
+                    msg: "Page visit",
+                    method: 'POST',
+                    url: this.prefix + "tokens",
+                    ip: request.ip,
+                    user: request.user?.username
+                }));
+            if (!request.csrfToken) {
+                return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
+            }
+            const oauthData = await this.server.getSessionData(request, "oauth");
+            if (!oauthData) {
+                return reply.header(...JSONHDR).status(204).send();
+            }
+            let tokensReturning : {
+                access_token?: {[key:string]:any},
+                refresh_token?: {[key:string]:any},
+                id_token?: {[key:string]:any},
+                have_access_token?: boolean,
+                have_refresh_token?: boolean,
+                have_id_token?: boolean,
+            } = {};
+            for (let tokenType of this.tokenEndpoints) {
+                let isHave = false;
+                let tokenName : string = tokenType;
+                if (tokenType.startsWith("have_")) {
+                    tokenName = tokenType.replace("have_", "");
+                    isHave = true;
+                }
+                if (tokenName in oauthData) {
+                    let payload = oauthData[tokenName];
+                    payload = decodePayload(oauthData[tokenName]);
+                    if (payload) {
+                        // @ts-ignore it doesn't recognize we filtered out _have
+                        tokensReturning[tokenType] = isHave ? true : payload;
+                    }    
+                } else if (isHave) {
+                    // @ts-ignore it doesn't recognize we filtered on _have
+                    tokensReturning[tokenType] = false;
+                }
+    
+            }
+
+            return reply.header(...JSONHDR).status(200).send({...tokensReturning});
+        });
+
         // Add BFF endpoints
         if (this.bffEndpoints.length > 0 && !this.bffBaseUrl) {
             throw new CrossauthError(ErrorCode.Configuration, "If enabling BFF endpoints, must also define bffBaseUrl");

@@ -18,11 +18,13 @@ const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient : prisma})
 const passwordAuthenticator = new LocalPasswordAuthenticator(userStorage);
 export let crossauth : SvelteKitServer;
 try {
+    console.log("Instantiating client's SvelteKitServer")
     crossauth = new SvelteKitServer({
         session: {
             keyStorage: keyStorage,
             options: {
                 allowedFactor2: ["none", "totp"],
+                enableCsrfProtection: false,
             }
         },
         oAuthClient: {

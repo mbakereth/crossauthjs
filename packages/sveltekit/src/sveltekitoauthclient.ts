@@ -141,6 +141,25 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
     bffBaseUrl? : string,
 
     /**
+     * Now many times to attempt to make a BFF request before failing
+     * with an unauthorized reponse.  This is useful when you have
+     * enable auto refresh.  If you make a resource request just as the
+     * token is renewing, you might get an error.
+     * 
+     * Default 1
+     */
+    bffMaxTries? : number,
+
+    /**
+     * How many milliseconds to sleep between BFF tries.
+     * 
+     * See {@link SvelteKitOAuthClientOptions.bffMaxTries}
+     * 
+     * Default 500
+     */
+    bffSleepMilliseconds? : number,
+
+    /**
      * Endpoints to provide to acces tokens through the BFF mechanism,
      * See {@link FastifyOAuthClient} class documentation for full description.
      */
@@ -568,15 +587,15 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | refreshTokenEndpoint                  | For BFF only, return the refresh token payload or error      | JSON of the refresh token payload                                            | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | idTokenEndpoint                       | For BFF only, return the id token payload or error           | JSON of the id token payload                                                 | *Not provided*                                                   |                                                                 |  
+ * | idTokenEndpoint                       | For BFF only, return the id token payload or error           | POST: JSON of the id token payload                                                 | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | havAeccessTokenEndpoint               | For BFF only, return whether access token present            | `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | havAeccessTokenEndpoint               | For BFF only, return whether access token present            | POST: `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | haveRefreshTokenEndpoint              | For BFF only, return whether refresh token present           | `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | haveRefreshTokenEndpoint              | For BFF only, return whether refresh token present           | POST: `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | haveIdTokenEndpoint                   | For BFF only, return whether id token present                | `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | haveIdTokenEndpoint                   | For BFF only, return whether id token present                | POST: `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | tokensEndpoint                        | For BFF only, a JSON object of all of the above              | All of the above, keyed on `access_token`, `have_access_token`, etc.         | *Not provided*                                                   |                                                                 |  
+ * | tokensEndpoint                        | For BFF only, a JSON object of all of the above              | POST: All of the above, keyed on `access_token`, `have_access_token`, etc.         | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  */
 export class SvelteKitOAuthClient extends OAuthClientBackend {
@@ -592,6 +611,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     private loginUrl : string = "/login";
     private validFlows : string[] = [OAuthFlows.All];
     authorizedUrl : string = "";
+    private autoRefreshActive : {[key:string]: boolean} = {};
 
     readonly redirect : any;
     readonly error : any;
@@ -621,6 +641,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     private bffEndpointName = "bff";
     private bffBaseUrl? : string;
     private tokenEndpoints : string[] = [];
+    private bffMaxTries : number = 1;
+    private bffSleepMilliseconds : number = 500;
     
     /**
      * Constructor
@@ -642,6 +664,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         setParameter("redirectUri", ParamType.String, this, options, "OAUTH_REDIRECTURI", true);
         setParameter("authorizedUrl", ParamType.String, this, options, "AUTHORIZED_URL", false);
         setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("bffMaxTries", ParamType.Number, this, options, "OAUTH_BFF_MAX_RETRIES");
+        setParameter("bffSleepMilliseconds", ParamType.Number, this, options, "OAUTH_BFF_SLEEP_MILLISECONDS");
 
         if (this.bffEndpointName && !this.bffEndpointName.startsWith("/")) this.bffEndpointName = "/" + this.bffEndpointName;
         if (this.bffEndpointName && this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
@@ -906,7 +930,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             error?: string,
             error_description?: string
             }|undefined> {
-
+        
         if (!expiresAt || !refreshToken) {
             if (mode != "silent") {
                 return await this.receiveTokenFn({},
@@ -918,7 +942,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         }
 
         if (!onlyIfExpired || expiresAt <= Date.now()) {
+            if (event.locals.sessionId && this.autoRefreshActive[event.locals.sessionId]) return undefined;
+
             try {
+                if (event.locals.sessionId) this.autoRefreshActive[event.locals.sessionId] = true;
                 const resp = await this.refreshTokenFlow(refreshToken);
                 if (!resp.error && !resp.access_token) {
                     resp.error = "server_error";
@@ -981,6 +1008,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     error_description: "Failed refreshing access token",
                 };                    
 
+            } finally {
+                if (event.locals.sessionId && event.locals.sessionId in this.autoRefreshActive) delete this.autoRefreshActive[event.locals.sessionId];
             }
         }
         return undefined;
@@ -1048,6 +1077,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 error_description: ce.message,
             };
         }
+
     };
 
     private async passwordFlow_post(event : RequestEvent, passwordFn : (event : RequestEvent, formData: {[key:string]:string}) => Promise<OAuthTokenResponse>) {
@@ -1173,74 +1203,102 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     /**
-     * Ordinarily you would not call this directly but use `bffEndpoint`.
+     * Call a resource on the resource server, passing in the access token 
+     * along with the body from the event and, unless overridden, the URL.
      * 
-     * However you can use this if you need to pass custom headers.
+     * It is probably easier to use `bffEndpoint` instead of this method.
+     * However you can use this if you need to pass custom headers or want
+     * to specify the URL manually.
+     * 
      * @param event the Sveltekit request event
-     * @param opts additional data to put in resource server request
+     * @param opts additional data to put in resource server request.  You can also override the URL here
      * @returns resource server response
      */
-    async bff(event : RequestEvent, opts: {method?: "GET"|"POST"|"PUT"|"HEAD"|"OPTIONS"|"PATCH"|"DELETE", headers? : Headers} = {}) : Promise<Response> {
+    async bff(event : RequestEvent, opts: {method?: "GET"|"POST"|"PUT"|"HEAD"|"OPTIONS"|"PATCH"|"DELETE", headers? : Headers, url? : string} = {}) : Promise<Response> {
         try {
             if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
             if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
             if (!this.bffBaseUrl) throw new CrossauthError(ErrorCode.Configuration, "Must set bffBaseUrl to use bff()");
             if (!this.bffEndpointName) throw new CrossauthError(ErrorCode.Configuration, "Must set bffEndpointName to use bff()");
     
-            if (!event.url.pathname.startsWith(this.bffEndpointName)) throw new CrossauthError(ErrorCode.Unauthorized, "Attempt to call BFF url with the wrong prefix");
-            const path = event.url.pathname.substring(this.bffEndpointName.length);
-            let query = event.url.searchParams?.toString() ?? undefined;
-            if (query && query != "") query = "?" + query;
-            const url = new URL(this.bffBaseUrl + path + query);
+            let url : URL | string | undefined = opts.url;
+            if (!url) {
+                if (!event.url.pathname.startsWith(this.bffEndpointName)) throw new CrossauthError(ErrorCode.Unauthorized, "Attempt to call BFF url with the wrong prefix");
+                const path = event.url.pathname.substring(this.bffEndpointName.length);
+                let query = event.url.searchParams?.toString() ?? undefined;
+                if (query && query != "") query = "?" + query;
+                url = new URL(this.bffBaseUrl + path + query);
+            }
             if (!opts.headers) {
                 opts.headers = new Headers();
             }
-            const oauthData = 
-                await this.server.sessionServer.getSessionData(event, 
-                    "oauth");
-            if (!oauthData) {
-                throw new CrossauthError(ErrorCode.Unauthorized, "No access token found");
-            }
-            let access_token = oauthData.access_token;
-            if (oauthData && oauthData.access_token) {
-                const resp = 
-                    await this.server.oAuthClient.refresh("silent",
-                        event,
-                        true,
-                        oauthData.refresh_token,
-                        oauthData.expires_at);
-                // following shouödn't happen but TS doesn't know that
-                if (resp instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Expected object when refreshing tokens, not Response");
-                if (resp?.access_token) {
-                    access_token = resp.access_token;
+            for (let i = 0; i < this.bffMaxTries; ++i) {
+
+                if (i > 0) await new Promise(r => setTimeout(r, this.bffSleepMilliseconds));
+
+
+                const oauthData = 
+                    await this.server.sessionServer.getSessionData(event, 
+                        "oauth");
+                        if (!oauthData) {
+                    if (i == this.bffMaxTries) {
+                        throw new CrossauthError(ErrorCode.Unauthorized, "No access token found");
+                    } else {
+                        continue;
+                    }
+                }
+                let access_token = oauthData.access_token;
+                if (oauthData && oauthData.access_token) {
+                    const resp = 
+                    await this.refresh("silent",
+                            event,
+                            true,
+                            oauthData.refresh_token,
+                            oauthData.expires_at);
+                            // following shouldn't happen but TS doesn't know that
+                    if (resp instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Expected object when refreshing tokens, not Response");
+                    if (resp?.access_token) {
+                        access_token = resp.access_token;
+                    } else if (resp?.error) {
+                        continue; // try again
+                    }
+                }
+
+                opts.headers.set("accept", "application/json");
+                opts.headers.set("content-type", "application/json");
+                if (access_token) opts.headers.set("authorization", "Bearer " + access_token);
+
+                let resp : Response;
+                let body : {[key:string]:any} | undefined = undefined;
+                if (event.request.body) {
+                    var data = new JsonOrFormData();
+                    await data.loadData(event);
+                    body = data.toObject();
+                }
+                CrossauthLogger.logger.debug(j({msg: "Calling BFF URL", url: url, method: event.request.method}));
+                if (body) {
+                    resp = await fetch(url, {
+                        headers:opts.headers,
+                        method: opts.method ?? event.request.method,
+                        body: JSON.stringify(body??"{}"),
+                    });    
+                } else {
+                    resp = await fetch(url, {
+                        headers:opts.headers,
+                        method: opts.method ?? event.request.method,
+                    });    
+                }
+                if (resp.status == 401) {
+                    if (i < this.bffMaxTries - 1) {
+                        continue;
+                    } else {
+                        return resp;
+                    }
+                } else {
+                    return resp;
                 }
             }
-
-            opts.headers.set("accept", "application/json");
-            opts.headers.set("content-type", "application/json");
-            if (access_token) opts.headers.set("authorization", "Bearer " + access_token);
-
-            let resp : Response;
-            let body : {[key:string]:any} | undefined = undefined;
-            if (event.request.body) {
-                var data = new JsonOrFormData();
-                await data.loadData(event);
-                body = data.toObject();
-            }
-            CrossauthLogger.logger.debug(j({msg: "Calling BFF URL", url: url, method: event.request.method}))
-            if (body) {
-                resp = await fetch(url, {
-                    headers:opts.headers,
-                    method: opts.method ?? event.request.method,
-                    body: JSON.stringify(body??"{}"),
-                });    
-            } else {
-                resp = await fetch(url, {
-                    headers:opts.headers,
-                    method: opts.method ?? event.request.method,
-                });    
-            }
-            return resp;
+            return new Response(null, {status: 401}); // not reached but to ensure TS return type is correct
 
         } catch (e) {
             if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1269,6 +1327,15 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 return {status: resp.status, body: {}, error: ce.oauthErrorCode, error_description: ce.message}
             }
         }
+    }
+
+    pack(ret : {[key:string]:any}|undefined|Response) {
+        if (ret instanceof Response) return ret;
+        let status = 200;
+        if (ret?.error == "access_denied") status = 401;
+        else if (ret?.error) status = 500;
+        else if (!ret) status = 204;
+        return json(ret ?? null, {status});
     }
 
     /**
@@ -1360,18 +1427,24 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             }
             let tokensReturning : {
                 access_token?: {[key:string]:any},
-                have_access_token?: {[key:string]:any},
+                have_access_token?: boolean,
                 refresh_token?: {[key:string]:any},
-                have_refresh_token?: {[key:string]:any},
+                have_refresh_token?: boolean,
                 id_token?: {[key:string]:any},
-                have_id_token?: {[key:string]:any},
+                have_id_token?: boolean,
             } = {};
             let lastTokenPayload : ({[key:string]:any}|undefined) = undefined;
             for (let t of tokens) {
                 if (!this.tokenEndpoints.includes(t)) throw new CrossauthError(ErrorCode.Unauthorized, "Token type " + t + " may not be returned");
-                let payload = this.tokenPayload(t, oauthData);
+                let isHave = false;
+                let tokenName : string = t;
+                if (t.startsWith("have_")) {
+                    tokenName = t.replace("have_", "");
+                    isHave = true;
+                }
+                let payload = this.tokenPayload(tokenName, oauthData);
                 // @ts-ignore because t is a string
-                if (payload) tokensReturning[t] = payload;
+                if (payload) tokensReturning[t] = isHave ? true : payload;
                 lastTokenPayload = payload;
             }
             if (!Array.isArray(token)) {
@@ -2033,7 +2106,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
                 return this.errorFn(this.server, event, ce);
             }
-            return this.refreshTokens(event, "post", true);
+            return this.pack(await this.refreshTokens(event, "post", true));
         },
 
         actions: {
@@ -2054,9 +2127,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         post: async (event : RequestEvent) => {
             if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
+                console.log(ce);
                 return this.errorFn(this.server, event, ce);
             }
-            return this.refreshTokens(event, "silent", true);
+            return this.pack(await this.refreshTokens(event, "silent", true));
         },
     };
 
@@ -2067,10 +2141,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
                 return this.errorFn(this.server, event, ce);
             }
-            return this.refreshTokens(event, "silent", false);
+            return this.pack(await this.refreshTokens(event, "silent", false));
         },
     };
-
 
     readonly passwordFlowEndpoint = {
 
@@ -2126,6 +2199,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         actions: {
             get: async ( event : RequestEvent ) => 
                 await this.unpack(await this.bff(event)),
+            post: async ( event : RequestEvent ) => 
+                await this.unpack(await this.bff(event)),
         },
 
     };
@@ -2157,7 +2232,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     };
 
     readonly accessTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokens(event, "access_token"),
+        post: async (event : RequestEvent) => await this.tokens(event, "access_token"),
         actions: {
             default: async ( event : RequestEvent ) => 
                 await this.tokens(event, "access_token"),
@@ -2165,7 +2240,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     readonly haveAccessTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokensResponse(event, "have_access_token"),
+        post: async (event : RequestEvent) => await this.tokensResponse(event, "have_access_token"),
         actions: {
             default: async ( event : RequestEvent ) => 
                 await this.tokens(event, "have_access_token"),
@@ -2173,7 +2248,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     readonly refreshTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokensResponse(event, "refresh_token"),
+        post: async (event : RequestEvent) => await this.tokensResponse(event, "refresh_token"),
         actions: {
             default: async ( event : RequestEvent ) => 
                 await this.tokens(event, "refresh_token"),
@@ -2181,7 +2256,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     readonly haveRefreshTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokensResponse(event, "have_refresh_token"),
+        post: async (event : RequestEvent) => await this.tokensResponse(event, "have_refresh_token"),
         actions: {
             default: async ( event : RequestEvent ) => 
                 await this.tokens(event, "have_refresh_token"),
@@ -2189,7 +2264,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     readonly idTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokensResponse(event, "id_token"),
+        post: async (event : RequestEvent) => await this.tokensResponse(event, "id_token"),
         actions: {
             default: async ( event : RequestEvent ) => 
                 await this.tokens(event, "id_token"),
@@ -2197,7 +2272,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     readonly haveIdTokenEndpoint = {
-        get: async (event : RequestEvent) => await this.tokensResponse(event, "have_id_token"),
+        post: async (event : RequestEvent) => await this.tokensResponse(event, "have_id_token"),
         actions: {
             default: async ( event : RequestEvent ) => 
                 await this.tokens(event, "have_id_token"),
@@ -2205,7 +2280,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     readonly tokensEndpoint = {
-        get: async (event : RequestEvent) => await this.tokensResponse(event, this.tokenEndpoints),
+        post: async (event : RequestEvent) => await this.tokensResponse(event, this.tokenEndpoints),
         actions: {
             default: async ( event : RequestEvent ) => 
                 await this.tokens(event,this.tokenEndpoints),

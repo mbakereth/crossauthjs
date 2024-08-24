@@ -76,21 +76,31 @@ export class OAuthAutoRefresher {
 
             // Get token expiries
             const expiries = await this.tokenProvider.getTokenExpiries([...tokensToFetch, "refresh"], csrfToken);
-            if (expiries.refresh == undefined) return;
+            if (expiries.refresh == undefined) {
+                CrossauthLogger.logger.debug(j({msg: `No refresh token found`}))
+                return;
+            }
 
             const now = Date.now();
 
             // if neither access nor ID token expires, we have nothing to do
             let tokenExpiry = expiries.id;
             if (!tokenExpiry || (expiries.access && expiries.access < tokenExpiry)) tokenExpiry = expiries.access;
-            if (!tokenExpiry) return;
+            if (!tokenExpiry) {
+                CrossauthLogger.logger.debug(j({msg: `No tokens expire`}))
+                return;
+            }
 
             // renew token TOLERANCE_SECONDS before expiry
             const renewTime = tokenExpiry*1000 - now - TOLERANCE_SECONDS;
-            if (renewTime < 0) return;
+            if (renewTime < 0) {
+                CrossauthLogger.logger.debug(j({msg: `Expiry time has passed`}))
+                return;
+            }
 
             // if refresh token is about to expire, don't try to use it
             if (expiries.refresh && expiries.refresh - TOLERANCE_SECONDS < renewTime) {
+                CrossauthLogger.logger.debug(j({msg: `Refresh token has expired`}))
                 return;
             }
 
@@ -130,13 +140,13 @@ export class OAuthAutoRefresher {
                         }
                     }, "refresh");
 
-                    if (!resp.ok) {
+                    if (!resp.ok) { 
                         CrossauthLogger.logger.error(j({msg: "Failed auto refreshing tokens", status: resp.status}));
         
                     }
                     reply = await resp.json();
 
-                    if (reply?.ok) {
+                    if (reply?.ok || reply?.success) { // TODO: make success ok in sveltekit
                         await this.scheduleAutoRefresh(tokensToFetch, errorFn);
                         success = true;
                         try {
@@ -155,7 +165,7 @@ export class OAuthAutoRefresher {
                         if (tries < AUTOREFRESH_RETRIES) {
                             CrossauthLogger.logger.error(j({msg: `Failed auto refreshing tokens.  Retrying in ${AUTOREFRESH_RETRY_INTERVAL_SECS} seconds`}));
                             let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
-                            await wait(AUTOREFRESH_RETRY_INTERVAL_SECS);
+                            await wait(AUTOREFRESH_RETRY_INTERVAL_SECS*1000);
                         } else {
                             CrossauthLogger.logger.error(j({msg: `Failed auto refreshing tokens.  Number of retries exceeded`}));
                             if (errorFn) {

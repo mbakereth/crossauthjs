@@ -487,7 +487,7 @@ export class OAuthClient extends OAuthClientBase {
      * Does nothing as CSRF tokens are not needed for this class
      * @returns `undefined`
      */
-    getCsrfToken() : undefined {return undefined;}
+    async getCsrfToken() : Promise<undefined> {return undefined;}
 
     async receiveTokens(tokens : {
         access_token? : string|null,

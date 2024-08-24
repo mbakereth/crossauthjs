@@ -1,9 +1,26 @@
 <script>
     import { goto } from '$app/navigation';
+    import { CrossauthLogger, OAuthBffClient } from '@crossauth/frontend';
     export let data;
 	import { enhance, applyAction } from '$app/forms';
+    import { onMount } from 'svelte';
 
-    let resourceResult = "Resource output will go here"
+    let resourceResult = "Resource output will go here";
+
+    onMount(() => {
+        CrossauthLogger.logger.level = CrossauthLogger.Debug;
+        const bffClient = new OAuthBffClient({
+        enableCsrfProtection: false,
+        autoRefreshUrl: "/autorefresh",
+        tokensUrl: "/tokens",
+
+        });
+        bffClient.startAutoRefresh(["access"], (msg, e) => {
+            if (e) console.log(e);
+            alert(msg);
+        });
+    })
+
 </script>
 
 <svelte:head>
@@ -21,7 +38,7 @@
 <p><a href="flows/passwordflow">Password Flow</a></p>
 <p><a href="flows/oidcauthzcodeflow">OIDC Authorization Code Flow</a></p>
 
-<form method="POST" action="/bff/resource?/get" use:enhance={({ formData }) => {
+<form method="POST" action="/bff/resource" use:enhance={({ formData }) => {
     // `formElement` is this `<form>` element
     // `formData` is its `FormData` object that's about to be submitted
     // `action` is the URL to which the form is posted
@@ -31,7 +48,8 @@
     return async ({ result }) => {
         // `result` is an `ActionResult` object
         // `update` is a function which triggers the default logic that would be triggered if this callback wasn't set
-        if (result.type === 'redirect') {
+        // Following is for when BFF URL returns ActionData
+        /*if (result.type === 'redirect') {
             goto(result.location);
         } else if (result.status != 200) {
             resourceResult = "Error calling resource";
@@ -41,12 +59,13 @@
             resourceResult = JSON.stringify(result.data.body);
         } else {
             resourceResult = "{}"
-        }
+        }*/
+        resourceResult = JSON.stringify(result);
     };
 }}>
     <button type="submit" class="btn btn-neutral">Call Resource</button>
 </form>
-<pre id="result">
+<pre class="mt-2 mb-2" id="result">
     {resourceResult}
 </pre>
 

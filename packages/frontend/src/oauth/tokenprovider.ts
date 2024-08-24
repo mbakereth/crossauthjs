@@ -8,7 +8,7 @@ export abstract class OAuthTokenProvider {
      * @returns the CSRF token that can be included in
      *          the `X-CROSSAUTH-CSRF` header
      */
-    getCsrfToken() : Promise<string>|undefined {return undefined;}
+    getCsrfToken() : Promise<string|undefined> {return new Promise(_resolve => undefined);}
 
     /**
      * Fetches the expiry times for each token.

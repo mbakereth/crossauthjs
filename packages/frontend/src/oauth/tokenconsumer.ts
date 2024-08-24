@@ -1,4 +1,4 @@
-import { CrossauthError, ErrorCode, OAuthTokenConsumerBase } from "@crossauth/common";
+import { OAuthTokenConsumerBase } from "@crossauth/common";
 
 export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
    
