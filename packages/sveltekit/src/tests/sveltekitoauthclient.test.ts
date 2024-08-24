@@ -900,7 +900,6 @@ test('SvelteKitClient.tokens', async () => {
     const resp = await server.oAuthClient?.tokensEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    console.log(body)
     expect(body.access_token?.jti).toBeDefined();
     expect(body.have_access_token).toBe(true);
     expect(body.have_id_token).toBe(false);

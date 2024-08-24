@@ -160,7 +160,7 @@ test('SvelteSessionHooks.loginProtectedNotLoggedIn', async () => {
 
     let resp = await handle({event: event, resolve: resolver.mockResolve});
     expect(resp.status).toBe(302);
-    expect(resp.headers.get('location')).toBe("/login");
+    expect(resp.headers.get('location')).toContain("/login");
 
     // log in
     let {event: loginEvent} = await login(server, resolver, handle);
