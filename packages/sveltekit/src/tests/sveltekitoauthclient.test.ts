@@ -49,6 +49,7 @@ export async function oauthLogin () {
     let event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
     const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    if (!resp || !(resp instanceof Response)) throw "Resp is not an object";
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(true);
@@ -295,6 +296,7 @@ test('SvelteKitClient.passwordFlow_post', async () => {
     let event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
     const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    if (!resp || !(resp instanceof Response)) throw "Resp is not an object";
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(true);
@@ -369,6 +371,7 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
     let event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
     const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    if (!resp || !(resp instanceof Response)) throw "Resp is not an object";
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(true);
@@ -429,6 +432,7 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
     event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
     const password2Resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    if (!password2Resp || !(password2Resp instanceof Response)) throw "Resp is not an object";
     expect(password2Resp.status).toBe(200);
     const password2Body = await password2Resp.json();
     expect(password2Body.ok).toBe(true);

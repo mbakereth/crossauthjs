@@ -50,6 +50,7 @@ export async function oauthLogin () {
     let event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
     const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    if (!resp || !(resp instanceof Response)) throw "response is not an object";
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(true);

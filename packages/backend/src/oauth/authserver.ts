@@ -990,7 +990,7 @@ export class OAuthAuthorizationServer {
             if (!oobCode || !bindingCode) {
                 return {
                     error: "access_denied",
-                    error_description: "OOB code or binding codfe not provided"
+                    error_description: "OOB code or binding code not provided"
                 };
             }
 

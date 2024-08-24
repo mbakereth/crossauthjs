@@ -1,6 +1,7 @@
 <script>
     import { goto } from '$app/navigation';
     export let data;
+    export let form;
     export let error;
 </script>
 <h2>Enter Your One-Time Password</h2>
@@ -18,6 +19,8 @@
         </label>
         <label class="input-group">
             <input type="password" id="otp" name="otp" class="input input-bordered w-full max-w-xs mb-4" placeholder="Code"/><br>
+            <input type="hidden" id="mfa_token" name="mfa_token" value={form?.mfa_token}/><br>
+            <input type="hidden" id="scope" name="scope" value={form?.scope}/><br>
         </label>
     </div>
 

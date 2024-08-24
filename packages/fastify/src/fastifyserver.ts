@@ -155,6 +155,9 @@ function defaultIsAdminFn(user : User) : boolean {
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link FastifyAuthorizationServer}
  * - `oAuthClient`     OAuth client.  See {@link FastifyOAuthClient}.
+ * - `oAuthClients`    An array of OAuthClients if you want more than one.  
+ *                     Use either this or `oAuthClient` but not both.  
+ *                     See {@link FastifyOAuthClient}.
  * - `oAuthResServer`  OAuth resource server.  See 
  *                     {@link FastifyOAuthResourceServer}.
  * 
@@ -199,6 +202,9 @@ export class FastifyServer {
     readonly oAuthClient? : FastifyOAuthClient;
 
     /** See class comment */
+    readonly oAuthClients? : FastifyOAuthClient[];
+
+    /** See class comment */
     readonly oAuthResServer? : FastifyOAuthResourceServer;
 
     /** Config for `@fastify/cors` */
@@ -233,6 +239,11 @@ export class FastifyServer {
      *       There must be a field called `authServerBaseUrl` and is the 
      *       bsae URL for the authorization server.  When validating access
      *       tokens, the `iss` claim must match this.
+     *     - `oAuthClients` if present, an array of OAuth clients will be created.
+     *       There must be a field called `authServerBaseUrl` and is the 
+     *       bsae URL for the authorization serve for each.  When validating access
+     *       tokens, the `iss` claim must match this.
+     *       Do not use both this and `oAuthClient`.
      *     - `oAuthResServer` if present. an OAuth resource server will be
      *       created.  It has one optional field: `protectedEndpoints`.  The
      *       value is an object whose key is a URL (relative to the base
@@ -244,7 +255,12 @@ export class FastifyServer {
      *       {@link FastifyServerOptions}.
      *
      */
-    constructor({ session, apiKey, oAuthAuthServer, oAuthClient, oAuthResServer } : {
+    constructor({ session,
+        apiKey,
+        oAuthAuthServer,
+        oAuthClient,
+        oAuthClients,
+        oAuthResServer } : {
             session?: {
                     keyStorage: KeyStorage, 
                     options?: FastifySessionServerOptions,
@@ -262,6 +278,10 @@ export class FastifyServer {
                 authServerBaseUrl: string,
                 options? : FastifyOAuthClientOptions,
             },
+            oAuthClients? : {
+                authServerBaseUrl: string,
+                options? : FastifyOAuthClientOptions,
+            }[],
             oAuthResServer? : {
                 options? : FastifyOAuthResourceServerOptions,
             }},
@@ -346,10 +366,23 @@ export class FastifyServer {
                 { ...extraOptions, ...options, ...oAuthAuthServer.options });
         }
 
+        if (oAuthClient && this.oAuthClients) {
+            throw new CrossauthError(ErrorCode.Configuration, "Do not use both oAuthClient and oAuthClients")
+        }
         if (oAuthClient) {
             this.oAuthClient = new FastifyOAuthClient(this,
                 oAuthClient.authServerBaseUrl,
                 { ...options, ...oAuthClient.options });
+        }
+        if (oAuthClients) {
+            this.oAuthClients = [];
+            for (let client of oAuthClients) {
+                this.oAuthClients.push(
+                    new FastifyOAuthClient(this,
+                        client.authServerBaseUrl,
+                        { ...options, ...client.options })
+                );
+            }
         }
 
         if (oAuthResServer) {

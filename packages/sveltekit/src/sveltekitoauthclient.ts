@@ -482,8 +482,8 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  *      redirect Uri are displayed in the address bar, as the response
  *      is to the redirect to the redirect Uri.
  *    - saveInSessionAndRedirect` same as `saveInSessionAndLoad` except that 
- *      a redirect is done to the `authorizedUrl`.  Instead of using the `load`
- *      or `actions` method in a `+page.server.ts`, you should use the `get` 
+ *      a redirect is done to the `authorizedUrl`.  As an alternative to using `load`
+ *      or `actions` method in a `+page.server.ts`, you can use the `get` 
  *      or `post` method in a `+server.ts`.
  *    - saveInSessionAndReturn` same as `saveInSessionAndLoad` except that 
  *      a JSON response is returned`.  Instead of using the `load`
@@ -767,8 +767,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 resp.mfa_token &&
                 this.validFlows.includes(OAuthFlows.PasswordMfa)) {
                 const mfa_token = resp.mfa_token;
+                let scope : string|undefined = formData.scope;
+                if (scope == "") scope = undefined;
                 resp = await this.passwordMfa(mfa_token,
-                    formData.scope,
+                    scope,
                     event);
                 if (resp.error) {
                     const ce = CrossauthError.fromOAuthError(resp.error, 
@@ -837,6 +839,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             return {
                 scope: scope,
                 mfa_token: mfa_token,
+                challenge_type: resp.challenge_type,
             };            
         } else if (auth.authenticator_type == "oob") {
             const resp = await this.mfaOobRequest(mfa_token, auth.id);
@@ -877,8 +880,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         formData: {[key:string]:string}
     ) : Promise<OAuthTokenResponse> {
 
+        let scope : string|undefined = formData.scope;
+        if (scope == "") scope = undefined;
         const resp = await this.mfaOtpComplete(formData.mfa_token, 
-            formData.otp);
+            formData.otp, scope);
         if (resp.error) {
             const ce = CrossauthError.fromOAuthError(resp.error,
                 resp.error_description??"Error completing MFA");
@@ -896,22 +901,21 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         formData: {[key:string]:string}
     ) : Promise<OAuthTokenResponse> {
 
+        let scope : string|undefined = formData.scope;
+        if (scope == "") scope = undefined;
         const resp = await this.mfaOobComplete(formData.mfa_token, 
             formData.oob_code,
-            formData.binding_code);
+            formData.binding_code,
+            scope);
         if (resp.error) {
-            const ce = CrossauthError.fromOAuthError(resp.error,
-                resp.error_description??"Error completing MFA");
             CrossauthLogger.logger.warn(j({
                 msg: "Error completing MFA",
-                cerr: ce,
                 user: event.locals.user?.user,
-                hashedMfaToken: Crypto.hash(formData.mfa_token),
+                hashedMfaToken: formData.mfa_token ? Crypto.hash(formData.mfa_token) : undefined,
             }));
-            CrossauthLogger.logger.debug(j({err: ce}));
             return {
-                error: ce.oauthErrorCode,
-                error_description: ce.message,
+                error: resp.error,
+                error_description: resp.error_description,
             };                    
         }
         //return await this.receiveTokenFn(resp, this, event);
@@ -1034,7 +1038,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     error_description: "No CSRF token found"
                 }; 
             }
-            const oauthData = await this.server.sessionServer.getSessionData(event, "oauth");
+            const oauthData = await this.server.sessionServer.getSessionData(event, this.sessionDataName);
             if (!oauthData?.refresh_token) {
                 if (mode == "silent") {
                     return new Response(null, {status: 204});
@@ -1122,6 +1126,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             const resp = 
                 await passwordFn(event, formData);
             if (!resp) throw new CrossauthError(ErrorCode.UnknownError, "Password flow returned no data");
+            if (resp.error) return {
+                ok: false,
+                ...resp,
+            }
             const resp2 = await this.receiveTokenFn(resp, this, event, false) ;
             if (resp && resp2 instanceof Response) return resp2;
             throw new CrossauthError(ErrorCode.UnknownError, "Receive token function did not return a Response");
@@ -1139,7 +1147,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     private async passwordFlow_action( event : RequestEvent, passwordFn : (event : RequestEvent, formData: {[key:string]:string}) => Promise<OAuthTokenResponse> ) {
-        if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+        if (/*this.tokenResponseType == "saveInSessionAndRedirect" ||*/ this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
             const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
             throw ce;
         }
@@ -1149,7 +1157,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
             if (!(this.validFlows.includes(OAuthFlows.Password) ||
                  this.validFlows.includes(OAuthFlows.PasswordMfa))) {
-                const ce = new CrossauthError(ErrorCode.Unauthorized, "Refresh token flow is not supported");
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Password and Password MFA flows are not supported");
                 return this.errorFn(this.server, event, ce);
             }
             var data = new JsonOrFormData();
@@ -1180,7 +1188,19 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             const resp = 
                 await passwordFn(event, formData);
             if (!resp) throw new CrossauthError(ErrorCode.UnknownError, "Password flow returned no data");
-
+            if (resp.error) {
+                return {
+                    ok: false,
+                    ...resp,
+                }
+            }
+            if (resp.challenge_type) {
+                if (!(this.validFlows.includes(OAuthFlows.PasswordMfa))) {
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Password MFA flow is not supported");
+                    return this.errorFn(this.server, event, ce);
+                }
+                return resp;
+            }
             const resp2 = await this.receiveTokenFn(resp, this, event, false) ?? {};
             if (resp2 instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Refresh token flow should return an object not Response");
             return resp2;
@@ -1239,7 +1259,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
                 const oauthData = 
                     await this.server.sessionServer.getSessionData(event, 
-                        "oauth");
+                        this.sessionDataName);
                         if (!oauthData) {
                     if (i == this.bffMaxTries) {
                         throw new CrossauthError(ErrorCode.Unauthorized, "No access token found");
@@ -1421,7 +1441,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
             const oauthData = 
                 await this.server.sessionServer.getSessionData(event, 
-                    "oauth");
+                    this.sessionDataName);
             if (!oauthData) {
                 throw new CrossauthError(ErrorCode.Unauthorized, "No access token found");
             }
@@ -1505,7 +1525,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
                 }          
-                const scope = event.url.searchParams.get("scope") ?? undefined;
+                let scope = event.url.searchParams.get("scope") ?? undefined;
+                if (scope == "") scope = undefined;
                 const {url, error, error_description} = 
                     await this.startAuthorizationCodeFlow(scope);
                 if (error || !url) {
@@ -1532,7 +1553,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
 
         load: async (event : RequestEvent) : Promise<AuthorizationCodeFlowReturn> => {
-            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+            if (/*this.tokenResponseType == "saveInSessionAndRedirect" ||*/ this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
                 return {
                     ok: false,
@@ -1555,7 +1576,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
                 }          
-                const scope = event.url.searchParams.get("scope") ?? undefined;
+                let scope = event.url.searchParams.get("scope") ?? undefined;
+                if (scope == "") scope = undefined;
                 const {url, error, error_description} = 
                     await this.startAuthorizationCodeFlow(scope);
                 if (error || !url) {
@@ -1610,7 +1632,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
                 }          
-                const scope = event.url.searchParams.get("scope") ?? undefined;
+                let scope = event.url.searchParams.get("scope") ?? undefined;
+                if (scope == "") scope = undefined;
                 const {url, error, error_description} = 
                     await this.startAuthorizationCodeFlow(scope, true);
                 if (error || !url) {
@@ -1640,7 +1663,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
 
         load: async (event : RequestEvent) : Promise<AuthorizationCodeFlowReturn> => {
-            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+            if (/*this.tokenResponseType == "saveInSessionAndRedirect" ||*/ this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use get not load");
                 return {
                     ok: false,
@@ -1664,7 +1687,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
                 }          
-                const scope = event.url.searchParams.get("scope") ?? undefined;
+                let scope = event.url.searchParams.get("scope") ?? undefined;
+                if (scope == "") scope = undefined;
                 const {url, error, error_description} = 
                     await this.startAuthorizationCodeFlow(scope, true);
                 if (error || !url) {
@@ -1754,7 +1778,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
 
         load: async (event : RequestEvent) : Promise<RedirectUriReturn> => {
-            if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+            if (/*this.tokenResponseType == "saveInSessionAndRedirect" ||*/ this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use get not load");
                 return {
                     ok: false,
@@ -1893,7 +1917,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
         actions: {
             default: async ( event : RequestEvent ) => {
-                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+                if (/*this.tokenResponseType == "saveInSessionAndRedirect" ||*/ this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                     const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
                     throw ce;
                 }
@@ -1988,7 +2012,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // try to find in session
                 let refreshToken : string | undefined = formData.refresh_token;
                 if (!refreshToken && this.server.sessionServer) {
-                    const oauthData = await this.server.sessionServer.getSessionData(event, "oauth");
+                    const oauthData = await this.server.sessionServer.getSessionData(event, this.sessionDataName);
                     if (!oauthData?.refresh_token) {
                         const ce = new CrossauthError(ErrorCode.BadRequest,
                             "No refresh token in session or in parameters");
@@ -2024,7 +2048,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
         actions: {
             default: async ( event : RequestEvent ) => {
-                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+                if (/*this.tokenResponseType == "saveInSessionAndRedirect" ||*/ this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                     const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
                     throw ce;
                 }
@@ -2064,7 +2088,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     // try to find in session
                     let refreshToken : string | undefined = formData.refresh_token;
                     if (!refreshToken && this.server.sessionServer) {
-                        const oauthData = await this.server.sessionServer.getSessionData(event, "oauth");
+                        const oauthData = await this.server.sessionServer.getSessionData(event, this.sessionDataName);
                         if (!oauthData?.refresh_token) {
                             const ce = new CrossauthError(ErrorCode.BadRequest,
                                 "No refresh token in session or in parameters");
@@ -2118,7 +2142,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
         actions: {
             default: async ( event : RequestEvent ) => {
-                if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+                if (/*this.tokenResponseType == "saveInSessionAndRedirect" ||*/ this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                     const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
                     throw ce;
                 }

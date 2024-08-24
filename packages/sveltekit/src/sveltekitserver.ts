@@ -98,9 +98,11 @@ function defaultIsAdminFn(user : User) : boolean {
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link SvelteKitAuthorizationServer}
  * - `oAuthClient`     OAuth client.  See {@link SvelteKitOAuthClient}.
+ * - `oAuthClients`    Array of OAuth clients if you want more than one.  See {@link SvelteKitOAuthClient}.
  * - `oAuthResServer`  OAuth resource server.  See 
  *                     {@link SvelteKitOAuthResourceServer}.
  * 
+ * Use either `oAuthClient` or `oAuthClients` but not both.
  * 
  * There is also an API key server which is not available as a variable as
  * it has no functions other than the hook it registers.
@@ -186,6 +188,11 @@ export class SvelteKitServer {
      */
     readonly oAuthClient? : SvelteKitOAuthClient;
 
+    /**
+     * Array of OAuth client instances as an alternative to `oAuthClient`
+     */
+    readonly oAuthClients? : SvelteKitOAuthClient[];
+
     /** OAuth resource server instance */
     readonly oAuthResServer? : SvelteKitOAuthResourceServer;
 
@@ -219,6 +226,8 @@ export class SvelteKitServer {
      *      There must be a field called `authServerBaseUrl` and is the 
      *      base URL for the authorization server.  When validating access
      *      tokens, the `iss` claim must match this.
+     *    - `oAuthClients` use this instead of `oAuthClient` if you want more
+     *       than one OAuth client.
      *    - `oAuthResServer`  OAuth resource server.  See 
      *       {@link SvelteKitOAuthResourceServer}.
      *   - `options` Configuration that applies to the whole application,
@@ -229,6 +238,7 @@ export class SvelteKitServer {
         apiKey,
         oAuthAuthServer,
         oAuthClient,
+        oAuthClients,
         oAuthResServer,
         options,
     } : {
@@ -250,6 +260,10 @@ export class SvelteKitServer {
             authServerBaseUrl: string,
             options? : SvelteKitOAuthClientOptions,
         },
+        oAuthClients? : {
+            authServerBaseUrl: string,
+            options? : SvelteKitOAuthClientOptions,
+        }[],
         oAuthResServer? : {
             options? : SvelteKitOAuthResourceServerOptions,
         },
@@ -289,11 +303,26 @@ export class SvelteKitServer {
                 { ...extraOptions, ...options, ...oAuthAuthServer.options });
         }
     
+        if (oAuthClient && oAuthClients) {
+            throw new CrossauthError(ErrorCode.Configuration, "Cannot specify both oAuthClient and oAuthClients")
+        }
         if (oAuthClient) {
             this.oAuthClient = new SvelteKitOAuthClient(this,
                 oAuthClient.authServerBaseUrl,
                 { ...options, ...oAuthClient.options });
         }
+
+        if (oAuthClients) {
+            this.oAuthClients = [];
+            for (let client of oAuthClients) {
+                this.oAuthClients.push(
+                    new SvelteKitOAuthClient(this,
+                    client.authServerBaseUrl,
+                    { ...options, ...client.options })
+                );
+            }
+        }
+        
 
         if (oAuthResServer) {
             this.oAuthResServer = new SvelteKitOAuthResourceServer( 

@@ -9,7 +9,7 @@
     <p class="bg-error p-2 rounded text-slate-900">{error}</p>
 {/if}
 
-<p>Open Google Authenticator and enter the code for this application.</p>
+<p>Enter the code we just emailed you.</p>
 
     <input type="hidden" name="csrfToken" value="{ data.csrfToken }"/>
     <div class="form-control mt-2 ml-3">
@@ -17,7 +17,7 @@
         <span class="label-text">Code</span>
         </label>
         <label class="input-group">
-            <input type="password" id="otp" name="otp" class="input input-bordered w-full max-w-xs mb-4" placeholder="Code"/><br>
+            <input type="password" id="oob" name="otp" class="input input-bordered w-full max-w-xs mb-4" placeholder="Code"/><br>
         </label>
     </div>
 

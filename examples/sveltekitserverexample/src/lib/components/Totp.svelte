@@ -17,7 +17,7 @@
         <span class="label-text">Code</span>
         </label>
         <label class="input-group">
-            <input type="password" id="otp" name="otp" class="input input-bordered w-full max-w-xs mb-4" placeholder="Password"/><br>
+            <input type="password" id="otp" name="otp" class="input input-bordered w-full max-w-xs mb-4" placeholder="Code"/><br>
         </label>
     </div>
 

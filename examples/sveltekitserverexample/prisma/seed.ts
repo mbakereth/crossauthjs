@@ -27,6 +27,7 @@ async function main() {
         username: "alice", 
         state: "active",
         factor1: "localpassword",
+        factor2: "dummy",
         email: "alice@alice.com",
     }, {
         password: await authenticator.createPasswordHash("alicePass123"), 

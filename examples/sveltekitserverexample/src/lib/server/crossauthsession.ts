@@ -6,7 +6,8 @@ import {
     PrismaOAuthAuthorizationStorage,
     LocalPasswordAuthenticator,
     EmailAuthenticator,
-    TotpAuthenticator } from '@crossauth/backend';
+    TotpAuthenticator,
+    DummyFactor2Authenticator } from '@crossauth/backend';
 import { CrossauthError } from '@crossauth/common'
 import { PrismaClient } from '@prisma/client'
 import { redirect, error } from '@sveltejs/kit';
@@ -17,6 +18,7 @@ const keyStorage = new PrismaKeyStorage({prismaClient : prisma});
 const clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
 const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient : prisma});
 const passwordAuthenticator = new LocalPasswordAuthenticator(userStorage);
+const dummyAuthenticator = new DummyFactor2Authenticator("0000");
 const totpAuthenticator = new TotpAuthenticator("Sveltekit Example")
 const emailAuthenticator = new EmailAuthenticator();
 export let crossauth : SvelteKitServer;
@@ -25,7 +27,7 @@ try {
         session: {
             keyStorage: keyStorage,
             options: {
-                allowedFactor2: ["none", "totp"],
+                allowedFactor2: ["none", "totp", "dummy"],
             }
         },
         oAuthAuthServer: {
@@ -48,6 +50,7 @@ try {
                 localpassword: passwordAuthenticator,
                 totp: totpAuthenticator,
                 email: emailAuthenticator,
+                dummy: dummyAuthenticator,
             },
             loginProtectedPageEndpoints: ["/account"],
             factor2ProtectedPageEndpoints: ["/resetpassword/*"],

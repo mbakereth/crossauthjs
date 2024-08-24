@@ -125,7 +125,7 @@ export class OAuthFlows {
             case OAuthFlows.Password:
                 return ["password"];
             case OAuthFlows.PasswordMfa:
-                return ["http://auth0.com/oauth/grant-type/mfa-otp"];
+                return ["http://auth0.com/oauth/grant-type/mfa-otp", "http://auth0.com/oauth/grant-type/mfa-oob"];
             case OAuthFlows.DeviceCode:
                 return ["device_code"];
         }
@@ -671,7 +671,7 @@ export abstract class OAuthClientBase {
             challenge_type? : string, 
             error? : string, 
             error_description? : string}> {
-        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        CrossauthLogger.logger.debug(j({msg: "Making MFA OTB request"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
@@ -722,7 +722,8 @@ export abstract class OAuthClientBase {
      */
     async mfaOtpComplete(
         mfaToken: string,
-        otp: string) : 
+        otp: string,
+        scope?: string) : 
         Promise<{
         access_token? : string, 
         refresh_token? : string, 
@@ -732,7 +733,7 @@ export abstract class OAuthClientBase {
         token_type?: string, 
         error? : string, 
         error_description? : string}> {
-        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        CrossauthLogger.logger.debug(j({msg: "Completing MFA OTP request"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
@@ -753,6 +754,7 @@ export abstract class OAuthClientBase {
             challenge_type: "otp",
             mfa_token: mfaToken,
             otp: otp,
+            scope: scope,
         }, this.authServerHeaders);
         return {
             id_token: otpResp.id_token,
@@ -792,7 +794,7 @@ export abstract class OAuthClientBase {
         binding_method?: string, 
         error? : string, 
         error_description? : string}> {
-        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        CrossauthLogger.logger.debug(j({msg: "Making MFA OOB request"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
@@ -841,8 +843,9 @@ export abstract class OAuthClientBase {
      */
     async mfaOobComplete(mfaToken: string,
         oobCode: string,
-        bindingCode: string) : Promise<OAuthTokenResponse> {
-        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        bindingCode: string,
+        scope?: string) : Promise<OAuthTokenResponse> {
+        CrossauthLogger.logger.debug(j({msg: "Completing MFA OOB request"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-oob")) {
@@ -864,16 +867,21 @@ export abstract class OAuthClientBase {
             mfa_token: mfaToken,
             oob_code: oobCode,
             binding_code: bindingCode,
+            scope: scope,
         }, this.authServerHeaders);
+        if (resp.error) {
+            return {
+                error: resp.error,
+                error_description: resp.error_description,
+            }
+        }
         return {
             id_token: resp.id_token,
             access_token: resp.access_token,
             refresh_token: resp.refresh_token,
-            expires_in: Number(resp.expires_in),
+            expires_in: "expires_in" in resp ? Number(resp.expires_in) : undefined,
             scope: resp.scope,
             token_type: resp.token_type,
-            error: resp.error,
-            error_description: resp.error_description,
         }
 
     }
