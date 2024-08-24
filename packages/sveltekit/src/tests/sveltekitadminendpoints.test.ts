@@ -34,7 +34,7 @@ test('SvelteKitAdminEndpoints.deleteUser', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.adminEndpoints.deleteUser(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     let found = false;
     try {
         await userStorage.getUserByUsername("bob");
@@ -78,7 +78,7 @@ test('SvelteKitAdminEndpoints.createUser', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.adminEndpoints.createUser(event)
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     let found = false;
     try {
         await userStorage.getUserByUsername("mary");
@@ -125,7 +125,7 @@ test('SvelteKitAdminEndpoints.createUserNoPassword', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.adminEndpoints.createUser(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     let newUser = undefined;
     try {
         const resp2 = await userStorage.getUserByUsername("mary", {skipActiveCheck: true});
@@ -171,7 +171,7 @@ test('SvelteKitAdminEndpoints.createUserFactor2', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.adminEndpoints.createUser(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     let newUser = undefined;
     try {
         const resp2 = await userStorage.getUserByUsername("mary", {skipActiveCheck: true});
@@ -220,7 +220,7 @@ test('SvelteKitAdminEndpoints.createUserFactor2NoPassword', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.adminEndpoints.createUser(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     let newUser = undefined;
     try {
         const resp2 = await userStorage.getUserByUsername("mary", {skipActiveCheck: true});
@@ -262,7 +262,7 @@ test('SvelteKitAdminEndpoints.updateUser', async () => {
     event.locals.user = loginEvent.locals.user;
     const {user} = await userStorage.getUserByUsername("bob");
     let resp1 = await server.sessionServer?.adminEndpoints.updateUser(user, event)
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     let newUser = undefined;
     try {
         const resp2 = await userStorage.getUserByUsername("bob");

@@ -33,7 +33,7 @@ test('SvelteKitUserClientEndpoints.selectClients', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.userClientEndpoints.searchClients(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     expect(resp1?.clients?.length).toBe(1);
 
 });
@@ -89,7 +89,7 @@ test('SvelteKitUserClientEndpoints.updateClient', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.load(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
 
     let postRequest = new Request("http://ex.com/oauth/clients", {
         method: "POST",
@@ -106,7 +106,7 @@ test('SvelteKitUserClientEndpoints.updateClient', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.actions.default(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     expect(resp1?.client?.clientName).toBe("newName");
     expect(resp1?.plaintextSecret).toBeUndefined();
     expect(resp1?.client?.clientSecret).toContain("pbkdf2:sha256");
@@ -126,7 +126,7 @@ test('SvelteKitUserClientEndpoints.updateClient', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.actions.default(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     expect(resp1?.plaintextSecret).toBeDefined();
     expect(resp1?.client?.clientSecret).not.toContain("pbkdf2:sha256");
 });
@@ -182,7 +182,7 @@ test('SvelteKitUserClientEndpoints.deleteClient', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.load(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
 
     let postRequest = new Request("http://ex.com/oauth/clients", {
         method: "POST",
@@ -199,7 +199,7 @@ test('SvelteKitUserClientEndpoints.deleteClient', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.actions.default(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
 });
 
 test('SvelteKitUserClientEndpoints.createClient', async () => {
@@ -240,7 +240,7 @@ test('SvelteKitUserClientEndpoints.createClient', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.userClientEndpoints.createClientEndpoint.load(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
 
     let postRequest = new Request("http://ex.com/oauth/clients", {
         method: "POST",
@@ -257,7 +257,7 @@ test('SvelteKitUserClientEndpoints.createClient', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.userClientEndpoints.createClientEndpoint.actions.default(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     expect(resp1?.client?.clientName).toBe("newName");
     expect(resp1?.plaintextSecret).toBeUndefined();
     expect(resp1?.client?.clientSecret).not.toContain("pbkdf2:sha256");

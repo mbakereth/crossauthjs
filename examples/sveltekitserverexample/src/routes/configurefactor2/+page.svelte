@@ -12,7 +12,7 @@
 </svelte:head>
 <h1>Two Factor Authentication</h1>
 
-{#if form?.success}
+{#if form?.ok}
     {#if form?.emailVerificationRequired}
         <p class="text-slate-900 bg-info p-2 rounded ">Please check your email and
             follow the link we sent to complete registration.

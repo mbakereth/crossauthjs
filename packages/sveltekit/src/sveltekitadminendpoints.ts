@@ -19,7 +19,7 @@ export type AdminUpdateUserReturn = {
     error?: string,
     exception?: CrossauthError,
     formData?: {[key:string]:string},
-    success: boolean,
+    ok: boolean,
 };
 
 /**
@@ -33,7 +33,7 @@ export type AdminChangePasswordReturn = {
     error?: string,
     exception?: CrossauthError,
     formData?: {[key:string]:string},
-    success: boolean
+    ok: boolean
 };
 
 /**
@@ -53,7 +53,7 @@ export type AdminCreateUserReturn = {
     error?: string,
     exception?: CrossauthError,
     formData?: {[key:string]:string|undefined},
-    success: boolean,
+    ok: boolean,
 };
 
 /**
@@ -66,7 +66,7 @@ export type AdminDeleteUserReturn = {
     user? : User,
     error?: string,
     exception?: CrossauthError,
-    success: boolean
+    ok: boolean
 };
 
 /**
@@ -76,7 +76,7 @@ export type AdminDeleteUserReturn = {
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
 export type SearchUsersReturn = {
-    success : boolean,
+    ok : boolean,
     users?: User[],
     skip : number,
     take : number,
@@ -292,7 +292,7 @@ export class SvelteKitAdminEndpoints {
                 }
 
                 return {
-                success: true,
+                ok: true,
                 users,
                 skip,
                 take,
@@ -304,7 +304,7 @@ export class SvelteKitAdminEndpoints {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             return {
-                success: false,
+                ok: false,
                 error: ce.message,
                 exception: ce,
                 hasPrevious: false,
@@ -395,7 +395,7 @@ export class SvelteKitAdminEndpoints {
             await this.sessionServer.sessionManager.updateUser(user, user, true);
 
             return {
-                success: true,
+                ok: true,
                 formData: formData,
             };
 
@@ -408,7 +408,7 @@ export class SvelteKitAdminEndpoints {
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
                 formData,
             }
 
@@ -499,7 +499,7 @@ export class SvelteKitAdminEndpoints {
             }
     
             return {
-                success: true,
+                ok: true,
                 formData: formData,
             };
 
@@ -512,7 +512,7 @@ export class SvelteKitAdminEndpoints {
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
                 formData,
             }
         }
@@ -654,14 +654,14 @@ export class SvelteKitAdminEndpoints {
                 await this.sessionServer.sessionManager.requestPasswordReset(email);
             }
             
-            return { success: true, user: newUser,  formData};
+            return { ok: true, user: newUser,  formData};
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't create user");
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
                 formData,
             }
         }
@@ -701,7 +701,7 @@ export class SvelteKitAdminEndpoints {
     
                 await this.sessionServer.userStorage.deleteUserById(userId);
                 return {
-                    success: true,
+                    ok: true,
     
                 };
     
@@ -710,7 +710,7 @@ export class SvelteKitAdminEndpoints {
                 return {
                     error: ce.message,
                     exception: ce,
-                    success: false,
+                    ok: false,
                 }
             }
         }
@@ -759,7 +759,7 @@ export class SvelteKitAdminEndpoints {
                 const getUserResp = await this.getUserFromParam(event);
                 if (getUserResp.exception || !getUserResp.user) {
                     return {
-                        success: false,
+                        ok: false,
                         error: getUserResp.exception?.message ?? "Couldn't get user",
                     }
                 }
@@ -795,7 +795,7 @@ export class SvelteKitAdminEndpoints {
                 const getUserResp = await this.getUserFromParam(event);
                 if (getUserResp.exception || !getUserResp.user) {
                     return {
-                        success: false,
+                        ok: false,
                         error: getUserResp.exception?.message ?? "Couldn't get user",
                     }
                 }

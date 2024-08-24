@@ -12,7 +12,7 @@
 </svelte:head>
 <h1>Change Your Password</h1>
 
-{#if form?.success}
+{#if form?.ok}
     <p class="bg-success p-2 rounded text-slate-900">Your password has been changed</p>
     <p><a href="/account">Your Account</a></p>
 {:else}

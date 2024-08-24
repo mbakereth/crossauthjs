@@ -10,7 +10,7 @@
     let haveClientSecret = data?.client.clientSecret && data?.client.clientSecret.length > 0;
 </script>
 
-{#if form?.success}
+{#if form?.ok}
     <p class="bg-success p-2 rounded text-slate-900">
         The client was updated.
         {#if form.plaintextSecret}

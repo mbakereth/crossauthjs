@@ -48,7 +48,7 @@ export interface AuthorizeQueryType {
 }
 
 export interface ReturnBase {
-    success: boolean,
+    ok: boolean,
     error? : string,
     error_description? : string,
 };
@@ -390,7 +390,7 @@ export class SvelteKitAuthorizationServer {
                     errorDescription??"Neither code nor error received")
                 CrossauthLogger.logger.error(j({cerr: ce}));
                 return {
-                    success: false,
+                    ok: false,
                     error,
                     error_description: errorDescription,
                 }
@@ -421,7 +421,7 @@ export class SvelteKitAuthorizationServer {
                 CrossauthLogger.logger.error(j({
                     msg: `Couldn't send error message ${ce.codeName} to ${redirectUri}}`}));
                 return {
-                    success: false,
+                    ok: false,
                     error: "server_error",
                     error_description: "Redirect Uri is not valid"
                 };
@@ -471,7 +471,7 @@ export class SvelteKitAuthorizationServer {
     private requireGetParam(event : RequestEvent, name : string) : ReturnBase | undefined {
         const val = event.url.searchParams.get(name);
         if (!val) return {
-            success: false,
+            ok: false,
             error: "invalid_request",
             error_description: name + " is required"
         };
@@ -480,7 +480,7 @@ export class SvelteKitAuthorizationServer {
 
     private requireBodyParam(formData : {[key:string]:any}, name : string) : ReturnBase | undefined {
         if (!(name in formData)) return {
-            success: false,
+            ok: false,
             error: "invalid_request",
             error_description: name + " is required"
         };
@@ -509,7 +509,7 @@ export class SvelteKitAuthorizationServer {
             code_challenge,
             code_challenge_method,
         }
-        return {query, error: {error: "Unknown error", error_description: "Unknown error", success: true}};
+        return {query, error: {error: "Unknown error", error_description: "Unknown error", ok: true}};
     }
 
     private async getMfaChallengeQuery(event : RequestEvent) : Promise<{query?: MfaChallengeBodyType, error: ReturnBase}> {
@@ -533,7 +533,7 @@ export class SvelteKitAuthorizationServer {
             mfa_token,
             authenticator_id,
         }
-        return {query, error: {error: "Unknown error", error_description: "Unknown error", success: true}};
+        return {query, error: {error: "Unknown error", error_description: "Unknown error", ok: true}};
     }
 
 
@@ -695,7 +695,7 @@ export class SvelteKitAuthorizationServer {
 
             if (ce) {
                 return { 
-                    success: false,
+                    ok: false,
                     error: ce.oauthErrorCode, 
                     error_description: ce.message
                 };
@@ -736,7 +736,7 @@ export class SvelteKitAuthorizationServer {
                 });
                 // the above either throws a redirect or returns with an error
                 return {
-                    success: false,
+                    ok: false,
                     error: resp.error ?? "server_error",
                     error_description: resp.error_description ?? "An unexpected error occurred",
                 }
@@ -753,7 +753,7 @@ export class SvelteKitAuthorizationServer {
                         await this.clientStorage.getClientById(query.client_id);
                     
                     return {
-                        success: true,
+                        ok: true,
                         authorizationNeeded: {
                             user: event.locals.user,
                             response_type: query.response_type,
@@ -774,7 +774,7 @@ export class SvelteKitAuthorizationServer {
                     const ce = e as CrossauthError;
                     CrossauthLogger.logger.debug(j({err: ce}));
                     return {
-                        success: false,
+                        ok: false,
                         error: "unauthorized_client",
                         error_description: "Not a valid client",
                     };
@@ -806,7 +806,7 @@ export class SvelteKitAuthorizationServer {
                     else if (!state) missing = "state";
                     if (missing) {
                         return {
-                            success: false,
+                            ok: false,
                             error: "invalid_request",
                             error_description: "Invalid form: does not contain " + missing + " parameter"
                         };
@@ -829,7 +829,7 @@ export class SvelteKitAuthorizationServer {
                     });
                     // the above either throws a redirect or returns with an error
                     return {
-                        success: false,
+                        ok: false,
                         error: resp.error ?? "server_error",
                         error_description: resp.error_description ?? "An unexpected error occurred",
                     }
@@ -841,7 +841,7 @@ export class SvelteKitAuthorizationServer {
                     return {
                         error: ce.oauthErrorCode,
                         error_description: ce.message,
-                        success: false,
+                        ok: false,
                         formData,
                     }
                 }

@@ -11,7 +11,7 @@
 </svelte:head>
 <h1>Delete Your Account</h1>
 
-{#if form?.success}
+{#if form?.ok}
     <p class="bg-success p-2 rounded text-slate-900">Your account has been deleted</p>
     <p><a href="/">Home</a></p>
 {:else}

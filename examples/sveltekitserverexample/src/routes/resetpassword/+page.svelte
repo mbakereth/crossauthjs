@@ -10,7 +10,7 @@
 </svelte:head>
 <h1>Password Reset</h1>
 
-{#if form?.success}
+{#if form?.ok}
 <p class="bg-info p-2 rounded text-slate-900">
     Please click on the link in the email we sent you.
 </p>

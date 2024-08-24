@@ -28,7 +28,7 @@
 </svelte:head>
 <h1>Update Details for {data.editUser.username}</h1>
 
-{#if form?.success}
+{#if form?.ok}
     <p class="bg-success p-2 rounded text-slate-900">The user's details have been updated</p>
     <p><a href="/admin/users">Users</a></p>
 {:else}

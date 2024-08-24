@@ -190,7 +190,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
  * Returned by the authorize endpoint
  */
 export interface AuthorizationCodeFlowReturn {
-    success: boolean,
+    ok: boolean,
     error? : string,
     error_description? : string
 }
@@ -199,7 +199,7 @@ export interface AuthorizationCodeFlowReturn {
  * Returned by the token endpoint
  */
 export interface TokenReturn extends OAuthTokenResponse {
-    success: boolean,
+    ok: boolean,
     id_payload?: {[key:string]:any},
 }
 
@@ -207,7 +207,7 @@ export interface TokenReturn extends OAuthTokenResponse {
  * Returned by the redirect URI endpoint
  */
 export interface RedirectUriReturn extends OAuthTokenResponse {
-    success: boolean,
+    ok: boolean,
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -218,7 +218,7 @@ async function jsonError(_server: SvelteKitServer,
     ce: CrossauthError) : Promise<Response> {
     CrossauthLogger.logger.debug(j({err: ce}));
     return json({
-            success: false,
+            ok: false,
             status: ce.httpStatus,
             errorMessage: ce.message,
             errorMessages: ce.messages,
@@ -249,7 +249,7 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
 async function sendJson(oauthResponse: OAuthTokenResponse,
     _client: SvelteKitOAuthClient,
     _event: RequestEvent) : Promise<Response|undefined> {
-        return json({success: true, ...oauthResponse, 
+        return json({ok: true, ...oauthResponse, 
             id_payload: decodePayload(oauthResponse.id_token)})
 }
 
@@ -367,7 +367,7 @@ async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
             await updateSessionData(oauthResponse, client, event);
         }
 
-        return json({success: true, ...oauthResponse});
+        return json({ok: true, ...oauthResponse});
         if (!silent) return client.redirect(302, client.authorizedUrl);
     } catch (e) {
         if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -385,7 +385,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     ) : Promise<TokenReturn|undefined> {
     if (oauthResponse.error) {
         return {
-            success: false,
+            ok: false,
             error: oauthResponse.error,
             error_description: oauthResponse.error_description
         }
@@ -399,7 +399,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
         }
 
     return {
-        success: true,
+        ok: true,
         ...oauthResponse,
         id_payload: decodePayload(oauthResponse.id_token)}
     } catch (e) {
@@ -408,7 +408,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
         return {
-            success: false,
+            ok: false,
             error: ce.oauthErrorCode,
             error_description: ce.message,
         }
@@ -422,7 +422,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
     ) : Promise<TokenReturn|undefined> {
     if (oauthResponse.error) {
         return {
-            success: false, 
+            ok: false, 
             error: oauthResponse.error,
             error_description: oauthResponse.error_description
         }
@@ -433,7 +433,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
     try {
 
         return {
-            success: true,
+            ok: true,
             ...oauthResponse,
             id_payload: decodePayload(oauthResponse.id_token)}
         } catch (e) {
@@ -442,7 +442,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
         CrossauthLogger.logger.debug(j({err: ce}));
         CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
         return {
-            success: false,
+            ok: false,
             error: ce.oauthErrorCode,
             error_description: ce.message,
         }
@@ -467,7 +467,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * 
  *   - `sendJson` the token response is sent as-is as a JSON Response.  
  *      In addition to the `token` endpoint response fields,
- *      `success: true` and `id_payload` with the decoded 
+ *      `ok: true` and `id_payload` with the decoded 
  *      payload of the ID token are retruned.  
  *      This method should be used
  *      with `get`/ `post` endpoints, not `load`/`actions`.
@@ -1022,14 +1022,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         try {
             if (!this.server.sessionServer) {
                 return {
-                    success: false,
+                    ok: false,
                     error: "server_error",
                     error_description: "Refresh tokens if expired or silent refresh only available if sessions are enabled",
                 };
             }
             if (this.server.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
                 return {
-                    success: false,
+                    ok: false,
                     error: "access_denied",
                     error_description: "No CSRF token found"
                 }; 
@@ -1055,7 +1055,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 if (resp instanceof Response) {
                     throw new CrossauthError(ErrorCode.Configuration, "Unexpected error: refresh: mode is silent but didn't receive an object")
                 }
-                return {success: true, expires_at: resp?.expires_at};
+                return {ok: true, expires_at: resp?.expires_at};
             } else if (mode == "post") {
                 if (resp == undefined) return this.receiveTokenFn({}, this, event, false);
                 if (resp != undefined) {
@@ -1072,7 +1072,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             CrossauthLogger.logger.error({cerr: ce});
             if (mode == "page") return this.errorFn(this.server, event, ce);
             else return {
-                success: false,
+                ok: false,
                 error: ce.oauthErrorCode,
                 error_description: ce.message,
             };
@@ -1193,7 +1193,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             CrossauthLogger.logger.error({cerr: e});
             //throw this.error(ce.httpStatus, ce.message);
             return { 
-                success: false,
+                ok: false,
                 error: ce.oauthErrorCode, 
                 error_description: ce.message
             };
@@ -1444,9 +1444,13 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     isHave = true;
                 }
                 let payload = this.tokenPayload(tokenName, oauthData);
-                // @ts-ignore because t is a string
-                if (payload) tokensReturning[t] = isHave ? true : payload;
-                else if (isHave) tokensReturning[t] = false;
+                if (payload) {
+                    // @ts-ignore because t is a string
+                    tokensReturning[t] = isHave ? true : payload;
+                } else if (isHave) {
+                    // @ts-ignore because t is a string
+                    tokensReturning[t] = false;
+                }
                 lastTokenPayload = payload;
             }
             if (!Array.isArray(token)) {
@@ -1531,7 +1535,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
                 return {
-                    success: false,
+                    ok: false,
                     error: ce.oauthErrorCode,
                     error_description: ce.message,
                 }
@@ -1540,7 +1544,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 if (!(this.validFlows.includes(OAuthFlows.AuthorizationCode))) {
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
                     return {
-                        success: false,
+                        ok: false,
                         error: ce.oauthErrorCode,
                         error_description: ce.message,
                     }
@@ -1558,7 +1562,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
                     return {
-                        success: false,
+                        ok: false,
                         error: ce.oauthErrorCode,
                         error_description: ce.message,
                     }
@@ -1577,7 +1581,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 CrossauthLogger.logger.error({cerr: e});
                 //throw this.error(ce.httpStatus, ce.message);
                 return {
-                    success: false,
+                    ok: false,
                     error: ce.oauthErrorCode,
                     error_description: ce.message,
                 }
@@ -1639,7 +1643,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use get not load");
                 return {
-                    success: false,
+                    ok: false,
                     error: ce.oauthErrorCode,
                     error_description: ce.message,
                 }
@@ -1649,7 +1653,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 if (!(this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE))) {
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
                     return {
-                        success: false,
+                        ok: false,
                         error: ce.oauthErrorCode,
                         error_description: ce.message,
                     }
@@ -1667,7 +1671,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
                         return {
-                            success: false,
+                            ok: false,
                             error: ce.oauthErrorCode,
                             error_description: ce.message,
                         }
@@ -1686,7 +1690,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 CrossauthLogger.logger.error({cerr: e});
                 //throw this.error(ce.httpStatus, ce.message);
                 return {
-                    success: false,
+                    ok: false,
                     error: ce.oauthErrorCode,
                     error_description: ce.message,
                 }
@@ -1753,7 +1757,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             if (this.tokenResponseType == "saveInSessionAndRedirect" || this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use get not load");
                 return {
-                    success: false,
+                    ok: false,
                     error: ce.oauthErrorCode,
                     error_description: ce.message,
                 }
@@ -1765,7 +1769,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     this.validFlows.includes(OAuthFlows.OidcAuthorizationCode))) {
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flows are not supported");
                     return {
-                        success: false,
+                        ok: false,
                         error: ce.oauthErrorCode,
                         error_description: ce.message,
                     }
@@ -1787,7 +1791,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     error,
                     error_description);
                 if (resp.error) return {
-                    success: false,
+                    ok: false,
                     error: resp.error,
                     error_description: resp.error_description,
                 }
@@ -1797,26 +1801,26 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const ce = CrossauthError.fromOAuthError(resp.error, 
                         resp.error_description);
                     return {
-                        success: false,
+                        ok: false,
                         error: ce.oauthErrorCode,
                         error_description: ce.message,
                     }
                 }
                 const receiveTokenResp = await this.receiveTokenFn(resp, this, event, false);
                 if (receiveTokenResp instanceof Response) return {
-                    success: false,
+                    ok: false,
                     error: "server_error",
                     error_description: "When using load, receiveTokenFn should return an object not a Response",
 
                 };
                 if (receiveTokenResp == undefined) return {
-                    success: false,
+                    ok: false,
                     error: "server_error",
                     error_description: "No response received from receiveTokenFn",
 
                 };
                 if (receiveTokenResp.error) return {
-                    success: false,
+                    ok: false,
                     error: receiveTokenResp.error,
                     error_description: receiveTokenResp.error_description,
 
@@ -1833,7 +1837,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 CrossauthLogger.logger.error({cerr: e});
                 //throw this.error(ce.httpStatus, ce.message);
                 return {
-                    success: false,
+                    ok: false,
                     error: ce.oauthErrorCode,
                     error_description: ce.message,
                 }
@@ -1908,7 +1912,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     if (!event.locals.user && 
                         (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
                             return {
-                                success: false,
+                                ok: false,
                                 error: "access_denied",
                                 error_description: "Must log in to use client credentials flow" ,
                             }
@@ -1930,7 +1934,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     CrossauthLogger.logger.error({cerr: e});
                     //throw this.error(ce.httpStatus, ce.message);
                     return { 
-                        success: false,
+                        ok: false,
                         error: ce.oauthErrorCode, 
                         error_description: ce.message
                     };
@@ -2090,7 +2094,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     CrossauthLogger.logger.error({cerr: e});
                     //throw this.error(ce.httpStatus, ce.message);
                     return { 
-                        success: false,
+                        ok: false,
                         error: ce.oauthErrorCode, 
                         error_description: ce.message
                     };

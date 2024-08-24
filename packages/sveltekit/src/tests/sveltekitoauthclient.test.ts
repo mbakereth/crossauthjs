@@ -51,7 +51,7 @@ export async function oauthLogin () {
     const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    expect(body.success).toBe(true);
+    expect(body.ok).toBe(true);
     expect(body.access_token).toBeDefined();
     expect(body.refresh_token).toBeDefined();
     const access_token = body.access_token;
@@ -160,7 +160,7 @@ test('SvelteKitClient.clientCredentials_post', async () => {
     const resp = await server.oAuthClient?.clientCredentialsFlowEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    expect(body.success).toBe(true);
+    expect(body.ok).toBe(true);
     expect(body.body.grant_type).toBe("client_credentials");
     expect(body.body.client_secret).toBe("DEF");
 
@@ -227,7 +227,7 @@ test('SvelteKitClient.refreshTokenFlow_post', async () => {
     const resp = await server.oAuthClient?.refreshTokenFlowEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    expect(body.success).toBe(true);
+    expect(body.ok).toBe(true);
     expect(body.body.grant_type).toBe("refresh_token");
     expect(body.body.client_secret).toBe("DEF");
 
@@ -297,7 +297,7 @@ test('SvelteKitClient.passwordFlow_post', async () => {
     const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    expect(body.success).toBe(true);
+    expect(body.ok).toBe(true);
     expect(body.body.grant_type).toBe("password");
     expect(body.body.client_secret).toBe("DEF");
 
@@ -371,7 +371,7 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
     const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    expect(body.success).toBe(true);
+    expect(body.ok).toBe(true);
     expect(body.body.grant_type).toBe("password");
     expect(body.body.client_secret).toBe("DEF");
 
@@ -431,7 +431,7 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
     const password2Resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
     expect(password2Resp.status).toBe(200);
     const password2Body = await password2Resp.json();
-    expect(password2Body.success).toBe(true);
+    expect(password2Body.ok).toBe(true);
     expect(password2Body.challenge_type).toBe("oob");
     const oobCode = password2Body.oob_code;
 

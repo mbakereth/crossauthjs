@@ -103,7 +103,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.error(j({cerr: e}));
             return {
-                success: false,
+                ok: false,
                 error: ce.message,
                 exception: ce,
                 validFlows: this.validFlows,
@@ -136,7 +136,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.error(j({cerr: e}));
             return {
-                success: false,
+                ok: false,
                 error: ce.message,
                 exception: ce,
             }
@@ -167,7 +167,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.error(j({cerr: e}));
             return {
-                success: false,
+                ok: false,
                 error: ce.message,
                 exception: ce,
             }
@@ -198,7 +198,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.error(j({cerr: e}));
             return {
-                success: false,
+                ok: false,
                 error: ce.message,
                 exception: ce,
             }

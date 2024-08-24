@@ -53,7 +53,7 @@ test('SvelteKitOAuthServer.getAccessTokenWhileLoggedIn', async () => {
     let redirectTo : string|undefined = undefined;
     try {
         const resp = await authServer?.authorizeEndpoint.load(event);
-        expect(resp?.success).toBe(true);
+        expect(resp?.ok).toBe(true);
         expect(resp?.authorizationNeeded).toBeDefined();
         expect(resp?.authorizationNeeded?.user?.username).toBe("bob");
     } catch (e) {
@@ -146,7 +146,7 @@ test('SvelteKitOAuthServer.alreadyAuthorized', async () => {
     let redirectTo : string|undefined = undefined;
     try {
         const resp = await authServer?.authorizeEndpoint.load(event);
-        expect(resp?.success).toBe(true);
+        expect(resp?.ok).toBe(true);
         expect(resp?.authorizationNeeded).toBeDefined();
         expect(resp?.authorizationNeeded?.user?.username).toBe("bob");
     } catch (e) {
@@ -228,7 +228,7 @@ test('SvelteKitOAuthServer.notAuthorized', async () => {
     let redirectTo : string|undefined = undefined;
     try {
         const resp = await authServer?.authorizeEndpoint.load(event);
-        expect(resp?.success).toBe(true);
+        expect(resp?.ok).toBe(true);
         expect(resp?.authorizationNeeded).toBeDefined();
         expect(resp?.authorizationNeeded?.user?.username).toBe("bob");
     } catch (e) {

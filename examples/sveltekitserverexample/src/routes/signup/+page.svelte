@@ -20,7 +20,7 @@
     <p><a href="/">Home</a></p>
 {:else if form?.factor2Data?.factor2 == "totp"}
     <ConfigureTotp data={data} factor2Data={form?.factor2Data}/>
-{:else if form?.success}
+{:else if form?.ok}
     <p class="text-slate-900 bg-success p-2 rounded ">User created</p>
     <p><a href="/">Home</a></p>
 {:else}

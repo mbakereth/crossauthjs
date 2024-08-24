@@ -10,7 +10,7 @@
 </svelte:head>
 <h1>Delete OAuth Client</h1>
 
-{#if form?.success}
+{#if form?.ok}
     <p class="bg-success p-2 rounded text-slate-900">
         The client was deleted.
     </p>

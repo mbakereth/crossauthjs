@@ -52,7 +52,7 @@ export async function oauthLogin () {
     const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
     expect(resp.status).toBe(200);
     const body = await resp.json();
-    expect(body.success).toBe(true);
+    expect(body.ok).toBe(true);
     expect(body.access_token).toBeDefined();
     expect(body.refresh_token).toBeDefined();
     const access_token = body.access_token;

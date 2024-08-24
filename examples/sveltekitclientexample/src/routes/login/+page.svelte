@@ -8,7 +8,7 @@
 	/** @type {import('./$types').ActionData} */
 	export let form;
     /*onMount(() => {
-        if (form?.success) {
+        if (form?.ok) {
             goto("/");
         }
     });*/

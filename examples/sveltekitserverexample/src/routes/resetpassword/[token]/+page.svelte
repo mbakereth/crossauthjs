@@ -11,7 +11,7 @@
 </svelte:head>
 <h1>Password Reset</h1>
 
-{#if form?.success == true}
+{#if form?.ok == true}
     <!-- password reset was successful (from the POST action)-->
     <p class="text-slate-900 bg-success p-2 rounded ">Password reset successful</p>
     <p><a href="/">Home</a></p>

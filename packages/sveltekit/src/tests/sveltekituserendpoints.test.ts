@@ -81,7 +81,7 @@ test('SvelteKitUserEndpoints.resetPassword', async () => {
     event.locals.csrfToken = csrfToken;
     event.cookies.set("CSRFTOKEN", csrfCookieValue, {path: "/"});
     let resp1 = await server.sessionServer?.userEndpoints.requestPasswordReset(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     const token = passwordResetData.token;
 
     // submit password reset
@@ -96,7 +96,7 @@ test('SvelteKitUserEndpoints.resetPassword', async () => {
     event.locals.csrfToken = csrfToken;
     event.cookies.set("CSRFTOKEN", csrfCookieValue, {path: "/"});
     resp1 = await server.sessionServer?.userEndpoints.resetPassword(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
 
 });
 
@@ -129,7 +129,7 @@ test('SvelteKitUserEndpoints.changePassword', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.userEndpoints.changePassword(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
 
 });
 
@@ -162,7 +162,7 @@ test('SvelteKitUserEndpoints.deleteUser', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     let resp1 = await server.sessionServer?.userEndpoints.deleteUser(event);
-    expect(resp1?.success).toBe(true);
+    expect(resp1?.ok).toBe(true);
     let found = false;
     try {
         await userStorage.getUserByUsername("bob");

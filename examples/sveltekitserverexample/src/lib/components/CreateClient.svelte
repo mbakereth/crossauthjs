@@ -10,7 +10,7 @@
     let username = form?.formData?.username ?? data?.clientUsername;
 </script>
 
-{#if form?.success}
+{#if form?.ok}
     <p class="bg-success p-2 rounded text-slate-900">
         The client was created.
         {#if form?.client.confidential}

@@ -19,7 +19,7 @@
 </svelte:head>
 <h1>Update your Details</h1>
 
-{#if form?.success}
+{#if form?.ok}
     {#if form?.emailVerificationNeeded}
         <p class="bg-success p-2 rounded text-slate-900">
             Please click on the link we emailed you to finish updating your details.

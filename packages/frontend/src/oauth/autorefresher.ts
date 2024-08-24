@@ -146,7 +146,7 @@ export class OAuthAutoRefresher {
                     }
                     reply = await resp.json();
 
-                    if (reply?.ok || reply?.success) { // TODO: make success ok in sveltekit
+                    if (reply?.ok) { 
                         await this.scheduleAutoRefresh(tokensToFetch, errorFn);
                         success = true;
                         try {

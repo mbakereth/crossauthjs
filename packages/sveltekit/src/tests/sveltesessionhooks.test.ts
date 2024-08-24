@@ -185,7 +185,7 @@ test('SvelteSessionHooks.login2FA', async () => {
     const sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookie??"");
     resp = await loginFactor2(server, resolver, handle, sessionCookie??"", sessionId??"");
     ret = resp.ret;
-    expect(ret?.success).toBe(true);
+    expect(ret?.ok).toBe(true);
     expect(ret?.user?.username).toBe("alice");
 });
 
@@ -202,7 +202,7 @@ test('SvelteSessionHooks.visitPage2FA', async () => {
     resp = await loginFactor2(server, resolver, handle, sessionCookieValue??"", sessionId??"");
     loginEvent = resp.event;
     ret = resp.ret;
-    expect(ret?.success).toBe(true);
+    expect(ret?.ok).toBe(true);
     expect(ret?.user?.username).toBe("alice");
 
     const {csrfToken, csrfCookieValue} = await getCsrfToken(server, resolver, handle);

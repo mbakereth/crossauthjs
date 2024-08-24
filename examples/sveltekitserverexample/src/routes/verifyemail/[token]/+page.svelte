@@ -9,7 +9,7 @@
 </svelte:head>
 <h1>Create an Account</h1>
 
-{#if data?.success}
+{#if data?.ok}
     <p class="text-slate-900 bg-success p-2 rounded ">Email verification successful</p>
     <p><a href="/">Home</a></p>
 {:else}

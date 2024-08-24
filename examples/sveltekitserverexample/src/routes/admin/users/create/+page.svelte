@@ -27,7 +27,7 @@
 </svelte:head>
 <h1>Create an Account</h1>
 
-{#if form?.success}
+{#if form?.ok}
     <p class="text-slate-900 bg-success p-2 rounded ">
         User created.
         {#if form?.user?.state == "passwordresetneeded"}

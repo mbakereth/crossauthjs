@@ -380,7 +380,7 @@ export class SvelteKitSessionServer {
     readonly sessionHook : (input: {event: RequestEvent}, 
         //response: Response
     ) => /*MaybePromise<Response>*/ MaybePromise<{headers: Header[]}>;
-    readonly twoFAHook : (input: {event: RequestEvent}) => MaybePromise<{twofa: boolean, success: boolean, response?: Response}>;
+    readonly twoFAHook : (input: {event: RequestEvent}) => MaybePromise<{twofa: boolean, ok: boolean, response?: Response}>;
 
 
     /**
@@ -763,13 +763,13 @@ export class SvelteKitSessionServer {
                                     CrossauthLogger.logger.debug(j({err:e}))
                                 }
                                 this.error(401, {message: "Sorry, your code has expired"});
-                                return {success: false, twofa: true};
+                                return {ok: false, twofa: true};
 
                             } else {
                                 if (isFactor2PageProtected) {
                                     return {
                                         twofa: true, 
-                                        success: false, 
+                                        ok: false, 
                                         response: 
                                             new Response('', {
                                                 status: 302, 
@@ -779,7 +779,7 @@ export class SvelteKitSessionServer {
                                 } else {
                                     return {
                                         twofa: true, 
-                                        success: false, 
+                                        ok: false, 
                                         response: new Response(JSON.stringify({
                                             ok: false,
                                             errorMessage: error1.message,
@@ -796,7 +796,7 @@ export class SvelteKitSessionServer {
                         }
                         // restore original request body
                         SvelteKitSessionServer.updateRequest(event, sessionData.pre2fa.body, sessionData.pre2fa["content-type"]);
-                        return {twofa: true, success: true};
+                        return {twofa: true, ok: true};
                     } else {
                         // 2FA has not started - start it
                         CrossauthLogger.logger.debug(j({msg:"Starting 2FA", username: user.username}));
@@ -804,7 +804,7 @@ export class SvelteKitSessionServer {
                             const error = new CrossauthError(ErrorCode.Forbidden, "CSRF token missing");
                             return {
                                 twofa: true, 
-                                success: false, 
+                                ok: false, 
                                 response: new Response(JSON.stringify({
                                     ok: false, 
                                     errorMessage: error.message, 
@@ -827,7 +827,7 @@ export class SvelteKitSessionServer {
                         if (isFactor2PageProtected) {
                             return {
                                 twofa: true, 
-                                success: true, 
+                                ok: true, 
                                 response: new Response('', {
                                     status: 302, 
                                     statusText: httpStatus(302), 
@@ -835,7 +835,7 @@ export class SvelteKitSessionServer {
                         } else {
                             return {
                                 twofa: true, 
-                                success: true, 
+                                ok: true, 
                                 response: new Response(JSON.stringify({
                                     ok: true,
                                     factor2Required: true}), {
@@ -865,7 +865,7 @@ export class SvelteKitSessionServer {
                     }
                 }
             } 
-            return {twofa: false, success: true};
+            return {twofa: false, ok: true};
         }
     }
 

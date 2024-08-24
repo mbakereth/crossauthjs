@@ -18,7 +18,7 @@
 </svelte:head>
 <h1>Change Two-Factor Authentication</h1>
 
-{#if form?.success && !form.factor2Data}
+{#if form?.ok && !form.factor2Data}
     <p class="bg-success p-2 rounded text-slate-900">Your two-factor authentication has been updated</p>
     <p><a href="/account">Your Account</a></p>
 {:else if form?.factor2Data?.factor2 == "totp"}

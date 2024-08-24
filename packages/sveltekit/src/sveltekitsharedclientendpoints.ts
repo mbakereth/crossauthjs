@@ -23,7 +23,7 @@ import { error, redirect } from '@sveltejs/kit';
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type SearchClientsPageData = {
-    success : boolean,
+    ok : boolean,
     clients?: OAuthClient[],
     skip : number,
     take : number,
@@ -42,7 +42,7 @@ export type SearchClientsPageData = {
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type UpdateClientPageData = {
-    success: boolean,
+    ok: boolean,
     client?: OAuthClient,
     clientId?: string;
     clientUsername? : string,
@@ -59,7 +59,7 @@ export type UpdateClientPageData = {
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type UpdateClientFormData = {
-    success : boolean,
+    ok : boolean,
     client?: OAuthClient,
     error? : string,
     exception?: CrossauthError,
@@ -74,7 +74,7 @@ export type UpdateClientFormData = {
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type CreateClientPageData = {
-    success: boolean,
+    ok: boolean,
     clientUserId? : string|number,
     clientUsername? : string,
     error? : string,
@@ -90,7 +90,7 @@ export type CreateClientPageData = {
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type CreateClientFormData = {
-    success : boolean,
+    ok : boolean,
     client?: OAuthClient,
     error? : string,
     exception?: CrossauthError,
@@ -104,7 +104,7 @@ export type CreateClientFormData = {
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type DeleteClientPageData = {
-    success: boolean,
+    ok: boolean,
     client?: OAuthClient,
     clientId?: string;
     clientUsername? : string,
@@ -119,7 +119,7 @@ export type DeleteClientPageData = {
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
 export type DeleteClientFormData = {
-    success : boolean,
+    ok : boolean,
     error? : string,
     exception?: CrossauthError,
 };
@@ -355,7 +355,7 @@ export class SvelteKitSharedClientEndpoints {
             }
 
             return {
-                success: true,
+                ok: true,
                 clients,
                 skip,
                 take,
@@ -371,7 +371,7 @@ export class SvelteKitSharedClientEndpoints {
                 throw e;
             const ce = CrossauthError.asCrossauthError(e);
             return {
-                success: false,
+                ok: false,
                 error: ce.message,
                 exception: ce,
                 hasPrevious: false,
@@ -401,7 +401,7 @@ export class SvelteKitSharedClientEndpoints {
             const userResp  = client.userId == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(client.userId);
             const clientUsername = userResp?.user?.username;
             return {
-                success: true,
+                ok: true,
                 client: client,
                 validFlows: this.validFlows,
                 validFlowNames: this.validFlowNames,
@@ -413,7 +413,7 @@ export class SvelteKitSharedClientEndpoints {
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
                 validFlows: this.validFlows,
                 validFlowNames: this.validFlowNames,
                 clientId,
@@ -502,7 +502,7 @@ export class SvelteKitSharedClientEndpoints {
                 clientUpdate,
                 resetSecret);
         return {
-            success: true,
+            ok: true,
             client: newClient,
             formData: formData,
             //plaintextSecret: resetSecret ? formData.clientSecret : undefined,
@@ -516,7 +516,7 @@ export class SvelteKitSharedClientEndpoints {
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
                 formData,
             }
         } 
@@ -561,7 +561,7 @@ export class SvelteKitSharedClientEndpoints {
             const clientUsername = userResp?.user?.username;
 
             return {
-                success: true,
+                ok: true,
                 validFlows: this.validFlows,
                 validFlowNames: this.validFlowNames,
                 clientUserId,
@@ -572,7 +572,7 @@ export class SvelteKitSharedClientEndpoints {
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
                 validFlows: this.validFlows,
                 validFlowNames: this.validFlowNames,
             }
@@ -664,7 +664,7 @@ export class SvelteKitSharedClientEndpoints {
                     data.getAsBoolean("confidential") ?? false,
                     clientUserId );
             return {
-                success: true,
+                ok: true,
                 client: newClient,
                 formData: formData,
             }
@@ -675,7 +675,7 @@ export class SvelteKitSharedClientEndpoints {
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
                 formData,
             }
         } 
@@ -697,7 +697,7 @@ export class SvelteKitSharedClientEndpoints {
             const userResp  = client.userId == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(client.userId);
             const clientUsername = userResp?.user?.username;
             return {
-                success: true,
+                ok: true,
                 client: client,
                 clientId,
                 clientUsername,
@@ -707,7 +707,7 @@ export class SvelteKitSharedClientEndpoints {
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
                 clientId,
             }
         }
@@ -740,7 +740,7 @@ export class SvelteKitSharedClientEndpoints {
         
         await this.clientStorage.deleteClient(clientId);
         return {
-            success: true,
+            ok: true,
         }
 
         } catch (e) {
@@ -749,7 +749,7 @@ export class SvelteKitSharedClientEndpoints {
             return {
                 error: ce.message,
                 exception: ce,
-                success: false,
+                ok: false,
             }
         } 
     }

@@ -21,6 +21,17 @@
         });
     })
 
+    async function clientCredentials() {
+        try {
+            const resp = await fetch("/flows/clientcredentials", {
+                method: "POST",
+                body: "{'scope': 'read write'}",
+            });
+            if (resp.redirected) goto(resp.url);
+        } catch (e) {
+            console.log(e);
+        }
+    }
 </script>
 
 <svelte:head>
@@ -29,12 +40,17 @@
 <h1>Sveltekit OAuth Client Example</h1>
 
 <p>Logged in as {data?.user?.username ?? "nobody"}</p>
-<p><a href="/account">Account details</a></p>
+{#if data?.user}
+    <p><a href="/account">Account details</a></p>
+{:else}
+<p><a href="/login">Login</a></p>
+{/if}
 
 <h2>OAuth Flows</h2>
 
 <p><a href="flows/authzcodeflow?scope=read+write">Authorization Code Flow</a></p>
-<p><a href="flows/clientcredentialsflow">Client Credentials Flow</a></p>
+<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-missing-attribute -->
+<p><a class="cursor-pointer" on:click={clientCredentials}>Client Credentials Flow</a></p>
 <p><a href="flows/passwordflow">Password Flow</a></p>
 <p><a href="flows/oidcauthzcodeflow">OIDC Authorization Code Flow</a></p>
 

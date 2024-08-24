@@ -11,7 +11,7 @@
 </svelte:head>
 <h1>Authorize Your Account</h1>
 
-{#if form?.success}
+{#if form?.ok}
     <!-- the form was successfully submitted-->
     <p class="bg-success p-2 rounded text-slate-900">
         You have authorized your access.
