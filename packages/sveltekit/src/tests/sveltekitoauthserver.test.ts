@@ -334,9 +334,9 @@ test('SvelteKitOAuthServer.mfa', async () => {
 
     // log in
     await login(server, resolver, handle);
-    
 
-    // authorize get endpoint
+
+    // get OAuth auth server
     let authServer = server.oAuthAuthServer;
     if (!authServer) throw new Error("No auth server");
 
@@ -408,14 +408,333 @@ test('SvelteKitOAuthServer.mfa', async () => {
             mfa_token: mfa_token,
             oob_code: oob_code,
             binding_code: oob
-    }),
-    headers: [
-        ["content-type", "application/json"],
-    ] 
-});
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
     event = new MockRequestEvent("1", postRequest, {});
     const resp5 = await authServer.tokenEndpoint.post(event);
     const body5 = await resp5.json();
     expect(body5.access_token).toBeDefined();
     
+});
+
+test('SvelteKitOAuthServer.deviceCodeManual', async () => {
+    const { server, resolver, handle, userStorage } = await makeServer(true, false, true);
+
+    // log in
+    await login(server, resolver, handle);
+    
+    // get OAuth auth server
+    let authServer = server.oAuthAuthServer;
+    if (!authServer) throw new Error("No auth server");
+
+    // call device authorization endpoint to create user and device code 
+    let postRequest = new Request("http://ex.com/dummy", {
+        method: "POST",
+        body: JSON.stringify({
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id : "ABC",
+            client_secret: "DEF",
+            scope: "read write",
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
+    let event = new MockRequestEvent("1", postRequest, {});
+    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event);
+    let devAuthBody = await devAuthResp.json();
+    expect(devAuthBody.device_code).toBeDefined();
+    expect(devAuthBody.verification_uri).toBe('http://localhost:5174/device');
+    expect(devAuthBody.verification_uri_complete).toContain('http://localhost:5174/device?user_code=');
+    expect(devAuthBody.user_code?.length).toBe(9);
+    
+    // call device endpoint - should result in a redirect to login page
+    let getRequest = new Request("http://ex.com/dummy", {
+        method: "GET",
+    });
+    event = new MockRequestEvent("1", getRequest, {});
+    let location = undefined;
+    let status = undefined;
+    try {
+        await authServer.deviceEndpoint.load(event);
+    } catch (e : any) {
+        location = e.location;
+        status = e.status;
+    }
+    expect(status).toBe(302);
+    expect(location).toBe("/login?next=http%3A%2F%2Fex.com%2Fdummy")
+
+    // simulate login
+    const user = (await userStorage.getUserByUsername("bob")).user;
+    event.locals.user = user;
+
+    // call device endpoint again, without user code.  Should return data for showing prompt page
+    let devResp = await authServer.deviceEndpoint.load(event);
+    expect(devResp.ok).toBe(true);
+    expect(devResp.completed).toBe(false);
+    expect(devResp.retryAllowed).toBe(true);
+    expect(devResp.user?.username).toBe("bob");
+    expect(devResp.authorizationNeeded).toBeUndefined();
+
+    // call token endpoint - should return authorization_pending
+    let tokenRequest = new Request("http://ex.com/token", {
+        method: "POST",
+        body: JSON.stringify({
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id : "ABC",
+            client_secret: "DEF",
+            scope: "read write",
+            device_code: devAuthBody.device_code,
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+            });
+    let tokenEvent = new MockRequestEvent("1", tokenRequest, {});
+    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    let tokenBody = await tokenResp.json();
+    expect(tokenResp.status).toBe(200);
+    expect(tokenBody.error).toBe("authorization_pending");
+
+    // submit wrong user code
+    postRequest = new Request("http://ex.com/dummy", {
+        method: "POST",
+        body: JSON.stringify({
+            user_code: "XXX",
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
+    event = new MockRequestEvent("1", postRequest, {});
+    event.locals.user = user;
+    let devPostResp = await authServer.deviceEndpoint.actions.userCode(event);
+    expect(devPostResp.ok).toBe(false);
+    expect(devPostResp.error).toBe("access_denied");
+    
+    // token should still return authorization_pending
+    tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    tokenBody = await tokenResp.json();
+    expect(tokenResp.status).toBe(200);
+    expect(tokenBody.error).toBe("authorization_pending");
+
+    // submit right user code
+    postRequest = new Request("http://ex.com/dummy", {
+        method: "POST",
+        body: JSON.stringify({
+            user_code: devAuthBody.user_code,
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
+    event = new MockRequestEvent("1", postRequest, {});
+    event.locals.user = user;
+    devPostResp = await authServer.deviceEndpoint.actions.userCode(event);
+    expect(devPostResp.ok).toBe(true);
+    expect(devPostResp.completed).toBe(false);
+    expect(devPostResp.authorizationNeeded?.user?.username).toBe("bob");
+    expect(devPostResp.authorizationNeeded?.client_id).toBe("ABC");
+    expect(devPostResp.authorizationNeeded?.scope).toBe("read write");
+    expect(devPostResp.user_code).toBe(devAuthBody.user_code);
+
+    // authorize scopes
+    authServer.authServer.validateAndPersistScope("ABC", "read write", user);
+
+    // submit user code again
+    devPostResp = await authServer.deviceEndpoint.actions.userCode(event);
+    expect(devPostResp.ok).toBe(true);
+    expect(devPostResp.completed).toBe(true);
+
+    // token should return access_token
+    tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    tokenBody = await tokenResp.json();
+    expect(tokenResp.status).toBe(200);
+    expect(tokenBody.error).toBeUndefined();
+    expect(tokenBody.access_token).toBeDefined();
+    
+
+});
+
+test('SvelteKitOAuthServer.deviceCodeAuto', async () => {
+    const { server, resolver, handle, userStorage } = await makeServer(true, false, true);
+
+    // log in
+    await login(server, resolver, handle);
+    
+    // get OAuth auth server
+    let authServer = server.oAuthAuthServer;
+    if (!authServer) throw new Error("No auth server");
+
+    // call device authorization endpoint to create user and device code 
+    let postRequest = new Request("http://ex.com/dummy", {
+        method: "POST",
+        body: JSON.stringify({
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id : "ABC",
+            client_secret: "DEF",
+            scope: "read write",
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
+    let event = new MockRequestEvent("1", postRequest, {});
+    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event);
+    let devAuthBody = await devAuthResp.json();
+    expect(devAuthBody.device_code).toBeDefined();
+    expect(devAuthBody.verification_uri).toBe('http://localhost:5174/device');
+    expect(devAuthBody.verification_uri_complete).toContain('http://localhost:5174/device?user_code=');
+    expect(devAuthBody.user_code?.length).toBe(9);
+    
+    // call device endpoint - should result in a redirect to login page
+    let getRequest = new Request("http://ex.com/dummy?user_code="+devAuthBody.user_code, {
+        method: "GET",
+    });
+    event = new MockRequestEvent("1", getRequest, {});
+    let location = undefined;
+    let status = undefined;
+    try {
+        await authServer.deviceEndpoint.load(event);
+    } catch (e : any) {
+        location = e.location;
+        status = e.status;
+    }
+    expect(status).toBe(302);
+    expect(location).toContain("/login?next=http%3A%2F%2Fex.com%2Fdummy%3Fuser_code%3D")
+
+    // simulate login
+    const user = (await userStorage.getUserByUsername("bob")).user;
+    event.locals.user = user;
+
+    // call device endpoint again, without user code.  Should return data for showing prompt page
+    let devResp = await authServer.deviceEndpoint.load(event);
+    expect(devResp.ok).toBe(true);
+    expect(devResp.completed).toBe(false);
+    expect(devResp.retryAllowed).toBe(true);
+    expect(devResp.user?.username).toBe("bob");
+    expect(devResp.authorizationNeeded).toBeDefined();
+    expect(devResp.user_code?.length).toBe(9);
+
+    // authorize scopes
+    authServer.authServer.validateAndPersistScope("ABC", "read write", user);
+
+    // call token endpoint - should return authorization_pending
+    let tokenRequest = new Request("http://ex.com/token", {
+        method: "POST",
+        body: JSON.stringify({
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id : "ABC",
+            client_secret: "DEF",
+            scope: "read write",
+            device_code: devAuthBody.device_code,
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+            });
+    let tokenEvent = new MockRequestEvent("1", tokenRequest, {});
+    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    let tokenBody = await tokenResp.json();
+    expect(tokenResp.status).toBe(200);
+    expect(tokenBody.error).toBe("authorization_pending");
+    
+    // submit post with user code
+    postRequest = new Request("http://ex.com/dummy", {
+        method: "POST",
+        body: JSON.stringify({
+            user_code: devResp.user_code,
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
+    event = new MockRequestEvent("1", postRequest, {});
+    event.locals.user = user;
+    let devPostResp = await authServer.deviceEndpoint.actions.userCode(event);
+    expect(devPostResp.ok).toBe(true);
+    expect(devPostResp.completed).toBe(true);
+    expect(devPostResp.authorizationNeeded).toBeUndefined();
+
+    // token should return access_token
+    tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    tokenBody = await tokenResp.json();
+    expect(tokenResp.status).toBe(200);
+    expect(tokenBody.error).toBeUndefined();
+    expect(tokenBody.access_token).toBeDefined();
+    
+
+});
+
+test('SvelteKitOAuthServer.deviceCodeAutoPreAuthorizePreLogin', async () => {
+    const { server, resolver, handle, userStorage } = await makeServer(true, false, true);
+
+    // log in
+    await login(server, resolver, handle);
+    
+    // get OAuth auth server
+    let authServer = server.oAuthAuthServer;
+    if (!authServer) throw new Error("No auth server");
+
+    // call device authorization endpoint to create user and device code 
+    let postRequest = new Request("http://ex.com/dummy", {
+        method: "POST",
+        body: JSON.stringify({
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id : "ABC",
+            client_secret: "DEF",
+            scope: "read write",
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+    });
+    let event = new MockRequestEvent("1", postRequest, {});
+    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event);
+    let devAuthBody = await devAuthResp.json();
+    expect(devAuthBody.device_code).toBeDefined();
+    expect(devAuthBody.verification_uri).toBe('http://localhost:5174/device');
+    expect(devAuthBody.verification_uri_complete).toContain('http://localhost:5174/device?user_code=');
+    expect(devAuthBody.user_code?.length).toBe(9);
+   
+    const user = (await userStorage.getUserByUsername("bob")).user;
+    
+    // authorize scopes
+    authServer.authServer.validateAndPersistScope("ABC", "read write", user);
+
+    // call device endpoint - should result in a redirect to login page
+    let getRequest = new Request("http://ex.com/dummy?user_code="+devAuthBody.user_code, {
+        method: "GET",
+    });
+    event = new MockRequestEvent("1", getRequest, {});
+    event.locals.user = user;
+    let devResp = await authServer.deviceEndpoint.load(event);
+    expect(devResp.ok).toBe(true);
+    expect(devResp.completed).toBe(true);
+    expect(devResp.user?.username).toBe("bob");
+    expect(devResp.authorizationNeeded).toBeUndefined();
+
+    // call token endpoint - should return access token
+    let tokenRequest = new Request("http://ex.com/token", {
+        method: "POST",
+        body: JSON.stringify({
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id : "ABC",
+            client_secret: "DEF",
+            scope: "read write",
+            device_code: devAuthBody.device_code,
+        }),
+        headers: [
+            ["content-type", "application/json"],
+        ] 
+            });
+    let tokenEvent = new MockRequestEvent("1", tokenRequest, {});
+    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    let tokenBody = await tokenResp.json();
+    expect(tokenResp.status).toBe(200);
+    expect(tokenBody.error).toBeUndefined();
+    expect(tokenBody.access_token).toBeDefined();
 });

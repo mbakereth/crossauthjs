@@ -134,6 +134,15 @@ export enum ErrorCode {
     /** Thrown when an invalid request is made, eg configure 2FA when 2FA is switched off for user */
     BadRequest,
 
+    /** Thrown in the OAuth device code flow */
+    AuthorizationPending,
+
+    /** Thrown in the OAuth device code flow */
+    SlowDown,
+
+    /** Thrown in the OAuth device code flow */
+    ExpiredToken,
+
     /** Thrown for an condition not convered above. */
     UnknownError,
 }
@@ -290,6 +299,15 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.FetchError) {
             _message = "Couldn't execute a fetch";
             _httpStatus = 500;
+        } else if (code == ErrorCode.AuthorizationPending) {
+            _message = "Waiting for authorization";
+            _httpStatus = 200;
+        } else if (code == ErrorCode.SlowDown) {
+            _message = "Slow polling down by 5 seconds";
+            _httpStatus = 200;
+        } else if (code == ErrorCode.ExpiredToken) {
+            _message = "Token has expired";
+            _httpStatus = 401;
         } else {
             _message = "Unknown error";
             _httpStatus = 500;
@@ -328,8 +346,11 @@ export class CrossauthError extends Error {
             case "server_error": code = ErrorCode.UnknownError; break;
             case "temporarily_unavailable": code = ErrorCode.Connection; break;
             case "invalid_token": code = ErrorCode.InvalidToken; break;
+            case "expired_token": code = ErrorCode.ExpiredToken; break;
             case "insufficient_scope": code = ErrorCode.InvalidToken; break;
             case "mfa_required": code = ErrorCode.MfaRequired; break;
+            case "authorization_pending": code = ErrorCode.AuthorizationPending; break;
+            case "slow_down": code = ErrorCode.SlowDown; break;
             default: code = ErrorCode.UnknownError;
         }
         return new CrossauthError(code, error_description);
@@ -345,6 +366,10 @@ export class CrossauthError extends Error {
             case ErrorCode.Connection: return "temporarily_unavailable";
             case ErrorCode.InvalidToken: return "invalid_token";
             case ErrorCode.MfaRequired: return "mfa_required";
+            case ErrorCode.AuthorizationPending: return "authorization_pending";
+            case ErrorCode.SlowDown: return "slow_down";
+            case ErrorCode.ExpiredToken: return "expired_token";
+            case ErrorCode.Expired: return "expired_token";
             default: return "server_error";
         }
     }

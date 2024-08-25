@@ -153,6 +153,8 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
             options: {
                 userStorage,
                 authStorage,
+                deviceCodeVerificationUri: "http://localhost:5174/device",
+                userCodeThrottle: 0,
             }
                
     } : undefined;

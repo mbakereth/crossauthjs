@@ -21,8 +21,11 @@ import { CrossauthError, ErrorCode, UserState } from '@crossauth/common';
 import type {
     OAuthClient,
     OAuthTokenResponse,
+    OAuthDeviceAuthorizationResponse,
+    OAuthDeviceResponse,
     Key,
-    User } from '@crossauth/common';
+    User,
+ } from '@crossauth/common';
 import { CrossauthLogger, j, KeyPrefix } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, type JsonWebKey } from 'crypto'
@@ -139,6 +142,43 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
      * expire.  Defult 5 minutes */
     authorizationCodeExpiry? : number | null,
 
+    /** Expiry for user codes codes in seconds.   Defult 5 minutes */
+    userCodeExpiry? : number,
+
+    /** Milliseconds to wait after each failed code attempt
+     * Default 1500.  A 1500ms throttle and 8 character user codes gives 
+     * a brute force a 2^-32 chance of success at brute forcing.
+     */
+    userCodeThrottle? : number,
+
+    /** For device code flow, tell client to use a poll interval of this many seconds.
+     * Default 5.
+     */
+    deviceCodePollInterval? : number,
+
+    /** Length for device codes (before base64-encoding).  Default 16
+     */
+    deviceCodeLength? : number,
+
+    /** 
+     * Length for user codes codes in base 32.  Default 8.
+     */
+    userCodeLength? : number,
+
+    /** 
+     * Put a dash after this number of characters in user codes.
+     * null means no dashes.  Dashes are ignored during validation.
+     * Default 4
+     */
+    userCodeDashEvery? : number,
+
+    /**
+     * URI to tell user to go to to enter user code in device code flow.
+     * 
+     * No default - required if using the device flow.
+     */
+    deviceCodeVerificationUri? : string,
+
     /** Expiry for authorization codes in seconds.  If null, they don't 
      * expire.  Defult 5 minutes */
     mfaTokenExpiry? : number | null,
@@ -234,6 +274,15 @@ export class OAuthAuthorizationServer {
     private validScopes : string[] = [];
     private idTokenClaims : {[key:string] : any} = {};
 
+    // device code
+    private userCodeExpiry = 60*5;
+    readonly userCodeThrottle = 1500;
+    private deviceCodePollInterval = 5;
+    private userCodeLength = 8;
+    private deviceCodeLength = 16;
+    private userCodeDashEvery : number|null = 4;
+    private deviceCodeVerificationUri : string = "";
+
     /** Set from options.  See {@link OAuthAuthorizationServerOptions.validFlows} */
     validFlows : string[] = ["all"];
 
@@ -293,6 +342,27 @@ export class OAuthAuthorizationServer {
         setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
         setParameter("idTokenClaims", ParamType.Json, this, options, "OAUTH_ID_TOKEN_CLAIMS");
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
+
+        // device code
+        setParameter("userCodeExpiry", ParamType.Number, this, options, "DEVICECODE_USERCODE_EXPIRY");
+        setParameter("userCodeThrottle", ParamType.Number, this, options, "DEVICECODE_USERCODE_THROTTLE");
+        setParameter("deviceCodePollInterval", ParamType.Number, this, options, "DEVICECODE_POLL_INTERVAL");
+        setParameter("deviceCodeLength", ParamType.Number, this, options, "DEVICECODE_LENGTH");
+        setParameter("userCodeLength", ParamType.Number, this, options, "DEVICECODE_USERCODE_LENGTH");
+        let tmp : {userCodeDashEvery? : string} = {};
+        setParameter("userCodeDashEvery", ParamType.String, tmp, options, "DEVICECODE_USERCODE_DASH_EVERY");
+        if (tmp.userCodeDashEvery) {
+            if (tmp.userCodeDashEvery == "" || tmp.userCodeDashEvery.toLowerCase() == "null") this.userCodeDashEvery = null;
+            else {
+                try {
+                    this.userCodeDashEvery = Number(tmp.userCodeDashEvery)
+                } catch (e) {
+                    throw new CrossauthError(ErrorCode.Configuration,
+                        "userCodeDashEvery must be a number or null")
+                }
+            }
+        }
+        setParameter("deviceCodeVerificationUri", ParamType.String, this, options, "DEVICECODE_VERIFICATION_URI");
 
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {
@@ -637,7 +707,7 @@ export class OAuthAuthorizationServer {
 
     /**
      * The the OAuth2 authorize endpoint.  All parameters are expected to be
-     * strings and have be URL-decoded.
+     * strings and have been URL-decoded.
      * 
      * For arguments and return parameters, see OAuth2 documentation.
      * @param options these arguments correspond to the OAuth `token`
@@ -659,6 +729,7 @@ export class OAuthAuthorizationServer {
         oobCode,
         bindingCode,
         otp,
+        deviceCode,
     } : {
         grantType : string, 
         clientId : string, 
@@ -672,7 +743,8 @@ export class OAuthAuthorizationServer {
         mfaToken? : string,
         oobCode? : string,
         bindingCode?: string,
-        otp? : string}) 
+        otp? : string,
+        deviceCode? : string}) 
     : Promise<OAuthTokenResponse> {
 
         const flow = this.inferFlowFromPost(grantType, codeVerifier);
@@ -954,7 +1026,7 @@ export class OAuthAuthorizationServer {
             }
 
             try {
-                this.keyStorage.deleteKey(mfa.key.value);
+                await this.keyStorage.deleteKey(mfa.key.value);
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.warn(j({
@@ -1044,7 +1116,7 @@ export class OAuthAuthorizationServer {
             }
     
             try {
-                this.keyStorage.deleteKey(mfa.key.value);
+                await this.keyStorage.deleteKey(mfa.key.value);
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.warn(j({
@@ -1062,6 +1134,69 @@ export class OAuthAuthorizationServer {
                 issueRefreshToken: createRefreshToken, 
                 user: mfa.user});
 
+        } else if (grantType == "device_code" || grantType == "urn:ietf:params:oauth:grant-type:device_code") {
+
+            // validate device code
+            if (!deviceCode) {
+                return {
+                    error: "invalid_request",
+                    error_description: "No device code given"
+                };
+            }
+            let deviceCodeKey : Key;
+            try {
+                deviceCodeKey = await this.keyStorage.getKey(KeyPrefix.deviceCode + deviceCode);
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug(j({err: ce}));
+                CrossauthLogger.logger.error(j({msg: "Couldn't get device code", cerr: ce}));
+                return {
+                    error: "accerss_denied",
+                    error_description: "Invalid device code"
+                };
+            }
+
+            try {
+                const data = JSON.parse(deviceCodeKey.data ?? "{}");
+                const now = (new Date()).getTime();
+                if (deviceCodeKey.expires && now > deviceCodeKey.expires.getTime()) {
+                    await this.deleteDeviceCode(deviceCode);
+                    return {
+                        error: "expired_token",
+                        error_description: "Code has expired",
+                    }
+                }
+                else if (!(data.success == true)) {
+                    return {
+                        error: "authorization_pending",
+                        error_description: "Waiting for user code to be entered",
+                    }
+                } else {
+                    let scopes = data.scope ? data.scope.split(" ") : undefined;
+                    let userResponse = data.userId ? await this.userStorage?.getUserById(data.userId) : undefined;
+                    await this.deleteDeviceCode(deviceCode);
+                    return await this.getAccessToken({
+                        client,
+                        clientSecret,
+                        codeVerifier,
+                        scopes,
+                        issueRefreshToken: createRefreshToken,
+                        user: userResponse?.user,
+                    });
+                }
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug(j({err: ce}));
+                CrossauthLogger.logger.error(j({msg: "Couldn't get device code", cerr: ce}));
+                await this.deleteDeviceCode(deviceCode);
+                return {
+                    error: "accerss_denied",
+                    error_description: "Invalid device code"
+                };
+            }
+
+        
+    
         } else {
 
             return {
@@ -1069,6 +1204,431 @@ export class OAuthAuthorizationServer {
                 error_description: `Invalid grant_type ${grantType}`,
             };
 
+        }
+    }
+
+    private async deleteDeviceCode(deviceCode : string) {
+        try {
+            await this.keyStorage.deleteKey(KeyPrefix.deviceCode + deviceCode);
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({msg: "Couldn't delete device code", cerr: ce}));
+        }
+    }
+
+    private async deleteUserCode(userCode : string) {
+        try {
+            await this.keyStorage.deleteKey(KeyPrefix.userCode + userCode);
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({msg: "Couldn't delete user code", cerr: ce}));
+        }
+    }
+
+    /**
+     * The the OAuth2 device authorization endpoint for starting the
+     * device flow.  All parameters are expected to be
+     * strings and have been URL-decoded.
+     * 
+     * For arguments and return parameters, see RFC 8628.
+     * @param options these arguments correspond to the device authorization
+     *        endpoint in RFC 8628 section 3.1.
+     * @return the return object's fields correspond to the OAuth `token`
+     *         endpoint JSON output.
+     */
+    async deviceAuthorizationEndpoint({
+        clientId, 
+        scope, 
+        clientSecret,
+    } : {
+        clientId : string, 
+        scope? : string, 
+        clientSecret? : string}) 
+    : Promise<OAuthDeviceAuthorizationResponse> {
+
+        // validate verification URI
+        if (this.deviceCodeVerificationUri == "") throw new CrossauthError(ErrorCode.Configuration, "Must provide deviceCodeVerificationUri if supporting device code flow");
+        try {
+            new URL(this.deviceCodeVerificationUri)
+        } catch (e) {
+            throw new CrossauthError(ErrorCode.Configuration, "Invalid deviceCodeVerificationUri " + this.deviceCodeVerificationUri);
+        }
+
+        const flow = OAuthFlows.DeviceCode;
+
+        // get client
+        const clientResponse = await this.getClientById(clientId);
+        if (!clientResponse.client) return clientResponse;    
+        const client = clientResponse.client;
+
+        // throw an error if client authentication is required not not present
+        const clientAuthentication = 
+            await this.authenticateClient(flow, client, clientSecret);
+        if (clientAuthentication.error) return clientAuthentication;
+
+        // validate flow type
+        if (!(this.validFlows.includes(flow))) {
+            return {
+                error: "access_denied",
+                error_description: "Unsupported flow type " + flow,
+            };    
+        }
+
+        // validate scopes 
+        if (scope) {
+            const {error: scopeError, errorDescription: scopeErrorDesciption} = 
+                this.validateScope(scope);
+            if (scopeError) return {error: scopeError, 
+                error_description: scopeErrorDesciption};        
+        }
+
+        // create a device code
+        let deviceCode = undefined; 
+        let success = false;
+        const created = new Date();
+        const expirySecs = this.userCodeExpiry;
+        const expires = 
+            new Date(created.getTime() + this.userCodeExpiry*1000 + 
+                    this.clockTolerance*1000);
+        for (let i=0; i<10 && !success; ++i) {
+            try {
+                deviceCode = Crypto.randomValue(this.deviceCodeLength);
+                await this.keyStorage.saveKey(undefined,
+                    KeyPrefix.deviceCode + deviceCode,
+                    created,
+                    expires,
+                    JSON.stringify({scope: scope, clientId: clientId}));
+                success = true;
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
+            }
+        }
+        if (!success || !deviceCode) {
+            return {
+                error: "server_error",
+                error_description: "Couldn't create device code",
+            };
+        }
+
+        // create a user code
+        let userCode = undefined; 
+        success = false;
+        for (let i=0; i<10 && !success; ++i) {
+            try {
+                userCode = Crypto.randomBase32(this.userCodeLength);
+                await this.keyStorage.saveKey(undefined,
+                    KeyPrefix.userCode + userCode,
+                    created,
+                    expires,
+                    JSON.stringify({deviceCode: deviceCode}));
+                success = true;
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
+            }
+        }
+        if (!success || !userCode) {
+            await this.deleteDeviceCode(deviceCode);
+            return {
+                error: "server_error",
+                error_description: "Couldn't create device code",
+            };
+        }
+
+        if (userCode && this.userCodeDashEvery) {
+            const re = new RegExp(String.raw`(.{1,${this.userCodeDashEvery}})`, "g");
+            userCode = userCode.match(re)?.join("-");
+        }
+        return {
+            device_code: deviceCode,
+            user_code: userCode,
+            verification_uri: this.deviceCodeVerificationUri,
+            verification_uri_complete: this.deviceCodeVerificationUri + "?user_code=" + userCode,
+            expires_in: expirySecs,
+            interval: this.deviceCodePollInterval,
+        }
+
+    }
+
+    /**
+     * The the OAuth2 device authorization endpoint for starting the
+     * device flow.  All parameters are expected to be
+     * strings and have been URL-decoded.
+     * 
+     * For arguments and return parameters, see RFC 8628.
+     * @param options these arguments correspond to the device authorization
+     *        endpoint in RFC 8628 section 3.1.
+     * @return the return object's fields correspond to the OAuth `token`
+     *         endpoint JSON output.
+     */
+    async deviceEndpoint({
+        userCode,
+        user,
+    } : {
+        userCode : string,
+        user : User}) 
+    : Promise<OAuthDeviceResponse> {
+    
+        // validate user code 
+        userCode = userCode.replace(/[ -]*/g, '');
+        let userCodeKey : Key|undefined = undefined;
+        let userCodeData : {[key:string]:any} = {};
+        try {
+            userCodeKey = await this.keyStorage.getKey(KeyPrefix.userCode + userCode);
+            userCodeData = JSON.parse(userCodeKey?.data ?? "{}");
+        } catch (e) {
+
+            // user code is invalid - tell user
+            return {
+                ok: false,
+                error: "access_denied",
+                error_description: "Invalid user code",
+            }
+        }
+
+        if (!userCodeData.deviceCode) {
+            // there is no device code in the user code data - delete
+            CrossauthLogger.logger.error(j({msg: "No device code for user code", userCodeHash: Crypto.hash(userCode)}));
+            await this.deleteUserCode(userCode);
+            return {
+                ok: false,
+                error: "server_error",
+                error_description: "No device code for user code",
+            }
+        }
+
+        let deviceCodeKey : Key;
+        try {
+            deviceCodeKey = await this.keyStorage.getKey(KeyPrefix.deviceCode + userCodeData.deviceCode);
+        } catch (e) {
+            // there is an invalid device code in the user code data - delete
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({msg: "Invalid device code for user code", 
+                userCodeHash: Crypto.hash(userCode), 
+                deviceCodeHash: Crypto.hash(userCodeData.deviceCode), 
+                cerr: ce}));
+            await this.deleteUserCode(userCode);
+            return {
+                ok: false,
+                error: "server_error",
+                error_description: "Invalid device code user code",
+            }
+        }
+        let scope : string|undefined = undefined;
+        let clientId : string|undefined = undefined;
+        try {
+            if (!deviceCodeKey.data) throw new CrossauthError(ErrorCode.UnknownError);
+            const data = JSON.parse(deviceCodeKey.data);
+            scope = data.scope;
+            clientId = data.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.UnknownError)
+        } catch (e) {
+            await this.deleteUserCode(userCode);
+            await this.deleteDeviceCode(userCodeData.deviceCode);
+            return {
+                ok: false,
+                error: "server_error",
+                error_description: "Unexpected or incomplete data in device code key",
+            }
+        }
+            
+        // check if the user code has expired.
+        const now = new Date().getTime(); 
+        if (now > userCodeData.expires?.getTime()) {
+
+            // delete the user code
+            await this.deleteUserCode(userCode);
+            // We don't delete the device key as the RFC says the polling
+            // must return token_expired.  We let the polling delete it instead.
+            // we also don't log - expect to caller to log with the IP address
+            return {
+                ok: false,
+                error: "expired_token",
+                error_description: "User code has expired",
+                client_id: clientId,
+            };
+
+        }
+
+        // check if the user code was already used.  This gets deleted after
+        // the token endpoint returns success
+        if (userCodeData.success == true) {
+            return {
+                ok: false,
+                error: "access_denied",
+                error_description: "User code has already been used",
+                client_id: clientId,
+            };
+        }
+
+        // check scopes - if they are not authorized, don't set to success
+        // but tell the caller to request authority
+        let hasAllScopes = false;
+        CrossauthLogger.logger.debug(j({
+            msg: `Checking scopes have been authorized`,
+            scope: scope }))
+        if (scope) {
+            hasAllScopes = await this.hasAllScopes(clientId,
+                user,
+                scope.split(" "));
+
+        } else {
+            hasAllScopes = await this.hasAllScopes(clientId,
+                user,
+                [null]);
+        }
+
+        if (!hasAllScopes) {
+            try {
+                if (user?.id) await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "userId", user.id);
+            } catch (e) {
+                // error updating device code data, so delete both device code and user code
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug(j({err: ce}));
+                CrossauthLogger.logger.warn(j({msg: "Couldn't update user id on user code entry - deleting", cerr: ce}));
+                await this.deleteUserCode(userCode);
+                await this.deleteDeviceCode(userCodeData.deviceCode);
+                return {
+                    ok: false,
+                    error: "access_denied",
+                    error_description: "Invalid user code",
+                    client_id: clientId
+                };
+            }
+            return {
+                ok: true,
+                scope,
+                client_id: clientId,
+                scopeAuthorizationNeeded: true,
+            }
+    
+        }
+
+        // success - store this in the user code, along with the userId
+        try {
+            if (user?.id) await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "userId", user.id);
+            await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "success", true);
+        } catch (e) {
+            // error updating device code data, so delete both device code and user code
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.warn(j({msg: "Couldn't update status on user code entry - deleting", cerr: ce}));
+            await this.deleteUserCode(userCode);
+            await this.deleteDeviceCode(userCodeData.deviceCode);
+            return {
+                ok: false,
+                error: "access_denied",
+                error_description: "Invalid user code",
+                client_id: clientId        };
+        }
+
+        // we no longer need the user code, so delete it
+        await this.deleteUserCode(userCode);
+        
+        // tell the caller the user code enty was successful
+        return {
+            ok: true,
+            scope,
+            client_id: clientId
+        }
+
+    }
+    
+
+                
+    async authorizeDeviceFlowScopes(userCode : string) : Promise<OAuthDeviceResponse>{
+        // validate user code 
+        userCode = userCode.replace(/[ -]*/g, '');
+        let userCodeKey : Key|undefined = undefined;
+        let userCodeData : {[key:string]:any} = {};
+        try {
+            userCodeKey = await this.keyStorage.getKey(KeyPrefix.userCode + userCode);
+            userCodeData = JSON.parse(userCodeKey?.data ?? "{}");
+        } catch (e) {
+
+            // user code is invalid - tell user
+            return {
+                ok: false,
+                error: "access_denied",
+                error_description: "Invalid user code",
+            }
+        }
+
+        if (!userCodeData.deviceCode) {
+            // there is no device code in the user code data - delete
+            CrossauthLogger.logger.error(j({msg: "No device code for user code", userCodeHash: Crypto.hash(userCode)}));
+            await this.deleteUserCode(userCode);
+            return {
+                ok: false,
+                error: "server_error",
+                error_description: "No device code for user code",
+            }
+        }
+
+        let deviceCodeKey : Key;
+        try {
+            deviceCodeKey = await this.keyStorage.getKey(KeyPrefix.deviceCode + userCodeData.deviceCode);
+        } catch (e) {
+            // there is an invalid device code in the user code data - delete
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({msg: "Invalid device code for user code", 
+                userCodeHash: Crypto.hash(userCode), 
+                deviceCodeHash: Crypto.hash(userCodeData.deviceCode), 
+                cerr: ce}));
+            await this.deleteUserCode(userCode);
+            return {
+                ok: false,
+                error: "server_error",
+                error_description: "Invalid device code user code",
+            }
+        }
+        let scope : string|undefined = undefined;
+        let clientId : string|undefined = undefined;
+        try {
+            if (!deviceCodeKey.data) throw new CrossauthError(ErrorCode.UnknownError);
+            const data = JSON.parse(deviceCodeKey.data);
+            scope = data.scope;
+            clientId = data.clientId;
+            if (!clientId) throw new CrossauthError(ErrorCode.UnknownError)
+        } catch (e) {
+            await this.deleteUserCode(userCode);
+            await this.deleteDeviceCode(userCodeData.deviceCode);
+            return {
+                ok: false,
+                error: "server_error",
+                error_description: "Unexpected or incomplete data in device code key",
+            }
+        }
+
+        // success - store this in the user code, along with the userId
+        try {
+            await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "success", true);
+        } catch (e) {
+            // error updating device code data, so delete both device code and user code
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.warn(j({msg: "Couldn't update status on user code entry - deleting", cerr: ce}));
+            await this.deleteUserCode(userCode);
+            await this.deleteDeviceCode(userCodeData.deviceCode);
+            return {
+                ok: false,
+                error: "access_denied",
+                error_description: "Invalid user code",
+                client_id: clientId        
+            };
+        }
+        
+        // we no longer need the user code, so delete it
+        await this.deleteUserCode(userCode);
+        
+        // tell the caller the user code enty was successful
+        return {
+            ok: true,
+            scope,
+            client_id: clientId
         }
     }
 
@@ -1279,7 +1839,7 @@ export class OAuthAuthorizationServer {
                     "User's authenticator has not been loaded");
             }
             const resp = await authenticator.createOneTimeSecrets(mfa.user);
-            this.keyStorage.updateData(mfa.key.value,
+            await this.keyStorage.updateData(mfa.key.value,
                 "omfa",
                 { ...omfaFields, ...resp });
         } catch (e) {
@@ -1372,13 +1932,15 @@ export class OAuthAuthorizationServer {
             return OAuthFlows.RefreshToken;
         } else if (grantType == "device_code") {
             return OAuthFlows.DeviceCode;
+        } else if (grantType == "urn:ietf:params:oauth:grant-type:device_code") {
+            return OAuthFlows.DeviceCode;
         } else if (grantType == "password") {
             return OAuthFlows.Password;
         } else if (grantType == "http://auth0.com/oauth/grant-type/mfa-otp") {
             return OAuthFlows.PasswordMfa;
         } else if (grantType == "http://auth0.com/oauth/grant-type/mfa-oob") {
             return OAuthFlows.PasswordMfa;
-        }
+        } 
         return undefined;
 
     }
@@ -1450,14 +2012,14 @@ export class OAuthAuthorizationServer {
         for (let i=0; i<10 && !success; ++i) {
             try {
                 authzCode = Crypto.randomValue(this.codeLength);
-                this.keyStorage.saveKey(undefined,
+                await this.keyStorage.saveKey(undefined,
                     KeyPrefix.authorizationCode + Crypto.hash(authzCode),
                     created,
                     expires,
                     authzDataString);
                 success = true;
             } catch (e) {
-                CrossauthLogger.logger.debug(j({msg: `Attempt nmumber${i} at creating a unique authozation code failed`}));
+                CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
             }
         }
         if (!success) {

@@ -307,4 +307,10 @@ export class KeyPrefix {
 
     /** OAuth MFA key (used by the password MFA flow) */
     static readonly mfaToken = "omfa:";
+
+    /** Device code device code */
+    static readonly deviceCode = "dc:"
+
+    /** Device code flow user code */
+    static readonly userCode = "uc:"
 }

@@ -176,6 +176,19 @@ export class Crypto {
         return randomBytes(length).toString('base64url');
     }
 
+    static Base32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".split(""); // not real base32 - omits 1,i,0,o
+    /**
+     * Creates a random base-23 string
+     * @param length length of the string to create
+     * @returns the random value as a string.  Number of bytes will be greater as it is base64 encoded.
+     */
+    static randomBase32(length : number, dashEvery? : number) : string {
+        let bytes = [...randomBytes(length)];
+        const str = (bytes.map((i) => Crypto.Base32[i%32])).join("");
+        if (!dashEvery) return str;
+        return str.match(/(.{1,4})/g)?.join("-") ?? str;
+    }
+
     /**
      * Creates a UUID
      */

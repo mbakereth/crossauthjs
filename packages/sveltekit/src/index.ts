@@ -34,6 +34,8 @@ export type {
     ReturnBase,
     AuthorizePageData,
     AuthorizeFormData,
+    DevicePageData,
+    DeviceFormData,
     MfaChallengeBodyType,
     MfaChallengeReturn,
     SvelteKitAuthorizationServerOptions } from './sveltekitoauthserver';

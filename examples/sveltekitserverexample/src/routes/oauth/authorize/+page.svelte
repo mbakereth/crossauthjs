@@ -18,7 +18,7 @@
     </p>
     <p><a href="/">Home</a></p>
 {:else}
-Hi
+
     <!-- form not submitted or there was an error -->
     {#if data?.error}
         <!-- there was an error in the get - we cannot display the form-->
@@ -34,7 +34,7 @@ Hi
                 {form?.error_description ?? "An unknown error occurred"}
             </p>
         {/if}
-        <form method="POST">
+        <form method="POST" action="?/authorize">
             <input type="hidden" name="csrfToken" value={data.csrfToken} />
             {#if data?.authorizationNeeded.scopes}
                 <p class="bg-warning p-2 rounded text-slate-900">

@@ -631,7 +631,7 @@ export class SvelteKitSessionServer {
                        this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, event);
                    } catch (e2) {
                        CrossauthLogger.logger.debug(j({err: e2}));
-                       CrossauthLogger.logger.error(j({cerr: e2, msg: "Couldn't delete CSRF cookie", ip: event.request.referrerPolicy, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
+                       CrossauthLogger.logger.error(j({cerr: e2, msg: "Couldn't delete CSRF cookie", ip: event.request.referrer, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
                    }
                    cookieValue = undefined;
                    event.locals.csrfToken = undefined;

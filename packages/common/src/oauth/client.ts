@@ -155,6 +155,34 @@ export interface OAuthTokenResponse {
 }
 
 /**
+ * These are the fields that can be returned in the device_authorization
+ * device code flow endpoint.
+ */
+export interface OAuthDeviceAuthorizationResponse {
+    device_code?: string,
+    user_code? : string, 
+    verification_uri? : string, 
+    verification_uri_complete?: string, 
+    expires_in?: number,
+    interval?: number,
+    error? : string,
+    error_description? : string,
+}
+
+/**
+ * These are the fields that can be returned in the device
+ * device code flow endpoint.
+ */
+export interface OAuthDeviceResponse {
+    ok: boolean,
+    client_id?: string,
+    scopeAuthorizationNeeded? : boolean,
+    scope? : string,
+    error? : string,
+    error_description? : string,
+}
+
+/**
  * An abstract base class for OAuth clients.
  * 
  * Crossauth provides OAuth clients that work in the browser as well as in
