@@ -5,7 +5,8 @@
     export let data;
 	/** @type {import('./$types').ActionData} */
 	export let form;
-    console.log(data);
+    console.log("device data", data);
+    console.log("device form", form);
     $: cancelled = false;
 </script>
 
@@ -24,7 +25,7 @@
         <p class="bg-error p-2 rounded text-slate-900">The code has expired</p>
     {:else if data?.error}
         <p class="bg-error p-2 rounded text-slate-900">{data?.error_description ?? "There was an error"}</p>
-    {:else if data?.completed}
+    {:else if data?.completed == true}
         <p class="bg-success p-2 rounded text-slate-900">Code successfully submitted.  Please return to the other device.</p>
     {:else if data?.authorizationNeeded}
         <!-- ask the user for authorization-->
@@ -53,7 +54,7 @@
             {form?.error_description ?? "An error has occurred.  Please try again"}
         </p>
     {/if}
-    {#if form?.completed}
+    {#if form?.completed == true}
         <p class="bg-success p-2 rounded text-slate-900">Code successfully submitted.  Please return to the other device.</p>
         {:else if data?.authorizationNeeded}
         <!-- ask the user for authorization-->

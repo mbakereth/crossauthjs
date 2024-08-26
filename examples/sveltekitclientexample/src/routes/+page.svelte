@@ -32,6 +32,10 @@
             console.log(e);
         }
     }
+
+    /** @type HTMLFormElement} */
+    let deviceCodeFlowForm;
+
 </script>
 
 <svelte:head>
@@ -48,10 +52,17 @@
 
 <h2>OAuth Flows</h2>
 
+<form method="POST" action="/flows/devicecodeflow" bind:this={deviceCodeFlowForm}>
+    <input type="hidden" name="scope" value="read write"/>
+    <input type="hidden" name="csrdfToken" value={data?.csrfToken}/>
+</form>
+
 <p><a href="flows/authzcodeflow?scope=read+write">Authorization Code Flow</a></p>
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-missing-attribute -->
 <p><a class="cursor-pointer" on:click={clientCredentials}>Client Credentials Flow</a></p>
 <p><a href="flows/passwordflow">Password Flow</a></p>
+<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-missing-attribute -->
+<p><a class="cursor-pointer" on:click={() => {deviceCodeFlowForm.submit()}}>Device Code Flow</a></p>
 <p><a href="flows/oidcauthzcodeflow">OIDC Authorization Code Flow</a></p>
 
 <form method="POST" action="/bff/resource" use:enhance={({ formData }) => {

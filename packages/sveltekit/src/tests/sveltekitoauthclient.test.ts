@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 export async function oauthLogin () {
-    const {server, keyStorage, userStorage} = await makeServer(true, false, false, true, {tokenResponseType: "saveInSessionAndReturn", enableCsrfProtection: false});
+    const {server, keyStorage, userStorage, clientStorage} = await makeServer(true, false, true, true, {tokenResponseType: "saveInSessionAndReturn", enableCsrfProtection: false});
     const {authServer} = await getAccessToken();
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
@@ -62,7 +62,7 @@ export async function oauthLogin () {
     let sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
 
 
-    return {server, authServer, sessionCookieValue, sessionId, access_token, refresh_token, keyStorage, userStorage};
+    return {server, authServer, sessionCookieValue, sessionId, access_token, refresh_token, keyStorage, userStorage, clientStorage};
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -912,3 +912,80 @@ test('SvelteKitClient.tokens', async () => {
     expect(body.have_refresh_token).toBeUndefined();
 });
 
+test('SvelteKitClient.deviceCodeFlow', async () => {
+    // login using password flow
+    const {server, sessionId, sessionCookieValue, clientStorage, userStorage} = await oauthLogin();
+
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({url: request.url, method: request.method, body: request.body? JSON.parse(request.body.toString()) : "{}"})});
+
+    // start device flow - device_authorization call
+    let postRequest = new Request(`http://server.com/dummy`, {
+        method: "POST",
+        body: JSON.stringify({scope: "read write"}),
+        headers: {"cookie": "SESSIONID="+sessionCookieValue,
+            "content-type": "application/json",
+        },
+    });
+    let event = new MockRequestEvent("1", postRequest, {});
+    event.locals.sessionId = sessionId;
+    if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
+    let resp : {[key:string]:any} = await server.oAuthClient?.startDeviceCodeFlowEndpoint.actions.default(event);
+    expect(resp.url).toBe("http://server.com/device_authorization");
+    expect(resp.body.grant_type).toBe("urn:ietf:params:oauth:grant-type:device_code");
+    expect(resp.body.client_id).toBe("ABC");
+    expect(resp.body.client_secret).toBe("DEF");
+    expect(resp.body.scope).toBe("read write");
+
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => {return JSON.stringify({error: "authorization_pending", error_description: "authorization pending"})});
+
+    // poll receiving pending
+    postRequest = new Request(`http://server.com/dummy`, {
+        method: "POST",
+        body: JSON.stringify({device_code: "ABC"}),
+        headers: {"cookie": "SESSIONID="+sessionCookieValue,
+            "content-type": "application/json",
+        },
+    });
+    event = new MockRequestEvent("1", postRequest, {});
+    event.locals.sessionId = sessionId;
+    if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
+    resp = await server.oAuthClient?.pollDeviceCodeFlowEndpoint.actions.default(event);
+    expect(resp.error).toBe('authorization_pending');
+
+    // poll receive access token
+
+    const client = await clientStorage.getClientById("ABC");
+    const user = await userStorage.getUserByUsername("bob");
+    try {
+        const tokens = await server.oAuthAuthServer?.authServer.makeAccessToken({
+            client,
+            clientSecret: "DEF",
+            scopes: ["read", "write"],
+            user: user?.user,
+        });
+        // @ts-ignore
+        fetchMocker.mockResponseOnce((request) => {return JSON.stringify(tokens)});    
+    } catch (e) {
+        console.log(e);
+        process.exit();
+    }
+
+    // poll receiving pending
+    postRequest = new Request(`http://server.com/dummy`, {
+        method: "POST",
+        body: JSON.stringify({device_code: "ABC"}),
+        headers: {"cookie": "SESSIONID="+sessionCookieValue,
+            "content-type": "application/json",
+        },
+    });
+    event = new MockRequestEvent("1", postRequest, {});
+    event.locals.sessionId = sessionId;
+    if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
+    resp = await server.oAuthClient?.pollDeviceCodeFlowEndpoint.actions.default(event);
+    //expect(resp.error).toBe('authorization_pending');
+    
+});

@@ -833,7 +833,7 @@ export class OAuthAuthorizationServer {
                 };
             }
 
-            return await this.getAccessToken({
+            return await this.makeAccessToken({
                 client,
                 code,
                 clientSecret,
@@ -844,7 +844,7 @@ export class OAuthAuthorizationServer {
         } else if (grantType == "refresh_token") {
     
             const refreshData = await this.getRefreshTokenData(refreshToken);
-            if (!refreshData || !this.userStorage) {
+            if (!refreshToken || !refreshData || !this.userStorage) {
                 return {
                     error: "access_denied",
                     error_description: "Refresh token is invalid",
@@ -867,7 +867,15 @@ export class OAuthAuthorizationServer {
                     }
                 }
             }
-            return await this.getAccessToken({
+            try {
+                const hash = KeyPrefix.refreshToken + Crypto.hash(refreshToken);
+                await this.keyStorage.deleteKey(hash);   
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug(j({err: e}));
+                CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
+            }
+            return await this.makeAccessToken({
                 client,
                 clientSecret,
                 codeVerifier,
@@ -890,7 +898,7 @@ export class OAuthAuthorizationServer {
                 };
             }
     
-            return await this.getAccessToken({
+            return await this.makeAccessToken({
                 client,
                 clientSecret,
                 codeVerifier,
@@ -960,7 +968,7 @@ export class OAuthAuthorizationServer {
                         return await this.createMfaRequest(user);
                     }
             }
-            return await this.getAccessToken({
+            return await this.makeAccessToken({
                 client, 
                 clientSecret, 
                 codeVerifier, 
@@ -998,6 +1006,8 @@ export class OAuthAuthorizationServer {
             }
 
             const mfa = await this.validateMfaToken(mfaToken);
+            const mfaKey = KeyPrefix.mfaToken + Crypto.hash(mfaToken);
+
             if (!mfa.user || !mfa.key) {
                 return {
                     error: "access_denied",
@@ -1026,7 +1036,7 @@ export class OAuthAuthorizationServer {
             }
 
             try {
-                await this.keyStorage.deleteKey(mfa.key.value);
+                await this.keyStorage.deleteKey(mfaKey);
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.warn(j({
@@ -1036,7 +1046,7 @@ export class OAuthAuthorizationServer {
                 }))
             }
     
-            return await this.getAccessToken({
+            return await this.makeAccessToken({
                 client, 
                 clientSecret, 
                 codeVerifier, 
@@ -1126,7 +1136,7 @@ export class OAuthAuthorizationServer {
                 }))
             }
 
-            return await this.getAccessToken({
+            return await this.makeAccessToken({
                 client, 
                 clientSecret, 
                 codeVerifier, 
@@ -1175,7 +1185,7 @@ export class OAuthAuthorizationServer {
                     let scopes = data.scope ? data.scope.split(" ") : undefined;
                     let userResponse = data.userId ? await this.userStorage?.getUserById(data.userId) : undefined;
                     await this.deleteDeviceCode(deviceCode);
-                    return await this.getAccessToken({
+                    return await this.makeAccessToken({
                         client,
                         clientSecret,
                         codeVerifier,
@@ -2030,7 +2040,10 @@ export class OAuthAuthorizationServer {
         return {code: authzCode, state: state};
     }
 
-    private async getAccessToken({
+    /**
+     * Create an access token
+     */
+    async makeAccessToken({
         client, 
         code, 
         clientSecret, 

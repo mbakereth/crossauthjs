@@ -7,6 +7,7 @@ import {
     CrossauthError } from '@crossauth/common'
 import type { OAuthTokenResponse } from '@crossauth/common'
 import { OAuthAutoRefresher } from './autorefresher.ts';
+import { OAuthDeviceCodePoller } from './devicecodepoller.ts';
 import { OAuthTokenConsumer } from './tokenconsumer';
 /**
  * This is the type for a function that is called when an OAuth endpoint
@@ -48,6 +49,7 @@ export class OAuthClient extends OAuthClientBase {
     #clientId : string|undefined;
     #clientSecret : string|undefined;
     private autoRefresher : OAuthAutoRefresher;
+    private deviceCodePoller : OAuthDeviceCodePoller;
 
     /**
      * Constructor
@@ -84,6 +86,8 @@ export class OAuthClient extends OAuthClientBase {
      *   - `resServerHeaders` - adds headers to fetfh calls
      *   - `autoRefresh` - if set and tokens are present in local or session storage, 
      *      automatically turn on auto refresh
+     *   - `deviceCodePollUrl` URL for polling for device code authorization.  
+     *      Default is `/devicecodepoll`
      *  For other options see {@link @crossauth/common/OAuthClientBase}.
      */
     constructor(options  : {
@@ -106,6 +110,7 @@ export class OAuthClient extends OAuthClientBase {
             resServerMode? : "no-cors" | "cors" | "same-origin",
             resServerHeaders? : {[key:string]:any},
             autoRefresh? : ("access"|"id")[]
+            deviceCodePollUrl? : string,
         }) {
         if (!options.tokenConsumer) {
             options.tokenConsumer = new OAuthTokenConsumer(
@@ -138,6 +143,8 @@ export class OAuthClient extends OAuthClientBase {
             autoRefreshUrl: this.authServerBaseUrl + "/token",
             tokenProvider: this,
         });
+
+        this.deviceCodePoller = new OAuthDeviceCodePoller(options);
 
         // if tokens were saved in local or session storage, fetch them.
         // turn on auto refresh if we have tokens.
@@ -316,6 +323,25 @@ export class OAuthClient extends OAuthClientBase {
      */
     stopAutoRefresh() {
         return this.autoRefresher.stopAutoRefresh();
+    }
+
+    /**
+     * Turns polling for a device code
+     * @param tokensToFetch which tokens to fetch
+     * @param errorFn what to call in case of error
+     */
+    async startDeviceCodePolling(deviceCode : string, 
+        pollResultFn : (status: ("complete"|"completeAndRedirect"|"authorization_pending"|"expired_token"|"error"), error? : string, location? : string) => void, interval : number = 5) {
+    
+        return this.deviceCodePoller.startPolling(deviceCode, pollResultFn, interval);
+    }
+
+
+    /**
+     * Turns off polling for a device code
+     */
+    stopDeviceCodePolling() {
+        return this.deviceCodePoller.stopPolling();
     }
 
     /**

@@ -31,7 +31,7 @@ export const oidcConfiguration : OpenIdConfiguration = {
     jwks_uri: "http://server.com/jwks",
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
-    grant_types_supported: ["authorization_code", "client_credentials", "password", "refresh_token", "http://auth0.com/oauth/grant-type/mfa-otp", "http://auth0.com/oauth/grant-type/mfa-oob"],
+    grant_types_supported: ["authorization_code", "client_credentials", "password", "refresh_token", "http://auth0.com/oauth/grant-type/mfa-otp", "http://auth0.com/oauth/grant-type/mfa-oob", "urn:ietf:params:oauth:grant-type:device_code"],
     token_endpoint_auth_signing_alg_values_supported: ["RS256"],
     subject_types_supported: ["public"],
     id_token_signing_alg_values_supported: ["RS256"],

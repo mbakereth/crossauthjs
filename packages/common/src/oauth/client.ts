@@ -103,6 +103,7 @@ export class OAuthFlows {
             OAuthFlows.Password,
             OAuthFlows.PasswordMfa,
             OAuthFlows.OidcAuthorizationCode,
+            OAuthFlows.DeviceCode,
         ];
     }
 
@@ -127,7 +128,7 @@ export class OAuthFlows {
             case OAuthFlows.PasswordMfa:
                 return ["http://auth0.com/oauth/grant-type/mfa-otp", "http://auth0.com/oauth/grant-type/mfa-oob"];
             case OAuthFlows.DeviceCode:
-                return ["device_code"];
+                return ["device_code", "urn:ietf:params:oauth:grant-type:device_code"];
         }
         return undefined;
     }
@@ -361,6 +362,9 @@ export abstract class OAuthClientBase {
      */
     protected abstract sha256(plaintext :string) : Promise<string>;
 
+    //////////////////////////////////////////////////////////////////////
+    // Authorization Code Flow
+
     /**
      * Starts the authorizatuin code flow, optionally with PKCE.
      * 
@@ -505,6 +509,9 @@ export abstract class OAuthClientBase {
         }
     }
 
+    //////////////////////////////////////////////////////////////////////
+    // Client Credentials Flow
+
     /**
      * Performs the client credentials flow.
      * 
@@ -559,6 +566,9 @@ export abstract class OAuthClientBase {
         //return {url: url, params: params};
     }
 
+    //////////////////////////////////////////////////////////////////////
+    // Password and Password MFA Flows
+
     /** Initiates the Password Flow.
      * 
      * Does not throw exceptions.
@@ -612,7 +622,6 @@ export abstract class OAuthClientBase {
         }
         //return {url: url, params: params};
     }
-
 
     /** Request valid authenticators using the Password MFA flow, 
      * after the Password flow has been initiated.
@@ -914,6 +923,9 @@ export abstract class OAuthClientBase {
 
     }
 
+    //////////////////////////////////////////////////////////////////////
+    // Refresh Token Flow
+
     async refreshTokenFlow(refreshToken : string) : 
         //Promise<{[key:string]:any}> {
         Promise<OAuthTokenResponse> {
@@ -945,6 +957,86 @@ export abstract class OAuthClientBase {
         if (clientSecret) params.client_secret = clientSecret;
         try {
             return await this.post(url, params, this.authServerHeaders);
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return {
+                error: "server_error",
+                error_description: "Error connecting to authorization server"
+            };
+        }
+        //return {url: url, params: params};
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    // Device Code Flow
+
+    /**
+     * Starts the Device Code Flow on the primary device (the one wanting an access token)
+     * @param url The URl for the device_authorization endpoint, as it is not defined in the OIDC configuration
+     * @param scope optional scope to request authorization for
+     * @returns See {@link OAuthDeviceAuthorizationResponse}
+     */
+    async startDeviceCodeFlow(url : string, scope?: string) : Promise<OAuthDeviceAuthorizationResponse> {
+        CrossauthLogger.logger.debug(j({msg: "Starting device code flow"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("urn:ietf:params:oauth:grant-type:device_code") && !this.oidcConfig?.grant_types_supported.includes("device_code")) {
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support device code grant"
+            };
+        }
+
+        let params : {[key:string]:any} = {
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
+        }
+        if (scope) params.scope = scope;
+        try {
+            return await this.post(url, params, this.authServerHeaders);
+        } catch (e) {
+            CrossauthLogger.logger.error(j({err: e}));
+            return {
+                error: "server_error",
+                error_description: "Error connecting to authorization server"
+            };
+        }
+        //return {url: url, params: params};
+    }
+
+    /**
+     * Polls the device endpoint to check if the device code flow has been
+     * authorized by the user.
+     * 
+     * @param deviceCode the device code to poll
+     * @returns See {@link OAuthDeviceResponse}
+     */
+    async pollDeviceCodeFlow(deviceCode : string) : Promise<OAuthTokenResponse> {
+        CrossauthLogger.logger.debug(j({msg: "Starting device code flow"}));
+        if (!this.oidcConfig) await this.loadConfig();
+        if (!this.oidcConfig?.grant_types_supported.includes("urn:ietf:params:oauth:grant-type:device_code") && !this.oidcConfig?.grant_types_supported.includes("device_code")) {
+            return {
+                error: "invalid_request",
+                error_description: "Server does not support device code grant"
+            };
+        }
+        if (!this.oidcConfig?.token_endpoint) {
+            return {
+                error: "server_error",
+                error_description: "Cannot get token endpoint"
+            };
+        }
+
+        let params : {[key:string]:any} = {
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
+            device_code: deviceCode,
+        }
+        try {
+            const resp = await this.post(this.oidcConfig?.token_endpoint, params, this.authServerHeaders);
+            if (resp.error) return resp;
+            return resp;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {

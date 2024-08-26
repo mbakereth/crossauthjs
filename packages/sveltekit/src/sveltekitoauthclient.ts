@@ -1,12 +1,15 @@
 import { jwtDecode } from "jwt-decode";
+import QRCode from 'qrcode';
 import {
     CrossauthError,
     ErrorCode,
     CrossauthLogger,
     OAuthFlows,
-    type OAuthTokenResponse,
-    j, 
-    type MfaAuthenticatorResponse} from '@crossauth/common';
+    j,} from '@crossauth/common';
+import type {
+    OAuthTokenResponse,
+    MfaAuthenticatorResponse,
+    OAuthDeviceAuthorizationResponse} from '@crossauth/common';
 import {
     setParameter,
     ParamType,
@@ -78,10 +81,10 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * This function is called after successful authorization to pass the
      * new tokens to.
      * @param oauthResponse the response from the OAuth `token` endpoint.
-     * @param client the fastify OAuth client
-     * @param request the Fastify request
-     * @param reply the Fastify reply
-     * @returns the Fastify reply
+     * @param client the OAuth client
+     * @param event the SvelteKit request event
+     * @param silent if true, don't return a Response, only JSON or undefined.
+     * @returns a Response, JSON or undefined
      */
     receiveTokenFn?: (oauthResponse: OAuthTokenResponse,
         client: SvelteKitOAuthClient,
@@ -94,6 +97,18 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * See {@link SvelteKitErrorFn}.
      */
     errorFn? :SvelteKitErrorFn;
+
+    /**
+     * This function called when the token endpoint in the device code flow
+     * reports that authorization is pending
+     * @param oauthResponse the response from the OAuth `token` endpoint.
+     * @param client the OAuth client
+     * @param event the SvelteKit request event
+     * @returns a Response, JSON or undefined
+     */
+    deviceCodePendingFn?: (oauthResponse: OAuthTokenResponse,
+        client: SvelteKitOAuthClient,
+        event: RequestEvent) => Promise<Response|TokenReturn|undefined>;
 
     /**
      * What to do when receiving tokens.
@@ -248,7 +263,8 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
 
 async function sendJson(oauthResponse: OAuthTokenResponse,
     _client: SvelteKitOAuthClient,
-    _event: RequestEvent) : Promise<Response|undefined> {
+    _event: RequestEvent,
+    _silent?: boolean) : Promise<Response|undefined> {
         return json({ok: true, ...oauthResponse, 
             id_payload: decodePayload(oauthResponse.id_token)})
 }
@@ -710,6 +726,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             }
         }
 
+        // receive token fn
         if (this.tokenResponseType == "custom" && !options.receiveTokenFn) {
             throw new CrossauthError(ErrorCode.Configuration, 
                 "Token response type of custom selected but receiveTokenFn not defined");
@@ -735,6 +752,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             this.server.sessionServer == undefined) {
             throw new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is" + this.tokenResponseType + ", must activate the session server");
         }
+        
+        // errorFn
         if (this.errorResponseType == "custom" && !options.errorFn) {
             throw new CrossauthError(ErrorCode.Configuration, 
                 "Error response type of custom selected but errorFn not defined");
@@ -1117,8 +1136,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                }
                catch (e) {
                 if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
-                const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
-                    return this.errorFn(this.server, event, ce);
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
+                return this.errorFn(this.server, event, ce);
                }
 
             }
@@ -1179,7 +1198,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }
                 catch (e) {
                     if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
-                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
                     throw ce;
                 }
 
@@ -1503,8 +1522,129 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         return json(null, {status: resp.status});
     }
 
+    private async startDeviceCodeFlow_internal(event : RequestEvent) : Promise<OAuthDeviceAuthorizationResponse&{verification_uri_qrdata? : string}> {
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+
+            if (!(this.validFlows.includes(OAuthFlows.DeviceCode))) {
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Device code flow is not supported");
+                throw ce;
+            }
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+                
+            // if the session server and CSRF protection enabled, require a valid CSRF token
+            if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+                try {
+                    const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
+                    if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+                }
+                catch (e) {
+                    if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
+                    throw ce;
+                }
+
+            }
+
+            // get scopes from body
+            let scope : string|undefined = formData.scope;
+            if (scope == "") scope = undefined;
+
+            let url = this.authServerBaseUrl;
+            if (!(url.endsWith("/"))) url += "/";
+            url += this.deviceAuthorizationUrl;
+            const resp =  await this.startDeviceCodeFlow(url, scope);
+
+            let qrUrl : string|undefined = undefined;
+            if (resp.verification_uri_complete) {
+                await QRCode.toDataURL(resp.verification_uri_complete)
+                    .then((url) => {
+                            qrUrl = url;
+                    })
+                    .catch((err) => {
+                        CrossauthLogger.logger.debug(j({err: err}));
+                        CrossauthLogger.logger.warn(j({msg: "Couldn't generate verification URL QR Code"}))
+                    });
+        
+            }
+            if (qrUrl) return {verification_uri_qrdata: qrUrl, ...resp};
+            return resp;
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+            if (SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: e});
+            CrossauthLogger.logger.error({cerr: e});
+            //throw this.error(ce.httpStatus, ce.message);
+            return { 
+                error: ce.oauthErrorCode, 
+                error_description: ce.message
+            };
+        }
+    }
+
+    private async pollDeviceCodeFlow_internal(event : RequestEvent) : Promise<TokenReturn|Response|undefined> {
+        let formData : {[key:string]:string}|undefined = undefined;
+        try {
+
+            if (!(this.validFlows.includes(OAuthFlows.DeviceCode))) {
+                const ce = new CrossauthError(ErrorCode.Unauthorized, "Device code flow is not supported");
+                throw ce;
+            }
+            var data = new JsonOrFormData();
+            await data.loadData(event);
+            formData = data.toObject();
+                
+            // if the session server and CSRF protection enabled, require a valid CSRF token
+            if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+                try {
+                    const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
+                    if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+                }
+                catch (e) {
+                    if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
+                    throw ce;
+                }
+
+            }
+
+            // get device code from body
+            let deviceCode = formData.device_code;
+            if (!deviceCode) throw new CrossauthError(ErrorCode.BadRequest, "No device code given when polling for user authorization")
+
+            const resp =  await this.pollDeviceCodeFlow(deviceCode);
+            if (resp.access_token && !resp.error) {
+                const resp2 = await this.receiveTokenFn(resp, this, event, false);
+                return resp2;    
+            } else {
+                if (resp.error == "authorization_pending") return {ok: true, ...resp};
+                let error = resp.error ?? "server_error";
+                let error_description = resp.error_description ?? "Didn't receive an access token";
+                const ce = CrossauthError.fromOAuthError(error, error_description);
+                return this.errorFn(this.server, event, ce);
+            }
+
+
+        } catch (e) {
+            if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+            if (SvelteKitServer.isSvelteKitError(e)) throw e;
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: e});
+            CrossauthLogger.logger.error({cerr: e});
+            //throw this.error(ce.httpStatus, ce.message);
+            return this.errorFn(this.server, event, ce);
+        }
+    }
+
+
     ////////////////////////////////////////////////////////////////
     // Endpoints
+
+    /////
+    // Authorization code flows
 
     readonly authorizationCodeFlowEndpoint = {
 
@@ -1870,6 +2010,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
     };
 
+    /////
+    // Client credentials flow
+
     readonly clientCredentialsFlowEndpoint = {
 
         post: async (event : RequestEvent) => {
@@ -1969,6 +2112,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         }
     };
 
+    /////
+    // Refresh token flows
+
     readonly refreshTokenFlowEndpoint = {
 
         post: async (event : RequestEvent) => {
@@ -2002,7 +2148,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                    }
                    catch (e) {
                     if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
-                    const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
+                    const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
                         return this.errorFn(this.server, event, ce);
                    }
     
@@ -2078,7 +2224,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     }
                     catch (e) {
                         if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
-                        const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
+                        const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
                         throw ce;
                     }
         
@@ -2175,6 +2321,59 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
     };
 
+    /////
+    // Device code flow
+
+    readonly startDeviceCodeFlowEndpoint = {
+        actions: {
+            default: async ( event : RequestEvent ) => {
+                return await this.startDeviceCodeFlow_internal(event);
+            },
+        },
+        post: async (event : RequestEvent) => {
+            const resp = await this.startDeviceCodeFlow_internal(event);
+            if (resp.error) {
+                const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description)
+                return json(resp, {status: ce.httpStatus});
+            }
+            return json(resp);
+        }
+    }
+
+    readonly pollDeviceCodeFlowEndpoint = {
+        actions: {
+            default: async ( event : RequestEvent ) => {
+                /*if (this.tokenResponseType == "sendJson" || this.tokenResponseType == "saveInSessionAndLoad") {
+                    const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use post not load");
+                    throw ce;
+                }*/
+
+                const resp = await this.pollDeviceCodeFlow_internal(event);
+                if (resp instanceof (Response)) return this.unpack(resp);
+                if (resp == undefined) return {};
+                return resp;
+            },
+        },
+        post: async (event : RequestEvent) => {
+            /*if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
+                const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
+                return this.errorFn(this.server, event, ce);
+            }*/
+            const resp = await this.pollDeviceCodeFlow_internal(event);
+            if (resp instanceof Response) return resp;
+            if (resp == undefined) return new Response(null, {status: 204});
+            if (resp.error) {
+                const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description)
+                return json(resp, {status: ce.httpStatus});
+            }
+            return json(resp);
+        }
+    }
+
+
+    /////
+    // Password and Password MFA flows
+
     readonly passwordFlowEndpoint = {
 
         post: async (event : RequestEvent) => 
@@ -2215,6 +2414,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 await this.passwordFlow_action(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordOob(e, formData)),
         }
     };
+
+    /////
+    // BFF endpoints
 
     readonly bffEndpoint = {
 
@@ -2260,6 +2462,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 await this.unpack(await this.allBff(event, {method: "PATCH"})),
         },
     };
+
+    /////
+    // Endpoints for getting BFF tokens
 
     readonly accessTokenEndpoint = {
         post: async (event : RequestEvent) => await this.tokens(event, "access_token"),
@@ -2316,5 +2521,4 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 await this.tokens(event,this.tokenEndpoints),
         },
     }
-
 }

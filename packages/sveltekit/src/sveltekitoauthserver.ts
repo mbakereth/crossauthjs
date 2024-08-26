@@ -1353,6 +1353,7 @@ export class SvelteKitAuthorizationServer {
 
         actions: {
             userCode: async ( event : RequestEvent ) : Promise<DeviceFormData> => {
+                console.log("userCode endpoint")
                 if (!event.locals.user) throw this.error(401, "Access Denied");
 
                 try {

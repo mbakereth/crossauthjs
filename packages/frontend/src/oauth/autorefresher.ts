@@ -8,11 +8,9 @@ const AUTOREFRESH_RETRY_INTERVAL_SECS = 30;
 /**
  * Used by {@link OAuthClient} and {@link OAuthBsffClient} to automatically
  * refresh access and ID tokens
- * 
- * See {@link @crossauth/fastify!FastifyOAuthClient}.
  */
 export class OAuthAutoRefresher {
-    private autoRefreshUrl : string = "/";
+    private autoRefreshUrl : string = "/autorefresh";
     protected csrfHeader : string = "X-CROSSAUTH-CSRF";
     protected headers : {[key:string]:string} = {};
     private autoRefreshActive = false;
@@ -24,8 +22,7 @@ export class OAuthAutoRefresher {
      * Constructor
      * 
      * @param options
-     *   - `autoRefreshUrl` the base url for calls to the client session manager
-     *        (eg `https://myclient.com`).  Default is `/`
+     *   - `autoRefreshUrl` the URL to call to perform the refresh  Default is `/autorefresh`
      *   - `csrfHeader` the header to put CSRF tokens into 
      *        (default `X-CROSSAUTH-CSRF`))
      *   - `mode` overrides the default `mode` in fetch calls
@@ -35,7 +32,6 @@ export class OAuthAutoRefresher {
      */
     constructor(options  : {
             autoRefreshUrl : string,
-            csrfTokenUrl? : string,
             csrfHeader? : string,
             credentials? : "include" | "omit" | "same-origin",
             mode? : "no-cors" | "cors" | "same-origin",

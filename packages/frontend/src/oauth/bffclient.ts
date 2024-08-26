@@ -1,5 +1,6 @@
 import { CrossauthError } from "@crossauth/common";
 import { OAuthAutoRefresher } from './autorefresher.ts';
+import { OAuthDeviceCodePoller } from './devicecodepoller.ts';
 
 /**
  * A browser-side OAuth client designed with work with the
@@ -15,6 +16,7 @@ export class OAuthBffClient {
     private mode :  "no-cors" | "cors" | "same-origin" = "cors";
     private credentials : "include" | "omit" | "same-origin" = "same-origin";
     private autoRefresher : OAuthAutoRefresher;
+    private deviceCodePoller : OAuthDeviceCodePoller;
     private getCsrfTokenUrl = "/api/getcsrftoken";
     private autoRefreshUrl = "/api/refreshtokens";
     private tokensUrl = "/tokens";
@@ -33,6 +35,8 @@ export class OAuthBffClient {
      *        `/api/refreshtokens`
      *   - `tokensUrl` URL to use to fetch token payloads.  Default is
      *        `/tokens`
+     *   - `deviceCodePollUrl` URL for polling for device code authorization.  
+     *      Default is `/devicecodepoll`
      *   - `mode` overrides the default `mode` in fetch calls
      *   - `credentials` - overrides the default `credentials` for fetch calls
      *   - `headers` - adds headers to fetfh calls
@@ -47,6 +51,7 @@ export class OAuthBffClient {
             getCsrfTokenUrl? : string,
             autoRefreshUrl? : string,
             tokensUrl? : string,
+            deviceCodePollUrl? : string,
 
         } = {}) {
         if (options.bffPrefix) this.bffPrefix = options.bffPrefix;
@@ -68,6 +73,8 @@ export class OAuthBffClient {
             autoRefreshUrl: this.autoRefreshUrl,
             tokenProvider: this,
         });
+
+        this.deviceCodePoller = new OAuthDeviceCodePoller(options);
     }
 
     /**
@@ -271,6 +278,25 @@ export class OAuthBffClient {
         return this.autoRefresher.stopAutoRefresh();
     }
 
+    /**
+     * Turns polling for a device code
+     * @param tokensToFetch which tokens to fetch
+     * @param errorFn what to call in case of error
+     */
+    async startDeviceCodePolling(deviceCode : string, 
+        pollResultFn : (status: ("complete"|"completeAndRedirect"|"authorization_pending"|"expired_token"|"error"), error? : string, location? : string) => void, interval : number = 5) {
+    
+        return this.deviceCodePoller.startPolling(deviceCode, pollResultFn, interval);
+    }
+
+
+    /**
+     * Turns off polling for a device code
+     */
+    stopDeviceCodePolling() {
+        return this.deviceCodePoller.stopPolling();
+    }
+    
     ///////////////////////////////////////////////////////////
     // OAuthTokenProvider interface
 
