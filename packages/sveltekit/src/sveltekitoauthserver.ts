@@ -1394,7 +1394,7 @@ export class SvelteKitAuthorizationServer {
                     formData = data.toObject();
                     const authorized = data.getAsBoolean('authorized');
                     const scope = formData.scope;
-                    const clientId = formData.client_od;
+                    const clientId = formData.client_id;
                     const userCode = formData.user_code;
                     let missing = undefined;
                     if (authorized == undefined) missing = "authorized";

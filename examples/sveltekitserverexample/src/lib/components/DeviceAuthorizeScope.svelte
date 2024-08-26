@@ -7,7 +7,7 @@
 
 <form method="POST" action="?/authorize">
     <input type="hidden" name="csrfToken" value={data.csrfToken} />
-    {#if data?.authorizationNeeded.scopes}
+    {#if data?.authorizationNeeded.scopes?.length > 0}
         <p class="bg-warning p-2 rounded text-slate-900">
             Do you agree to authorize <b>{data?.authorizationNeeded.client_name}</b>
             to access your account with the following scopes?
@@ -25,10 +25,10 @@
     {/if}
 
     <input type="hidden" name="authorized" value="true"/>
-    <input type="hidden" name="client_id" value="{form?.authorizationNeeded?.client_id ?? data?.authorizationNeeded?.client_id}"/>
-    <input type="hidden" name="user_code" value="{form?.user_code ?? data?.user_code}"/>
+    <input type="hidden" name="client_id" value={form?.authorizationNeeded?.client_id ?? data?.authorizationNeeded?.client_id}/>
+    <input type="hidden" name="user_code" value={form?.user_code ?? data?.user_code}/>
     {#if data?.authorizationNeeded?.scope}
-        <input type="hidden" name="scope" value="{data?.authorizationNeeded?.scope}"/>
+        <input type="hidden" name="scope" value={data?.authorizationNeeded?.scope}/>
     {/if}
     <p>
         <button class="btn btn-primary" type="submit">Authorize</button>&nbsp;

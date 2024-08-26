@@ -605,7 +605,7 @@ export class OAuthAuthorizationServer {
                     [...new Set([...existingScopes, ...newScopes])];
                 CrossauthLogger.logger.debug(j({
                     msg: "Updating authorizations for " + clientId + " to " + updatedScopes}));
-                this.authStorage.updateAuthorizations(clientId,
+                await this.authStorage.updateAuthorizations(clientId,
                     user?.id,
                     updatedScopes);
             } catch (e) {

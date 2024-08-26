@@ -487,7 +487,7 @@ export class SessionCookie {
     async updateSessionKey(sessionKey : Partial<Key>) : Promise<void> {
         if (!sessionKey.value) throw new CrossauthError(ErrorCode.InvalidKey, "No session when updating activity");
         sessionKey.value = SessionCookie.hashSessionId(sessionKey.value);
-        this.keyStorage.updateKey(sessionKey);
+        await this.keyStorage.updateKey(sessionKey);
     }
 
     /**

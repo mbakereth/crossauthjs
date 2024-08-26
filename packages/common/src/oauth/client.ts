@@ -333,7 +333,7 @@ export abstract class OAuthClientBase {
         }
         if (!resp || !resp.ok) {
             throw new CrossauthError(ErrorCode.Connection, 
-                "Couldn't get OIDC configuration");
+                "Couldn't get OIDC configuration from URL" + this.authServerBaseUrl + "/.well-known/openid-configuration");
         }
         this.oidcConfig = {...DEFAULT_OIDCCONFIG};
         try {
