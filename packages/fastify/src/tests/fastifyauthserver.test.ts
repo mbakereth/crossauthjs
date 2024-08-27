@@ -766,7 +766,7 @@ test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowManual', async () => {
 
 test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowAuto', async () => {
 
-    let {server, userStorage, keyStorage} = await makeAppWithOptions();
+    let {server, userStorage} = await makeAppWithOptions();
     await createEmailAccount("mary", "maryPass123", userStorage);
 
     let res;

@@ -23,7 +23,7 @@ const oidcConfiguration : OpenIdConfiguration = {
     jwks_uri: "http://server.com/jwks",
     response_types_supported: ["code"],
     response_modes_supported: ["query"],
-    grant_types_supported: ["authorization_code", "client_credentials", "password", "refresh_token"],
+    grant_types_supported: ["authorization_code", "client_credentials", "password", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"],
     token_endpoint_auth_signing_alg_values_supported: ["RS256"],
     subject_types_supported: ["public"],
     id_token_signing_alg_values_supported: ["RS256"],
@@ -175,6 +175,7 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
     expect(returnedState).toBe(state);
     expect(code).toBeDefined();
 });
+
 
 test('FastifyOAuthClient.authzcodeflowWithLoginRedirects', async () => {
     await getAccessToken();
@@ -543,3 +544,64 @@ test('FastifyOAuthClient.bffPost', async () => {
     const requestBody = JSON.parse(body.body);
     expect(requestBody.param).toBe("value");
 });
+
+test('FastifyOAuthClient.deviceCodeFlow', async () => {
+    const {authServer} = await getAuthServer();
+
+    const {server} = await makeClient();
+
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    let res;
+    let body;
+
+    // get csrf token 
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body);
+    const {csrfCookie, csrfToken} = getCsrf(res);
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+    
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())}));
+
+    // start device flow
+    res = await server.app.inject({ method: "POST", 
+        url: "/devicecodeflow",
+        payload: {
+            csrfToken,
+            scope: "read write",
+        },
+        cookies: {CSRFTOKEN: csrfCookie}, 
+      });
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("devicecodeflow.njk");
+    expect(body.args.body.grant_type).toBe("urn:ietf:params:oauth:grant-type:device_code");
+    expect(body.args.body.client_id).toBe("ABC");
+    expect(body.args.body.client_secret).toBe("DEF");
+    expect(body.args.body.scope).toBe("read write");
+
+
+    const authResp = await authServer.deviceAuthorizationEndpoint({clientId: "ABC", scope: "read write", clientSecret: "DEF"});
+    expect(authResp.device_code).toBeDefined();
+    expect(authResp.user_code).toBeDefined();
+
+    // @ts-ignore
+    fetchMocker.mockResponseOnce((request) => JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())}));
+
+    // poll device flow
+    res = await server.app.inject({ method: "POST", 
+        url: "/devicecodepoll",
+        payload: {
+            csrfToken,
+            device_code: authResp.device_code,
+        },
+        cookies: {CSRFTOKEN: csrfCookie}, 
+      });
+    body = JSON.parse(res.body);
+    expect(body.url).toBe("http://server.com/token");
+    expect(body.body.grant_type).toBe("urn:ietf:params:oauth:grant-type:device_code");
+    expect(body.body.client_id).toBe("ABC");
+    expect(body.body.client_secret).toBe("DEF");
+    expect(body.body.device_code).toBe(authResp.device_code);
+});
+

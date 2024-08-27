@@ -3,6 +3,7 @@ import {
     OAuthAuthorizationServer,
     InMemoryOAuthClientStorage,
     InMemoryKeyStorage,
+    InMemoryOAuthAuthorizationStorage,
     OAuthClientStorage,
     Crypto,
     LocalPasswordAuthenticator,
@@ -50,6 +51,7 @@ export async function getAuthServer({
     const {clientStorage, client} = await createClient(secretRequired == undefined || secretRequired == true);
     const privateKey = fs.readFileSync("keys/rsa-private-key.pem", 'utf8');
     const userStorage = await getTestUserStorage();
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
     const lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
     const totpAuth = new TotpAuthenticator("Unittest");
     const emailAuth = new EmailAuthenticator();
@@ -68,6 +70,8 @@ export async function getAuthServer({
         emptyScopeIsValid: emptyScopeIsValid,
         validFlows: ["all"],
         userStorage,
+        authStorage,
+        deviceCodeVerificationUri: "http://localhost:3000/device",
     };
     if (aud) options.audience = aud;
     if (persistAccessToken) {

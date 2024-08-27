@@ -1,4 +1,5 @@
 import { jwtDecode } from "jwt-decode";
+import QRCode from 'qrcode';
 import { type FastifyRequest, type FastifyReply } from 'fastify';
 import {
     CrossauthError,
@@ -57,8 +58,18 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     /**
      * The template file for asking the user for username and password
      * in the password flow,
+     * 
+     * Default `passwordflow.njk`
      */
     passwordFlowPage? : string,
+
+    /**
+     * The template file to tell users the url to go to to complete the 
+     * device code flow.
+     * 
+     * Default `devicecodeflow.njk`
+     */
+    deviceCodeFlowPage? : string,
 
     /**
      * The template file for asking the user for an OTP in the password MFA
@@ -101,6 +112,17 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
      * The URL to create the password flow under.  Default `passwordflow`.
      */
     passwordFlowUrl? : string,
+
+    /**
+     * The URL to to create the device code flow under.  Default `devicecodeflow`.
+     */
+    deviceCodeFlowUrl? : string,
+
+    /**
+     * The URL to to for polling until the device code flow completes.  
+     * Default `devicecodepoll`.
+     */
+    deviceCodePollUrl? : string,
 
     /**
      * The URL to create the otp endpoint for the password mfa flow under.  
@@ -248,6 +270,22 @@ export interface PasswordBodyType {
     username : string,
     password: string,
     scope? : string,
+    csrfToken? : string,
+}
+
+/**
+ * Body type for the device code flow Fastify request.
+ */
+export interface DeviceCodeBodyType {
+    scope? : string,
+    csrfToken? : string,
+}
+
+/**
+ * Body type for the device code flow Fastify request.
+ */
+export interface DeviceCodePollBodyType {
+    device_code : string,
     csrfToken? : string,
 }
 
@@ -653,6 +691,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     private prefix : string = "/";
     errorPage : string = "error.njk";
     passwordFlowPage : string = "passwordflow.njk"
+    deviceCodeFlowPage : string = "devicecodeflow.njk"
     mfaOtpPage : string = "mfaotp.njk"
     mfaOobPage : string = "mfaoob.njk"
     authorizedPage : string = "authorized.njk";
@@ -685,6 +724,8 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     private passwordFlowUrl : string = "passwordflow";
     private passwordOtpUrl : string = "passwordotp";
     private passwordOobUrl : string = "passwordoob";
+    private deviceCodeFlowUrl : string = "devicecodeflow";
+    private deviceCodePollUrl : string = "devicecodepoll";
     private bffEndpoints: {
         url: string,
         methods: ("GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS" | "HEAD")[],
@@ -721,8 +762,11 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         setParameter("passwordOtpUrl", ParamType.String, this, options, "OAUTH_PASSWORD_OTP_URL");
         setParameter("passwordOobUrl", ParamType.String, this, options, "OAUTH_PASSWORD_OOB_URL");
         setParameter("passwordFlowPage", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_PAGE");
+        setParameter("deviceCodeFlowPage", ParamType.String, this, options, "OAUTH_DEVICECODE_FLOW_PAGE");
         setParameter("mfaOtpPage", ParamType.String, this, options, "OAUTH_MFA_OTP_PAGE");
         setParameter("mfaOobPage", ParamType.String, this, options, "OAUTH_MFA_OOB_PAGE");
+        setParameter("deviceCodeFlowUrl", ParamType.String, this, options, "OAUTH_DEVICECODE_FLOW_URL");
+        setParameter("deviceCodePollUrl", ParamType.String, this, options, "OAUTH_DEVICECODE_POLL_URL");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
         setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
@@ -1107,19 +1151,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 return await this.passwordPost(false, request, reply);
             });
 
-            /*this.server.app.post(this.prefix+"api/"+this.passwordFlowUrl, 
-                async (request : FastifyRequest<{ Body: PasswordBodyType }>, 
-                    reply : FastifyReply) =>  {
-                    CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
-                        method: 'POST',
-                        url: this.prefix + "api/" + this.passwordFlowUrl,
-                        ip: request.ip,
-                        user: request.user?.username
-                    }));
-                return await this.passwordPost(true, request, reply);
-            });*/
-
         }
 
         if (this.validFlows.includes(OAuthFlows.PasswordMfa)) {
@@ -1148,36 +1179,40 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     }));
                 return await this.passwordOob(false, request, reply);
             });
-
-            /*if (this.validFlows.includes(OAuthFlows.PasswordMfa)) {
-                this.server.app.post(this.prefix+"api/"+this.passwordOtpUrl, 
-                    async (request : FastifyRequest<{ Body: PasswordOtpType }>, 
-                        reply : FastifyReply) =>  {
-                        CrossauthLogger.logger.info(j({
-                            msg: "Page visit",
-                            method: 'POST',
-                            url: this.prefix + "api/" + this.passwordOtpUrl,
-                            ip: request.ip,
-                            user: request.user?.username
-                        }));
-                    return await this.passwordOtp(true, request, reply);
-                });
-    
-                this.server.app.post(this.prefix+"api/"+this.passwordOobUrl, 
-                    async (request : FastifyRequest<{ Body: PasswordOobType }>, 
-                        reply : FastifyReply) =>  {
-                        CrossauthLogger.logger.info(j({
-                            msg: "Page visit",
-                            method: 'POST',
-                            url: this.prefix + "api/" + this.passwordOobUrl,
-                            ip: request.ip,
-                            user: request.user?.username
-                        }));
-                    return await this.passwordOob(true, request, reply);
-                });
-            }*/
         }
  
+        ///////// Device code flow
+
+        if (this.validFlows.includes(OAuthFlows.DeviceCode)) {
+
+            this.server.app.post(this.prefix+this.deviceCodeFlowUrl, 
+                async (request : FastifyRequest<{ Body: DeviceCodeBodyType }>, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + this.deviceCodeFlowPage,
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                return await this.deviceCodePost(false, request, reply);
+            });
+
+            this.server.app.post(this.prefix+this.deviceCodePollUrl, 
+                async (request : FastifyRequest<{ Body: DeviceCodePollBodyType }>, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + this.deviceCodePollUrl,
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                return await this.deviceCodePoll(request, reply);
+            });
+
+
+        }
 
 
         // Token endpoints
@@ -1634,6 +1669,132 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             });
         }
         return await this.receiveTokenFn(resp, this, request, reply)??reply;
+    }
+
+    private async deviceCodePost(isApi: boolean,
+        request: FastifyRequest<{ Body: DeviceCodeBodyType }>,
+        reply: FastifyReply) {
+        if (this.server.sessionServer) {
+            // if sessions are enabled, require a csrf token
+            const {error, reply: reply1} = 
+                await this.server.errorIfCsrfInvalid(request,
+                    reply,
+                    this.errorFn);
+            if (error) return reply1;
+        }
+        try {
+            if (!request.csrfToken) {
+                throw new CrossauthError(ErrorCode.Unauthorized, "CSRF token missing or invalid");
+            }
+
+            let url = this.authServerBaseUrl;
+            if (!(url.endsWith("/"))) url += "/";
+            url += this.deviceAuthorizationUrl;
+            const resp =  await this.startDeviceCodeFlow(url, request.body.scope);
+
+            if (resp.error) {
+                const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description)
+                if (isApi) {
+                    return await this.errorFn(this.server,
+                        request,
+                        reply,
+                        ce);
+                } else {
+                    return reply.view(this.deviceCodeFlowPage, 
+                        {
+                            user: request.user,
+                            scope: request.body.scope,
+                            errorMessage: ce.message,
+                            errorCode: ce.code,
+                            errorCodeName: ce.codeName,
+                            csrfToken: request.csrfToken
+                        });            
+
+                }
+            }
+
+            let qrUrl : string|undefined = undefined;
+            if (resp.verification_uri_complete) {
+                await QRCode.toDataURL(resp.verification_uri_complete)
+                    .then((url) => {
+                            qrUrl = url;
+                    })
+                    .catch((err) => {
+                        CrossauthLogger.logger.debug(j({err: err}));
+                        CrossauthLogger.logger.warn(j({msg: "Couldn't generate verification URL QR Code"}))
+                    });
+        
+            }
+
+            if (isApi) {
+                return reply.header(...JSONHDR)
+                    .send(resp);
+            } else {
+                return reply.view(this.deviceCodeFlowPage, 
+                    {
+                        user: request.user,
+                        scope: request.body.scope,
+                        verification_uri_qrdata: qrUrl,
+                        ...resp
+                    });            
+            }
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.error(j({
+                msg: "Error receiving token",
+                cerr: ce,
+                user: request.user?.user
+            }));
+            CrossauthLogger.logger.debug(j({err: e}));
+            if (isApi) return await this.errorFn(this.server,
+                request,
+                reply,
+                ce);
+            return reply.view(this.deviceCodeFlowPage, {
+                user: request.user,
+                scope: request.body.scope,
+                errorMessage: ce.message,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
+                csrfToken: request.csrfToken
+            });
+        }
+    }
+
+    private async deviceCodePoll(request: FastifyRequest<{ Body: DeviceCodePollBodyType }>,
+        reply: FastifyReply) {
+        if (this.server.sessionServer) {
+            // if sessions are enabled, require a csrf token
+            const {error, reply: reply1} = 
+                await this.server.errorIfCsrfInvalid(request,
+                    reply,
+                    this.errorFn);
+            if (error) return reply1;
+        }
+        try {
+            if (!request.csrfToken) {
+                throw new CrossauthError(ErrorCode.Unauthorized, "CSRF token missing or invalid");
+            }
+
+            const resp =  await this.pollDeviceCodeFlow(request.body.device_code);
+
+            return reply.header(...JSONHDR)
+                .send(resp);
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.error(j({
+                msg: "Error receiving token",
+                cerr: ce,
+                user: request.user?.user
+            }));
+            CrossauthLogger.logger.debug(j({err: e}));
+            return await this.errorFn(this.server,
+                request,
+                reply,
+                ce);
+        }
     }
 
     async refresh(request: FastifyRequest,

@@ -99,18 +99,6 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
     errorFn? :SvelteKitErrorFn;
 
     /**
-     * This function called when the token endpoint in the device code flow
-     * reports that authorization is pending
-     * @param oauthResponse the response from the OAuth `token` endpoint.
-     * @param client the OAuth client
-     * @param event the SvelteKit request event
-     * @returns a Response, JSON or undefined
-     */
-    deviceCodePendingFn?: (oauthResponse: OAuthTokenResponse,
-        client: SvelteKitOAuthClient,
-        event: RequestEvent) => Promise<Response|TokenReturn|undefined>;
-
-    /**
      * What to do when receiving tokens.
      * See {@link SvelteKitOAuthClient} class documentation for full description.
      */
