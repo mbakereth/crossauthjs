@@ -615,6 +615,12 @@ export class OAuthAuthorizationServer {
                     error_description: "Couldn't save scope"
                 };
             }
+        } else if (scope) {
+            return {
+                error: "server_error",
+                error_description: "Must provide auth storage in order to use scopes"
+            };
+
         }
         return {scopes: scopes};
     }
@@ -1259,11 +1265,20 @@ export class OAuthAuthorizationServer {
     : Promise<OAuthDeviceAuthorizationResponse> {
 
         // validate verification URI
-        if (this.deviceCodeVerificationUri == "") throw new CrossauthError(ErrorCode.Configuration, "Must provide deviceCodeVerificationUri if supporting device code flow");
+        if (this.deviceCodeVerificationUri == "") {
+            return {
+                error: "invalid_request",
+                error_description: "Must provide deviceCodeVerificationUri if using the device code flow"
+            }
+        }
         try {
             new URL(this.deviceCodeVerificationUri)
         } catch (e) {
-            throw new CrossauthError(ErrorCode.Configuration, "Invalid deviceCodeVerificationUri " + this.deviceCodeVerificationUri);
+            //throw new CrossauthError(ErrorCode.Configuration, "Invalid deviceCodeVerificationUri " + this.deviceCodeVerificationUri);
+            return {
+                error: "invalid_request",
+                error_description: "Invalid deviceCodeVerificationUri"
+            }
         }
 
         const flow = OAuthFlows.DeviceCode;

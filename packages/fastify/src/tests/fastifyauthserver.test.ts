@@ -5,6 +5,7 @@ import {
     InMemoryUserStorage,
     InMemoryKeyStorage,
     InMemoryOAuthClientStorage,
+    InMemoryOAuthAuthorizationStorage,
     Crypto,
     LocalPasswordAuthenticator,
     TotpAuthenticator,
@@ -100,6 +101,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         return "1";
     };
     const clientStorage = new InMemoryOAuthClientStorage();
+    const authStorage = new InMemoryOAuthAuthorizationStorage();
     const clientSecret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
@@ -126,6 +128,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             keyStorage,
         }}, {
             userStorage,
+            authStorage,
             authenticators: {
                 localpassword: lpAuthenticator,
                 totp: totpAuth,
@@ -139,6 +142,7 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
             jwtPublicKeyFile: "keys/rsa-public-key.pem",
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
             siteUrl: `http://localhost:3000`,
+            deviceCodeVerificationUri: "http://localhost:3000/device",
             ...options,
         });
     // @ts-ignore
@@ -636,6 +640,223 @@ test('FastifyAuthServer.refreshTokenFlowFromCookie', async () => {
             grant_type: "refresh_token",
             client_id: "ABC",
             client_secret: "DEF",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeDefined();
+    // @ts-ignore
+    await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
+
+});
+
+test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowManual', async () => {
+
+    let {server, userStorage} = await makeAppWithOptions();
+    await createEmailAccount("mary", "maryPass123", userStorage);
+
+    let res;
+    let body;
+
+    // device_authorization request
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/device_authorization`,  
+        payload: {
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            scope: "read write",
+            client_id: "ABC",
+            client_secret: "DEF",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.device_code).toBeDefined();
+    expect(body.user_code).toBeDefined();
+    expect(body.error).toBeUndefined();
+    let device_code = body.device_code;
+    let user_code = body.user_code;
+
+    // device GET endpoint
+    res = await server.app.inject({ 
+        method: "GET", 
+        url: `/device`,  
+        });
+    expect(res.statusCode).toBe(302);
+
+    // submit again after logging in
+    let { sessionCookie, csrfCookie: csrfCookie, csrfToken: csrfToken } = await login(server);
+    res = await server.app.inject({ 
+        method: "GET", 
+        url: `/device`,  
+        cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("device.njk");
+    expect(body.args.success).toBe(false);
+    expect(body.args.completed).toBe(false);
+        
+    // device POST endpoint - should ask for authorization
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/device`,  
+        payload: {
+            user_code,
+            csrfToken
+        },
+        cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("device.njk");
+    expect(body.args.success).toBe(true);
+    expect(body.args.completed).toBe(false);
+    expect(body.args.authorizationNeeded).toBeDefined();
+    expect(body.args.authorizationNeeded.client_id).toBeDefined();
+    expect(body.error).toBeUndefined();
+   
+    // token endpoint - should receive a authorization pending
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        cookies: {
+            CSRFTOKEN: csrfCookie,
+        }, 
+        payload: {
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id: "ABC",
+            client_secret: "DEF",
+            device_code: device_code,
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeUndefined();
+    expect(body.error).toBe("authorization_pending");
+
+
+    // device POST endpoint - grant authorization
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/device`,  
+        payload: {
+            user_code,
+            csrfToken,
+            client_id: "ABC",
+            authorized: "true",
+            scope: "read write",
+        },
+        cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("device.njk");
+    expect(body.args.success).toBe(true);
+    expect(body.args.completed).toBe(true);
+    expect(body.error).toBeUndefined();
+
+    // token endpoint - should receive a token
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        cookies: {
+            CSRFTOKEN: csrfCookie,
+        }, 
+        payload: {
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id: "ABC",
+            client_secret: "DEF",
+            device_code: device_code,
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeDefined();
+    // @ts-ignore
+    await server.oAuthAuthServer.authServer.validateJwt(body.access_token, "access");
+
+});
+
+test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowAuto', async () => {
+
+    let {server, userStorage, keyStorage} = await makeAppWithOptions();
+    await createEmailAccount("mary", "maryPass123", userStorage);
+
+    let res;
+    let body;
+
+    // device_authorization request
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/device_authorization`,  
+        payload: {
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            scope: "read write",
+            client_id: "ABC",
+            client_secret: "DEF",
+        }});
+    body = JSON.parse(res.body);
+    expect(body.device_code).toBeDefined();
+    expect(body.user_code).toBeDefined();
+    expect(body.error).toBeUndefined();
+    let device_code = body.device_code;
+    let user_code = body.user_code;
+
+    // device GET endpoint
+    res = await server.app.inject({ 
+        method: "GET", 
+        url: `/device?user_code=` + user_code,  
+        });
+    expect(res.statusCode).toBe(302);
+
+    // submit again after logging in - should ask for authorization
+    let { sessionCookie, csrfCookie: csrfCookie, csrfToken: csrfToken } = await login(server);
+    res = await server.app.inject({ 
+        method: "GET", 
+        url: `/device?user_code=` + user_code,  
+        cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("device.njk");
+    expect(body.args.success).toBe(true);
+    expect(body.args.completed).toBe(false);
+    expect(body.args.authorizationNeeded).toBeDefined();
+    expect(body.args.authorizationNeeded.client_id).toBeDefined();
+    expect(body.error).toBeUndefined();
+   
+    // token endpoint - should receive a authorization pending
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        cookies: {
+            CSRFTOKEN: csrfCookie,
+        }, 
+        payload: {
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id: "ABC",
+            client_secret: "DEF",
+            device_code: device_code,
+        }});
+    body = JSON.parse(res.body);
+    expect(body.access_token).toBeUndefined();
+    expect(body.error).toBe("authorization_pending");
+
+    // device POST endpoint - grant authorization
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/device`,  
+        payload: {
+            user_code,
+            csrfToken,
+            client_id: "ABC",
+            authorized: "true",
+            scope: "read write",
+        },
+        cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("device.njk");
+    expect(body.args.success).toBe(true);
+    expect(body.args.completed).toBe(true);
+    expect(body.error).toBeUndefined();
+
+    // token endpoint - should receive a token
+    res = await server.app.inject({ 
+        method: "POST", 
+        url: `/token`,  
+        cookies: {
+            CSRFTOKEN: csrfCookie,
+        }, 
+        payload: {
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+            client_id: "ABC",
+            client_secret: "DEF",
+            device_code: device_code,
         }});
     body = JSON.parse(res.body);
     expect(body.access_token).toBeDefined();

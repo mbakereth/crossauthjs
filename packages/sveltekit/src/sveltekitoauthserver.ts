@@ -96,7 +96,6 @@ export interface DevicePageData extends ReturnBase {
         csrfToken?: string,
     },
     completed: boolean,
-    throttleSeconds?: number,
     retryAllowed: boolean,
     user?: User,
     csrfToken? : string,
@@ -117,7 +116,6 @@ export interface DeviceFormData extends ReturnBase {
         csrfToken?: string,
     },
     completed: boolean,
-    throttleSeconds?: number,
     retryAllowed: boolean,
     user?: User,
     csrfToken? : string,
@@ -696,7 +694,6 @@ export class SvelteKitAuthorizationServer {
                     ok: false,
                     completed: false,
                     retryAllowed: true,
-                    throttleSeconds: this.authServer.userCodeThrottle,
                     error: ret.error,
                     error_description: ret.error_description,
                 }
