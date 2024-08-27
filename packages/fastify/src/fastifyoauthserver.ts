@@ -76,8 +76,14 @@ export interface FastifyAuthorizationServerOptions
      *   - `errorMessage`
      *   - `success`
      *   - `authorizationNeeded`
+     *      - `client_id`
+     *      - `client_name`
+     *      - `scope`
+     *      - `scopes`
+     *      - `user`
      *   - `user_code`
      *   - `retryAlllowed`
+     *   - `csrfToken`
      * Default `device.njk`
      */
     devicePage? : string,
@@ -277,7 +283,10 @@ export interface DeviceAuthorizationBodyType {
  * | POST   | `token`                    | See OAuth spec                                                                    | See OAuth spec                                     |
  * | GET    | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
  * | POST   | `mfa/authenticators`       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
- * | POST   | `mfa/challenge     `       | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
+ * | POST   | `mfa/challenge`            | See {@link https://auth0.com/docs/api/authentication#multi-factor-authentication} | See link to the left                               |
+ * | POST   | `device_authorization`     | See {@link https://datatracker.ietf.org/doc/html/rfc8628}                         | See link to the left                               |
+ * | GET    | `device`                   | `user_code` (optional).                                                           | `devicePage`                                       |
+ * | POST   | `device`                   | See {@link DeviceBodyType}.                                                       | `devicePage`                                       |
  * 
  */
 export class FastifyAuthorizationServer {
@@ -687,51 +696,32 @@ export class FastifyAuthorizationServer {
                     }));
                     if (!request.user) return reply.redirect(this.loginUrl+"?next="+encodeURIComponent(request.url), 302);
 
-                    if (!request.query.user_code) {
-
-                        // no user code given - ask for ti
-                        return reply.status(200).view(this.devicePage, 
-                            {
-                                success: false,
-                                completed: false,
-                                user_code: request.query.user_code
-                            });
-                    } else {
-                        // user code given - process it
-                        let ret = await this.applyUserCode(request.query.user_code, request, request.user);
-                        if (ret.error) {
-                            const ce = CrossauthError.fromOAuthError(ret.error, ret.error_description);
-                            CrossauthLogger.logger.debug({err: ce});
-                            CrossauthLogger.logger.error({cerr: ce});
-                            return reply.status(ce.httpStatus).view(this.devicePage, 
-                                {
-                                    success: false,
-                                    completed: false,
-                                    status: ce.httpStatus,
-                                    errorMessage: ce.message,
-                                    errorCode: ce.code,
-                                    errorCodeName: ce.codeName,
-                                    retryAllowed: ret.retryAllowed,
-                                });
-                        } else if (ret.authorizationNeeded) {
-                            return reply.status(200).view(this.devicePage, 
-                                {
-                                    success: true,
-                                    completed: false,
-                                    retryAllowed: ret.retryAllowed,
-                                    authorizationNeeded: ret.authorizationNeeded,
-                                });
-
-                        }
-
-                        return reply.status(200).view(this.devicePage, 
-                            {
-                                success: true,
-                                completed: true,
-                            });
-                    }
+                    return await this.deviceGet(false, request, reply, request.user);
                 });
 
+                app.get(this.prefix+'api/device', 
+                    async (request : FastifyRequest<{Querystring: DeviceQueryType}>, 
+                        reply : FastifyReply) =>  {
+                        CrossauthLogger.logger.info(j({
+                            msg: "Page visit",
+                            method: 'GET',
+                            url: this.prefix + 'device',
+                            ip: request.ip,
+                            user: request.user?.username
+                        }));
+                        if (!request.user) {
+                            const ce = new CrossauthError(ErrorCode.Unauthorized, "Not logged in")
+                            return reply.header(...JSONHDR).status(401).send({
+                                    errorMessage: ce.message,
+                                    errorCode: ce.code,
+                                    errorCodeName: ce.codeName
+            
+                            });
+                        }
+
+                        return await this.deviceGet(true, request, reply, request.user);
+                    });
+    
             this.app.post(this.prefix+'device', 
                 async (request: FastifyRequest<{ Body: DeviceBodyType }>,
                     reply: FastifyReply) => {
@@ -740,119 +730,26 @@ export class FastifyAuthorizationServer {
                         method: 'POST',
                         url: this.prefix + 'device',
                         ip: request.ip,
-                        user: request.user?.username
+                        user: request.user?.username,
                     }));
 
-                try {
-                    // this should not be called if a user is not logged in
-                    if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized, "You are not logged in");
+                    if (!request.user) return reply.redirect(this.loginUrl+"?next="+encodeURIComponent(request.url), 302);
 
-                    // this should not be called there is no CSRF token
-                    if (!request.csrfToken) throw new CrossauthError(ErrorCode.Unauthorized, "CSRF token missing or invalid");
+                    return await this.deviceCodePost(false, request, reply);
+            });
 
-                    if (!request.body.authorized || request.body.authorized=="") {
+            this.app.post(this.prefix+'api/device', 
+                async (request: FastifyRequest<{ Body: DeviceBodyType }>,
+                    reply: FastifyReply) => {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + 'device',
+                        ip: request.ip,
+                        user: request.user?.username,
+                    }));
 
-                        // this is just a request for the user code, not to authorize scopes
-                        if (request.body.user_code) {
-                            // user code given in body   - ask user to authorize
-                            // - process code
-                            // - request authorization if needed
-
-                            let ret = await this.applyUserCode(request.body.user_code, request, request.user);
-                            if (ret.error) {
-                                const ce = CrossauthError.fromOAuthError(ret.error, ret.error_description);
-                                CrossauthLogger.logger.debug({err: ce});
-                                CrossauthLogger.logger.error({cerr: ce});
-                                return reply.status(ce.httpStatus).view(this.devicePage, 
-                                    {
-                                        success: false,
-                                        completed: false,
-                                        status: ce.httpStatus,
-                                        errorMessage: ce.message,
-                                        errorCode: ce.code,
-                                        errorCodeName: ce.codeName,
-                                        retryAllowed: ret.retryAllowed,
-                                    });
-                            } else if (ret.authorizationNeeded) {
-                                return reply.status(200).view(this.devicePage, 
-                                    {
-                                        success: true,
-                                        completed: false,
-                                        retryAllowed: ret.retryAllowed,
-                                        authorizationNeeded: ret.authorizationNeeded,
-                                    });
-
-                            }
-    
-                            return reply.status(200).view(this.devicePage, 
-                                {
-                                    success: true,
-                                    completed: true,
-                                });
-                        } else {
-                            // user code not given - display error
-                            return reply.status(200).view(this.devicePage, 
-                                {
-                                    success: false,
-                                    completed: false,
-                                    user_code: request.body.user_code,
-                                    retryAllowed: true,
-                                    error: "unauthorized",
-                                    error_description: "Please enter the code",
-                                });
-        
-                        }
-
-                    } else if (request.body.authorized == "true") {
-
-                        // user is authorizing the client
-                        let userCode = request.body.user_code;
-                        let scope : string|undefined = request.body.scope;
-                        if (scope == "") undefined;
-                        const clientId = request.body.client_id; 
-                        if (!userCode) throw new CrossauthError(ErrorCode.BadRequest, "user_code missing");
-                        if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "client_id missing");
-
-
-                        // validate the scopes
-                        let ret = await this.authServer.validateAndPersistScope(clientId, scope, request.user);
-                        if (ret.error) {
-                            throw CrossauthError.fromOAuthError(ret.error, ret.error_description);
-                        }
-                        ret = await this.applyUserCode(userCode, request, request.user);
-
-                        if (ret.error) {
-                            // all errors here are fatal as the user code was already validated
-                            throw CrossauthError.fromOAuthError(ret.error, ret.error_description);
-                        }
-
-                        return reply.status(200).view(this.devicePage, 
-                            {
-                                success: true,
-                                completed: true,
-                            });
-
-
-                    } else {
-                        // user denied authorization
-                        throw new CrossauthError(ErrorCode.Unauthorized, "You did not authorize the client");
-                    }
-    
-                } catch (e) {
-                    const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.debug({err: ce});
-                    CrossauthLogger.logger.error({cerr: ce});
-                    return reply.status(ce.httpStatus).view(this.devicePage, 
-                        {
-                            success: false,
-                            status: ce.httpStatus,
-                            errorMessage: ce.message,
-                            errorCode: ce.code,
-                            errorCodeName: ce.codeName
-                        });
-
-                }
-
+                    return await this.deviceCodePost(true, request, reply);
             });
 
         }
@@ -1300,6 +1197,223 @@ export class FastifyAuthorizationServer {
                 error_description: ce.message,
             }
         }
+    }
+
+    private async deviceGet(isApi : boolean, 
+        request : FastifyRequest<{Querystring: DeviceQueryType}>, 
+        reply : FastifyReply, user: User) {
+        if (!request.query.user_code) {
+
+            // no user code given - ask for it$
+            const data = {
+                success: false,
+                completed: false,
+                user_code: request.query.user_code,
+                csrfToken: request.csrfToken,
+            };
+            if (isApi) {
+                return reply.header(...JSONHDR).status(200).send(data);
+            }
+            return reply.status(200).view(this.devicePage, data);
+        } else {
+            // user code given - process it
+            let ret = await this.applyUserCode(request.query.user_code, request, user);
+            if (ret.error) {
+                const ce = CrossauthError.fromOAuthError(ret.error, ret.error_description);
+                CrossauthLogger.logger.debug({err: ce});
+                CrossauthLogger.logger.error({cerr: ce});
+                const data = {
+                    success: false,
+                    completed: false,
+                    status: ce.httpStatus,
+                    errorMessage: ce.message,
+                    errorCode: ce.code,
+                    errorCodeName: ce.codeName,
+                    retryAllowed: ret.retryAllowed,
+                };
+                if (isApi) {
+                    return reply.header(...JSONHDR).status(ce.httpStatus).send(data);
+                }
+                return reply.status(ce.httpStatus).view(this.devicePage, {
+                    csrfToken: request.csrfToken,
+                    ...data});
+            } else if (ret.authorizationNeeded) {
+                const data = {
+                    success: true,
+                    completed: false,
+                    retryAllowed: ret.retryAllowed,
+                    authorizationNeeded: ret.authorizationNeeded,
+                    user_code: ret.user_code,
+                };
+                if (isApi) {
+                    return reply.header(...JSONHDR).status(200).send(data);
+                }
+                return reply.status(200).view(this.devicePage, {
+                    csrfToken: request.csrfToken,
+                    ...data});
+
+            }
+
+            const data = {
+                success: true,
+                completed: true,
+            };
+            if (isApi) {
+                return reply.header(...JSONHDR).status(401).send(data);
+            }
+        return reply.status(200).view(this.devicePage, {
+            csrfToken: request.csrfToken,
+            ...data});
+        }
+    }
+
+    private async deviceCodePost(isApi: boolean, 
+        request: FastifyRequest<{ Body: DeviceBodyType }>,
+        reply: FastifyReply) {
+        try {
+            console.log("deviceCodePost", JSON.stringify(request.body))
+            // this should not be called if a user is not logged in
+            if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized, "You are not logged in");
+
+            // this should not be called there is no CSRF token
+            if (!request.csrfToken) throw new CrossauthError(ErrorCode.Unauthorized, "CSRF token missing or invalid");
+
+            if (!request.body.authorized || request.body.authorized=="") {
+
+                // this is just a request for the user code, not to authorize scopes
+                if (request.body.user_code) {
+                    // user code given in body   - ask user to authorize
+                    // - process code
+                    // - request authorization if needed
+
+                    let ret = await this.applyUserCode(request.body.user_code, request, request.user);
+                    if (ret.error) {
+                        const ce = CrossauthError.fromOAuthError(ret.error, ret.error_description);
+                        CrossauthLogger.logger.debug({err: ce});
+                        CrossauthLogger.logger.error({cerr: ce});
+                        const data =  {
+                            success: false,
+                            completed: false,
+                            status: ce.httpStatus,
+                            errorMessage: ce.message,
+                            errorCode: ce.code,
+                            errorCodeName: ce.codeName,
+                            retryAllowed: ret.retryAllowed,
+                        };
+                        if (isApi) {
+                            return reply.header(...JSONHDR).status(200).send(data);
+                        }
+                        return reply.status(ce.httpStatus).view(this.devicePage, {
+                            csrfToken: request.csrfToken,
+                            ...data});
+                    } else if (ret.authorizationNeeded) {
+                        const data = {
+                            success: true,
+                            completed: false,
+                            retryAllowed: ret.retryAllowed,
+                            authorizationNeeded: ret.authorizationNeeded,
+                            user_code: ret.user_code,
+                        };
+                        if (isApi) {
+                            return reply.header(...JSONHDR).status(200).send(data);
+                        }
+                        return reply.status(200).view(this.devicePage, {
+                            csrfToken: request.csrfToken,
+                            ...data});
+
+                    }
+
+                    const data = {
+                        success: true,
+                        completed: true,
+                        csrfToken: request.csrfToken,
+                    };
+                    if (isApi) {
+                        return reply.header(...JSONHDR).status(200).send(data);
+                    }
+                    return reply.status(200).view(this.devicePage, data);
+                } else {
+                    // user code not given - display error
+                    const ce = CrossauthError.fromOAuthError("unauthorized", "Please enter the code");
+                    const data = {
+                        success: false,
+                        completed: false,
+                        user_code: request.body.user_code,
+                        retryAllowed: true,
+                        error: "unauthorized",
+                        error_description: "Please enter the code",
+                        errorMessage: ce.message,
+                        errorCode: ce.code,
+                        errorCodeName: ce.codeName,
+                        };
+                    if (isApi) {
+                        return reply.header(...JSONHDR).status(401).send(data);
+                    }
+                    return reply.status(200).view(this.devicePage, {
+                        csrfToken: request.csrfToken,
+                        ...data});
+
+                }
+
+            } else if (request.body.authorized == "true") {
+
+                // user is authorizing the client
+                let userCode = request.body.user_code;
+                let scope : string|undefined = request.body.scope;
+                if (scope == "") undefined;
+                const clientId = request.body.client_id; 
+                if (!userCode) throw new CrossauthError(ErrorCode.BadRequest, "user_code missing");
+                if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "client_id missing");
+
+
+                // validate the scopes
+                let ret = await this.authServer.validateAndPersistScope(clientId, scope, request.user);
+                if (ret.error) {
+                    throw CrossauthError.fromOAuthError(ret.error, ret.error_description);
+                }
+                ret = await this.applyUserCode(userCode, request, request.user);
+
+                if (ret.error) {
+                    // all errors here are fatal as the user code was already validated
+                    throw CrossauthError.fromOAuthError(ret.error, ret.error_description);
+                }
+
+                const data = {
+                    success: true,
+                    completed: true,
+                    csrfToken: request.csrfToken,
+                };
+                if (isApi) {
+                    return reply.header(...JSONHDR).status(401).send(data);
+                }
+                return reply.status(200).view(this.devicePage, data);
+
+
+            } else {
+                // user denied authorization
+                throw new CrossauthError(ErrorCode.Unauthorized, "You did not authorize the client");
+            }
+
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug({err: ce});
+            CrossauthLogger.logger.error({cerr: ce});
+            const data = {
+                success: false,
+                status: ce.httpStatus,
+                errorMessage: ce.message,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
+            };
+            if (isApi) {
+                return reply.header(...JSONHDR).status(401).send(data);
+            }
+            return reply.status(ce.httpStatus).view(this.devicePage, {
+                csrfToken: request.csrfToken,
+                ...data});
+
+        }
+
     }
 
 }

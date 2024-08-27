@@ -85,6 +85,7 @@ let server = new FastifyServer({
         validFlows: ["all"],
         validScopes: ["read", "write"],
         siteUrl: `http://localhost:${port}`,
+        deviceCodeVerificationUri: `http://localhost:${port}/device`,
         authStorage: authStorage,
         userStorage: userStorage,
         authenticators: {

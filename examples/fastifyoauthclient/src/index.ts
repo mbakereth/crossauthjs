@@ -72,13 +72,14 @@ const server = new FastifyServer({
     validFlows: ["all"], // activate all OAuth flows
     loginProtectedFlows: [OAuthFlows.AuthorizationCode, OAuthFlows.AuthorizationCodeWithPKCE],
     tokenResponseType: "saveInSessionAndRedirect",
+    errorResponseType: "errorInPage",
     bffEndpoints: [{url: "/resource", methods: ["GET"]}],
     bffBaseUrl: process.env["RESOURCE_SERVER"],
     tokenEndpoints: ["id_token", "access_token", "refresh_token", "have_access_token", "have_id_token", "have_refresh_token"],
 });
 
 app.get('/', async (request : FastifyRequest, reply : FastifyReply) =>  {
-    return reply.view('index.njk', {user: request.user});
+    return reply.view('index.njk', {user: request.user, csrfToken: request.csrfToken});
 }
 );
 

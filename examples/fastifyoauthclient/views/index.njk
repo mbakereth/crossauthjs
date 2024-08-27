@@ -4,17 +4,39 @@
         <link rel="stylesheet" href="/public/style.css"/>
 
         <script src="/public/crossauth_frontend.js"></script>
-        <script src="/public/createclient.js"></script>        
         <script>
+
+            crossauth_frontend.CrossauthLogger.logger.level = crossauth_frontend.CrossauthLogger.Debug;
+            const bffClient = new crossauth_frontend.OAuthBffClient({
+            });
+            bffClient.startAutoRefresh(["access"], (msg, e) => {
+                if (e) console.log(e);
+                alert(msg);
+            });
+
             function authorize() {
                 window.location.href = '/authzcodeflow?scope=read+write';
             }
+            async function tokens() {
+                try {
+                    const resp = await bffClient.getTokens();
+                    document.getElementById("tokens").innerHTML = 
+                        "<pre>" + 
+                        JSON.stringify(resp, null, 4) 
+                        "</pre>"
+                } catch (e) {
+                    logger.debug(j({err: e }));
+                    logger.error(j({msg: "Couldn't get tokens" }));
+                    document.getElementById("tokens").text = e.message;
+                }
+            }
+
             async function callResource() {
                 try {
                     const resp = await bffClient.api("GET", "resource");
                     document.getElementById("result").innerHTML = 
                         "<pre>" + 
-                        JSON.stringify(resp.body) + 
+                        JSON.stringify(resp.body, null, 4) + 
                         "</pre>"
                 } catch (e) {
                     logger.debug(j({err: e }));
@@ -22,10 +44,16 @@
                     document.getElementById("result").text = e.message;
                 }
             }
+
             bffClient.startAutoRefresh().catch((err) => {
                 logger.debug(j({err: e }));
                 logger.error(j({msg: "Couldn't start auto refresh" }));
             });
+
+            function devicecodeflow() {
+                console.log("devicecodeflow")
+                document.getElementById("devicecodeflowform").submit();
+            }
         </script>
 
         </head>
@@ -33,13 +61,22 @@
         <h1>Client</h1>
         <p>Logged in as {{ user.username or "nobody" }}</p>
 
+        <form method="POST" action="/devicecodeflow" id="devicecodeflowform">
+            <input type="hidden" name="scope" value="read write"/>
+            <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
+        </form>
+
         <p><a href="authzcodeex">Authorization code flow</a></p>
         <p><a href="clientcredentialsex">Client credentials flow</a></p>
         <p><a href="passwordex">Password flow</a></p>
+        <p><a href="#" onClick="devicecodeflow()">Device Code Flow</a></p>
         <p><a href="oidcex">OIDC authorization code flow</a></p>
 
         <p><button onClick="callResource()">Call Resource</button></p>
         <p id="result">Result will be here</p>
+
+        <p><button onClick="tokens()">Tokens</button></p>
+        <p id="tokens">Tokens</p>
 
 	    {% if user %}
        	    <form method="POST" action="logout">

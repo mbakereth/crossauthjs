@@ -1,16 +1,17 @@
-import { CrossauthError, CrossauthLogger, j } from "@crossauth/common";
+import { OAuthClientBase, CrossauthError, CrossauthLogger, j } from "@crossauth/common";
 
 /**
  * Used by {@link OAuthClient} and {@link OAuthBsffClient} to poll for 
  * authorization in the device code flow
  */
 export class OAuthDeviceCodePoller {
-    private deviceCodePollUrl : string = "/devicecodepoll";
+    private deviceCodePollUrl : string|null = "/devicecodepoll";
     protected headers : {[key:string]:string} = {};
     private pollingActive = false;
     protected mode :  "no-cors" | "cors" | "same-origin" = "cors";
     protected credentials : "include" | "omit" | "same-origin" = "same-origin";
     protected respectRedirect = true;
+    protected oauthClient? : OAuthClientBase;
 
     /**
      * Constructor
@@ -22,13 +23,15 @@ export class OAuthDeviceCodePoller {
      *   - `headers` - adds headers to fetfh calls
      */
     constructor(options  : {
-        deviceCodePollUrl? : string,
+        deviceCodePollUrl? : string|null,
         credentials? : "include" | "omit" | "same-origin",
         mode? : "no-cors" | "cors" | "same-origin",
         headers? : {[key:string]:any},
+        oauthClient? : OAuthClientBase,
     
     }) {
-    if (options.deviceCodePollUrl) this.deviceCodePollUrl = options.deviceCodePollUrl;
+    this.oauthClient = options.oauthClient;
+    if (options.deviceCodePollUrl != undefined) this.deviceCodePollUrl = options.deviceCodePollUrl;
     if (options.headers) this.headers = options.headers;
     if (options.mode) this.mode = options.mode;
     if (options.credentials) this.credentials = options.credentials;
@@ -57,6 +60,30 @@ export class OAuthDeviceCodePoller {
         } else {
             try {
                 CrossauthLogger.logger.debug(j({msg: "device code poll: poll"}));
+                if (!this.deviceCodePollUrl && this.oauthClient) {
+                    if (!this.oauthClient.getOidcConfig()) await this.oauthClient.loadConfig();
+                    if (!this.oauthClient.getOidcConfig()?.grant_types_supported
+                        .includes("http://auth0.com/oauth/grant-type/mfa-oob")) {
+                        return {
+                            error: "invalid_request",
+                            error_description: "Server does not support password_mfa grant"
+                        };
+                    }
+            
+                    let config = this.oauthClient.getOidcConfig();
+                    if (!config?.token_endpoint) return {
+                        error: "server_error",
+                        error_description: "Couldn't get OIDC configuration"
+                    };
+                    this.deviceCodePollUrl = config.token_endpoint;
+            
+                }
+                if (!this.deviceCodePollUrl) {
+                    return {
+                        error: "server_error",
+                        error_description: "Must either provide deviceCodePollUrl or an oauthClient to fetch it from",
+                    }
+                }
                 const resp = await fetch(this.deviceCodePollUrl, {
                     method: "POST",
                     body: JSON.stringify({device_code: deviceCode}),

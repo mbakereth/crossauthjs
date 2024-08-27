@@ -8,7 +8,9 @@ import {
     OAuthFlows,
     type OAuthTokenResponse,
     j, 
-    MfaAuthenticatorResponse} from '@crossauth/common';
+    MfaAuthenticatorResponse,
+    type OAuthDeviceAuthorizationResponse,
+    User} from '@crossauth/common';
 import {
     setParameter,
     ParamType,
@@ -273,6 +275,15 @@ export interface PasswordBodyType {
     csrfToken? : string,
 }
 
+export interface DeviceCodeFlowResponse extends OAuthDeviceAuthorizationResponse {
+    user? : User,
+    scope? : string,
+    verification_uri_qrdata? : string,
+    errorMessage? : string,
+    errorCode? : number,
+    errorCodeName? : string,
+    csrfToken? : string,
+}
 /**
  * Body type for the device code flow Fastify request.
  */
@@ -678,6 +689,10 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
  * | POST   | `authzcodeflowpkce` | Initiates the authorization code flow with PKCE              | *See OAuth authorization code flow with PKCE spec*  | *See docs for`tokenResponseType`*                         |                          | 
  * | POST   | `clientcredflow`    | Initiates the client credentials flow                        | *See OAuth client credentials flow spec*            | *See docs for`tokenResponseType`*                         |                          | 
  * | POST   | `refreshtokenflow`  | Initiates the refresh token flow                             | *See OAuth refresh token flow spec*                 | *See docs for`tokenResponseType`*                         |                          | 
+ * | POST   | `devicecodeflow`    | Initiates the device code flow                               | See {@link DeviceCodeBodyType}                      | See {@link DeviceCodeFlowResponse}                        | `deviceCodeFlowPage`     | 
+ * | POST   | `api/devicecodeflow` | Initiates the device code flow                              | See {@link DeviceCodeBodyType}                      | See {@link DeviceCodeFlowResponse}                        |                          | 
+ * | POST   | `devicecodepoll`     | Initiates the device code flow                              | See {@link DeviceCodePollBodyType}                  | Authorization complete: See docs for`tokenResponseType`.  Other cases, {@link @crossauth/common!OAuthTokenResponse} |                          | 
+ * | POST   | `api/devicecodepoll` | Initiates the device code flow                              | See {@link DeviceCodePollBodyType}                  | {@link @crossauth/common!OAuthTokenResponse}              |                          | 
  * | POST   | `access_token`      | For BFF mode, returns the saved access token                 |                                                     | *Access token payload*                                    |                          | 
  * | POST   | `refresh_token`     | For BFF mode, returns the saved refresh token                |                                                     | `token` containing the refresh token                      |                          | 
  * | POST   | `id_token     `     | For BFF mode, returns the saved ID token                     |                                                     | *ID token payload*                                        |                          | 
@@ -1198,6 +1213,19 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 return await this.deviceCodePost(false, request, reply);
             });
 
+            this.server.app.post(this.prefix+"api/"+this.deviceCodeFlowUrl, 
+                async (request : FastifyRequest<{ Body: DeviceCodeBodyType }>, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + "api/" + this.deviceCodeFlowPage,
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                return await this.deviceCodePost(true, request, reply);
+            });
+
             this.server.app.post(this.prefix+this.deviceCodePollUrl, 
                 async (request : FastifyRequest<{ Body: DeviceCodePollBodyType }>, 
                     reply : FastifyReply) =>  {
@@ -1208,7 +1236,20 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         ip: request.ip,
                         user: request.user?.username
                     }));
-                return await this.deviceCodePoll(request, reply);
+                return await this.deviceCodePoll(false, request, reply);
+            });
+
+            this.server.app.post(this.prefix+"api/"+this.deviceCodePollUrl, 
+                async (request : FastifyRequest<{ Body: DeviceCodePollBodyType }>, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + this.deviceCodePollUrl,
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                return await this.deviceCodePoll(true, request, reply);
             });
 
 
@@ -1693,22 +1734,21 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             const resp =  await this.startDeviceCodeFlow(url, request.body.scope);
 
             if (resp.error) {
-                const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description)
+                const ce = CrossauthError.fromOAuthError(resp.error, resp.error_description);
+                const data = {
+                    user: request.user,
+                    scope: request.body.scope,
+                    errorMessage: ce.message,
+                    errorCode: ce.code,
+                    errorCodeName: ce.codeName,
+                    csrfToken: request.csrfToken,
+                    error: resp.error,
+                    error_description: resp.error_description,
+                };
                 if (isApi) {
-                    return await this.errorFn(this.server,
-                        request,
-                        reply,
-                        ce);
+                    return reply.header(...JSONHDR).status(ce.httpStatus).send(resp);
                 } else {
-                    return reply.view(this.deviceCodeFlowPage, 
-                        {
-                            user: request.user,
-                            scope: request.body.scope,
-                            errorMessage: ce.message,
-                            errorCode: ce.code,
-                            errorCodeName: ce.codeName,
-                            csrfToken: request.csrfToken
-                        });            
+                    return reply.view(this.deviceCodeFlowPage, data);            
 
                 }
             }
@@ -1727,8 +1767,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             }
 
             if (isApi) {
-                return reply.header(...JSONHDR)
-                    .send(resp);
+                return reply.header(...JSONHDR).send(resp);
             } else {
                 return reply.view(this.deviceCodeFlowPage, 
                     {
@@ -1747,40 +1786,49 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 user: request.user?.user
             }));
             CrossauthLogger.logger.debug(j({err: e}));
-            if (isApi) return await this.errorFn(this.server,
-                request,
-                reply,
-                ce);
-            return reply.view(this.deviceCodeFlowPage, {
-                user: request.user,
-                scope: request.body.scope,
+            const data = {
                 errorMessage: ce.message,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName,
-                csrfToken: request.csrfToken
+            };
+            if (isApi) return reply.header(...JSONHDR).status(ce.httpStatus).send(data);
+
+            return reply.view(this.deviceCodeFlowPage, {
+                user: request.user,
+                csrfToken: request.csrfToken,
+                scope: request.body.scope,
+                ...data,
             });
         }
     }
 
-    private async deviceCodePoll(request: FastifyRequest<{ Body: DeviceCodePollBodyType }>,
+    private async deviceCodePoll(isApi : boolean, request: FastifyRequest<{ Body: DeviceCodePollBodyType }>,
         reply: FastifyReply) {
-        if (this.server.sessionServer) {
+        // CSRF protection is disabled because this just wraps the OAuth token
+        // endpoint, which does nothing with cookies
+        /*if (this.server.sessionServer) {
             // if sessions are enabled, require a csrf token
             const {error, reply: reply1} = 
                 await this.server.errorIfCsrfInvalid(request,
                     reply,
                     this.errorFn);
             if (error) return reply1;
-        }
+        }*/
         try {
-            if (!request.csrfToken) {
-                throw new CrossauthError(ErrorCode.Unauthorized, "CSRF token missing or invalid");
-            }
 
             const resp =  await this.pollDeviceCodeFlow(request.body.device_code);
 
-            return reply.header(...JSONHDR)
+            if (resp.error) {
+                return reply.header(...JSONHDR)
                 .send(resp);
+
+            }
+
+            console.log(resp);
+            return await this.receiveTokenFn(resp,
+                this,
+                request,
+                isApi ? undefined : reply);
 
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);

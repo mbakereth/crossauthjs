@@ -74,7 +74,7 @@ export class OAuthBffClient {
             tokenProvider: this,
         });
 
-        this.deviceCodePoller = new OAuthDeviceCodePoller(options);
+        this.deviceCodePoller = new OAuthDeviceCodePoller({...options, oauthClient: undefined});
     }
 
     /**

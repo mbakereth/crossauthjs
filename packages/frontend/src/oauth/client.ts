@@ -5,7 +5,7 @@ import {
     j,
     ErrorCode,
     CrossauthError } from '@crossauth/common'
-import type { OAuthTokenResponse } from '@crossauth/common'
+import type { OAuthTokenResponse, OAuthDeviceAuthorizationResponse } from '@crossauth/common'
 import { OAuthAutoRefresher } from './autorefresher.ts';
 import { OAuthDeviceCodePoller } from './devicecodepoller.ts';
 import { OAuthTokenConsumer } from './tokenconsumer';
@@ -50,6 +50,7 @@ export class OAuthClient extends OAuthClientBase {
     #clientSecret : string|undefined;
     private autoRefresher : OAuthAutoRefresher;
     private deviceCodePoller : OAuthDeviceCodePoller;
+    private deviceAuthorizationUrl = "device_authorization";
 
     /**
      * Constructor
@@ -86,7 +87,8 @@ export class OAuthClient extends OAuthClientBase {
      *   - `resServerHeaders` - adds headers to fetfh calls
      *   - `autoRefresh` - if set and tokens are present in local or session storage, 
      *      automatically turn on auto refresh
-     *   - `deviceCodePollUrl` URL for polling for device code authorization.  
+     *   - `deviceAuthorization` URL, relative to the authorization server base, 
+     *      for starting the device code flow.  Default `device_authorization`
      *      Default is `/devicecodepoll`
      *  For other options see {@link @crossauth/common/OAuthClientBase}.
      */
@@ -110,7 +112,7 @@ export class OAuthClient extends OAuthClientBase {
             resServerMode? : "no-cors" | "cors" | "same-origin",
             resServerHeaders? : {[key:string]:any},
             autoRefresh? : ("access"|"id")[]
-            deviceCodePollUrl? : string,
+            deviceAuthorizationUrl? : string,
         }) {
         if (!options.tokenConsumer) {
             options.tokenConsumer = new OAuthTokenConsumer(
@@ -137,6 +139,7 @@ export class OAuthClient extends OAuthClientBase {
         if (options.resServerCredentials) this.resServerCredentials = options.resServerCredentials;
         if (options.clientId) this.#clientId = options.clientId;
         if (options.clientSecret) this.#clientSecret = options.clientSecret;
+        if (options.deviceAuthorizationUrl) this.deviceAuthorizationUrl = options.deviceAuthorizationUrl;
 
         this.autoRefresher = new OAuthAutoRefresher({
             ...options,
@@ -144,7 +147,7 @@ export class OAuthClient extends OAuthClientBase {
             tokenProvider: this,
         });
 
-        this.deviceCodePoller = new OAuthDeviceCodePoller(options);
+        this.deviceCodePoller = new OAuthDeviceCodePoller({...options, oauthClient: this, deviceCodePollUrl: null});
 
         // if tokens were saved in local or session storage, fetch them.
         // turn on auto refresh if we have tokens.
@@ -583,6 +586,20 @@ export class OAuthClient extends OAuthClientBase {
         Promise<OAuthTokenResponse> {
             const resp = await super.passwordFlow(username, password, scope);
             await this.receiveTokens(resp);
+            return resp;
+        }
+
+    /**
+     * See {@link @crossuath/common!OAuthClientBase}.  Calls the base function
+     * then saves the tokens, as per the requested method
+     * @param scope 
+     */
+    async deviceCodeFlow(scope?: string) : 
+        Promise<OAuthDeviceAuthorizationResponse> {
+            let url = this.authServerBaseUrl;
+            if (!url.endsWith("/")) url += "/";
+            url += this.deviceAuthorizationUrl;
+            const resp = await super.startDeviceCodeFlow(url, scope);
             return resp;
         }
 

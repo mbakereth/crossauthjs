@@ -347,6 +347,10 @@ export abstract class OAuthClientBase {
         }
     }
 
+    getOidcConfig() {
+        return this.oidcConfig;
+    }
+
     /**
      * Produce a random Base64-url-encoded string, whose length before 
      * base64-url-encoding is the given length,

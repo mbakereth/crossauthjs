@@ -1,0 +1,81 @@
+<html>
+    <head>
+        <title>Device Authorization</title>
+        <link rel="stylesheet" href="/public/style.css"/>
+        <script>
+            function deny() {
+                let authorized = document.getElementById('authorized'); 
+                authorized.value = "false";
+                document.getElementById("form").submit();
+            }
+        </script>
+        </head>
+    <body>
+        <h1>Device Authorization</h1>
+
+        {% if completed %}
+            <p>
+                Authorization was successful
+            </p>
+        {% elif authorizationNeeded %}
+            <div style="max-width: 640px; margin: auto;">
+                <h1>Please Allow Authorization</h1>
+                <form method="POST" id="form">
+                    <input type="hidden" name="user_code" value="{{ user_code }}"/>
+                    <input type="hidden" name="client_id" value="{{ authorizationNeeded.client_id }}"/>
+                    <input type="hidden" name="scope" value="{{ authorizationNeeded.scope }}"/>
+                    <input type="hidden" name="csrfToken" value="{{ authorizationNeeded.csrfToken }}"/>
+                    <input type="hidden" name="authorized" id="authorized" value="true"/>
+                    {% if errorMessage %}
+                        <p class="error">
+                            {{ errorMessage }}
+                        </p>
+                    {% endif %}
+                    <p>
+                        {{ authorizationNeeded.client_name }} would like access to your account.
+
+                        {% if authorizationNeeded.scope %}
+                        It is requesting the following permissions:
+                        <ul>
+                            {% for s in authorizationNeeded.scopes %}
+                                <li>{{ s }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </p>
+                    <p>
+                        <button type="submit">Allow</button>
+                        <span style="min-width: 5ex">&nbsp;</span>
+                        <button type="button" onClick="deny()">Deny</button>
+                    </p>
+
+                </form>
+            </div>
+
+        {% elif ok == false and isRetryAllowed == false %}
+            <p class="error">
+                {{ error_description or "Unknown error" }}
+            </p>
+        {% else %}
+            <form method="POST" id="form">
+                {% if error_description %}
+                    <p class="error">
+                        {{ error_description }}
+                    </p>
+                {% endif %}
+                <p>
+                    Enter the code that was displayed on the device.
+                </p>
+                <p>
+                    <input type="hidden" name="csrfToken" value="{{ csrfToken }}">
+                    <label for="user_code">Code</label>
+                    <input type="text" name="user_code">
+                    <button type="submit">Submit</button>
+                </p>
+
+            </form>
+
+        {% endif %}
+
+    </body>
+</html>

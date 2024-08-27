@@ -10,7 +10,7 @@ export type { FastifySessionServerOptions, AuthenticatorDetails, CsrfBodyType } 
 export { FastifyAuthorizationServer } from './fastifyoauthserver';
 export type { FastifyAuthorizationServerOptions, AuthorizeQueryType, MfaChallengeBodyType, UserAuthorizeBodyType } from './fastifyoauthserver';
 export { FastifyOAuthClient } from './fastifyoauthclient';
-export type { FastifyOAuthClientOptions, ClientAuthorizeQueryType, RedirectUriQueryType, PasswordQueryType, ClientCredentialsBodyType, RefreshTokenBodyType, PasswordBodyType, PasswordOtpType, PasswordOobType } from './fastifyoauthclient';
+export type { FastifyOAuthClientOptions, ClientAuthorizeQueryType, RedirectUriQueryType, PasswordQueryType, ClientCredentialsBodyType, RefreshTokenBodyType, PasswordBodyType, PasswordOtpType, PasswordOobType, DeviceCodeFlowResponse } from './fastifyoauthclient';
 export { FastifyOAuthResourceServer } from './fastifyresserver';
 export type  { FastifyOAuthResourceServerOptions } from './fastifyresserver';
 export { FastifyAdminClientEndpoints } from './fastifyadminclientendpoints';
