@@ -34,7 +34,7 @@
                 {form?.error_description ?? "An unknown error occurred"}
             </p>
         {/if}
-        <form method="POST" action="?/authorize">
+        <form method="POST">
             <input type="hidden" name="csrfToken" value={data.csrfToken} />
             {#if data?.authorizationNeeded.scopes}
                 <p class="bg-warning p-2 rounded text-slate-900">

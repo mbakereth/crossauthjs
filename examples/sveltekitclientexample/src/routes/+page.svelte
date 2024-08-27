@@ -6,6 +6,7 @@
     import { onMount } from 'svelte';
 
     let resourceResult = "Resource output will go here";
+    let idTokenResult = "ID token will go here"
 
     onMount(() => {
         CrossauthLogger.logger.level = CrossauthLogger.Debug;
@@ -63,38 +64,57 @@
 <p><a href="flows/passwordflow">Password Flow</a></p>
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-missing-attribute -->
 <p><a class="cursor-pointer" on:click={() => {deviceCodeFlowForm.submit()}}>Device Code Flow</a></p>
-<p><a href="flows/oidcauthzcodeflow">OIDC Authorization Code Flow</a></p>
+<p><a href="flows/authzcodeflow?scope=read+write+openid+email">OIDC Authorization Code Flow</a></p>
 
-<form method="POST" action="/bff/resource" use:enhance={({ formData }) => {
-    // `formElement` is this `<form>` element
-    // `formData` is its `FormData` object that's about to be submitted
-    // `action` is the URL to which the form is posted
-    // calling `cancel()` will prevent the submission
-    // `submitter` is the `HTMLElement` that caused the form to be submitted
+<div class="mt-4">
+    <form method="POST" action="/bff/resource" use:enhance={({ formData }) => {
+        // `formElement` is this `<form>` element
+        // `formData` is its `FormData` object that's about to be submitted
+        // `action` is the URL to which the form is posted
+        // calling `cancel()` will prevent the submission
+        // `submitter` is the `HTMLElement` that caused the form to be submitted
+    
+        return async ({ result }) => {
+            // `result` is an `ActionResult` object
+            // `update` is a function which triggers the default logic that would be triggered if this callback wasn't set
+            // Following is for when BFF URL returns ActionData
+            /*if (result.type === 'redirect') {
+                goto(result.location);
+            } else if (result.status != 200) {
+                resourceResult = "Error calling resource";
+            } else if ("data" in result && result.data?.status != 200) {
+                resourceResult = String(result.data?.error_description) ?? "Unknown error calling resource"
+            } else if ("data" in result && result.data?.status == 200) {
+                resourceResult = JSON.stringify(result.data.body);
+            } else {
+                resourceResult = "{}"
+            }*/
+            resourceResult = JSON.stringify(result, null, 4);
+        };
+    }}>
+        <button type="submit" class="btn btn-neutral">Call Resource</button>
+    </form>
 
-    return async ({ result }) => {
-        // `result` is an `ActionResult` object
-        // `update` is a function which triggers the default logic that would be triggered if this callback wasn't set
-        // Following is for when BFF URL returns ActionData
-        /*if (result.type === 'redirect') {
-            goto(result.location);
-        } else if (result.status != 200) {
-            resourceResult = "Error calling resource";
-        } else if ("data" in result && result.data?.status != 200) {
-            resourceResult = String(result.data?.error_description) ?? "Unknown error calling resource"
-        } else if ("data" in result && result.data?.status == 200) {
-            resourceResult = JSON.stringify(result.data.body);
-        } else {
-            resourceResult = "{}"
-        }*/
-        resourceResult = JSON.stringify(result);
-    };
-}}>
-    <button type="submit" class="btn btn-neutral">Call Resource</button>
-</form>
-<pre class="mt-2 mb-2" id="result">
-    {resourceResult}
-</pre>
+    <pre class="mt-2 mb-2" id="result">
+{resourceResult}
+    </pre>
+</div>
+
+<div >
+    <form method="POST" action="/tokens" use:enhance={() => {
+
+        return async ({ result }) => {
+            idTokenResult = "id_token" in result ? JSON.stringify(result.id_token, null, 4) : "None sent";
+        };
+        }}>
+        <button type="submit" class="btn btn-neutral">Get ID Token</button>
+    </form>
+    
+    <pre class="mt-2 mb-2" id="result">
+{idTokenResult}
+    </pre>
+    
+</div>
 
 {#if data.user} 
     <form method="POST" action="logout">
