@@ -4,7 +4,6 @@
     export let data;
 	/** @type {import('./$types').ActionData} */
 	export let form;
-    console.log(data)
 </script>
 <svelte:head>
     <title>Authorize</title>

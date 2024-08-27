@@ -91,8 +91,7 @@ test('AuthorizationServer.deviceCodeFlow', async () => {
     await authServer.validateAndPersistScope(client.clientId, "read write");
 
     // tell auth server that scopes have been authorized
-    const authRet = await authServer.authorizeDeviceFlowScopes(deviceAuthRet.user_code ?? "");
-    console.log(authRet);
+    await authServer.authorizeDeviceFlowScopes(deviceAuthRet.user_code ?? "");
 
     // now we should get an access token
     tokenRet = await authServer.tokenEndpoint({

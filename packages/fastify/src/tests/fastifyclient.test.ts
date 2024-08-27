@@ -152,7 +152,6 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
     let res;
 
     res = await server.app.inject({ method: "GET", url: "/authzcodeflow?scope=read+write" });
-    console.log(res);
     const authUrl = res.headers?.location;
     expect(authUrl).toBeDefined();
     const state = get("state", authUrl??"");

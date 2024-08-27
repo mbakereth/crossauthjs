@@ -2,12 +2,8 @@
     import { CrossauthLogger, OAuthBffClient } from '@crossauth/frontend';
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
-	/** @type {import('./$types').PageData} */
-	export let data;
 	/** @type {import('./$types').ActionData} */
 	export let form;
-    console.log("devicecodeflow data", data);
-    console.log("devicecodeflow form", form);
 
     $: completed = false;
     $: expired = false;

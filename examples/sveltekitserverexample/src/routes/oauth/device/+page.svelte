@@ -5,8 +5,6 @@
     export let data;
 	/** @type {import('./$types').ActionData} */
 	export let form;
-    console.log("device data", data);
-    console.log("device form", form);
     $: cancelled = false;
 </script>
 
