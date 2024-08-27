@@ -346,6 +346,9 @@ importers:
       '@types/node':
         specifier: ^20.10.5
         version: 20.14.15
+      '@types/qrcode-terminal':
+        specifier: ^0.12.2
+        version: 0.12.2
       nodemon:
         specifier: ^3.0.2
         version: 3.1.4
@@ -2710,6 +2713,10 @@ packages:
 
   /@types/pug@2.0.10:
     resolution: {integrity: sha512-Sk/uYFOBAB7mb74XcpizmH0KOR2Pv3D2Hmrh1Dmy5BmK3MpdSa5kqZcg6EKBdklU0bFXX9gCfzvpnyUehrPIuA==}
+    dev: true
+
+  /@types/qrcode-terminal@0.12.2:
+    resolution: {integrity: sha512-v+RcIEJ+Uhd6ygSQ0u5YYY7ZM+la7GgPbs0V/7l/kFs2uO4S8BcIUEMoP7za4DNIqNnUD5npf0A/7kBhrCKG5Q==}
     dev: true
 
   /@types/qrcode@1.5.5:

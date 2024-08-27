@@ -34,7 +34,7 @@ async function main() {
     console.log("Enter the following code when prompted: " + resp.user_code);
     console.log("");
     console.log("Alternatively, scan the following QR code:");
-    qrcode.setErrorLevel('Q');
+    qrcode.setErrorLevel('L');
     qrcode.generate(resp.verification_uri_complete);
     console.log("");
 

@@ -56,7 +56,7 @@
     {/if}
     {#if form?.completed == true}
         <p class="bg-success p-2 rounded text-slate-900">Code successfully submitted.  Please return to the other device.</p>
-        {:else if data?.authorizationNeeded}
+    {:else if form?.authorizationNeeded}
         <!-- ask the user for authorization-->
         {#if form?.error}
             <!-- there was an error during form submission -->

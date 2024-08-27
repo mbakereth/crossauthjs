@@ -4,7 +4,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 
 
 export default defineConfig({
-	plugins: [sveltekit(), basicSsl()],
+	plugins: [sveltekit()],
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}']
 	},
@@ -15,7 +15,6 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: "0.0.0.0",
     proxy: {}
   },
 

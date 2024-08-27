@@ -28,13 +28,12 @@ try {
             }
         },
         oAuthClient: {
-            authServerBaseUrl: "https://192.168.0.101:5173/oauth",
+            authServerBaseUrl: process.env["AUTH_SERVER_BASE_URL"] ?? "",
             options: {
                 authorizedUrl: "/authorized",
                 tokenResponseType: "saveInSessionAndRedirect",
                 errorResponseType: "svelteKitError",
                 bffEndpoints: [{url: "/resource", methods: ["GET"]}],
-                bffBaseUrl: "https://192.168.0.101:5173",
                 tokenEndpoints: ["id_token", "access_token", "refresh_token", "have_access_token", "have_id_token", "have_refresh_token"],
                 loginProtectedFlows: [OAuthFlows.AuthorizationCode, OAuthFlows.AuthorizationCodeWithPKCE],
             },

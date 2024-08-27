@@ -35,7 +35,6 @@ try {
             keyStorage,
             options: {
                 authStorage,
-                deviceCodeVerificationUri: "https://192.168.0.101:5173/oauth/device",
             }
         },
         oAuthResServer: {
