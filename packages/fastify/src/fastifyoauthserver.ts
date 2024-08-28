@@ -320,7 +320,7 @@ export class FastifyAuthorizationServer {
      * @param app the Fastify app
      * @param fastifyServer the Fastify server this belongs to
      * @param clientStorage where OAuth clients are stored
-     * @param keyStorage where session IDs are stored
+     * @param keyStorage where refresh tokens, authorization cods, etc are temporarily stored
      * @param authenticators The authenticators (factor1 and factor2) to enable 
      *        for the password flow
      * @param options see {@link FastifyAuthorizationServerOptions}

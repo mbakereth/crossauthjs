@@ -35,7 +35,7 @@ import { type CookieSerializeOptions } from 'cookie';
 // ENDPOINT INTERFACES
 
 /**
- * Query parameters for the `authorize` Fastify request.
+ * Query parameters for the `authorize` request.
  */
 export interface AuthorizeQueryType {
     response_type : string,
@@ -154,7 +154,7 @@ export interface SvelteKitAuthorizationServerOptions
     extends OAuthAuthorizationServerOptions {
 
     /**
-     * The login URL (provided by {@link FastifySessionServer}). Default `/login`
+     * The login URL (provided by {@link SvelteKitSessionServer}). Default `/login`
      */
     loginUrl? : string,
 
@@ -335,10 +335,10 @@ export class SvelteKitAuthorizationServer {
      * Constructor
      * @param svelteKitServer the SvelteKit server this belongs to
      * @param clientStorage where OAuth clients are stored
-     * @param keyStorage where session IDs are stored
+     * @param keyStorage where refresh tokens, authorization cods, etc are temporarily stored
      * @param authenticators The authenticators (factor1 and factor2) to enable 
      *        for the password flow
-     * @param options see {@link FastifyAuthorizationServerOptions}
+     * @param options see {@link SvelteKitAuthorizationServerOptions}
      */
     constructor(
         svelteKitServer : SvelteKitServer,
