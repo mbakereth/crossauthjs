@@ -6,8 +6,7 @@ import {
     type UserStorageOptions,
     OAuthClientStorage,
     type OAuthClientStorageOptions,
-    OAuthAuthorizationStorage,
-    type OAuthAuthorizationStorageOptions } from '../storage';
+    OAuthAuthorizationStorage } from '../storage';
 import {
     type User,
     type UserSecrets,
