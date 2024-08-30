@@ -28,9 +28,9 @@ export async function oauthLogin () {
         const body = JSON.parse(request.body?.toString() ?? "{}");
         const firstTokenResponse = await authServer.tokenEndpoint({
             grantType: body.grant_type, 
-            clientId : body.client_id, 
+            client_id : body.client_id, 
             scope : body.scope, 
-            clientSecret : body.client_secret,
+            client_secret : body.client_secret,
             username: body.username,
             password: body.password,
         });

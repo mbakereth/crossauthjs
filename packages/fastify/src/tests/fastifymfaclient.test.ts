@@ -47,10 +47,10 @@ async function createTotpAccount(username: string,
 
     const user = await userStorage.createUser(userInputs, {
         password: await lpAuthenticator.createPasswordHash(password),
-        totpSecret: resp.sessionData.totpSecret,
+        totpsecret: resp.sessionData.totpsecret,
         } );
 
-    return { user, totpSecret: resp.sessionData.totpSecret };
+    return { user, totpsecret: resp.sessionData.totpsecret };
 };
 
 async function createEmailAccount(username: string,
@@ -151,8 +151,8 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
         allowedFactor2: ["none"],
         enableEmailVerification: false,
         siteUrl: `http://localhost:3000`,
-        clientId: "ABC",
-        clientSecret: "DEF",
+        client_id: "ABC",
+        client_secret: "DEF",
         validFlows: ["all"], // activate all OAuth flows
         tokenResponseType: "sendJson",
         errorResponseType: "sendJson",
@@ -172,7 +172,7 @@ test('FastifyOAuthClient.Mfa.otp', async () => {
         return "1";
     };
 
-    const { totpSecret} =
+    const { totpsecret} =
         await createTotpAccount("mary", "maryPass123", userStorage)
 
     const {server} = await makeClient();
@@ -192,10 +192,10 @@ test('FastifyOAuthClient.Mfa.otp', async () => {
     const firstTokenResponse = 
         await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: "ABC", 
+            client_id: "ABC", 
             username: "mary",
             password: "maryPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
 
     fetchMocker.mockResponseOnce((_req) => {
          return JSON.stringify(firstTokenResponse)});
@@ -220,14 +220,14 @@ test('FastifyOAuthClient.Mfa.otp', async () => {
     // Call passwordotp to completre MFA
     const maxTries = 2;
     for (let i=0; i<maxTries; ++i) {
-        const otp = gAuthenticator.generate(totpSecret);
+        const otp = gAuthenticator.generate(totpsecret);
 
         const {access_token, scope, error: error4, expires_in} =
         await authServer.tokenEndpoint({
             grantType: "http://auth0.com/oauth/grant-type/mfa-otp",
-            clientId : "ABC",
+            client_id : "ABC",
             scope: "read write",
-            clientSecret: "DEF",
+            client_secret: "DEF",
             mfaToken: firstTokenResponse.mfa_token,
             otp: otp
         });
@@ -287,10 +287,10 @@ test('FastifyOAuthClient.Mfa.oob', async () => {
     const firstTokenResponse = 
         await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: "ABC", 
+            client_id: "ABC", 
             username: "mary",
             password: "maryPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
 
     fetchMocker.mockResponseOnce((_req) => {
          return JSON.stringify(firstTokenResponse)});
@@ -332,9 +332,9 @@ test('FastifyOAuthClient.Mfa.oob', async () => {
         const {access_token, scope, error: error4, expires_in} =
         await authServer.tokenEndpoint({
             grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
-            clientId : "ABC",
+            client_id : "ABC",
             scope: "read write",
-            clientSecret: "DEF",
+            client_secret: "DEF",
             mfaToken: firstTokenResponse.mfa_token,
             oobCode: oobCode,
             bindingCode: otp,

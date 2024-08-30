@@ -70,42 +70,42 @@ export async function createUsers(userStorage: InMemoryUserStorage) {
         ]);
 }
 
-export async function createSession(userId : string,
+export async function createSession(userid : string,
     userStorage: InMemoryUserStorage, 
     keyStorage: InMemoryKeyStorage,
     options = {}) {
 
     let sessionCookie = new SessionCookie(keyStorage, {userStorage, ...options});
-    const key = await sessionCookie.createSessionKey(userId);
+    const key = await sessionCookie.createSessionKey(userid);
     const cookie = sessionCookie.makeCookie(key);
     return {key, cookie};
 }
 
 export async function createClients(clientStorage : InMemoryOAuthClientStorage, secretRequired = true) {
-    const clientSecret = await Crypto.passwordHash("DEF", {
+    const client_secret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
         keyLen: 32,
     });
     let client : OAuthClient = {
-        clientId : "ABC",
-        clientSecret: secretRequired ? clientSecret : undefined,
-        clientName: "Test",
+        client_id : "ABC",
+        client_secret: secretRequired ? client_secret : undefined,
+        client_name: "Test",
         confidential: secretRequired,
-        redirectUri: ["http://example.com/redirect"],
-        validFlow: OAuthFlows.allFlows(),
+        redirect_uri: ["http://example.com/redirect"],
+        valid_flow: OAuthFlows.allFlows(),
     };
     const retClient = client;
     await clientStorage.createClient(client);
 
     client = {
-        clientId : "bob_ABC",
-        clientSecret: secretRequired ? clientSecret : undefined,
-        clientName: "Test",
+        client_id : "bob_ABC",
+        client_secret: secretRequired ? client_secret : undefined,
+        client_name: "Test",
         confidential: secretRequired,
-        redirectUri: ["http://example.com/redirect"],
-        validFlow: OAuthFlows.allFlows(),
-        userId: "bob",
+        redirect_uri: ["http://example.com/redirect"],
+        valid_flow: OAuthFlows.allFlows(),
+        userid: "bob",
     };
     await clientStorage.createClient(client);
 
@@ -184,9 +184,9 @@ export async function makeServer(makeSession=true, makeApiKey=false, makeOAuthSe
             jwtPrivateKeyFile: "keys/rsa-private-key.pem",
             tokenResponseType: "sendJson",
             errorResponseType: "sendJson",
-            clientId: "ABC",
-            clientSecret: "DEF",
-            redirectUri: "http://example.com/redirect",
+            client_id: "ABC",
+            client_secret: "DEF",
+            redirect_uri: "http://example.com/redirect",
             validFlows: ["all"], // activate all OAuth flows
             bffEndpointName: "/bff",
             bffBaseUrl: "http://server.com",
@@ -341,6 +341,7 @@ export async function getAuthServer({
         emptyScopeIsValid: emptyScopeIsValid,
         validFlows: ["all"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     };
     if (aud) options.audience = aud;
     if (persistAccessToken) {
@@ -375,8 +376,8 @@ export async function getAuthorizationCode({
     const {code, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState,
             codeChallenge: codeChallenge,
@@ -393,9 +394,9 @@ export async function getAccessToken() {
     const {access_token, error, error_description, refresh_token, expires_in}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     return {authServer, client, code, clientStorage, access_token, error, error_description, refresh_token, expires_in};
 };
 

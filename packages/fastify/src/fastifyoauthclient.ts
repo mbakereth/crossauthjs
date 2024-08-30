@@ -784,7 +784,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         setParameter("deviceCodePollUrl", ParamType.String, this, options, "OAUTH_DEVICECODE_POLL_URL");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
-        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_validFlows");
 
         if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();
@@ -844,7 +844,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         }
         
         if (!this.prefix.endsWith("/")) this.prefix += "/";
-        this.redirectUri = this.siteUrl + this.prefix + "authzcode";
+        this.redirect_uri = this.siteUrl + this.prefix + "authzcode";
 
         if (this.validFlows.includes(OAuthFlows.AuthorizationCode)) {
             this.server.app.get(this.prefix+'authzcodeflow', 
@@ -1824,7 +1824,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
 
             }
 
-            console.log(resp);
             return await this.receiveTokenFn(resp,
                 this,
                 request,

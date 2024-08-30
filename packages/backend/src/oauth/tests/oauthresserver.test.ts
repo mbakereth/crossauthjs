@@ -12,9 +12,9 @@ test('ResourceServer.validAccessToken', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -41,9 +41,9 @@ test('ResourceServer.invalidPublicKey', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -70,9 +70,9 @@ test('ResourceServer.invalidSecret', async () => {
     const { error }
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEFG"});
+            client_secret: "DEFG"});
     expect(error).toBe("access_denied");
 });
 
@@ -82,9 +82,9 @@ test('ResourceServer.invalidAccessToken', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -111,7 +111,7 @@ test('ResourceServer.validCodeChallenge', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
             codeVerifier: "ABC123"});
     expect(error).toBeUndefined();
@@ -139,7 +139,7 @@ test('ResourceServer.invalidCodeChallenge', async () => {
     const {error}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
             codeVerifier: "ABC124"});
     expect(error).toBe("access_denied");
@@ -151,9 +151,9 @@ test('ResourceServer.validAud', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -180,9 +180,9 @@ test('ResourceServer.invalidAud', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -210,9 +210,9 @@ test('ResourceServer.invalidIsser', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -241,9 +241,9 @@ test('ResourceServer.persistAccessToken', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -276,9 +276,9 @@ test('ResourceServer.validateWithJwks', async () => {
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 

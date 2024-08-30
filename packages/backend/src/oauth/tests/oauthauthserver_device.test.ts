@@ -30,9 +30,9 @@ test('AuthorizationServer.deviceCodeFlow', async () => {
 
     // call device authorization endpoint to start flow
     const deviceAuthRet = await authServer.deviceAuthorizationEndpoint({
-        clientId: client.clientId,
+        client_id: client.client_id,
         scope: "read write",
-        clientSecret: "DEF"
+        client_secret: "DEF"
     });
     expect(deviceAuthRet.device_code).toBeDefined();
     expect(deviceAuthRet.user_code?.length).toBe(9);
@@ -46,8 +46,8 @@ test('AuthorizationServer.deviceCodeFlow', async () => {
     // poll token - should get authorization pending
     let tokenRet = await authServer.tokenEndpoint({
         grantType: "urn:ietf:params:oauth:grant-type:device_code", 
-        clientId: client.clientId, 
-        clientSecret: "DEF",
+        client_id: client.client_id, 
+        client_secret: "DEF",
         deviceCode: deviceAuthRet.device_code});
     expect(tokenRet.error).toBe("authorization_pending");
     expect(tokenRet.access_token).toBeUndefined();
@@ -63,8 +63,8 @@ test('AuthorizationServer.deviceCodeFlow', async () => {
     // poll token - should still get authorization pending
     tokenRet = await authServer.tokenEndpoint({
         grantType: "urn:ietf:params:oauth:grant-type:device_code", 
-        clientId: client.clientId, 
-        clientSecret: "DEF",
+        client_id: client.client_id, 
+        client_secret: "DEF",
         deviceCode: deviceAuthRet.device_code});
     expect(tokenRet.error).toBe("authorization_pending");
     expect(tokenRet.access_token).toBeUndefined();
@@ -76,19 +76,19 @@ test('AuthorizationServer.deviceCodeFlow', async () => {
     });
     expect(deviceRet.ok).toBe(true);
     expect(deviceRet.error).toBeUndefined();
-    expect(deviceRet.client_id).toBe(client.clientId);
+    expect(deviceRet.client_id).toBe(client.client_id);
     expect(deviceRet.scope).toBe("read write");
 
     // poll token - should still get authorization pending as scopes are validated
     tokenRet = await authServer.tokenEndpoint({
         grantType: "urn:ietf:params:oauth:grant-type:device_code", 
-        clientId: client.clientId, 
-        clientSecret: "DEF",
+        client_id: client.client_id, 
+        client_secret: "DEF",
         deviceCode: deviceAuthRet.device_code});
     expect(tokenRet.error).toBe("authorization_pending");
     expect(tokenRet.access_token).toBeUndefined();
     
-    await authServer.validateAndPersistScope(client.clientId, "read write");
+    await authServer.validateAndPersistScope(client.client_id, "read write");
 
     // tell auth server that scopes have been authorized
     await authServer.authorizeDeviceFlowScopes(deviceAuthRet.user_code ?? "");
@@ -96,8 +96,8 @@ test('AuthorizationServer.deviceCodeFlow', async () => {
     // now we should get an access token
     tokenRet = await authServer.tokenEndpoint({
         grantType: "urn:ietf:params:oauth:grant-type:device_code", 
-        clientId: client.clientId, 
-        clientSecret: "DEF",
+        client_id: client.client_id, 
+        client_secret: "DEF",
         deviceCode: deviceAuthRet.device_code});
     expect(tokenRet.error).toBeUndefined();
     expect(tokenRet.access_token).toBeDefined();

@@ -103,7 +103,6 @@ export class OAuthFlows {
             OAuthFlows.Password,
             OAuthFlows.PasswordMfa,
             OAuthFlows.OidcAuthorizationCode,
-            OAuthFlows.DeviceCode,
         ];
     }
 
@@ -128,7 +127,7 @@ export class OAuthFlows {
             case OAuthFlows.PasswordMfa:
                 return ["http://auth0.com/oauth/grant-type/mfa-otp", "http://auth0.com/oauth/grant-type/mfa-oob"];
             case OAuthFlows.DeviceCode:
-                return ["device_code", "urn:ietf:params:oauth:grant-type:device_code"];
+                return ["urn:ietf:params:oauth:grant-type:device_code"];
         }
         return undefined;
     }
@@ -202,13 +201,13 @@ export interface OAuthDeviceResponse {
  */
 export abstract class OAuthClientBase {
     protected authServerBaseUrl = "";
-    #clientId : string|undefined;
-    #clientSecret : string|undefined;
+    #client_id : string|undefined;
+    #client_secret : string|undefined;
     #codeChallenge : string|undefined;
     protected codeChallengeMethod : "plain" | "S256" = "S256";
     #codeVerifier : string|undefined;
     protected verifierLength = 32;
-    protected redirectUri : string|undefined;
+    protected redirect_uri : string|undefined;
     #state = "";
     protected stateLength = 32;
     protected authzCode : string = "";
@@ -225,9 +224,9 @@ export abstract class OAuthClientBase {
      *      - `authServerBaseUrl` the base URI for OAuth calls.  This is
      *        the value in the isser field of a JWT.  The client will
      *        reject any JWTs that are not from this issuer.
-     *      - `clientId` the client ID for this client.
+     *      - `client_id` the client ID for this client.
      *      - `redriectUri` when making OAuth calls, this value is put
-     *        in the redirectUri field.
+     *        in the redirect_uri field.
      *      - `number` of characters (before base64-url-encoding) for generating
      *        state values in OAuth calls.
      *      - `verifierLength` of characters (before base64-url-encoding) for
@@ -246,9 +245,9 @@ export abstract class OAuthClientBase {
      *        are received
      */
     constructor({authServerBaseUrl,
-        clientId,
-        clientSecret,
-        redirectUri,
+        client_id,
+        client_secret,
+        redirect_uri,
         codeChallengeMethod,
         stateLength,
         verifierLength,
@@ -260,9 +259,9 @@ export abstract class OAuthClientBase {
         authServerBaseUrl : string,
         stateLength? : number,
         verifierLength? : number,
-        clientId? : string,
-        clientSecret? : string,
-        redirectUri? : string,
+        client_id? : string,
+        client_secret? : string,
+        redirect_uri? : string,
         codeChallengeMethod? : "plain" | "S256",
         tokenConsumer : OAuthTokenConsumerBase,
         authServerHeaders? : {[key:string]:string},
@@ -274,9 +273,9 @@ export abstract class OAuthClientBase {
         this.authServerBaseUrl = authServerBaseUrl;
         if (verifierLength) this.verifierLength = verifierLength;
         if (stateLength) this.stateLength = stateLength;
-        if (clientId) this.#clientId = clientId;
-        if (clientSecret) this.#clientSecret = clientSecret;
-        if (redirectUri) this.redirectUri = redirectUri;
+        if (client_id) this.#client_id = client_id;
+        if (client_secret) this.#client_secret = client_secret;
+        if (redirect_uri) this.redirect_uri = redirect_uri;
         if (codeChallengeMethod) this.codeChallengeMethod = codeChallengeMethod;
         this.authServerBaseUrl = authServerBaseUrl;
         if (authServerCredentials) this.authServerCredentials = authServerCredentials;
@@ -285,11 +284,11 @@ export abstract class OAuthClientBase {
 
     }
 
-    set clientId(value : string) {
-        this.#clientId = value;
+    set client_id(value : string) {
+        this.#client_id = value;
     }
-    set clientSecret(value : string) {
-        this.#clientSecret = value;
+    set client_secret(value : string) {
+        this.#client_secret = value;
     }
     set codeVerifier(value : string) {
         this.#codeVerifier = value;
@@ -409,11 +408,11 @@ export abstract class OAuthClientBase {
             };
         }
         this.#state = this.randomValue(this.stateLength);
-        if (!this.#clientId) return {
+        if (!this.#client_id) return {
             error: "invalid_request",
             error_description: "Cannot make authorization code flow without client id"
         }; 
-        if (!this.redirectUri) return {
+        if (!this.redirect_uri) return {
             error: "invalid_request",
             error_description: "Cannot make authorization code flow without Redirect Uri"
         }; 
@@ -421,9 +420,9 @@ export abstract class OAuthClientBase {
         const base = this.oidcConfig.authorization_endpoint;
         let url = base 
             + "?response_type=code"
-            + "&client_id=" + encodeURIComponent(this.#clientId)
+            + "&client_id=" + encodeURIComponent(this.#client_id)
             + "&state=" + encodeURIComponent(this.#state)
-            + "&redirect_uri=" + encodeURIComponent(this.redirectUri);
+            + "&redirect_uri=" + encodeURIComponent(this.redirect_uri);
 
         if (scope) {
             url += "&scope=" + encodeURIComponent(scope);
@@ -492,15 +491,15 @@ export abstract class OAuthClientBase {
         const url = this.oidcConfig.token_endpoint;
 
         let grant_type : string;
-        let clientSecret : string|undefined;
+        let client_secret : string|undefined;
         grant_type = "authorization_code";
-        clientSecret = this.#clientSecret;
+        client_secret = this.#client_secret;
         let params : {[key:string]:any} = {
             grant_type: grant_type,
-            client_id: this.#clientId,
+            client_id: this.#client_id,
             code: this.authzCode,
         }
-        if (clientSecret) params.client_secret = clientSecret;
+        if (client_secret) params.client_secret = client_secret;
         params.code_verifier = this.#codeVerifier;
         try {
             return this.post(url, params, this.authServerHeaders);
@@ -541,11 +540,11 @@ export abstract class OAuthClientBase {
         if (!this.oidcConfig?.token_endpoint) {
             return {error: "server_error", error_description: "Cannot get token endpoint"};
         }
-        if (!this.#clientId) return {
+        if (!this.#client_id) return {
             error: "invalid_request",
             error_description: "Cannot make client credentials flow without client id"
         }; 
-        if (!this.#clientSecret) return {
+        if (!this.#client_secret) return {
             error: "invalid_request",
             error_description: "Cannot make client credentials flow without client secret"
         }; 
@@ -554,8 +553,8 @@ export abstract class OAuthClientBase {
 
         let params : {[key:string]:any} = {
             grant_type: "client_credentials",
-            client_id: this.#clientId,
-            client_secret: this.#clientSecret,
+            client_id: this.#client_id,
+            client_secret: this.#client_secret,
         }
         if (scope) params.scope = scope;
         try {
@@ -609,8 +608,8 @@ export abstract class OAuthClientBase {
 
         let params : {[key:string]:any} = {
             grant_type: "password",
-            client_id: this.#clientId,
-            client_secret: this.#clientSecret,
+            client_id: this.#client_id,
+            client_secret: this.#client_secret,
             username : username,
             password : password,
         }
@@ -728,8 +727,8 @@ export abstract class OAuthClientBase {
         const url = this.oidcConfig.issuer + 
             (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/challenge";
         const resp = await this.post(url, {
-            client_id: this.#clientId,
-            client_secret: this.#clientSecret,
+            client_id: this.#client_id,
+            client_secret: this.#client_secret,
             challenge_type: "otp",
             mfa_token: mfaToken,
             authenticator_id: authenticatorId,
@@ -790,8 +789,8 @@ export abstract class OAuthClientBase {
         const otpUrl = this.oidcConfig.token_endpoint;
         const otpResp = await this.post(otpUrl, {
             grant_type: "http://auth0.com/oauth/grant-type/mfa-otp",
-            client_id: this.#clientId,
-            client_secret: this.#clientSecret,
+            client_id: this.#client_id,
+            client_secret: this.#client_secret,
             challenge_type: "otp",
             mfa_token: mfaToken,
             otp: otp,
@@ -851,8 +850,8 @@ export abstract class OAuthClientBase {
         const url = this.oidcConfig.issuer + 
             (this.oidcConfig.issuer.endsWith("/") ? "" : "/") + "mfa/challenge";
         const resp = await this.post(url, {
-            client_id: this.#clientId,
-            client_secret: this.#clientSecret,
+            client_id: this.#client_id,
+            client_secret: this.#client_secret,
             challenge_type: "oob",
             mfa_token: mfaToken,
             authenticator_id: authenticatorId,
@@ -902,8 +901,8 @@ export abstract class OAuthClientBase {
         const url = this.oidcConfig.token_endpoint;
         const resp = await this.post(url, {
             grant_type: "http://auth0.com/oauth/grant-type/mfa-oob",
-            client_id: this.#clientId,
-            client_secret: this.#clientSecret,
+            client_id: this.#client_id,
+            client_secret: this.#client_secret,
             challenge_type: "otp",
             mfa_token: mfaToken,
             oob_code: oobCode,
@@ -950,15 +949,15 @@ export abstract class OAuthClientBase {
 
         const url = this.oidcConfig.token_endpoint;
 
-        let clientSecret : string|undefined;
-        clientSecret = this.#clientSecret;
+        let client_secret : string|undefined;
+        client_secret = this.#client_secret;
 
         let params : {[key:string]:any} = {
             grant_type: "refresh_token",
             refresh_token: refreshToken,
-            client_id: this.#clientId,
+            client_id: this.#client_id,
         }
-        if (clientSecret) params.client_secret = clientSecret;
+        if (client_secret) params.client_secret = client_secret;
         try {
             return await this.post(url, params, this.authServerHeaders);
         } catch (e) {
@@ -983,7 +982,7 @@ export abstract class OAuthClientBase {
     async startDeviceCodeFlow(url : string, scope?: string) : Promise<OAuthDeviceAuthorizationResponse> {
         CrossauthLogger.logger.debug(j({msg: "Starting device code flow"}));
         if (!this.oidcConfig) await this.loadConfig();
-        if (!this.oidcConfig?.grant_types_supported.includes("urn:ietf:params:oauth:grant-type:device_code") && !this.oidcConfig?.grant_types_supported.includes("device_code")) {
+        if (!this.oidcConfig?.grant_types_supported.includes("urn:ietf:params:oauth:grant-type:device_code")) {
             return {
                 error: "invalid_request",
                 error_description: "Server does not support device code grant"
@@ -992,8 +991,8 @@ export abstract class OAuthClientBase {
 
         let params : {[key:string]:any} = {
             grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-            client_id: this.#clientId,
-            client_secret: this.#clientSecret,
+            client_id: this.#client_id,
+            client_secret: this.#client_secret,
         }
         if (scope) params.scope = scope;
         try {
@@ -1018,7 +1017,7 @@ export abstract class OAuthClientBase {
     async pollDeviceCodeFlow(deviceCode : string) : Promise<OAuthTokenResponse> {
         CrossauthLogger.logger.debug(j({msg: "Starting device code flow"}));
         if (!this.oidcConfig) await this.loadConfig();
-        if (!this.oidcConfig?.grant_types_supported.includes("urn:ietf:params:oauth:grant-type:device_code") && !this.oidcConfig?.grant_types_supported.includes("device_code")) {
+        if (!this.oidcConfig?.grant_types_supported.includes("urn:ietf:params:oauth:grant-type:device_code")) {
             return {
                 error: "invalid_request",
                 error_description: "Server does not support device code grant"
@@ -1033,8 +1032,8 @@ export abstract class OAuthClientBase {
 
         let params : {[key:string]:any} = {
             grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-            client_id: this.#clientId,
-            client_secret: this.#clientSecret,
+            client_id: this.#client_id,
+            client_secret: this.#client_secret,
             device_code: deviceCode,
         }
         try {

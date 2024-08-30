@@ -45,30 +45,30 @@ async function main() {
 
     console.log({ user1, user2, admin });
 
-    const clientSecret = await Crypto.passwordHash("DEF", {
+    const client_secret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
         keyLen: 32,
     });
 
     const nonUserClient = await clientStorage.createClient({
-        clientId : "Client1",
-        clientSecret: clientSecret,
-        clientName: "Client1",
+        client_id : "Client1",
+        client_secret: client_secret,
+        client_name: "Client1",
         confidential: true,
-        redirectUri: ["http://localhost:5174/authcode"],
-        validFlow: OAuthFlows.allFlows(),
-        userId: undefined,
+        redirect_uri: ["http://localhost:5174/authcode"],
+        valid_flow: OAuthFlows.allFlows(),
+        userid: undefined,
     });
 
     const userClient = await clientStorage.createClient({
-        clientId : "Client2",
-        clientSecret: clientSecret,
-        clientName: "Client2",
+        client_id : "Client2",
+        client_secret: client_secret,
+        client_name: "Client2",
         confidential: true,
-        redirectUri: ["http://localhost:5174/authcode"],
-        validFlow: OAuthFlows.allFlows(),
-        userId: user1.id,
+        redirect_uri: ["http://localhost:5174/authcode"],
+        valid_flow: OAuthFlows.allFlows(),
+        userid: user1.id,
     });
 
     console.log({ nonUserClient, userClient });

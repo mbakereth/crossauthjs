@@ -670,7 +670,7 @@ export class SvelteKitAdminEndpoints {
     /**
      * Call this to delete the logged-in user
      * 
-     * @param userId the user to delete
+     * @param userid the user to delete
      * @param event the Sveltekit event.  
 
      * @returns object with:
@@ -686,8 +686,8 @@ export class SvelteKitAdminEndpoints {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             try {
     
-                const userId = event.params.id;
-                if (!userId) throw new CrossauthError(ErrorCode.BadRequest, "User ID is undefined");
+                const userid = event.params.id;
+                if (!userid) throw new CrossauthError(ErrorCode.BadRequest, "User ID is undefined");
 
                 // throw an error if the CSRF token is invalid
                 if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
@@ -699,7 +699,7 @@ export class SvelteKitAdminEndpoints {
                     this.sessionServer.error(401);
                 }
     
-                await this.sessionServer.userStorage.deleteUserById(userId);
+                await this.sessionServer.userStorage.deleteUserById(userid);
                 return {
                     ok: true,
     
@@ -739,14 +739,14 @@ export class SvelteKitAdminEndpoints {
     };
 
     private async getUserFromParam(event : RequestEvent, paramName="id") : Promise<{user? : User, exception? : CrossauthError}> {
-        let userId = event.params[paramName];
-        if (!userId) {
+        let userid = event.params[paramName];
+        if (!userid) {
             return {exception: new CrossauthError(ErrorCode.BadRequest, "Must give user id")};
 
         }
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
-            const resp = await this.sessionServer.userStorage.getUserById(userId);
+            const resp = await this.sessionServer.userStorage.getUserById(userid);
             return {user: resp.user};
         } catch (e) {
             return {exception: CrossauthError.asCrossauthError(e)};

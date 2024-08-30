@@ -12,8 +12,8 @@ export interface InMemoryUserStorageOptions extends UserStorageOptions {
 }
 
 interface UserWithNormalization extends User {
-    usernameNormalized? : string,
-    emailNormalized? : string,
+    username_normalized? : string,
+    email_normalized? : string,
 }
 
 /**
@@ -46,23 +46,23 @@ export class InMemoryUserStorage extends UserStorage {
     async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
         : Promise<User> {
 
-        user.usernameNormalized = UserStorage.normalize(user.username);
-        if (user.usernameNormalized in this.usersByUsername) {
+        user.username_normalized = UserStorage.normalize(user.username);
+        if (user.username_normalized in this.usersByUsername) {
             throw new CrossauthError(ErrorCode.UserExists);
         }
         if ("email" in user && user.email) {
-            user.emailNormalized = UserStorage.normalize(user.email);
-            if (user.emailNormalized in this.getUserByEmail) {
+            user.email_normalized = UserStorage.normalize(user.email);
+            if (user.email_normalized in this.getUserByEmail) {
                 throw new CrossauthError(ErrorCode.UserExists);
             }
 
         }
 
         const userToStore = {id: user.username, ...user}
-        this.usersByUsername[user.usernameNormalized] = userToStore;
-        this.secretsByUsername[user.usernameNormalized] = secrets??{};
-        if ("email" in user && user.email) this.usersByEmail[user.emailNormalized] = userToStore;
-        if ("email" in user && user.email) this.secretsByEmail[user.emailNormalized] = secrets??{};
+        this.usersByUsername[user.username_normalized] = userToStore;
+        this.secretsByUsername[user.username_normalized] = secrets??{};
+        if ("email" in user && user.email) this.usersByEmail[user.email_normalized] = userToStore;
+        if ("email" in user && user.email) this.secretsByEmail[user.email_normalized] = secrets??{};
 
         return {id: user.username, ...user};
     }
@@ -77,10 +77,10 @@ export class InMemoryUserStorage extends UserStorage {
     async getUserByUsername(
         username : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
-        const usernameNormalized = UserStorage.normalize(username);
-        if (usernameNormalized in this.usersByUsername) {
+        const username_normalized = UserStorage.normalize(username);
+        if (username_normalized in this.usersByUsername) {
 
-            const user = this.usersByUsername[usernameNormalized];
+            const user = this.usersByUsername[username_normalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
             if (options?.skipActiveCheck!=true && user["state"]==UserState.passwordChangeNeeded) {
                 CrossauthLogger.logger.debug(j({msg: "Password change required"}));
@@ -106,8 +106,8 @@ export class InMemoryUserStorage extends UserStorage {
                 CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
-            const secrets = this.secretsByUsername[usernameNormalized];
-            return {user: {...user}, secrets: {userId: user.id, ...secrets}};
+            const secrets = this.secretsByUsername[username_normalized];
+            return {user: {...user}, secrets: {userid: user.id, ...secrets}};
         }
 
         CrossauthLogger.logger.debug(j({msg: "User does not exist"}));
@@ -123,10 +123,10 @@ export class InMemoryUserStorage extends UserStorage {
      */
     async getUserByEmail(email : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
-        const emailNormalized = UserStorage.normalize(email);
-        if (emailNormalized in this.usersByEmail) {
+        const email_normalized = UserStorage.normalize(email);
+        if (email_normalized in this.usersByEmail) {
 
-            const user = this.usersByEmail[emailNormalized];
+            const user = this.usersByEmail[email_normalized];
             if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
             if (options?.skipEmailVerifiedCheck!=true && user['state'] == "awaitingemailverification") {
                 CrossauthLogger.logger.debug(j({msg: "User email not verified"}));
@@ -136,8 +136,8 @@ export class InMemoryUserStorage extends UserStorage {
                 CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
                 throw new CrossauthError(ErrorCode.UserNotActive);
             }
-            const secrets = this.secretsByEmail[emailNormalized];
-            return {user: {...user}, secrets: {userId: user.id, ...secrets}};
+            const secrets = this.secretsByEmail[email_normalized];
+            return {user: {...user}, secrets: {userid: user.id, ...secrets}};
         }
 
         CrossauthLogger.logger.debug(j({msg: "User does not exist"}));
@@ -145,7 +145,7 @@ export class InMemoryUserStorage extends UserStorage {
     }
 
     /**
-     * Same as {@link getUserByUsername } - userId is the username in this model,
+     * Same as {@link getUserByUsername } - userid is the username in this model,
      * @param id the user ID to match 
      * @returns a {@link @crossauth/common!User} and 
      *          {@link @crossauth/common!UserSecrets}instance, ie including 
@@ -165,21 +165,21 @@ export class InMemoryUserStorage extends UserStorage {
     async updateUser(user : Partial<User>, secrets?: Partial<UserSecrets>) : Promise<void> {
         let newUser : Partial<UserWithNormalization> = {...user};
         if ("username" in newUser && newUser.username) {
-            newUser.usernameNormalized = UserStorage.normalize(newUser.username);
+            newUser.username_normalized = UserStorage.normalize(newUser.username);
         } else if ("id" in newUser && newUser.id) {
-            newUser.usernameNormalized = UserStorage.normalize(String(newUser.id));
+            newUser.username_normalized = UserStorage.normalize(String(newUser.id));
         }
         if ("email" in newUser && newUser.email) {
-            newUser.emailNormalized = UserStorage.normalize(newUser.email);
+            newUser.email_normalized = UserStorage.normalize(newUser.email);
 
         }
-        if (newUser.usernameNormalized && newUser.usernameNormalized in this.usersByUsername) {
+        if (newUser.username_normalized && newUser.username_normalized in this.usersByUsername) {
             for (let field in newUser) {
-                this.usersByUsername[newUser.usernameNormalized][field] = newUser[field];
+                this.usersByUsername[newUser.username_normalized][field] = newUser[field];
             }
             if (secrets) {
-                this.secretsByUsername[newUser.usernameNormalized] = {
-                    ...this.secretsByUsername[newUser.usernameNormalized],
+                this.secretsByUsername[newUser.username_normalized] = {
+                    ...this.secretsByUsername[newUser.username_normalized],
                     ...secrets,
                 }
             }
@@ -196,10 +196,10 @@ export class InMemoryUserStorage extends UserStorage {
             const user = this.usersByUsername[normalizedUser];
             delete this.usersByUsername[normalizedUser];
             delete this.secretsByUsername[normalizedUser];
-            const emailNormalized = UserStorage.normalize(String(user.email));
-            if (emailNormalized in this.usersByEmail) {
-                delete this.usersByEmail[emailNormalized];
-                delete this.secretsByEmail[emailNormalized];
+            const email_normalized = UserStorage.normalize(String(user.email));
+            if (email_normalized in this.usersByEmail) {
+                delete this.usersByEmail[email_normalized];
+                delete this.secretsByEmail[email_normalized];
             }
         }
     }
@@ -260,31 +260,31 @@ export class InMemoryKeyStorage extends KeyStorage {
     /**
      * Saves a session key in the session table.
      * 
-     * @param userId user ID to store with the session key.  See {@link InMemoryUserStorage} for how this may differ from `username`.
+     * @param userid user ID to store with the session key.  See {@link InMemoryUserStorage} for how this may differ from `username`.
      * @param keyValue the value of session key to store.
      * @param dateCreated the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will also be stored in the key table row
      */
-    async saveKey(userId : string | number | undefined, 
+    async saveKey(userid : string | number | undefined, 
                       keyValue : string, dateCreated : Date, 
                       expires : Date | undefined, 
                       data? : string,
                       extraFields? : {[key : string]: any}) : Promise<void> {
         const key : Key = {
             value : keyValue,
-            userId : userId,
+            userid : userid,
             created: dateCreated,
             expires: expires,
             data: data,
             ...extraFields
         };
         this.keys[keyValue] = key;
-        if (userId) {
-            if (!(userId in this.keysByUserId)) {
-                this.keysByUserId[userId] = [key]
+        if (userid) {
+            if (!(userid in this.keysByUserId)) {
+                this.keysByUserId[userid] = [key]
             } else {
-                this.keysByUserId[userId].push(key);
+                this.keysByUserId[userid].push(key);
             }
         } else {
             this.nonUserKeys.push(key);
@@ -299,8 +299,8 @@ export class InMemoryKeyStorage extends KeyStorage {
     async deleteKey(keyValue : string) : Promise<void> {
         if (keyValue in this.keys) {
             const key = this.keys[keyValue];
-            if (key.userId) {
-                delete this.keysByUserId[key.userId];
+            if (key.userid) {
+                delete this.keysByUserId[key.userid];
             } else {
                 this.nonUserKeys = this.nonUserKeys.filter((v) => v.value != keyValue);
             }
@@ -311,24 +311,24 @@ export class InMemoryKeyStorage extends KeyStorage {
     /**
      * Deletes all keys from storage for the given user ID
      * 
-     * @param userId : user ID to delete keys for
+     * @param userid : user ID to delete keys for
      */
-    async deleteAllForUser(userId : string | number | undefined | null, prefix: string, except : string|undefined = undefined) : Promise<void> {
+    async deleteAllForUser(userid : string | number | undefined | null, prefix: string, except : string|undefined = undefined) : Promise<void> {
         for (const key in this.keys) {
-            if (this.keys[key].userId == userId && (!except || key != except) && key.startsWith(prefix)) {
+            if (this.keys[key].userid == userid && (!except || key != except) && key.startsWith(prefix)) {
                 delete  this.keys[key];
             } 
         }
-        if (userId) {
-            if (userId in this.keysByUserId) delete this.keysByUserId[userId];
+        if (userid) {
+            if (userid in this.keysByUserId) delete this.keysByUserId[userid];
         } else {
             this.nonUserKeys = [];
         }
     }
 
-    async getAllForUser(userId : string|number|undefined) : Promise<Key[]> {
-        if (!userId) return this.nonUserKeys;
-        if (userId in this.keysByUserId) return this.keysByUserId[userId];
+    async getAllForUser(userid : string|number|undefined) : Promise<Key[]> {
+        if (!userid) return this.nonUserKeys;
+        if (userid in this.keysByUserId) return this.keysByUserId[userid];
         return [];
     }
 
@@ -347,8 +347,8 @@ export class InMemoryKeyStorage extends KeyStorage {
             }
         }
 
-        for (let userId in this.keysByUserId) {
-            const thisKeys = this.keysByUserId[userId];
+        for (let userid in this.keysByUserId) {
+            const thisKeys = this.keysByUserId[userid];
             for (let i=0; i<thisKeys.length; ++i) {
                 let matches = true;
                 let idx = 0;
@@ -361,7 +361,7 @@ export class InMemoryKeyStorage extends KeyStorage {
                     }
                 }
                 if (matches) {
-                    this.keysByUserId[userId] = this.keysByUserId[userId].splice(idx, 1);
+                    this.keysByUserId[userid] = this.keysByUserId[userid].splice(idx, 1);
                 }
             }
         }
@@ -424,7 +424,7 @@ export class InMemoryKeyStorage extends KeyStorage {
  * Implementation of {@link KeyStorage } where keys stored in memory.  Intended for testing.
  */
 export class InMemoryOAuthClientStorage extends OAuthClientStorage {
-    private clients : { [clientId : string]: OAuthClient } = {};
+    private clients : { [client_id : string]: OAuthClient } = {};
     private clientsByName : { [name : string]: OAuthClient[] } = {};
 
     /**
@@ -436,13 +436,13 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
 
     /**
      * Returns the matching client record or throws an exception.
-     * @param clientId the client to look up in the key storage.
+     * @param client_id the client to look up in the key storage.
      * @returns the matching client record
      * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
-    async getClientById(clientId : string) : Promise<OAuthClient> {
-        if (this.clients && clientId in this.clients) {
-            return this.clients[clientId];
+    async getClientById(client_id : string) : Promise<OAuthClient> {
+        if (this.clients && client_id in this.clients) {
+            return this.clients[client_id];
         }
         CrossauthLogger.logger.debug(j({msg: "Client does not exist in client storage"}));
         let err = new CrossauthError(ErrorCode.InvalidClientId); 
@@ -456,13 +456,13 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
      * @returns the matching client record
      * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey`, `UserNotExist` or `Connection`
      */
-    async getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]> {
+    async getClientByName(name : string, userid? : string|number|null) : Promise<OAuthClient[]> {
         if (this.clientsByName && name in this.clientsByName) {
             const clients = this.clientsByName[name];
-            if (userId == undefined && !(userId === null)) return clients;
+            if (userid == undefined && !(userid === null)) return clients;
             const ret : OAuthClient[] = [];
             for (let client of clients) {
-                if (client.userId === userId) ret.push(client);
+                if (client.userid === userid) ret.push(client);
             }
             return ret;
         }
@@ -475,61 +475,61 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
      * @param client the client to save.
      */
     async createClient(client : OAuthClient) : Promise<OAuthClient> {
-        if (!("userId" in client )) client.userId = null;
-        if (!(client.clientName in this.clientsByName)) {
-            this.clientsByName[client.clientName] = [];
+        if (!("userid" in client )) client.userid = null;
+        if (!(client.client_name in this.clientsByName)) {
+            this.clientsByName[client.client_name] = [];
         }
-        this.clientsByName[client.clientName].push(client);
-        return this.clients[client.clientId] = client;
+        this.clientsByName[client.client_name].push(client);
+        return this.clients[client.client_id] = client;
     }
 
     /**
      * 
-     * @param clientId the client to delete
+     * @param client_id the client to delete
      */
-    async deleteClient(clientId : string) : Promise<void> {
-        if (clientId in this.clients) {
-            const name = this.clients[clientId].clientName;
+    async deleteClient(client_id : string) : Promise<void> {
+        if (client_id in this.clients) {
+            const name = this.clients[client_id].client_name;
             if (name in this.clientsByName) {
                 let ar = this.clientsByName[name];
                 for (let i=0; i<ar.length; ++i) {
-                    if (ar[i].clientId == clientId) {
+                    if (ar[i].client_id == client_id) {
                         ar.splice(i, 1);
                         break;
                     }
                 }
             }
-            delete this.clients[clientId];
+            delete this.clients[client_id];
         }
     }
 
     /**
      * If the given client exists in the database, update it with the passed values.  
      * 
-     * @param client the fields to update.  This must include `clientId` for search purposes, but this field is not updated.
+     * @param client the fields to update.  This must include `client_id` for search purposes, but this field is not updated.
      * @throws {@link @crossauth/common!CrossauthError} with `InvalidClientId` if the client id doesn't exist}
      */
     async updateClient(client : Partial<OAuthClient>) : Promise<void> {
-        if (client.clientId && client.clientId in this.clients) {
-            const oldClient = this.clients[client.clientId];
-            this.clients[client.clientId] = {
+        if (client.client_id && client.client_id in this.clients) {
+            const oldClient = this.clients[client.client_id];
+            this.clients[client.client_id] = {
                 ...oldClient,
                 ...client, 
             }
         }
     }
 
-    async getClients(skip? : number, take? : number, userId? : string|number|null) : Promise<OAuthClient[]> {
+    async getClients(skip? : number, take? : number, userid? : string|number|null) : Promise<OAuthClient[]> {
         const keys = Object.keys(this.clients).sort();
         let clients : OAuthClient[] = [];
         if (!skip) skip = 0;
         let last = take? take : keys.length;
         if (last >= keys.length-skip) last = keys.length-skip;
         for (let i=skip; i<last; ++i) {
-            if (userId === null) {
-                if (this.clients[keys[i]].userId == null) clients.push(this.clients[keys[i]]);
-            } else if (userId != undefined && userId !== null) {
-                if (this.clients[keys[i]].userId == userId) clients.push(this.clients[keys[i]]);
+            if (userid === null) {
+                if (this.clients[keys[i]].userid == null) clients.push(this.clients[keys[i]]);
+            } else if (userid != undefined && userid !== null) {
+                if (this.clients[keys[i]].userid == userid) clients.push(this.clients[keys[i]]);
 
             } else {
                 clients.push(this.clients[keys[i]]);
@@ -544,8 +544,8 @@ export class InMemoryOAuthClientStorage extends OAuthClientStorage {
  * Implementation of {@link KeyStorage } where keys stored in memory.  Intended for testing.
  */
 export class InMemoryOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
-    private byClientAndUser : { [clientId : string]: {[userId : string] : string[]} } = {};
-    private byClient : { [clientId : string]: string[] } = {};
+    private byClientAndUser : { [client_id : string]: {[userid : string] : string[]} } = {};
+    private byClient : { [client_id : string]: string[] } = {};
 
     /**
      * Constructor
@@ -554,14 +554,14 @@ export class InMemoryOAuthAuthorizationStorage extends OAuthAuthorizationStorage
         super();
     }
 
-    async getAuthorizations(clientId : string, userId : string|number|undefined) : Promise<string[]> {
-        if (userId) {
-            if (clientId in this.byClientAndUser) {
-                const byClient = this.byClientAndUser[clientId];
-                if (userId in byClient) return byClient[userId];
+    async getAuthorizations(client_id : string, userid : string|number|undefined) : Promise<string[]> {
+        if (userid) {
+            if (client_id in this.byClientAndUser) {
+                const byClient = this.byClientAndUser[client_id];
+                if (userid in byClient) return byClient[userid];
             }
         } else {
-            if (clientId in this.byClient) return this.byClient[clientId];
+            if (client_id in this.byClient) return this.byClient[client_id];
         }
         return [];
     }
@@ -569,20 +569,20 @@ export class InMemoryOAuthAuthorizationStorage extends OAuthAuthorizationStorage
     /**
      * Saves a client in the client table.
      * 
-     * @param clientId the client to save.
-     * @param userId the user Id to associate with the client.  Undefined means
+     * @param client_id the client to save.
+     * @param userid the user Id to associate with the client.  Undefined means
      *        not associated with a user
      * @param scopes the scopes that have been authorized for the client
      */
-    async updateAuthorizations(clientId: string,
-        userId: string | number | undefined,
+    async updateAuthorizations(client_id: string,
+        userid: string | number | undefined,
         scopes: string[]) : Promise<void> {
-        if (userId) {
-            if (!(clientId in this.byClientAndUser)) this.byClientAndUser[clientId] = {};
-            const byClient = this.byClientAndUser[clientId];
-            byClient[userId] = [...scopes];
+        if (userid) {
+            if (!(client_id in this.byClientAndUser)) this.byClientAndUser[client_id] = {};
+            const byClient = this.byClientAndUser[client_id];
+            byClient[userid] = [...scopes];
         } else {
-            this.byClient[clientId] = [...scopes];
+            this.byClient[client_id] = [...scopes];
         }
     }
 }

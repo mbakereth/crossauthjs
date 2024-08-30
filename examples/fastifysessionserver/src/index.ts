@@ -84,8 +84,8 @@ const clientManager = new OAuthClientManager({
 });
 async function init(clientManager : OAuthClientManager) {
     /*await clientManager.updateClient("SHD1OQi5UIz-jEHELuqopg", {
-        clientName : "Test 2",
-        validFlow: [],
+        client_name : "Test 2",
+        valid_flow: [],
     });*/
 }
 init(clientManager)

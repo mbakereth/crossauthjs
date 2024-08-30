@@ -87,8 +87,8 @@ async function makeClient(options : FastifyServerOptions = {}) : Promise<{server
         allowedFactor2: ["none"],
         enableEmailVerification: false,
         siteUrl: `http://localhost:3000`,
-        clientId: "ABC",
-        clientSecret: "DEF",
+        client_id: "ABC",
+        client_secret: "DEF",
         validFlows: ["all"], // activate all OAuth flows
         tokenResponseType: "sendJson",
         errorResponseType: "sendJson",
@@ -116,9 +116,9 @@ async function getAccessTokenThroughClient(clientParams : {[key:string]:any}) {
 
     const resp = await authServer.tokenEndpoint({
         grantType: "password", 
-        clientId : "ABC", 
+        client_id : "ABC", 
         scope : "read write", 
-        clientSecret : "DEF",
+        client_secret : "DEF",
         username: "bob",
         password: "bobPass123",
     });
@@ -166,8 +166,8 @@ test('FastifyOAuthClient.authzcodeflowLoginNotNeeded', async () => {
 
     const {code, state: returnedState, error} = await authServer.authorizeGetEndpoint({
         responseType: response_type??"", 
-        clientId: client_id??"", 
-        redirectUri: redirect_uri??"",
+        client_id: client_id??"", 
+        redirect_uri: redirect_uri??"",
         scope: scope,
         state: state??""
     });
@@ -224,9 +224,9 @@ test('FastifyOAuthClient.clientCredentialsFlow', async () => {
 
     const resp = await authServer.tokenEndpoint({
         grantType: body.body.grant_type, 
-        clientId : body.body.client_id, 
+        client_id : body.body.client_id, 
         scope : body.body.scope, 
-        clientSecret : body.body.client_secret,
+        client_secret : body.body.client_secret,
     });
     expect(resp.error).toBeUndefined();
     expect(resp.access_token).toBeDefined();
@@ -267,9 +267,9 @@ test('FastifyOAuthClient.passwordFlow', async () => {
 
     const resp = await authServer.tokenEndpoint({
         grantType: body.body.grant_type, 
-        clientId : body.body.client_id, 
+        client_id : body.body.client_id, 
         scope : body.body.scope, 
-        clientSecret : body.body.client_secret,
+        client_secret : body.body.client_secret,
         username: body.body.username,
         password: body.body.password,
     });
@@ -287,8 +287,8 @@ test('FastifyOAuthClient.refreshToken', async () => {
 
     const resp = await authServer.tokenEndpoint({
         grantType: "refresh_token", 
-        clientId : "ABC", 
-        clientSecret : "DEF",
+        client_id : "ABC", 
+        client_secret : "DEF",
         refreshToken: refresh_token,
     });
     expect(resp.error).toBeUndefined();
@@ -352,9 +352,9 @@ test('FastifyOAuthClient.refreshFlowEndpoint', async () => {
 
     const resp = await authServer.tokenEndpoint({
         grantType: "refresh_token", 
-        clientId : "ABC", 
+        client_id : "ABC", 
         scope : "read write", 
-        clientSecret : "DEF",
+        client_secret : "DEF",
         refreshToken: refresh_token,
     });
     const access_token2 = resp.access_token;
@@ -404,9 +404,9 @@ test('FastifyOAuthClient.refreshIfExpiredEndpoint_Interactive', async () => {
 
     const resp = await authServer.tokenEndpoint({
         grantType: "refresh_token", 
-        clientId : "ABC", 
+        client_id : "ABC", 
         scope : "read write", 
-        clientSecret : "DEF",
+        client_secret : "DEF",
         refreshToken: refresh_token,
     });
     const access_token2 = resp.access_token;
@@ -460,9 +460,9 @@ test('FastifyOAuthClient.refreshIfExpiredEndpoint_NonInteractive', async () => {
 
     const resp = await authServer.tokenEndpoint({
         grantType: "refresh_token", 
-        clientId : "ABC", 
+        client_id : "ABC", 
         scope : "read write", 
-        clientSecret : "DEF",
+        client_secret : "DEF",
         refreshToken: refresh_token,
     });
     const access_token2 = resp.access_token;
@@ -581,7 +581,7 @@ test('FastifyOAuthClient.deviceCodeFlow', async () => {
     expect(body.args.body.scope).toBe("read write");
 
 
-    const authResp = await authServer.deviceAuthorizationEndpoint({clientId: "ABC", scope: "read write", clientSecret: "DEF"});
+    const authResp = await authServer.deviceAuthorizationEndpoint({client_id: "ABC", scope: "read write", client_secret: "DEF"});
     expect(authResp.device_code).toBeDefined();
     expect(authResp.user_code).toBeDefined();
 

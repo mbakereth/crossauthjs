@@ -41,10 +41,10 @@ async function createTotpAccount(username: string,
 
   const user = await userStorage.createUser(userInputs, {
       password: await lpAuthenticator.createPasswordHash(password),
-      totpSecret: resp.sessionData.totpSecret,
+      totpsecret: resp.sessionData.totpsecret,
       } );
 
-  return { user, totpSecret: resp.sessionData.totpSecret };
+  return { user, totpsecret: resp.sessionData.totpsecret };
 };
 
 async function createEmailAccount(username: string,
@@ -93,36 +93,36 @@ async function main() {
   }, {
       password: await authenticator.createPasswordHash("alicePass123"), 
   });*/
-  const {user: user2, totpSecret} = await createTotpAccount("alice", "alicePass123", userStorage);
+  const {user: user2, totpsecret} = await createTotpAccount("alice", "alicePass123", userStorage);
   const {user: user3} = await createEmailAccount("mary", "maryPass123", userStorage);
   console.log({ user1 })
   console.log({ user2 })
-  console.log({ totpSecret })
+  console.log({ totpsecret })
   console.log({ user3 })
 
   const clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
-  const clientSecret = await Crypto.passwordHash("DEF", {
+  const client_secret = await Crypto.passwordHash("DEF", {
       encode: true,
       iterations: 1000,
       keyLen: 32,
   });
   const inputClient = {
-      clientId : "ABC",
+      client_id : "ABC",
       confidential: true,
-      clientSecret: clientSecret,
-      clientName: "Example Client",
-      redirectUri: ["http://localhost:3001/authzcode"],
-      validFlow: OAuthFlows.allFlows(),
+      client_secret: client_secret,
+      client_name: "Example Client",
+      redirect_uri: ["http://localhost:3001/authzcode"],
+      valid_flow: OAuthFlows.allFlows(),
   };
   const client = await clientStorage.createClient(inputClient);
   console.log(client);
   const inputClient2 = {
-      clientId : "DEF",
+      client_id : "DEF",
       confidential: false,
-      clientSecret: null,
-      clientName: "Example Public Client",
-      redirectUri: ["http://localhost:8080/authzcode.html"],
-      validFlow: OAuthFlows.allFlows(),
+      client_secret: null,
+      client_name: "Example Public Client",
+      redirect_uri: ["http://localhost:8080/authzcode.html"],
+      valid_flow: OAuthFlows.allFlows(),
   };
   const client2 = await clientStorage.createClient(inputClient2);
   console.log(client2);

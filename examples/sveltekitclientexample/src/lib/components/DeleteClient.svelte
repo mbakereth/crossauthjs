@@ -28,7 +28,7 @@
 {:else}
     <form method="POST">
         <p class="bg-warning p-2 rounded text-slate-900">
-            Are you sure you want to delete client {data?.client?.clientName}?
+            Are you sure you want to delete client {data?.client?.client_name}?
         </p>
         <button type="submit" class="btn btn-error mt-4">Delete</button>
         &nbsp;<button type="button" class="btn btn-neutral mt-4"  on:click={() => goto(back??"..")}>Cancel</button>&nbsp;

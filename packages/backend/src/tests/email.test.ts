@@ -23,8 +23,8 @@ test('TokenEmailer.verifyEmailVerificationToken_activation', async () => {
     });
     let {user: bob} = await userStorage.getUserByUsername("bob");
     let token = await emailer["createAndSaveEmailVerificationToken"](bob.id);
-    let {userId, newEmail} = await emailer["verifyEmailVerificationToken"](token);
-    expect(userId).toBe(bob.id);
+    let {userid, newEmail} = await emailer["verifyEmailVerificationToken"](token);
+    expect(userid).toBe(bob.id);
     expect(newEmail).toBe('');
 });
 
@@ -40,8 +40,8 @@ test('TokenEmailer.verifyEmailVerificationToken_emailchange', async () => {
     });
     let {user: bob} = await userStorage.getUserByUsername("bob");
     let token = await emailer["createAndSaveEmailVerificationToken"](bob.id, "newbob@bob.com");
-    let {userId, newEmail} = await emailer["verifyEmailVerificationToken"](token);
-    expect(userId).toBe(bob.id);
+    let {userid, newEmail} = await emailer["verifyEmailVerificationToken"](token);
+    expect(userid).toBe(bob.id);
     expect(newEmail).toBe("newbob@bob.com");
 });
 

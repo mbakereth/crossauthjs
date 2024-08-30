@@ -16,18 +16,18 @@ import { getTestUserStorage }  from './inmemorytestdata';
 
 export async function createClient(secretRequired = true) : Promise<{clientStorage : OAuthClientStorage, client : OAuthClient}> {
     const clientStorage = new InMemoryOAuthClientStorage();
-    const clientSecret = await Crypto.passwordHash("DEF", {
+    const client_secret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
         keyLen: 32,
     });
     const inputClient = {
-        clientId : "ABC",
-        clientSecret: secretRequired ? clientSecret : undefined,
-        clientName: "Test",
-        redirectUri: ["http://localhost:3000/authzcode"],
+        client_id : "ABC",
+        client_secret: secretRequired ? client_secret : undefined,
+        client_name: "Test",
+        redirect_uri: ["http://localhost:3000/authzcode"],
         confidential: secretRequired,
-        validFlow: OAuthFlows.allFlows(),
+        valid_flow: OAuthFlows.allFlows(),
     };
     const client = await clientStorage.createClient(inputClient);
     return {clientStorage, client};
@@ -106,8 +106,8 @@ export async function getAuthorizationCode({
     const {code, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState,
             codeChallenge: codeChallenge,
@@ -123,8 +123,8 @@ export async function getAccessToken() {
     const {access_token, error, error_description, refresh_token, expires_in}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     return {authServer, client, code, clientStorage, access_token, error, error_description, refresh_token, expires_in};
 };

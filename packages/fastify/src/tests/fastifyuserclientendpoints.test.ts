@@ -27,23 +27,23 @@ test('FastifyServer.createClient', async () => {
         url: "/createclient",
         cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie },
         payload: {
-            clientName: "Test Client",
+            client_name: "Test Client",
             confidential: "true",
             authorizationCode: "true",
-            userId : user.id,
+            userid : user.id,
             clientCredentials: "true",
-            redirectUris: "http://uri1.com, http://uri2.com",
+            redirect_uris: "http://uri1.com, http://uri2.com",
             csrfToken: csrfToken ,
         }
     });
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body);
     expect(body.args.message).toBeDefined();
-    expect(body.args.client.clientSecret).toBeDefined();
-    expect(body.args.client.clientId).toBeDefined();
-    const newClient = await clientStorage.getClientById(body.args.client.clientId);
-    expect(newClient.clientName).toBe("Test Client")
-    expect(newClient.userId).toBe(user.id)
+    expect(body.args.client.client_secret).toBeDefined();
+    expect(body.args.client.client_id).toBeDefined();
+    const newClient = await clientStorage.getClientById(body.args.client.client_id);
+    expect(newClient.client_name).toBe("Test Client")
+    expect(newClient.userid).toBe(user.id)
 });
 
 test('FastifyServer.selectClientUser', async () => {
@@ -55,13 +55,13 @@ test('FastifyServer.selectClientUser', async () => {
 
     const {user} = await userStorage.getUserByUsername("bob");
     const client = {
-        clientId : "ABC",
-        clientSecret: "DEF",
-        clientName: "Test",
+        client_id : "ABC",
+        client_secret: "DEF",
+        client_name: "Test",
         confidential: true,
-        redirectUri: ["http://example.com/redirect"],
-        validFlow: OAuthFlows.allFlows(),
-        userId: user.id,
+        redirect_uri: ["http://example.com/redirect"],
+        valid_flow: OAuthFlows.allFlows(),
+        userid: user.id,
     };
     await clientStorage.createClient(client);
 
@@ -83,13 +83,13 @@ test('FastifyServer.deleteClient', async () => {
 
     const {user} = await userStorage.getUserByUsername("bob");
     const client = {
-        clientId : "ABC",
-        clientSecret: "DEF",
-        clientName: "Test",
+        client_id : "ABC",
+        client_secret: "DEF",
+        client_name: "Test",
         confidential: true,
-        redirectUri: ["http://example.com/redirect"],
-        validFlow: OAuthFlows.allFlows(),
-        userId: user.id,
+        redirect_uri: ["http://example.com/redirect"],
+        valid_flow: OAuthFlows.allFlows(),
+        userid: user.id,
     };
     await clientStorage.createClient(client);
 
@@ -127,13 +127,13 @@ test('FastifyServer.updateClient', async () => {
     const {user: user2} = await userStorage.getUserById("alice");
 
     const client = {
-        clientId : "ABC",
-        clientSecret: "DEF",
-        clientName: "Test",
+        client_id : "ABC",
+        client_secret: "DEF",
+        client_name: "Test",
         confidential: true,
-        redirectUri: ["http://example.com/redirect"],
-        validFlow: OAuthFlows.allFlows(),
-        userId: user.id,
+        redirect_uri: ["http://example.com/redirect"],
+        valid_flow: OAuthFlows.allFlows(),
+        userid: user.id,
     };
     await clientStorage.createClient(client);
     const initialClient = await clientStorage.getClientById("ABC");
@@ -154,24 +154,24 @@ test('FastifyServer.updateClient', async () => {
         url: "/updateclient/ABC",
         cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie },
         payload: {
-            clientName: "Test1",
+            client_name: "Test1",
             confidential: "true",
             authorizationCode: "true",
-            redirectUris: "http://uri3.com",
+            redirect_uris: "http://uri3.com",
             csrfToken: csrfToken ,
-            userId: user2.id // should be ignored
+            userid: user2.id // should be ignored
         }
     });
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body);
     expect(body.args.message).toBeDefined();
-    expect(body.args.client.clientId).toBeDefined();
-    const newClient = await clientStorage.getClientById(body.args.client.clientId);
-    expect(newClient.clientName).toBe("Test1");
-    expect(newClient.userId).toBe(user.id);
-    expect(newClient.clientSecret).toBe(initialClient.clientSecret);
-    expect(newClient.redirectUri.length).toBe(1);
-    expect(newClient.validFlow.length).toBe(1);
+    expect(body.args.client.client_id).toBeDefined();
+    const newClient = await clientStorage.getClientById(body.args.client.client_id);
+    expect(newClient.client_name).toBe("Test1");
+    expect(newClient.userid).toBe(user.id);
+    expect(newClient.client_secret).toBe(initialClient.client_secret);
+    expect(newClient.redirect_uri.length).toBe(1);
+    expect(newClient.valid_flow.length).toBe(1);
 });
 
 test('FastifyServer.updateClientNotConfidential', async () => {
@@ -181,13 +181,13 @@ test('FastifyServer.updateClientNotConfidential', async () => {
     const {user} = await userStorage.getUserById("bob");
 
     const client = {
-        clientId : "ABC",
-        clientSecret: "DEF",
-        clientName: "Test",
+        client_id : "ABC",
+        client_secret: "DEF",
+        client_name: "Test",
         confidential: true,
-        redirectUri: ["http://example.com/redirect"],
-        validFlow: OAuthFlows.allFlows(),
-        userId: user.id,
+        redirect_uri: ["http://example.com/redirect"],
+        valid_flow: OAuthFlows.allFlows(),
+        userid: user.id,
     };
     await clientStorage.createClient(client);
 
@@ -207,19 +207,19 @@ test('FastifyServer.updateClientNotConfidential', async () => {
         url: "/updateclient/ABC",
         cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie },
         payload: {
-            clientName: "Test1",
+            client_name: "Test1",
             confidential: "false",
             authorizationCode: "true",
-            redirectUris: "http://uri3.com",
+            redirect_uris: "http://uri3.com",
             csrfToken: csrfToken ,
         }
     });
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body);
     expect(body.args.message).toBeDefined();
-    expect(body.args.client.clientId).toBeDefined();
-    const newClient = await clientStorage.getClientById(body.args.client.clientId);
-    expect(newClient.clientSecret).toBe(null);
+    expect(body.args.client.client_id).toBeDefined();
+    const newClient = await clientStorage.getClientById(body.args.client.client_id);
+    expect(newClient.client_secret).toBe(null);
 });
 
 test('FastifyServer.updateClientConfidential', async () => {
@@ -229,12 +229,12 @@ test('FastifyServer.updateClientConfidential', async () => {
     const {user} = await userStorage.getUserById("bob");
 
     const client = {
-        clientId : "ABC",
-        clientName: "Test",
+        client_id : "ABC",
+        client_name: "Test",
         confidential: false,
-        redirectUri: ["http://example.com/redirect"],
-        validFlow: OAuthFlows.allFlows(),
-        userId: user.id,
+        redirect_uri: ["http://example.com/redirect"],
+        valid_flow: OAuthFlows.allFlows(),
+        userid: user.id,
     };
     await clientStorage.createClient(client);
 
@@ -254,20 +254,20 @@ test('FastifyServer.updateClientConfidential', async () => {
         url: "/updateclient/ABC",
         cookies: { CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie },
         payload: {
-            clientName: "Test1",
+            client_name: "Test1",
             confidential: "true",
             authorizationCode: "true",
-            redirectUris: "http://uri3.com",
+            redirect_uris: "http://uri3.com",
             csrfToken: csrfToken ,
         }
     });
     expect(res.statusCode).toBe(200);
     body = JSON.parse(res.body);
     expect(body.args.message).toBeDefined();
-    expect(body.args.client.clientId).toBeDefined();
-    expect(body.args.client.clientSecret).toBeDefined();
-    expect(body.args.client.clientSecret).not.toBe(null);
-    const newClient = await clientStorage.getClientById(body.args.client.clientId);
-    expect(newClient.clientSecret).toBeDefined();
-    expect(newClient.clientSecret).not.toBe(null);
+    expect(body.args.client.client_id).toBeDefined();
+    expect(body.args.client.client_secret).toBeDefined();
+    expect(body.args.client.client_secret).not.toBe(null);
+    const newClient = await clientStorage.getClientById(body.args.client.client_id);
+    expect(newClient.client_secret).toBeDefined();
+    expect(newClient.client_secret).not.toBe(null);
 });

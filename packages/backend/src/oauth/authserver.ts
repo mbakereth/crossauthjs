@@ -339,7 +339,7 @@ export class OAuthAuthorizationServer {
         setParameter("validateScopes", ParamType.Boolean, this, options, "OAUTH_VALIDATE_SCOPES");
         setParameter("emptyScopeIsValid", ParamType.Boolean, this, options, "OAUTH_EMPTY_SCOPE_VALID");
         setParameter("validScopes", ParamType.JsonArray, this, options, "OAUTH_VALID_SCOPES");
-        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_validFlows");
         setParameter("idTokenClaims", ParamType.Json, this, options, "OAUTH_ID_TOKEN_CLAIMS");
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
 
@@ -448,8 +448,8 @@ export class OAuthAuthorizationServer {
      */
     async authorizeGetEndpoint({
             responseType, 
-            clientId, 
-            redirectUri, 
+            client_id, 
+            redirect_uri, 
             scope, 
             state,
             codeChallenge,
@@ -457,8 +457,8 @@ export class OAuthAuthorizationServer {
             user,
         } : {
             responseType : string, 
-            clientId : string, 
-            redirectUri : string, 
+            client_id : string, 
+            redirect_uri : string, 
             scope? : string, 
             state : string,
             codeChallenge? : string,
@@ -483,7 +483,7 @@ export class OAuthAuthorizationServer {
         // validate client
         let client : OAuthClient;
         try {
-            client = await this.clientStorage.getClientById(clientId);
+            client = await this.clientStorage.getClientById(client_id);
         }
         catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -495,7 +495,7 @@ export class OAuthAuthorizationServer {
         const { scopes,
             error: scopeError,
             error_description: scopeErrorDesciption } 
-            = await this.validateAndPersistScope(clientId, scope, user);
+            = await this.validateAndPersistScope(client_id, scope, user);
         if (scopeError) return {
             error: scopeError,
             error_description: scopeErrorDesciption
@@ -510,7 +510,7 @@ export class OAuthAuthorizationServer {
                 error_description: "Unsupported flow type " + flow,
             };
         }
-        if (!client.validFlow.includes(flow)) {
+        if (!client.valid_flow.includes(flow)) {
             return {
                 error: "unauthorized_client",
                 error_description: "Client does not support " + flow,
@@ -528,7 +528,7 @@ export class OAuthAuthorizationServer {
 
         if (responseType == "code") {
             return await this.getAuthorizationCode(client,
-                redirectUri,
+                redirect_uri,
                 scopes,
                 state,
                 codeChallenge,
@@ -548,23 +548,23 @@ export class OAuthAuthorizationServer {
      * Returns whether or not the user has authorized all the passed scopes
      * for the given client.
      * 
-     * @param clientId the client ID
+     * @param client_id the client ID
      * @param user the user logged in at the authorization server.
      * @param requestedScopes the scopes that have been requested
      * @returns true or false.
      */
-    async hasAllScopes(clientId: string,
+    async hasAllScopes(client_id: string,
         user: User | undefined,
         requestedScopes: (string | null)[]) : Promise<boolean> {
         if (!this.authStorage) return false;
         const existingScopes = 
-            await this.authStorage.getAuthorizations(clientId, user?.id);
+            await this.authStorage.getAuthorizations(client_id, user?.id);
         const existingRequestedScopes = 
             requestedScopes.filter((scope) => existingScopes.includes(scope));
         return existingRequestedScopes.length == requestedScopes.length;
     }
 
-    async validateAndPersistScope(clientId: string,
+    async validateAndPersistScope(client_id: string,
         scope?: string,
         user?: User): Promise<{
             scopes?: string[] | undefined,
@@ -599,13 +599,13 @@ export class OAuthAuthorizationServer {
             try {
                 const newScopes = scopesIncludingNull??[];
                 const existingScopes 
-                    = await this.authStorage.getAuthorizations(clientId,
+                    = await this.authStorage.getAuthorizations(client_id,
                         user?.id);
                 const updatedScopes = 
                     [...new Set([...existingScopes, ...newScopes])];
                 CrossauthLogger.logger.debug(j({
-                    msg: "Updating authorizations for " + clientId + " to " + updatedScopes}));
-                await this.authStorage.updateAuthorizations(clientId,
+                    msg: "Updating authorizations for " + client_id + " to " + updatedScopes}));
+                await this.authStorage.updateAuthorizations(client_id,
                     user?.id,
                     updatedScopes);
             } catch (e) {
@@ -627,7 +627,7 @@ export class OAuthAuthorizationServer {
 
     private async authenticateClient(flow: string,
         client: OAuthClient,
-        clientSecret?: string) :
+        client_secret?: string) :
         Promise<{error?: string, error_description? : string}>
     {
         let authenticateClient = false;
@@ -635,8 +635,8 @@ export class OAuthAuthorizationServer {
             case OAuthFlows.AuthorizationCode:
             case OAuthFlows.AuthorizationCodeWithPKCE:
                 authenticateClient = (client.confidential==true || 
-                    client.clientSecret != undefined || 
-                    clientSecret != undefined);
+                    client.client_secret != undefined || 
+                    client_secret != undefined);
                 break;
             case OAuthFlows.ClientCredentials:
                 authenticateClient = true;
@@ -644,28 +644,28 @@ export class OAuthAuthorizationServer {
             case OAuthFlows.Password:
             case OAuthFlows.PasswordMfa:
                 authenticateClient = (client.confidential==true || 
-                    client.clientSecret != undefined || 
-                    clientSecret != undefined);
+                    client.client_secret != undefined || 
+                    client_secret != undefined);
                 break;
             case OAuthFlows.RefreshToken:
                 authenticateClient = (client.confidential==true || 
-                    client.clientSecret != undefined || 
-                    clientSecret != undefined);
+                    client.client_secret != undefined || 
+                    client_secret != undefined);
                 break;
             case OAuthFlows.DeviceCode:
                 authenticateClient = (client.confidential==true || 
-                    client.clientSecret != undefined || 
-                    clientSecret != undefined);
+                    client.client_secret != undefined || 
+                    client_secret != undefined);
                 break;
         }
-        if (authenticateClient && (client.clientSecret==undefined || 
-            clientSecret==undefined)) {
+        if (authenticateClient && (client.client_secret==undefined || 
+            client_secret==undefined)) {
             return {
                 error: "access_denied",
                 error_description: "Client secret is required for this client",
             }
         }
-        if (authenticateClient && (!clientSecret || !client.clientSecret)) {
+        if (authenticateClient && (!client_secret || !client.client_secret)) {
             return {
                 error: "access_denied",
                 error_description: "Client is confidential but either secret not passed or is missing in database",
@@ -673,8 +673,8 @@ export class OAuthAuthorizationServer {
         }
         if (authenticateClient) {
             const passwordCorrect = 
-                await Crypto.passwordsEqual(clientSecret??"", 
-                    client.clientSecret??"");
+                await Crypto.passwordsEqual(client_secret??"", 
+                    client.client_secret??"");
             if (!passwordCorrect) {
                 return {
                     error: "access_denied",
@@ -689,10 +689,10 @@ export class OAuthAuthorizationServer {
 
     /**
      * Returns the matching client or an error if it does nto exist
-     * @param clientId 
-     * @returns the clientId, or an error or `access_denied`.
+     * @param client_id 
+     * @returns the client_id, or an error or `access_denied`.
      */
-    async getClientById(clientId : string) : 
+    async getClientById(client_id : string) : 
         Promise<{
             client?: OAuthClient,
             error?: string,
@@ -700,7 +700,7 @@ export class OAuthAuthorizationServer {
     }> {
         let client : OAuthClient;
         try {
-            client = await this.clientStorage.getClientById(clientId);
+            client = await this.clientStorage.getClientById(client_id);
             return {client};
         } catch (e) {
             return {
@@ -723,10 +723,10 @@ export class OAuthAuthorizationServer {
      */
     async tokenEndpoint({
         grantType, 
-        clientId, 
+        client_id, 
         scope, 
         code,
-        clientSecret,
+        client_secret,
         codeVerifier,
         refreshToken,
         username,
@@ -738,10 +738,10 @@ export class OAuthAuthorizationServer {
         deviceCode,
     } : {
         grantType : string, 
-        clientId : string, 
+        client_id : string, 
         scope? : string, 
         code? : string,
-        clientSecret? : string,
+        client_secret? : string,
         codeVerifier? : string,
         refreshToken? : string,
         username? : string,
@@ -761,13 +761,13 @@ export class OAuthAuthorizationServer {
         }
 
         // get client
-        const clientResponse = await this.getClientById(clientId);
+        const clientResponse = await this.getClientById(client_id);
         if (!clientResponse.client) return clientResponse;    
         const client = clientResponse.client;
 
         // throw an error if client authentication is required not not present
         const clientAuthentication = 
-            await this.authenticateClient(flow, client, clientSecret);
+            await this.authenticateClient(flow, client, client_secret);
         if (clientAuthentication.error) return clientAuthentication;
 
         // validate flow type
@@ -788,7 +788,7 @@ export class OAuthAuthorizationServer {
                 error_description: "Unsupported flow type " + flow,
             };
         }
-        if (client && !client.validFlow.includes(flow)) {
+        if (client && !client.valid_flow.includes(flow)) {
             return {
                 error: "unauthorized_client",
                 error_description: "Client does not support " + flow,
@@ -818,7 +818,7 @@ export class OAuthAuthorizationServer {
 
             // validate secret/challenge
             if (this.requireClientSecretOrChallenge && 
-                (client && client.clientSecret && !clientSecret) && 
+                (client && client.client_secret && !client_secret) && 
                 !codeVerifier) {
                 return {
                     error : "access_denied",
@@ -826,7 +826,7 @@ export class OAuthAuthorizationServer {
                 };
             }
 
-            if (client && client.clientSecret && !clientSecret) {
+            if (client && client.client_secret && !client_secret) {
                 return {
                     error : "access_denied",
                     error_description: "No client secret or code verifier provided for authorization coode flow",
@@ -842,7 +842,7 @@ export class OAuthAuthorizationServer {
             return await this.makeAccessToken({
                 client,
                 code,
-                clientSecret,
+                client_secret,
                 codeVerifier,
                 issueRefreshToken: createRefreshToken
             });
@@ -883,7 +883,7 @@ export class OAuthAuthorizationServer {
             }
             return await this.makeAccessToken({
                 client,
-                clientSecret,
+                client_secret,
                 codeVerifier,
                 issueRefreshToken: createRefreshToken,
                 scopes: refreshData.scope,
@@ -896,7 +896,7 @@ export class OAuthAuthorizationServer {
             const { scopes,
                 error: scopeError,
                 error_description: scopeErrorDesciption } = 
-                await this.validateAndPersistScope(clientId, scope, undefined);
+                await this.validateAndPersistScope(client_id, scope, undefined);
             if (scopeError) {
                 return {
                             error: scopeError,
@@ -906,7 +906,7 @@ export class OAuthAuthorizationServer {
     
             return await this.makeAccessToken({
                 client,
-                clientSecret,
+                client_secret,
                 codeVerifier,
                 scopes,
                 issueRefreshToken: createRefreshToken
@@ -955,7 +955,7 @@ export class OAuthAuthorizationServer {
             const { scopes,
                 error: scopeError,
                 error_description: scopeErrorDesciption } = 
-                await this.validateAndPersistScope(clientId, scope, user);
+                await this.validateAndPersistScope(client_id, scope, user);
             if (scopeError) {
                 return {
                     error: scopeError,
@@ -976,7 +976,7 @@ export class OAuthAuthorizationServer {
             }
             return await this.makeAccessToken({
                 client, 
-                clientSecret, 
+                client_secret, 
                 codeVerifier, 
                 scopes, 
                 issueRefreshToken: createRefreshToken, 
@@ -988,7 +988,7 @@ export class OAuthAuthorizationServer {
             const { scopes,
                 error: scopeError,
                 error_description: scopeErrorDesciption } = 
-                await this.validateAndPersistScope(clientId, scope, undefined);
+                await this.validateAndPersistScope(client_id, scope, undefined);
             if (scopeError) {
                 return {
                     error: scopeError,
@@ -1054,7 +1054,7 @@ export class OAuthAuthorizationServer {
     
             return await this.makeAccessToken({
                 client, 
-                clientSecret, 
+                client_secret, 
                 codeVerifier, 
                 scopes,
                 issueRefreshToken: createRefreshToken, 
@@ -1066,7 +1066,7 @@ export class OAuthAuthorizationServer {
             const { scopes,
                 error: scopeError,
                 error_description: scopeErrorDesciption } = 
-                await this.validateAndPersistScope(clientId, scope, undefined);
+                await this.validateAndPersistScope(client_id, scope, undefined);
             if (scopeError) {
                 return {
                     error: scopeError,
@@ -1144,13 +1144,13 @@ export class OAuthAuthorizationServer {
 
             return await this.makeAccessToken({
                 client, 
-                clientSecret, 
+                client_secret, 
                 codeVerifier, 
                 scopes,
                 issueRefreshToken: createRefreshToken, 
                 user: mfa.user});
 
-        } else if (grantType == "device_code" || grantType == "urn:ietf:params:oauth:grant-type:device_code") {
+        } else if (grantType == "urn:ietf:params:oauth:grant-type:device_code") {
 
             // validate device code
             if (!deviceCode) {
@@ -1189,11 +1189,11 @@ export class OAuthAuthorizationServer {
                     }
                 } else {
                     let scopes = data.scope ? data.scope.split(" ") : undefined;
-                    let userResponse = data.userId ? await this.userStorage?.getUserById(data.userId) : undefined;
+                    let userResponse = data.userid ? await this.userStorage?.getUserById(data.userid) : undefined;
                     await this.deleteDeviceCode(deviceCode);
                     return await this.makeAccessToken({
                         client,
-                        clientSecret,
+                        client_secret,
                         codeVerifier,
                         scopes,
                         issueRefreshToken: createRefreshToken,
@@ -1255,13 +1255,13 @@ export class OAuthAuthorizationServer {
      *         endpoint JSON output.
      */
     async deviceAuthorizationEndpoint({
-        clientId, 
+        client_id, 
         scope, 
-        clientSecret,
+        client_secret,
     } : {
-        clientId : string, 
+        client_id : string, 
         scope? : string, 
-        clientSecret? : string}) 
+        client_secret? : string}) 
     : Promise<OAuthDeviceAuthorizationResponse> {
 
         // validate verification URI
@@ -1284,13 +1284,13 @@ export class OAuthAuthorizationServer {
         const flow = OAuthFlows.DeviceCode;
 
         // get client
-        const clientResponse = await this.getClientById(clientId);
+        const clientResponse = await this.getClientById(client_id);
         if (!clientResponse.client) return clientResponse;    
         const client = clientResponse.client;
 
         // throw an error if client authentication is required not not present
         const clientAuthentication = 
-            await this.authenticateClient(flow, client, clientSecret);
+            await this.authenticateClient(flow, client, client_secret);
         if (clientAuthentication.error) return clientAuthentication;
 
         // validate flow type
@@ -1324,7 +1324,7 @@ export class OAuthAuthorizationServer {
                     KeyPrefix.deviceCode + deviceCode,
                     created,
                     expires,
-                    JSON.stringify({scope: scope, clientId: clientId}));
+                    JSON.stringify({scope: scope, client_id: client_id}));
                 success = true;
             } catch (e) {
                 CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
@@ -1442,13 +1442,13 @@ export class OAuthAuthorizationServer {
             }
         }
         let scope : string|undefined = undefined;
-        let clientId : string|undefined = undefined;
+        let client_id : string|undefined = undefined;
         try {
             if (!deviceCodeKey.data) throw new CrossauthError(ErrorCode.UnknownError);
             const data = JSON.parse(deviceCodeKey.data);
             scope = data.scope;
-            clientId = data.clientId;
-            if (!clientId) throw new CrossauthError(ErrorCode.UnknownError)
+            client_id = data.client_id;
+            if (!client_id) throw new CrossauthError(ErrorCode.UnknownError)
         } catch (e) {
             await this.deleteUserCode(userCode);
             await this.deleteDeviceCode(userCodeData.deviceCode);
@@ -1472,7 +1472,7 @@ export class OAuthAuthorizationServer {
                 ok: false,
                 error: "expired_token",
                 error_description: "User code has expired",
-                client_id: clientId,
+                client_id: client_id,
             };
 
         }
@@ -1484,7 +1484,7 @@ export class OAuthAuthorizationServer {
                 ok: false,
                 error: "access_denied",
                 error_description: "User code has already been used",
-                client_id: clientId,
+                client_id: client_id,
             };
         }
 
@@ -1495,19 +1495,19 @@ export class OAuthAuthorizationServer {
             msg: `Checking scopes have been authorized`,
             scope: scope }))
         if (scope) {
-            hasAllScopes = await this.hasAllScopes(clientId,
+            hasAllScopes = await this.hasAllScopes(client_id,
                 user,
                 scope.split(" "));
 
         } else {
-            hasAllScopes = await this.hasAllScopes(clientId,
+            hasAllScopes = await this.hasAllScopes(client_id,
                 user,
                 [null]);
         }
 
         if (!hasAllScopes) {
             try {
-                if (user?.id) await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "userId", user.id);
+                if (user?.id) await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "userid", user.id);
             } catch (e) {
                 // error updating device code data, so delete both device code and user code
                 const ce = CrossauthError.asCrossauthError(e);
@@ -1519,21 +1519,21 @@ export class OAuthAuthorizationServer {
                     ok: false,
                     error: "access_denied",
                     error_description: "Invalid user code",
-                    client_id: clientId
+                    client_id: client_id
                 };
             }
             return {
                 ok: true,
                 scope,
-                client_id: clientId,
+                client_id: client_id,
                 scopeAuthorizationNeeded: true,
             }
     
         }
 
-        // success - store this in the user code, along with the userId
+        // success - store this in the user code, along with the userid
         try {
-            if (user?.id) await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "userId", user.id);
+            if (user?.id) await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "userid", user.id);
             await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "success", true);
         } catch (e) {
             // error updating device code data, so delete both device code and user code
@@ -1546,7 +1546,7 @@ export class OAuthAuthorizationServer {
                 ok: false,
                 error: "access_denied",
                 error_description: "Invalid user code",
-                client_id: clientId        };
+                client_id: client_id        };
         }
 
         // we no longer need the user code, so delete it
@@ -1556,7 +1556,7 @@ export class OAuthAuthorizationServer {
         return {
             ok: true,
             scope,
-            client_id: clientId
+            client_id: client_id
         }
 
     }
@@ -1611,13 +1611,13 @@ export class OAuthAuthorizationServer {
             }
         }
         let scope : string|undefined = undefined;
-        let clientId : string|undefined = undefined;
+        let client_id : string|undefined = undefined;
         try {
             if (!deviceCodeKey.data) throw new CrossauthError(ErrorCode.UnknownError);
             const data = JSON.parse(deviceCodeKey.data);
             scope = data.scope;
-            clientId = data.clientId;
-            if (!clientId) throw new CrossauthError(ErrorCode.UnknownError)
+            client_id = data.client_id;
+            if (!client_id) throw new CrossauthError(ErrorCode.UnknownError)
         } catch (e) {
             await this.deleteUserCode(userCode);
             await this.deleteDeviceCode(userCodeData.deviceCode);
@@ -1628,7 +1628,7 @@ export class OAuthAuthorizationServer {
             }
         }
 
-        // success - store this in the user code, along with the userId
+        // success - store this in the user code, along with the userid
         try {
             await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "success", true);
         } catch (e) {
@@ -1642,7 +1642,7 @@ export class OAuthAuthorizationServer {
                 ok: false,
                 error: "access_denied",
                 error_description: "Invalid user code",
-                client_id: clientId        
+                client_id: client_id        
             };
         }
         
@@ -1653,7 +1653,7 @@ export class OAuthAuthorizationServer {
         return {
             ok: true,
             scope,
-            client_id: clientId
+            client_id: client_id
         }
     }
 
@@ -1703,7 +1703,7 @@ export class OAuthAuthorizationServer {
             try {
                 const mfaKey = KeyPrefix.mfaToken + Crypto.hash(mfaToken);
                 key = await this.keyStorage.getKey(mfaKey);
-                if (!key.userId) {
+                if (!key.userid) {
                     return {
                         error: "access_denied",
                         error_description: "Invalid MFA token",
@@ -1716,7 +1716,7 @@ export class OAuthAuthorizationServer {
                     }
                 }
                 const {user: user1} = 
-                    await this.userStorage?.getUserById(key.userId);
+                    await this.userStorage?.getUserById(key.userid);
                 user = user1;
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -1802,15 +1802,15 @@ export class OAuthAuthorizationServer {
     /**
      * The OAuth Password MFA `challenge` endpoint
      * @param mfaToken as defined by the Password MFA spec
-     * @param clientId as defined by the Password MFA spec
-     * @param clientSecret as defined by the Password MFA spec
+     * @param client_id as defined by the Password MFA spec
+     * @param client_secret as defined by the Password MFA spec
      * @param challengeType as defined by the Password MFA spec
      * @param authenticatorId as defined by the Password MFA spec
      * @returns respond as defined by the Password MFA spec
      */
     async mfaChallengeEndpoint(mfaToken: string,
-        clientId : string,
-        clientSecret : string|undefined,
+        client_id : string,
+        client_secret : string|undefined,
         challengeType: string,
         authenticatorId: string) :
         Promise<{
@@ -1824,13 +1824,13 @@ export class OAuthAuthorizationServer {
         const flow = OAuthFlows.PasswordMfa;
 
         // get client
-        const clientResponse = await this.getClientById(clientId);
+        const clientResponse = await this.getClientById(client_id);
         if (!clientResponse.client) return clientResponse;    
         const client = clientResponse.client;
 
         // throw an error if client authentication is required not not present
         const clientAuthentication = 
-            await this.authenticateClient(flow, client, clientSecret);
+            await this.authenticateClient(flow, client, client_secret);
         if (clientAuthentication.error) return clientAuthentication;
     
         // validate token
@@ -1955,8 +1955,6 @@ export class OAuthAuthorizationServer {
             return OAuthFlows.ClientCredentials;
         } else if (grantType == "refresh_token") {
             return OAuthFlows.RefreshToken;
-        } else if (grantType == "device_code") {
-            return OAuthFlows.DeviceCode;
         } else if (grantType == "urn:ietf:params:oauth:grant-type:device_code") {
             return OAuthFlows.DeviceCode;
         } else if (grantType == "password") {
@@ -1971,7 +1969,7 @@ export class OAuthAuthorizationServer {
     }
 
     private async getAuthorizationCode(client: OAuthClient,
-        redirectUri: string,
+        redirect_uri: string,
         scopes: string[] | undefined,
         state: string,
         codeChallenge?: string,
@@ -1996,13 +1994,13 @@ export class OAuthAuthorizationServer {
         }
 
         // validate redirect uri
-        const decodedUri = redirectUri; 
+        const decodedUri = redirect_uri; 
         OAuthClientManager.validateUri(decodedUri);
         if (this.requireRedirectUriRegistration && 
-            !client.redirectUri.includes(decodedUri)) {
+            !client.redirect_uri.includes(decodedUri)) {
             return {
                 error: "invalid_request",
-                error_description: `The redirect uri ${redirectUri} is invalid`
+                error_description: `The redirect uri ${redirect_uri} is invalid`
             };
         }
 
@@ -2061,14 +2059,14 @@ export class OAuthAuthorizationServer {
     async makeAccessToken({
         client, 
         code, 
-        clientSecret, 
+        client_secret, 
         codeVerifier,  
         scopes, 
         issueRefreshToken = false, 
         user} : {
             client: OAuthClient, 
             code? : string, 
-            clientSecret? : string, 
+            client_secret? : string, 
             codeVerifier? : string,  
             scopes? : string[], 
             issueRefreshToken? : boolean, 
@@ -2080,10 +2078,10 @@ export class OAuthAuthorizationServer {
         try {
             // we validated this before so if authentication is required,
             // it will not be undefined
-            if (client.clientSecret!=undefined) { 
+            if (client.client_secret!=undefined) { 
                 passwordCorrect = 
-                    await Crypto.passwordsEqual(clientSecret??"", 
-                        client.clientSecret??"");
+                    await Crypto.passwordsEqual(client_secret??"", 
+                        client.client_secret??"");
             }
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
@@ -2100,7 +2098,7 @@ export class OAuthAuthorizationServer {
             scope? : string[],
             challenge? : string,
             challengeMethod? : string,
-            userId? : number|string,
+            userid? : number|string,
             username? : string,
             [key:string] : any, 
         } = {};
@@ -2126,7 +2124,7 @@ export class OAuthAuthorizationServer {
                 CrossauthLogger.logger.warn(j({
                     err: e,
                     msg: "Couldn't delete authorization code from storatge",
-                    clientId: client?.clientId
+                    client_id: client?.client_id
                 }));
             }
             scopes = authzData.scope;
@@ -2328,7 +2326,7 @@ export class OAuthAuthorizationServer {
 
             const refreshData : {[key:string]: any} = {
                 username: authzData.username,
-                client_id: client.clientId,
+                client_id: client.client_id,
 
             }
             if (scopes) {
@@ -2559,15 +2557,15 @@ export class OAuthAuthorizationServer {
 
     /**
      * Appends the scope and state to the redirect URI
-     * @param redirectUri the redirect URI, whicvh may already contain
+     * @param redirect_uri the redirect URI, whicvh may already contain
      *        query parameters
      * @param code the authorization code to append
      * @param state the state to append
      * @returns the new URL as a string.
      */
-    redirectUri(redirectUri : string, code : string, state : string) : string {
-        const sep = redirectUri.includes("?") ? "&" : "?";
-        return `${redirectUri}${sep}code=${code}&state=${state}`;
+    redirect_uri(redirect_uri : string, code : string, state : string) : string {
+        const sep = redirect_uri.includes("?") ? "&" : "?";
+        return `${redirect_uri}${sep}code=${code}&state=${state}`;
     }
 
     /**

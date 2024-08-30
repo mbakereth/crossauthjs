@@ -160,7 +160,7 @@ export class TokenEmailer {
         return KeyPrefix.passwordResetToken + Crypto.hash(token);
     }
 
-    private async createAndSaveEmailVerificationToken(userId : string | number, 
+    private async createAndSaveEmailVerificationToken(userid : string | number, 
                                                       newEmail : string="") : Promise<string> {
         const maxTries = 10;
         let tryNum = 0;
@@ -170,7 +170,7 @@ export class TokenEmailer {
             let token = Crypto.randomValue(TOKEN_LENGTH);
             let hash = TokenEmailer.hashEmailVerificationToken(token);
             try {
-                await this.keyStorage.saveKey(userId, hash, now, expiry, newEmail);
+                await this.keyStorage.saveKey(userid, hash, now, expiry, newEmail);
                 return token;
             } catch (e) {
                 token = Crypto.randomValue(TOKEN_LENGTH);
@@ -221,7 +221,7 @@ export class TokenEmailer {
      * with {@link @crossauth/common!ErrorCode} of
      * `InvalidEmail` if it is not valid..
      * 
-     * @param userId userId to send it for
+     * @param userid userid to send it for
      * @param newEmail if this is a token to verify email for account 
      *        activation, leave this empty.
      *        If it is for changing an email, this will be the field it is 
@@ -229,7 +229,7 @@ export class TokenEmailer {
      * @param extraData : these extra variables will be passed to the Nunjucks 
      *        templates
      */
-    async sendEmailVerificationToken(userId : string | number,
+    async sendEmailVerificationToken(userid : string | number,
                                      newEmail : string="",
                                      extraData : {[key:string]:any} = {}) : Promise<void> {
         if (!this.emailVerificationTextBody && !this.emailVerificationHtmlBody) {
@@ -237,7 +237,7 @@ export class TokenEmailer {
                 "Either emailVerificationTextBody or emailVerificationHtmlBody must be set to send email verification emails");
                 throw error;
         }
-        let {user} = await this.userStorage.getUserById(userId, {skipEmailVerifiedCheck: true});
+        let {user} = await this.userStorage.getUserById(userid, {skipEmailVerifiedCheck: true});
         let email = newEmail;
         if (email != "") {
             // this message is to validate a new email (email change)
@@ -252,7 +252,7 @@ export class TokenEmailer {
             }
         }
         TokenEmailer.validateEmail(email);
-        const token = await this.createAndSaveEmailVerificationToken(userId, newEmail);
+        const token = await this.createAndSaveEmailVerificationToken(userid, newEmail);
         const messageId = await this._sendEmailVerificationToken(token, email, extraData);
     
         CrossauthLogger.logger.info(j({msg: "Sent email verification email", emailMessageId: messageId, email: email}));
@@ -264,24 +264,24 @@ export class TokenEmailer {
      * 
      * The following must match:
      *     * expiry date in the key storage record must be less than current time
-     *     * userId in the token must match the userId in the key storage
+     *     * userid in the token must match the userid in the key storage
      *     * email address in user storage must match the email in the key.  If there is no email address,
      *       the username field is set if it is in email format.
      *     * expiry time in the key storage must match the expiry time in the key
      * 
      * Looks the token up in key storage and verifies it matches and has not expired.
      * @param token the token to validate
-     * @returns the userId of the user the token is for and the email
+     * @returns the userid of the user the token is for and the email
      *          address the user is validating
      */
     async verifyEmailVerificationToken(token : string) : 
-        Promise<{userId: string|number, newEmail: string}> {
+        Promise<{userid: string|number, newEmail: string}> {
 
         const hash = TokenEmailer.hashEmailVerificationToken(token);
         let storedToken = await this.keyStorage.getKey(hash);
         try {
-            if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
-            const {user} = await this.userStorage.getUserById(storedToken.userId, {skipEmailVerifiedCheck: true});
+            if (!storedToken.userid || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
+            const {user} = await this.userStorage.getUserById(storedToken.userid, {skipEmailVerifiedCheck: true});
             let email = (user.email??user.username).toLowerCase();
             if (email) {
                 TokenEmailer.validateEmail(email);
@@ -292,7 +292,7 @@ export class TokenEmailer {
             const now = new Date().getTime();
             if (now > storedToken.expires.getTime()) throw new CrossauthError(ErrorCode.Expired);
             //await this.keyStorage.deleteKey(hash);
-            return {userId: storedToken.userId, newEmail: storedToken.data??''};
+            return {userid: storedToken.userid, newEmail: storedToken.data??''};
         } finally {
             /*try {
                 await this.keyStorage.deleteKey(hash);
@@ -314,7 +314,7 @@ export class TokenEmailer {
         }
     }
 
-    private async createAndSavePasswordResetToken(userId : string | number) : Promise<string> {
+    private async createAndSavePasswordResetToken(userid : string | number) : Promise<string> {
         const maxTries = 10;
         let tryNum = 0;
         const now = new Date();
@@ -323,7 +323,7 @@ export class TokenEmailer {
             let token = Crypto.randomValue(TOKEN_LENGTH);
             let hash = TokenEmailer.hashPasswordResetToken(token);
             try {
-                await this.keyStorage.saveKey(userId, hash, now, expiry);
+                await this.keyStorage.saveKey(userid, hash, now, expiry);
                 return token;
             } catch {
                 token = Crypto.randomValue(TOKEN_LENGTH);
@@ -339,7 +339,7 @@ export class TokenEmailer {
      * 
      * The following must match:
      *     * expiry date in the key storage record must be less than current time
-     *     * userId in the token must match the userId in the key storage
+     *     * userid in the token must match the userid in the key storage
      *     * the email in the token matches either the email or username field in user storage
      *     * the password in user storage must match the password in the key
      *     * expiry time in the key storage must match the expiry time in the key
@@ -352,9 +352,9 @@ export class TokenEmailer {
         const hash = TokenEmailer.hashPasswordResetToken(token);
         CrossauthLogger.logger.debug("verifyPasswordResetToken " + token + " " + hash);
         let storedToken = await this.keyStorage.getKey(hash);
-        if (!storedToken.userId) throw new CrossauthError(ErrorCode.InvalidKey);
-        if (!storedToken.userId || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
-        const {user} = await this.userStorage.getUserById(storedToken.userId, 
+        if (!storedToken.userid) throw new CrossauthError(ErrorCode.InvalidKey);
+        if (!storedToken.userid || !storedToken.expires) throw new CrossauthError(ErrorCode.InvalidKey);
+        const {user} = await this.userStorage.getUserById(storedToken.userid, 
             {skipActiveCheck: true });
         if (user.state != UserState.active && user.state != UserState.passwordResetNeeded && user.state != UserState.passwordAndFactor2ResetNeeded) {
             throw new CrossauthError(ErrorCode.UserNotActive);
@@ -401,18 +401,18 @@ export class TokenEmailer {
 
     /**
      * Send a password reset token email using the Nunjucks templates
-     * @param userId userId to send it for
+     * @param userid userid to send it for
      * @param extraData : these extra variables will be passed to the Nunjucks 
      *        templates
      */
-    async sendPasswordResetToken(userId : string | number,
+    async sendPasswordResetToken(userid : string | number,
         extraData : {[key:string]:any} = {}) : Promise<void> {
         if (!this.passwordResetTextBody && !this.passwordResetHtmlBody) {
             let error = new CrossauthError(ErrorCode.Configuration, 
                 "Either passwordResetTextBody or passwordResetTextBody must be set to send email verification emails");
                 throw error;
         }
-        let {user} = await this.userStorage.getUserById(userId, {
+        let {user} = await this.userStorage.getUserById(userid, {
             skipActiveCheck: true
         });
         if (user.state != UserState.active && user.state != UserState.passwordResetNeeded && user.state != UserState.passwordAndFactor2ResetNeeded) {
@@ -425,7 +425,7 @@ export class TokenEmailer {
             email = user.username.toLowerCase();
             TokenEmailer.validateEmail(email);
         }
-        const token = await this.createAndSavePasswordResetToken(userId);
+        const token = await this.createAndSavePasswordResetToken(userid);
         const messageId = await this._sendPasswordResetToken(token, email, extraData);
         CrossauthLogger.logger.info(j({msg: "Sent password reset email", emailMessageId: messageId, email: email}));
         

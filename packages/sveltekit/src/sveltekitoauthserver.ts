@@ -398,16 +398,16 @@ export class SvelteKitAuthorizationServer {
     private async authorize(event: RequestEvent,
         authorized: boolean, {
             responseType,
-            clientId,
-            redirectUri,
+            client_id,
+            redirect_uri,
             scope,
             state,
             codeChallenge,
             codeChallengeMethod,
         } : {
             responseType : string,
-            clientId : string,
-            redirectUri : string,
+            client_id : string,
+            redirect_uri : string,
             scope? : string,
             state : string,
             codeChallenge? : string,
@@ -421,8 +421,8 @@ export class SvelteKitAuthorizationServer {
         if (authorized) {
             const resp = await this.authServer.authorizeGetEndpoint({
                 responseType,
-                clientId,
-                redirectUri,
+                client_id,
+                redirect_uri,
                 scope,
                 state,
                 codeChallenge,
@@ -445,8 +445,8 @@ export class SvelteKitAuthorizationServer {
                 }
             }
 
-            throw this.redirect(302, this.authServer.redirectUri(
-                redirectUri,
+            throw this.redirect(302, this.authServer.redirect_uri(
+                redirect_uri,
                 code,
                 state
             ));
@@ -462,12 +462,12 @@ export class SvelteKitAuthorizationServer {
                 errorCodeName: ce.codeName
             }));
             try {
-                OAuthClientManager.validateUri(redirectUri);
-                throw this.redirect(302, redirectUri + "?error=access_denied&error_description="+encodeURIComponent("Access was not granted")); 
+                OAuthClientManager.validateUri(redirect_uri);
+                throw this.redirect(302, redirect_uri + "?error=access_denied&error_description="+encodeURIComponent("Access was not granted")); 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                 CrossauthLogger.logger.error(j({
-                    msg: `Couldn't send error message ${ce.codeName} to ${redirectUri}}`}));
+                    msg: `Couldn't send error message ${ce.codeName} to ${redirect_uri}}`}));
                 return {
                     ok: false,
                     error: "server_error",
@@ -630,32 +630,32 @@ export class SvelteKitAuthorizationServer {
     private getClientIdAndSecret(formData : {[key:string]:any}, event : RequestEvent) {
         // OAuth spec says we may take client credentials from 
         // authorization header
-        let clientId = formData.client_id;
-        let clientSecret = formData.client_secret;
+        let client_id = formData.client_id;
+        let client_secret = formData.client_secret;
         const authorizationHeader = event.request.headers.get("authorization");
         if (authorizationHeader) {
-            let clientId1 : string|undefined;
-            let clientSecret1 : string|undefined;
+            let client_id1 : string|undefined;
+            let client_secret1 : string|undefined;
             const parts = authorizationHeader.split(" ");
             if (parts.length == 2 &&
                 parts[0].toLocaleLowerCase() == "basic") {
                 const decoded = Crypto.base64Decode(parts[1]);
                 const parts2 = decoded.split(":", 2);
                 if (parts2.length == 2) {
-                    clientId1 = parts2[0];
-                    clientSecret1 = parts2[1];
+                    client_id1 = parts2[0];
+                    client_secret1 = parts2[1];
                 }
             }
-            if (clientId1 == undefined || clientSecret1 == undefined) {
+            if (client_id1 == undefined || client_secret1 == undefined) {
                 CrossauthLogger.logger.warn(j({
                     msg: "Ignoring malform authenization header " + 
                         authorizationHeader}));
             } else {
-                clientId = clientId1;
-                clientSecret = clientSecret1;
+                client_id = client_id1;
+                client_secret = client_secret1;
             }
         }
-        return {clientId, clientSecret};
+        return {client_id, client_secret};
 
     }
 
@@ -721,7 +721,7 @@ export class SvelteKitAuthorizationServer {
                     authorizationNeeded: {
                         user,
                         client_id: ret.client_id,
-                        client_name: client.clientName,
+                        client_name: client.client_name,
                         scope: ret.scope,
                         scopes : ret.scope ? ret.scope.split(" ") : [],
                         csrfToken: event.locals.csrfToken
@@ -933,8 +933,8 @@ export class SvelteKitAuthorizationServer {
                 // - create an authorization code
                 const resp = await this.authorize(event, true, {
                     responseType: query.response_type,
-                    clientId : query.client_id,
-                    redirectUri: query.redirect_uri,
+                    client_id : query.client_id,
+                    redirect_uri: query.redirect_uri,
                     scope: query.scope,
                     state: query.state,
                     codeChallenge: query.code_challenge,
@@ -964,7 +964,7 @@ export class SvelteKitAuthorizationServer {
                             user: event.locals.user,
                             response_type: query.response_type,
                             client_id : query.client_id,
-                            client_name : client.clientName,
+                            client_name : client.client_name,
                             redirect_uri: query.redirect_uri,
                             scope: query.scope,
                             scopes: query.scope ? query.scope.split(" ") : undefined,
@@ -1026,8 +1026,8 @@ export class SvelteKitAuthorizationServer {
                     // The following will either return an error or will throw a redirect
                     const resp = await this.authorize(event, authorized ?? false, {
                         responseType: response_type,
-                        clientId : client_id,
-                        redirectUri: redirect_uri,
+                        client_id : client_id,
+                        redirect_uri: redirect_uri,
                         scope: scope,
                         state: state,
                         codeChallenge: code_challenge,
@@ -1086,7 +1086,7 @@ export class SvelteKitAuthorizationServer {
                 await data.loadData(event);
                 formData = data.toObject();
 
-                const {clientId, clientSecret} = this.getClientIdAndSecret(formData, event);
+                const {client_id, client_secret} = this.getClientIdAndSecret(formData, event);
 
                 // if refreshTokenType is not "json", check if there
                 // is a refresh token in the cookie.
@@ -1111,7 +1111,7 @@ export class SvelteKitAuthorizationServer {
                         this.csrfTokens.validateDoubleSubmitCsrfToken(csrfCookie, csrfHeader)
                     } catch (e) {
                         CrossauthLogger.logger.debug(j({err: e}));
-                        CrossauthLogger.logger.warn(j({cerr: e, msg: "Invalid csrf token", clientId: formData.client_id}));
+                        CrossauthLogger.logger.warn(j({cerr: e, msg: "Invalid csrf token", client_id: formData.client_id}));
                         return json({
                             ok: false,
                             error: "access_denied",
@@ -1123,8 +1123,8 @@ export class SvelteKitAuthorizationServer {
         
                 const resp = await this.authServer.tokenEndpoint({
                     grantType: formData.grant_type,
-                    clientId : clientId,
-                    clientSecret : clientSecret,
+                    client_id : client_id,
+                    client_secret : client_secret,
                     scope: formData.scope,
                     codeVerifier: formData.code_verifier,
                     code: formData.code,
@@ -1276,12 +1276,12 @@ export class SvelteKitAuthorizationServer {
                 await data.loadData(event);
                 formData = data.toObject();
 
-                const {clientId, clientSecret} = this.getClientIdAndSecret(formData, event);
+                const {client_id, client_secret} = this.getClientIdAndSecret(formData, event);
 
         
                 const resp = await this.authServer.deviceAuthorizationEndpoint({
-                    clientId : clientId,
-                    clientSecret : clientSecret,
+                    client_id : client_id,
+                    client_secret : client_secret,
                     scope: formData.scope,
                 });
 
@@ -1390,11 +1390,11 @@ export class SvelteKitAuthorizationServer {
                     formData = data.toObject();
                     const authorized = data.getAsBoolean('authorized');
                     const scope = formData.scope;
-                    const clientId = formData.client_id;
+                    const client_id = formData.client_id;
                     const userCode = formData.user_code;
                     let missing = undefined;
                     if (authorized == undefined) missing = "authorized";
-                    if (clientId == undefined) missing = "client_id";
+                    if (client_id == undefined) missing = "client_id";
                     if (userCode == undefined) missing = "user_code";
                     if (missing) {
                         return {
@@ -1411,7 +1411,7 @@ export class SvelteKitAuthorizationServer {
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
                     if (this.svelteKitServer.sessionServer?.enableCsrfProtection && !event.locals.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
    
-                    const ret = await this.authServer.validateAndPersistScope(clientId, scope, event.locals.user);
+                    const ret = await this.authServer.validateAndPersistScope(client_id, scope, event.locals.user);
                     if (ret.error) {
                         return {
                             ok: false,

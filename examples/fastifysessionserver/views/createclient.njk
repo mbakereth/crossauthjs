@@ -13,24 +13,24 @@
             <p class="success">{{ message }}</p>
             {% if client %}
             <table>
-                {% if userId and isAdmin %}
+                {% if userid and isAdmin %}
                     <tr>
                         <td>User ID</td><td>{{ client.user_id }}</td>
                     </tr>
                 {% endif %}
                 <tr>
-                    <td>Client ID</td><td>{{ client.clientId }}</td>
+                    <td>Client ID</td><td>{{ client.client_id }}</td>
                 </tr>
                 <tr>
                     <td>Confidential</td><td>{{ client.confidential }}</td>
                 </tr>
                 <tr>
-                    <td>Client Secret</td><td>{{ client.clientSecret or "None Set" }}</td>
+                    <td>Client Secret</td><td>{{ client.client_secret or "None Set" }}</td>
                 </tr>
                 <tr>
                     <td>Redirect URIs</td>
                     <td>
-                        {% for uri in client.redirectUri%}
+                        {% for uri in client.redirect_uri%}
                             {{ uri }}<br>
                         {%endfor %}
                     </td>
@@ -38,13 +38,13 @@
                 <tr>
                     <td>Flows</td>
                     <td>
-                        {% for flow in client.validFlow%}
+                        {% for flow in client.valid_flow%}
                             {{ flow }}<br>
                         {%endfor %}
                     </td>
                 </tr>
             </table>
-            {% if client.clientSecret %}
+            {% if client.client_secret %}
                 <p>Make sure you write the client secret down.  If you lose it,
                     you will have to reset it.</p>
                 {% endif %}
@@ -59,11 +59,11 @@
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
                 <input type="hidden" name="next" value="{{ next }}"/>
                 {% if user %}
-                    <input type="hidden" name="userId" value="{{ user.id }}"/>
+                    <input type="hidden" name="userid" value="{{ user.id }}"/>
                 {% endif %}
                 <p>
-                    <label for="clientName">Friendly name</label><br>
-                    <input type="text" name="clientName" size="20" value="{{ clientName }}" />
+                    <label for="client_name">Friendly name</label><br>
+                    <input type="text" name="client_name" size="20" value="{{ client_name }}" />
                 </p>
                 <p>
                     <input type="checkbox" name="confidential" value="true" 
@@ -73,8 +73,8 @@
                     
                 </p>
                 <p>
-                    <label for="redirectUris">Redirect URIs (space separated)</label><br>
-                    <textarea name="redirectUris" rows="3" cols="40">{{ redirectUris }}</textarea>
+                    <label for="redirect_uris">Redirect URIs (space separated)</label><br>
+                    <textarea name="redirect_uris" rows="3" cols="40">{{ redirect_uris }}</textarea>
                 </p>
                 <h3>Enabled Flows</h3>
                 {% for flow in validFlows %}

@@ -46,8 +46,8 @@ export class OAuthClient extends OAuthClientBase {
     get idTokenPayload() {return this.#idTokenPayload;}
     #accessTokenPayload : {[key:string]:any} | undefined;
     #refreshTokenPayload : {[key:string]:any} | undefined;
-    #clientId : string|undefined;
-    #clientSecret : string|undefined;
+    #client_id : string|undefined;
+    #client_secret : string|undefined;
     private autoRefresher : OAuthAutoRefresher;
     private deviceCodePoller : OAuthDeviceCodePoller;
     private deviceAuthorizationUrl = "device_authorization";
@@ -65,7 +65,7 @@ export class OAuthClient extends OAuthClientBase {
      *      to this.  If you always give absolute URLs, this is optional.
      *      If you don't give it and you do make relative URLs, it will be
      *      relative to the page you are on.  Default: empty string.
-     *   - `redirectUri` a URL on the site serving this app which the
+     *   - `redirect_uri` a URL on the site serving this app which the
      *      authorization server will redirect to with an authorization
      *      code.  See description in class documentation.
      *      This is not required if you are not using OAuth flows
@@ -96,9 +96,9 @@ export class OAuthClient extends OAuthClientBase {
             authServerBaseUrl : string,
             stateLength? : number,
             verifierLength? : number,
-            clientId : string,
-            clientSecret? : string,
-            redirectUri? : string,
+            client_id : string,
+            client_secret? : string,
+            redirect_uri? : string,
             codeChallengeMethod? : "plain" | "S256",
             tokenConsumer : OAuthTokenConsumer,
             resServerBaseUrl? : string,
@@ -116,7 +116,7 @@ export class OAuthClient extends OAuthClientBase {
         }) {
         if (!options.tokenConsumer) {
             options.tokenConsumer = new OAuthTokenConsumer(
-                options.clientId, 
+                options.client_id, 
                 {authServerBaseUrl: options.authServerBaseUrl, 
             });
         }
@@ -137,8 +137,8 @@ export class OAuthClient extends OAuthClientBase {
         if (options.resServerHeaders) this.resServerHeaders = options.resServerHeaders;
         if (options.resServerMode) this.resServerMode = options.resServerMode;
         if (options.resServerCredentials) this.resServerCredentials = options.resServerCredentials;
-        if (options.clientId) this.#clientId = options.clientId;
-        if (options.clientSecret) this.#clientSecret = options.clientSecret;
+        if (options.client_id) this.#client_id = options.client_id;
+        if (options.client_secret) this.#client_secret = options.client_secret;
         if (options.deviceAuthorizationUrl) this.deviceAuthorizationUrl = options.deviceAuthorizationUrl;
 
         this.autoRefresher = new OAuthAutoRefresher({
@@ -277,7 +277,7 @@ export class OAuthClient extends OAuthClientBase {
      */
     async handleRedirectUri() : Promise<any|undefined> {
         const url = new URL(window.location.href);
-        if (url.origin + url.pathname != this.redirectUri) return undefined;
+        if (url.origin + url.pathname != this.redirect_uri) return undefined;
         const params = new URLSearchParams(window.location.search);
         let code : string|undefined = undefined;
         let state : string|undefined = undefined;
@@ -499,11 +499,11 @@ export class OAuthClient extends OAuthClientBase {
                 params.body.refresh_token = this.#refreshToken;
                 params.body.grant_type = "refresh_token";
             }
-            if (this.#clientId) {
+            if (this.#client_id) {
                 if (!params.body) params.body = {};
-                params.body.client_id = this.#clientId;
-                if (this.#clientSecret) {
-                    params.body.client_secret = this.#clientSecret;
+                params.body.client_id = this.#client_id;
+                if (this.#client_secret) {
+                    params.body.client_secret = this.#client_secret;
     
                 }
             }

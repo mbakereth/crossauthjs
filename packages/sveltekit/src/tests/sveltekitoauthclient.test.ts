@@ -27,9 +27,9 @@ export async function oauthLogin () {
         const body = JSON.parse(request.body?.toString() ?? "{}");
         const firstTokenResponse = await authServer.tokenEndpoint({
             grantType: body.grant_type, 
-            clientId : body.client_id, 
+            client_id : body.client_id, 
             scope : body.scope, 
-            clientSecret : body.client_secret,
+            client_secret : body.client_secret,
             username: body.username,
             password: body.password,
         });
@@ -100,8 +100,8 @@ test('SvelteKitClient.authzcodeflowLoginNotNeeded_get', async () => {
     const redirect_uri = url.searchParams.get("redirect_uri") ?? "";
     const {code, state: returnedState, error} = await authServer.authorizeGetEndpoint({
         responseType: "code", 
-        clientId: "ABC", 
-        redirectUri: redirect_uri??"",
+        client_id: "ABC", 
+        redirect_uri: redirect_uri??"",
         scope: scope,
         state: state??""
     });
@@ -167,9 +167,9 @@ test('SvelteKitClient.clientCredentials_post', async () => {
 
     const resp2 = await authServer.tokenEndpoint({
         grantType: body.body.grant_type, 
-        clientId : body.body.client_id, 
+        client_id : body.body.client_id, 
         scope : body.body.scope, 
-        clientSecret : body.body.client_secret,
+        client_secret : body.body.client_secret,
     });
     expect(resp2.error).toBeUndefined();
     expect(resp2.access_token).toBeDefined();
@@ -234,9 +234,9 @@ test('SvelteKitClient.refreshTokenFlow_post', async () => {
 
     const resp2 = await authServer.tokenEndpoint({
         grantType: body.body.grant_type, 
-        clientId : body.body.client_id, 
+        client_id : body.body.client_id, 
         scope : body.body.scope, 
-        clientSecret : body.body.client_secret,
+        client_secret : body.body.client_secret,
         refreshToken : refresh_token,
     });
     expect(resp2.error).toBeUndefined();
@@ -305,9 +305,9 @@ test('SvelteKitClient.passwordFlow_post', async () => {
 
     const resp2 = await authServer.tokenEndpoint({
         grantType: body.body.grant_type, 
-        clientId : body.body.client_id, 
+        client_id : body.body.client_id, 
         scope : body.body.scope, 
-        clientSecret : body.body.client_secret,
+        client_secret : body.body.client_secret,
         username: body.body.username,
         password: body.body.password,
     });
@@ -381,9 +381,9 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
     // call token with password flow
     const firstTokenResponse = await authServer.tokenEndpoint({
         grantType: body.body.grant_type, 
-        clientId : body.body.client_id, 
+        client_id : body.body.client_id, 
         scope : body.body.scope, 
-        clientSecret : body.body.client_secret,
+        client_secret : body.body.client_secret,
         username: body.body.username,
         password: body.body.password,
     });
@@ -443,9 +443,9 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
     const {access_token, expires_in} =
     await authServer.tokenEndpoint({
         grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
-        clientId : "ABC",
+        client_id : "ABC",
         scope: "read write",
-        clientSecret: "DEF",
+        client_secret: "DEF",
         mfaToken: firstTokenResponse.mfa_token,
         oobCode: oobCode,
         bindingCode: "0000",
@@ -470,9 +470,9 @@ test('SvelteKitClient.refreshIfExpired_post', async () => {
         const body = JSON.parse(request.body?.toString() ?? "{}");
         const resp2 = await authServer.tokenEndpoint({
             grantType: body.grant_type, 
-            clientId : body.client_id, 
+            client_id : body.client_id, 
             scope : body.scope, 
-            clientSecret : body.client_secret,
+            client_secret : body.client_secret,
             refreshToken : refresh_token,
         });
         return new Response(JSON.stringify(resp2), {headers: {"content-type": "application/json"}});
@@ -522,9 +522,9 @@ test('SvelteKitClient.refreshIfNotExpired_post', async () => {
         const body = JSON.parse(request.body?.toString() ?? "{}");
         const resp2 = await authServer.tokenEndpoint({
             grantType: body.grant_type, 
-            clientId : body.client_id, 
+            client_id : body.client_id, 
             scope : body.scope, 
-            clientSecret : body.client_secret,
+            client_secret : body.client_secret,
             refreshToken : refresh_token,
         });
         return new Response(JSON.stringify(resp2), {headers: {"content-type": "application/json"}});
@@ -566,9 +566,9 @@ test('SvelteKitClient.autoRefreshTokens_post', async () => {
         const body = JSON.parse(request.body?.toString() ?? "{}");
         const resp2 = await authServer.tokenEndpoint({
             grantType: body.grant_type, 
-            clientId : body.client_id, 
+            client_id : body.client_id, 
             scope : body.scope, 
-            clientSecret : body.client_secret,
+            client_secret : body.client_secret,
             refreshToken : refresh_token,
         });
         return new Response(JSON.stringify(resp2), {headers: {"content-type": "application/json"}});
@@ -963,7 +963,7 @@ test('SvelteKitClient.deviceCodeFlow', async () => {
     try {
         const tokens = await server.oAuthAuthServer?.authServer.makeAccessToken({
             client,
-            clientSecret: "DEF",
+            client_secret: "DEF",
             scopes: ["read", "write"],
             user: user?.user,
         });

@@ -80,14 +80,14 @@ export class FastifyApiKeyServer {
                         }
                         request.scope = scopes;
                     }
-                    if (key.userId) {
+                    if (key.userid) {
                         try {
-                            const {user} = await this.userStorage.getUserById(key.userId);
+                            const {user} = await this.userStorage.getUserById(key.userid);
                             request.user = user;
                             request.authType = "apiKey";
-                            CrossauthLogger.logger.debug(j({msg: "API key is for user", userId: user.id, user: user.username, hahedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
+                            CrossauthLogger.logger.debug(j({msg: "API key is for user", userid: user.id, user: user.username, hahedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                         } catch (e2) {
-                            CrossauthLogger.logger.error(j({msg: "API key has invalid user", userId: key.userId,  hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
+                            CrossauthLogger.logger.error(j({msg: "API key has invalid user", userid: key.userid,  hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                             CrossauthLogger.logger.debug(j({err: e2}));
                         }
                     }

@@ -41,7 +41,7 @@ test('InMemoryKeyStorage.createGetAndDeleteSession', async () => {
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await keyStorage.saveKey(bob.username, key, now, expiry);
     let sessionKey = await keyStorage.getKey(key);
-    expect(sessionKey.userId).toBe(bob.id);
+    expect(sessionKey.userid).toBe(bob.id);
     expect(sessionKey.expires).toStrictEqual(expiry);
     keyStorage.deleteKey(key);
     await expect(async () => {await keyStorage.getKey(key)}).rejects.toThrowError();
@@ -75,7 +75,7 @@ test("InMemoryKeyStorage.deleteAllKeysForUserExcept", async() => {
     await keyStorage.saveKey(bob.username, key2, now, expiry);
     await keyStorage.deleteAllForUser(bob.id, "", key1 );
     let bobkey2 = await keyStorage.getKey(key1);
-    expect(bobkey2.userId).toBe(bob.id);
+    expect(bobkey2.userid).toBe(bob.id);
     await expect(async () => {await keyStorage.getKey(key2)}).rejects.toThrowError();
 
 });
@@ -169,7 +169,7 @@ test("InMemoryKeyStorage.deleteKeyForUser", async() => {
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await keyStorage.saveKey(bob.id, key1, now, expiry);
     await keyStorage.saveKey(bob.id, key2, now, expiry);
-    await keyStorage.deleteMatching({userId: bob.id, value: key1});
+    await keyStorage.deleteMatching({userid: bob.id, value: key1});
     const keys = await keyStorage.getAllForUser(bob.id);
     expect(keys.length).toBe(1);
 });
@@ -184,7 +184,7 @@ test("InMemoryKeyStorage.deleteKeyForNoUser", async() => {
     expiry.setSeconds(now.getSeconds() + 24*60*60); // 1 day
     await keyStorage.saveKey(undefined, key1, now, expiry);
     await keyStorage.saveKey(undefined, key2, now, expiry);
-    await keyStorage.deleteMatching({userId: null, value: key1});
+    await keyStorage.deleteMatching({userid: null, value: key1});
     const keys = await keyStorage.getAllForUser(undefined);
     expect(keys.length).toBe(1);
 });
@@ -192,37 +192,37 @@ test("InMemoryKeyStorage.deleteKeyForNoUser", async() => {
 test('InMemoryClientStorage.createGetAndDeleteClient', async () => {
     const clientStorage = new InMemoryOAuthClientStorage();
     const client = {
-        clientId : "ABC",
-        clientSecret: "DEF",
-        clientName: "Test",
-        redirectUri: [],
-        validFlow: [],
+        client_id : "ABC",
+        client_secret: "DEF",
+        client_name: "Test",
+        redirect_uri: [],
+        valid_flow: [],
         confidential: true,
     };
     await clientStorage.createClient(client);
-    const getClient = await clientStorage.getClientById(client.clientId);
-    expect(getClient.clientSecret).toBe(client.clientSecret);
-    await clientStorage.deleteClient(client.clientId);
-    await expect(async () => {await clientStorage.getClientById(client.clientId)}).rejects.toThrowError();
+    const getClient = await clientStorage.getClientById(client.client_id);
+    expect(getClient.client_secret).toBe(client.client_secret);
+    await clientStorage.deleteClient(client.client_id);
+    await expect(async () => {await clientStorage.getClientById(client.client_id)}).rejects.toThrowError();
 });
 
 test('InMemoryClientStorage.createAndUpdateValidFlows', async () => {
     const clientStorage = new InMemoryOAuthClientStorage();
     const client = {
-        clientId : "ABC3b",
-        clientSecret: "DEF",
-        clientName: "Test",
-        redirectUri: ["http://client.com/uri1", "http://client.com/uri2"],
-        validFlow: ["authorizationCode", "authorizationCodeWithPKCE"],
+        client_id : "ABC3b",
+        client_secret: "DEF",
+        client_name: "Test",
+        redirect_uri: ["http://client.com/uri1", "http://client.com/uri2"],
+        valid_flow: ["authorizationCode", "authorizationCodeWithPKCE"],
         confidential: true,
     }
     await clientStorage.createClient(client);
-    const getClient1 = await clientStorage.getClientById(client.clientId);
-    expect(getClient1.validFlow.length).toBe(2);
-    await clientStorage.updateClient({clientId: client.clientId, validFlow: ["clientCredentials"]});
-    const getClient2 = await clientStorage.getClientById(client.clientId);
-    expect(getClient2.validFlow.length).toBe(1);
-    expect(getClient2.validFlow[0]).toBe("clientCredentials");
+    const getClient1 = await clientStorage.getClientById(client.client_id);
+    expect(getClient1.valid_flow.length).toBe(2);
+    await clientStorage.updateClient({client_id: client.client_id, valid_flow: ["clientCredentials"]});
+    const getClient2 = await clientStorage.getClientById(client.client_id);
+    expect(getClient2.valid_flow.length).toBe(1);
+    expect(getClient2.valid_flow[0]).toBe("clientCredentials");
 });
 
 test("InMemoryAuthorization.createAndGetForUser", async () => {
@@ -286,48 +286,48 @@ test("InMemoryAuthorization.createAndUpdateForUser", async () => {
 test('InMemoryClientStorage.getClientByName', async () => {
     const clientStorage = new InMemoryOAuthClientStorage();
     const client = {
-        clientId : "ABC",
-        clientSecret: "DEF",
-        clientName: "Test",
-        redirectUri: [],
-        validFlow: [],
+        client_id : "ABC",
+        client_secret: "DEF",
+        client_name: "Test",
+        redirect_uri: [],
+        valid_flow: [],
         confidential: true,
     };
     await clientStorage.createClient(client);
-    const getClients = await clientStorage.getClientByName(client.clientName);
-    expect(getClients[0].clientName).toBe(client.clientName);
+    const getClients = await clientStorage.getClientByName(client.client_name);
+    expect(getClients[0].client_name).toBe(client.client_name);
 });
 
 test('InMemoryAuthorization.getClients', async () => {
     const clientStorage = new InMemoryOAuthClientStorage();
     let client : OAuthClient = {
-        clientId : "ABC1",
-        clientSecret: "DEF",
-        clientName: "Test1",
-        redirectUri: [],
-        validFlow: [],
+        client_id : "ABC1",
+        client_secret: "DEF",
+        client_name: "Test1",
+        redirect_uri: [],
+        valid_flow: [],
         confidential: true,
     }
     await clientStorage.createClient(client);
 
     client = {
-        clientId : "ABC2",
-        clientSecret: "DEF",
-        clientName: "Test2",
-        redirectUri: [],
-        validFlow: [],
+        client_id : "ABC2",
+        client_secret: "DEF",
+        client_name: "Test2",
+        redirect_uri: [],
+        valid_flow: [],
         confidential: true,
     }
     await clientStorage.createClient(client);
 
     client = {
-        clientId : "ABC3",
-        clientSecret: "DEF",
-        clientName: "Test3",
-        redirectUri: [],
-        validFlow: [],
+        client_id : "ABC3",
+        client_secret: "DEF",
+        client_name: "Test3",
+        redirect_uri: [],
+        valid_flow: [],
         confidential: true,
-        userId : 1,
+        userid : 1,
     }
     await clientStorage.createClient(client);
 

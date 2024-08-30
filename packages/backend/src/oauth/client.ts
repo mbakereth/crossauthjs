@@ -23,17 +23,17 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
     /**
      * Client ID for this client
      */
-    clientId? : string,
+    client_id? : string,
 
     /**
      * Client secret for this client (can be undefined for no secret)
      */
-    clientSecret? : string,
+    client_secret? : string,
 
     /**
      * Redirect URI to send in `authorize` requests
      */
-    redirectUri? : string,
+    redirect_uri? : string,
 
     /**
      * Type of code challenge for PKCE
@@ -70,25 +70,25 @@ export class OAuthClientBackend extends OAuthClientBase {
     constructor(authServerBaseUrl : string, options : OAuthClientOptions) {
         // because we can't set instance variables before calling super()
         const options1 = {
-            clientId: "",
+            client_id: "",
         }
-        setParameter("clientId", ParamType.String, options1, options, "OAUTH_CLIENT_ID", true);
+        setParameter("client_id", ParamType.String, options1, options, "OAUTH_CLIENT_ID", true);
         super({ authServerBaseUrl, 
             tokenConsumer: new OAuthTokenConsumer({ 
-                audience: options1.clientId, 
+                audience: options1.client_id, 
                 authServerBaseUrl, 
                 ...options }), ...options });
-        this.clientId = options1.clientId;
+        this.client_id = options1.client_id;
 
         let tmp : {[key:string]: any} = {};
         setParameter("stateLength", ParamType.String, this, options, "OAUTH_STATE_LENGTH");
         setParameter("verifierLength", ParamType.String, this, options, "OAUTH_VERIFIER_LENGTH");
-        setParameter("clientSecret", ParamType.String, tmp, options, "OAUTH_CLIENT_SECRET");
+        setParameter("client_secret", ParamType.String, tmp, options, "OAUTH_CLIENT_SECRET");
         setParameter("codeChallengeMethod", ParamType.String, this, options, "OAUTH_CODE_CHALLENGE_METHOD");
         setParameter("deviceAuthorizationUrl", ParamType.String, options1, options, "OAUTH_DEVICE_AUTHORIZATION_URL");
         if (this.deviceAuthorizationUrl.startsWith("/")) this.deviceAuthorizationUrl = this.deviceAuthorizationUrl.substring(1);
 
-        if (tmp.clientSecret) this.clientSecret = tmp.clientSecret;
+        if (tmp.client_secret) this.client_secret = tmp.client_secret;
 
     }
 

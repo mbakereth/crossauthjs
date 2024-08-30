@@ -16,6 +16,21 @@ export interface UserStorageGetOptions {
      * If true, a valid user will be returned even if state is not set to `active`
      */
     skipActiveCheck? : boolean,
+
+    /**
+     * If true, usernames will be matched as lowercase and with diacritics removed.
+     * Default true,
+     * 
+     * Note: this doesn't apply to the ID column
+     */
+    normalizeUsername? : boolean,
+
+    /**
+     * If true, email addresses (in the email column not in the username column) 
+     * will be matched as lowercase and with diacritics removed.
+     * Default true.
+     */
+    normalizeEmail? : boolean,
 }
 
 /**
@@ -48,6 +63,8 @@ export interface UserStorageOptions {
 export abstract class UserStorage {
     readonly userEditableFields : string[] = [];
     readonly adminEditableFields : string[] = [];
+    readonly normalizeUsername = true;
+    readonly normalizeEmail = true;
     
     /**
      * Constructor
@@ -56,12 +73,15 @@ export abstract class UserStorage {
     constructor(options : UserStorageOptions = {}) {
         setParameter("userEditableFields", ParamType.JsonArray, this, options, "USER_EDITABLE_FIELDS");
         setParameter("adminEditableFields", ParamType.JsonArray, this, options, "ADMIN_EDITABLE_FIELDS");
+        setParameter("normalizeUsername", ParamType.JsonArray, this, options, "NORMALIZE_USERNAME");
+        setParameter("normalizeEmail", ParamType.JsonArray, this, options, "NORMALIZE_EMAIL");
     }
 
     /**
      * Returns user matching the given username, or throws an exception.  
      * 
-     * The username should be matched normalized and lowercased (using normalize())
+     * if `normalizeUsername` is true, the username should be matched normalized and 
+     * lowercased (using normalize())
      * @param username the username to return the user of
      * @param options optionally turn off checks.  Used internally
      * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
@@ -88,7 +108,7 @@ export abstract class UserStorage {
     /**
      * Returns user matching the given email address, or throws an exception.
      * 
-     * The email should be matched normalized and lowercased (using normalize())
+     * If `normalizeEmail` is true, email should be matched normalized and lowercased (using normalize())
      * If the email field doesn't exist, username is assumed to be the email column
      * 
      * @param email the email address to return the user of
@@ -153,7 +173,7 @@ export abstract class UserStorage {
     abstract getUsers(skip? : number, take? : number) : Promise<User[]>;
 
     /**
-     * Usernames and emails are stored in lowercase, normalized format.  
+     * By default, usernames and emails are stored in lowercase, normalized format.  
      * This function returns that normalization.
      * 
      * @param str the string to normalize
@@ -185,7 +205,7 @@ export abstract class KeyStorage {
     /**
      * Saves a session key in the session storage (eg database).
      * 
-     * @param userId the ID of the user.  This matches the primary key in the 
+     * @param userid the ID of the user.  This matches the primary key in the 
      *               {@link UserStorage } implementation.
      * @param value the key value to store.
      * @param dateCreated the date/time the key was created.
@@ -194,7 +214,7 @@ export abstract class KeyStorage {
      *             email for email change tokens
      * @param extraFields these will also be saved in the key record
      */
-    abstract saveKey(userId : string | number | undefined, 
+    abstract saveKey(userid : string | number | undefined, 
                          value : string, 
                          dateCreated : Date, 
                          expires : Date | undefined, 
@@ -222,12 +242,12 @@ export abstract class KeyStorage {
     /**
      * Deletes all keys from storage for the given user ID
      * 
-     * @param userId : user ID to delete keys for
+     * @param userid : user ID to delete keys for
      * @param prefix only keys starting with this prefix will be
      *               deleted
      * @param except if defined, the key with this value will not be deleted
      */
-    abstract deleteAllForUser(userId : string | number | undefined, 
+    abstract deleteAllForUser(userid : string | number | undefined, 
         prefix : string, except? : string) : Promise<void>;
 
     /**
@@ -240,10 +260,10 @@ export abstract class KeyStorage {
 
     /**
      * Return all keys matching the given user ID
-     * @param userId user to return keys for
+     * @param userid user to return keys for
      * @returns an array of keys
      */
-    abstract getAllForUser(userId : string|number|undefined) : Promise<Key[]>;
+    abstract getAllForUser(userid : string|number|undefined) : Promise<Key[]>;
 
     /**
      * The `data` field in a key entry is a JSON string.  This class should
@@ -306,35 +326,35 @@ export abstract class OAuthClientStorage {
      * Returns the matching client by its auto-generated id in the storage or 
      * throws an exception if it doesn't exist.
      * 
-     * @param clientId the clientId to look up
+     * @param client_id the client_id to look up
      * @returns The matching {@link @crossauth/common!OAuthClient} object.
      */
-    abstract getClientById(clientId : string) : Promise<OAuthClient>;
+    abstract getClientById(client_id : string) : Promise<OAuthClient>;
 
     /**
      * Returns the matching client in the storage by friendly name or 
      * throws an exception if it doesn't exist.
      * 
      * @param name the client name to look up
-     * @param userId if defined, only return clients belonging to this user.
-     *               if `null`, return only clients with a null userId.  
+     * @param userid if defined, only return clients belonging to this user.
+     *               if `null`, return only clients with a null userid.  
      *               if undefined, return all clients with this name.
      * @returns An array of {@link @crossauth/common!OAuthClient} objects.
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } of `InvalidSessionId` if a match was not found in session storage.
      */
-    abstract getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]>;
+    abstract getClientByName(name : string, userid? : string|number|null) : Promise<OAuthClient[]>;
 
     /**
      * Returns all clients in alphabetical order of client name.
      * @param skip skip this number of records from the start in alphabetical
      *             order
      * @param take return at most this number of records
-     * @param userId if defined, only return clients belonging to this user.
-     *               if `null`, return only clients with a null userId.  
+     * @param userid if defined, only return clients belonging to this user.
+     *               if `null`, return only clients with a null userid.  
      *               if undefined, return all clients.
      * @returns An array of {@link @crossauth/common!OAuthClient} objects.
      */
-    abstract getClients(skip? : number, take? : number, userId? : string|number|null) : Promise<OAuthClient[]>;
+    abstract getClients(skip? : number, take? : number, userid? : string|number|null) : Promise<OAuthClient[]>;
 
     /**
      * Creates and returns a new client with random ID and optionally secret.
@@ -352,7 +372,7 @@ export abstract class OAuthClientStorage {
      * passed values.  If it doesn't
      * exist, throw a {@link @crossauth/common!CrossauthError} with 
      * `InvalidClient`.
-     * @param client all fields to update (clientId must be set but will not
+     * @param client all fields to update (client_id must be set but will not
      *        be updated) 
      */
     abstract updateClient(client : Partial<OAuthClient>) : Promise<void>;
@@ -360,9 +380,9 @@ export abstract class OAuthClientStorage {
     /**
      * Deletes a key from storage .
      * 
-     * @param clientId the client to delete
+     * @param client_id the client to delete
      */
-    abstract deleteClient(clientId : string) : Promise<void>;
+    abstract deleteClient(client_id : string) : Promise<void>;
 }
 
 /**
@@ -391,12 +411,12 @@ export abstract class OAuthAuthorizationStorage {
     /**
      * Returns the matching all scopes authorized for the given client and optionally user.
      * 
-     * @param clientId the clientId to look up
-     * @param userId the userId to look up, undefined for a client authorization not user authorization
+     * @param client_id the client_id to look up
+     * @param userid the userid to look up, undefined for a client authorization not user authorization
      * @returns The authorized scopes as an array.
      */
-    abstract getAuthorizations(clientId: string,
-        userId: string | number | undefined) : Promise<(string|null)[]>;
+    abstract getAuthorizations(client_id: string,
+        userid: string | number | undefined) : Promise<(string|null)[]>;
 
     /**
      * Saves a new set of authorizations for the given client and optionally 
@@ -404,14 +424,14 @@ export abstract class OAuthAuthorizationStorage {
      * 
      * Deletes the old ones.
      * 
-     * @param clientId the clientId to look up
-     * @param userId the userId to look up, undefined for a client 
+     * @param client_id the client_id to look up
+     * @param userid the userid to look up, undefined for a client 
      *               authorization not user authorization
      * @param authorizations new set of authorized scopes, which may be empty
      * 
      */
-    abstract updateAuthorizations(clientId: string,
-        userId: string | number | undefined,
+    abstract updateAuthorizations(client_id: string,
+        userid: string | number | null,
         authorizations: (string | null)[]) : Promise<void>;
 }
 

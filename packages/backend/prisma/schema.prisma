@@ -14,14 +14,14 @@ datasource db {
 model User {
     id                  Int         @id @unique @default(autoincrement())
     username            String      @unique
-    usernameNormalized  String      @unique
+    username_normalized  String      @unique
     email               String      @unique
-    emailNormalized     String      @unique
+    email_normalized     String      @unique
     phone               String?
     state               String      @default("active")
     factor1             String      @default("password")
     factor2             String      @default("")
-    dummyField          String      @default("")
+    dummyfield          String      @default("")
 
     session             Key[]
     apiKey              ApiKey[]
@@ -36,7 +36,7 @@ model User {
 model UserSecrets {
     user_id             Int         @unique
     password            String
-    totpSecret          String      @default("")
+    totpsecret          String      @default("")
 
     user                User      @relation(references: [id], fields: [user_id], onDelete: Cascade)
 }
@@ -67,22 +67,22 @@ model ApiKey {
 
     @@index([id])
     @@index([user_id])
-    @@unique([user_id, name], name: "userIdName")
+    @@unique([user_id, name], name: "useridName")
 }
 
 model OAuthClient {
-    clientId       String                    @id @unique
+    client_id       String                    @id @unique
     confidential   Boolean                   @default(true)
-    clientName     String
-    clientSecret   String?
+    client_name     String
+    client_secret   String?
     user_id        Int?
 
-    redirectUri    OAuthClientRedirectUri[]
+    redirect_uri    OAuthClientRedirectUri[]
     authorization  OAuthAuthorization[]
-    validFlow      OAuthClientValidFlow[]
+    valid_flow      OAuthClientValidFlow[]
     user           User?     @relation(references: [id], fields: [user_id], onDelete: Cascade)
 
-    @@index([clientId])
+    @@index([client_id])
     @@index([user_id])
 }
 
@@ -91,12 +91,12 @@ model OAuthClientRedirectUri {
     client_id      String 
     uri            String
 
-    client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
+    client         OAuthClient @relation(references: [client_id], fields: [client_id], onDelete: Cascade)
 
     @@index([id])
     @@index([client_id])
-    @@unique([client_id, uri], name: "redirectUriUnique")
-    //@@unique([redirect_uri], name: "redirectUriUnique") // use this to ensure only one client has any given redirect uri
+    @@unique([client_id, uri], name: "redirect_uriUnique")
+    //@@unique([redirect_uri], name: "redirect_uriUnique") // use this to ensure only one client has any given redirect uri
 }
 
 model OAuthClientValidFlow {
@@ -104,7 +104,7 @@ model OAuthClientValidFlow {
     client_id      String 
     flow           String
 
-    client         OAuthClient @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
+    client         OAuthClient @relation(references: [client_id], fields: [client_id], onDelete: Cascade)
 
     @@index([id])
     @@index([client_id])
@@ -116,7 +116,7 @@ model OAuthAuthorization {
     client_id      String    
     user_id        Int?
     user           User?         @relation(references: [id], fields: [user_id], onDelete: Cascade)
-    Client         OAuthClient?  @relation(references: [clientId], fields: [client_id], onDelete: Cascade)
+    Client         OAuthClient?  @relation(references: [client_id], fields: [client_id], onDelete: Cascade)
     scope          String?
 
     @@index([id])

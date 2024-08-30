@@ -291,17 +291,17 @@ export interface FastifySessionServerOptions
 
     /**
      * Admin pages provide functionality for searching for OAuth clients.  By
-     * default the search string must exactly match the `clientName`.
+     * default the search string must exactly match the `client_name`.
      * Override this behaviour with this function
      * @param searchTerm the search term 
      * @param clientStorage the client storage to search
-     * @param userId if defined and non null, only clients owned by that
+     * @param userid if defined and non null, only clients owned by that
      *        user ID will be returned.  If `null`, only clients not owned
      *        by a user will be returned.  If undefined, all matching clients
      *        will be returned
      * @returns array of matching clients
      */
-    clientSearchFn? : (searchTerm : string, clientStorage : OAuthClientStorage, userId? : string|number|null) => Promise<OAuthClient[]>;
+    clientSearchFn? : (searchTerm : string, clientStorage : OAuthClientStorage, userid? : string|number|null) => Promise<OAuthClient[]>;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -713,7 +713,7 @@ function defaultUpdateUser(user: User,
  * | POST   | /updateuser                |             | user_*                                                               | message, user_*, allowedFactor2                                                                        | updatePasswordPage       | 
  * | POST   | /api/updateuser            |             | user_*                                                               | emailVerificationRequired                                                                              |                          | 
  * | GET    | /deleteuser                |             | next                                                                 | next, isAdmin, user                                                                                    | deleteUserPAge           | 
- * | POST   | /deleteuser                |             | next                                                                 | message, next, isAdmin, userId                                                                         | deleteUserPAge           | 
+ * | POST   | /deleteuser                |             | next                                                                 | message, next, isAdmin, userid                                                                         | deleteUserPAge           | 
  * | POST   | /api/deleteuser            |             |                                                                      |                                                                                                        |                          | 
  * | GET    | /requestpasswordreset      |             | next, required                                                       | next, required                                                                                         | requestPasswordResetPage | 
  * | POST   | /requestpasswordreset      |             | email, next, required                                                | next, required, email, message                                                                         | requestPasswordResetPage | 
@@ -727,14 +727,14 @@ function defaultUpdateUser(user: User,
  * | GET    | /api/getcsrftoken          |             |                                                                      |                                                                                                        |                          | 
  * | GET    | /selectclient              |             | next, search, skip, take, haveNext, havePrevious                     | next, search, skip, take, haveNext, havePrevious, user, clients, isAdmin                               | selectClient             |
  * | GET    | /createclient              |             | next                                                                 | next, validFLows, flowNames, user, isAdmin                                                             | createClientPage         |
- * | POST   | /createclient              |             | next, clientName, confidential, redirectUris, (flows)                | message, client, next, validFLows, flowNames, user, isAdmin                                            | createClientPage         |
- * | POST   | /api/createclient          |             | clientName, confidential, redirectUris, (flows)                      | client                                                                                                 |                          |
- * | GET    | /updateclient              | clientId    | next                                                                 | next, validFLows, flowNames, selectedFlows, redirectUris, clientId, clientName, user, isAdmin          | updateClientPage         |
- * | POST   | /updateclient              | clientId    | next, clientName, confidential, redirectUris, (flows), resetSecret   | message, next, validFLows, flowNames, selectedFlows, redirectUris, clientId, clientName, user, isAdmin | updateClientPage         |
- * | POST   | /api/updateclient          | clientId    | clientName, confidential, redirectUris, (flows), resetSecret         | client, newSecret                                                                                      |                          |
- * | GET    | /deleteclient              | clientId    | next, backUrl                                                        | next, backUrl, client                                                                                  | deleteClientPage         | 
- * | POST   | /deleteclient              | clientId    | next                                                                 | message, next, clientId                                                                                | deleteClientPage         | 
- * | POST   | /api/deleteclient          | clientId    |                                                                      |                                                                                                        |                          | 
+ * | POST   | /createclient              |             | next, client_name, confidential, redirect_uris, (flows)                | message, client, next, validFLows, flowNames, user, isAdmin                                            | createClientPage         |
+ * | POST   | /api/createclient          |             | client_name, confidential, redirect_uris, (flows)                      | client                                                                                                 |                          |
+ * | GET    | /updateclient              | client_id    | next                                                                 | next, validFLows, flowNames, selectedFlows, redirect_uris, client_id, client_name, user, isAdmin          | updateClientPage         |
+ * | POST   | /updateclient              | client_id    | next, client_name, confidential, redirect_uris, (flows), resetSecret   | message, next, validFLows, flowNames, selectedFlows, redirect_uris, client_id, client_name, user, isAdmin | updateClientPage         |
+ * | POST   | /api/updateclient          | client_id    | client_name, confidential, redirect_uris, (flows), resetSecret         | client, newSecret                                                                                      |                          |
+ * | GET    | /deleteclient              | client_id    | next, backUrl                                                        | next, backUrl, client                                                                                  | deleteClientPage         | 
+ * | POST   | /deleteclient              | client_id    | next                                                                 | message, next, client_id                                                                                | deleteClientPage         | 
+ * | POST   | /api/deleteclient          | client_id    |                                                                      |                                                                                                        |                          | 
  * 
  * ** Admin Endpoints **
  * 
@@ -2493,7 +2493,7 @@ export class FastifySessionServer {
      * in the reply.
      * 
      * An anonymous sessiin is a session cookie that is not associated
-     * with a user (`userId` is undefined).  It can be used to persist
+     * with a user (`userid` is undefined).  It can be used to persist
      * data between sessions just like a regular user session ID.
      * 
      * @param request the Fastify request

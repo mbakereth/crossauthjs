@@ -58,72 +58,82 @@ export class OAuthClientManager {
 
     /**
      * Creates a client and puts it in the storage
-     * @param clientName friendly name for the client
-     * @param redirectUri set of valid redirect URIs (may be empty)
-     * @param validFlow set of OAuth flows this client is allowed to initiate
+     * @param client_name friendly name for the client
+     * @param redirect_uri set of valid redirect URIs (may be empty)
+     * @param valid_flow set of OAuth flows this client is allowed to initiate
      *        (may be empty)
      * @param confidential if true, client can keep secrets confidential
-     *        and a clientSecret will be created
-     * @param userId user id who owns the client, or undefined for no user
-     * @returns the new client.  `clientId` and `clientSecret` (plaintext)
+     *        and a client_secret will be created
+     * @param userid user id who owns the client, or undefined for no user
+     * @returns the new client.  `client_id` and `client_secret` (plaintext)
      *          will be populated.
      */
-    async createClient(clientName: string,
-        redirectUri: string[],
-        validFlow?: string[],
+    async createClient(client_name: string,
+        redirect_uri: string[],
+        valid_flow?: string[],
         confidential = true,
-        userId? : string|number) : Promise<OAuthClient> {
-        const clientId = OAuthClientManager.randomClientId();
-        let clientSecret : string|undefined = undefined;
+        userid? : string|number) : Promise<OAuthClient> {
+        const client_id = OAuthClientManager.randomClientId();
+        let client_secret : string|undefined = undefined;
         let plaintext : string|undefined = undefined;
         if (confidential) {
             plaintext = OAuthClientManager.randomClientSecret();
-            clientSecret = await Crypto.passwordHash(plaintext, {
+            client_secret = await Crypto.passwordHash(plaintext, {
                 encode: true,
                 iterations: this.oauthPbkdf2Iterations,
                 keyLen: this.oauthPbkdf2KeyLength,
                 digest: this.oauthPbkdf2Digest,
             });
         }
-        redirectUri.forEach((uri) => {
+        redirect_uri.forEach((uri) => {
             OAuthClientManager.validateUri(uri);
         });
-        if (!validFlow) {
-            validFlow = OAuthFlows.allFlows();
+        if (!valid_flow) {
+            valid_flow = OAuthFlows.allFlows();
         }
         const client = {
-            clientId: clientId,
-            clientSecret: clientSecret,
-            clientName : clientName,
-            redirectUri : redirectUri,
+            client_id: client_id,
+            client_secret: client_secret,
+            client_name : client_name,
+            redirect_uri : redirect_uri,
             confidential: confidential,
-            validFlow: validFlow,
-            userId: userId,
+            valid_flow: valid_flow,
+            userid: userid,
         }
-        const newClient = await this.clientStorage.createClient(client);
-        if (newClient.clientSecret && plaintext) newClient.clientSecret = plaintext;
+        let newClient : OAuthClient | undefined = undefined;
+        for (let tryNum=0; tryNum<5; ++tryNum) {
+            try {
+                newClient = await this.clientStorage.createClient(client);
+                client.client_id = OAuthClientManager.randomClientId()
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                if (ce.code != ErrorCode.ClientExists) throw e;
+            }           
+        }
+        if (!newClient) throw new CrossauthError(ErrorCode.ClientExists);
+        if (newClient.client_secret && plaintext) newClient.client_secret = plaintext;
         return newClient;
     }
 
     /**
      * Updates a client
-     * @param clientId the clientId to update.
+     * @param client_id the client_id to update.
      * @param client the fields to update.  Anything not in here (or undefined)
      *        will remain unchanged
      * @param resetSecret if true, generate a new client secret
      * @returns the updated client.  If it has a secret. it will be in
-     *          `clientSecret` as plaintext.
+     *          `client_secret` as plaintext.
      */
-    async updateClient(clientId: string,
+    async updateClient(client_id: string,
         client: Partial<OAuthClient>,
         resetSecret : boolean = false) : Promise<{client: OAuthClient, newSecret: boolean}> {
-        const oldClient = await this.clientStorage.getClientById(clientId);
+        const oldClient = await this.clientStorage.getClientById(client_id);
         let newSecret = false;
         let plaintext : string|undefined = undefined;
         if ((client.confidential === true && !oldClient.confidential) ||
             (client.confidential === true && resetSecret)) {
             plaintext = OAuthClientManager.randomClientSecret();
-            client.clientSecret = await Crypto.passwordHash(plaintext, {
+            client.client_secret = await Crypto.passwordHash(plaintext, {
                 encode: true,
                 iterations: this.oauthPbkdf2Iterations,
                 keyLen: this.oauthPbkdf2KeyLength,
@@ -132,17 +142,17 @@ export class OAuthClientManager {
             newSecret = true;
         }
         else if (client.confidential === false) {
-            client.clientSecret = null;
+            client.client_secret = null;
         }
-        if (client.redirectUri) {
-            client.redirectUri.forEach((uri) => {
+        if (client.redirect_uri) {
+            client.redirect_uri.forEach((uri) => {
                 OAuthClientManager.validateUri(uri);
             });
         }
-        client.clientId = clientId;
+        client.client_id = client_id;
         await this.clientStorage.updateClient(client);
-        const newClient = await this.clientStorage.getClientById(clientId);
-        if (plaintext) newClient.clientSecret = plaintext;
+        const newClient = await this.clientStorage.getClientById(client_id);
+        if (plaintext) newClient.client_secret = plaintext;
         return {client: newClient, newSecret: newSecret};
     }
 

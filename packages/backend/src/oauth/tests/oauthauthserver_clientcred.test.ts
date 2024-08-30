@@ -6,8 +6,8 @@ test('AuthorizationServer.ClientCredFlow.accessToken', async () => {
     const {access_token, refresh_token, expires_in, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "client_credentials", 
-            clientId: client.clientId, 
-            clientSecret: "DEF",
+            client_id: client.client_id, 
+            client_secret: "DEF",
             scope: "read write"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
@@ -36,8 +36,8 @@ test('AuthorizationServer.ClientCredFlow.missingScopeValid', async () => {
     const {access_token, refresh_token, expires_in, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "client_credentials", 
-            clientId: client.clientId, 
-            clientSecret: "DEF"});
+            client_id: client.client_id, 
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -59,8 +59,8 @@ test('AuthorizationServer.ClientCredFlow.missingScopeInvalid', async () => {
     const {error}
         = await authServer.tokenEndpoint({
             grantType: "client_credentials", 
-            clientId: "ABC", 
-            clientSecret: "DEF"});
+            client_id: "ABC", 
+            client_secret: "DEF"});
     expect(error).toBe("invalid_scope");
 });
 
@@ -71,6 +71,6 @@ test('AuthorizationServer.ClientCredFlow.missingClientSecret', async () => {
         = await authServer.tokenEndpoint({
             grantType: "client_credentials", 
             scope: "read write",
-            clientId: client.clientId});
+            client_id: client.client_id});
     expect(error).toBe("access_denied");
 });

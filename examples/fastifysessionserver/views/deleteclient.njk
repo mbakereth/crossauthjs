@@ -12,7 +12,7 @@
         {% elif errorMessage %}
             <p class="error">{{ errorMessage }}</p>
         {% else %}
-            <p>Do you really want to delete client {{ client.clientName }}?</p>
+            <p>Do you really want to delete client {{ client.client_name }}?</p>
             <form method="POST">
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
                 <input type="hidden" name="next" value="{{ next }}"/>

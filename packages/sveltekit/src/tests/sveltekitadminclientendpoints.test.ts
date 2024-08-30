@@ -93,7 +93,7 @@ test('SvelteKitAdminClientEndpoints.updateClient', async () => {
             ["content-type", "application/x-www-form-urlencoded"],
         ] 
         });
-    let event = new MockRequestEvent("1", getRequest, {clientId: "ABC"});
+    let event = new MockRequestEvent("1", getRequest, {client_id: "ABC"});
     event.locals.csrfToken = csrfToken;
     let status = 200;
     let resp1 : {[key:string]:any}|undefined = {};
@@ -104,7 +104,7 @@ test('SvelteKitAdminClientEndpoints.updateClient', async () => {
     }
     expect(status).toBe(401);
 
-    event = new MockRequestEvent("1", getRequest, {clientId: "ABC"});
+    event = new MockRequestEvent("1", getRequest, {client_id: "ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
@@ -117,7 +117,7 @@ test('SvelteKitAdminClientEndpoints.updateClient', async () => {
     }
     expect(status).toBe(200);
 
-    event = new MockRequestEvent("1", getRequest, {clientId: "bob_ABC"});
+    event = new MockRequestEvent("1", getRequest, {client_id: "bob_ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
@@ -127,34 +127,34 @@ test('SvelteKitAdminClientEndpoints.updateClient', async () => {
 
     let postRequest = new Request("http://ex.com/oauth/clients", {
         method: "POST",
-        body: "csrfToken="+csrfToken+"&clientName=newName&confidential=on&redirectUri=http://uri1.com/redirect&authorizationCode=on",
+        body: "csrfToken="+csrfToken+"&client_name=newName&confidential=on&redirect_uri=http://uri1.com/redirect&authorizationCode=on",
         headers: [
             ["cookie", "CSRFTOKEN="+csrfCookieValue],
             ["cookie", "SESSIONID="+sessionCookieValue],
             ["content-type", "application/x-www-form-urlencoded"],
         ] 
         });
-    event = new MockRequestEvent("1", postRequest, {clientId: "bob_ABC"});
+    event = new MockRequestEvent("1", postRequest, {client_id: "bob_ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.adminClientEndpoints.updateClientEndpoint.actions.default(event);
     expect(resp1?.ok).toBe(true);
-    expect(resp1?.client?.clientName).toBe("newName");
+    expect(resp1?.client?.client_name).toBe("newName");
     expect(resp1?.plaintextSecret).toBeUndefined();
-    expect(resp1?.client?.clientSecret).toContain("pbkdf2:sha256");
+    expect(resp1?.client?.client_secret).toContain("pbkdf2:sha256");
 
     postRequest = new Request("http://ex.com/oauth/clients", {
         method: "POST",
-        body: "csrfToken="+csrfToken+"&clientName=newName&confidential=on&redirectUri=http://uri1.com/redirect&authorizationCode=on&resetSecret=on",
+        body: "csrfToken="+csrfToken+"&client_name=newName&confidential=on&redirect_uri=http://uri1.com/redirect&authorizationCode=on&resetSecret=on",
         headers: [
             ["cookie", "CSRFTOKEN="+csrfCookieValue],
             ["cookie", "SESSIONID="+sessionCookieValue],
             ["content-type", "application/x-www-form-urlencoded"],
         ] 
         });
-    event = new MockRequestEvent("1", postRequest, {clientId: "bob_ABC"});
+    event = new MockRequestEvent("1", postRequest, {client_id: "bob_ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
@@ -162,7 +162,7 @@ test('SvelteKitAdminClientEndpoints.updateClient', async () => {
     resp1 = await server.sessionServer?.adminClientEndpoints.updateClientEndpoint.actions.default(event);
     expect(resp1?.ok).toBe(true);
     expect(resp1?.plaintextSecret).toBeDefined();
-    expect(resp1?.client?.clientSecret).not.toContain("pbkdf2:sha256");
+    expect(resp1?.client?.client_secret).not.toContain("pbkdf2:sha256");
 });
 
 test('SvelteKitAdminClientEndpoints.deleteClient', async () => {
@@ -186,7 +186,7 @@ test('SvelteKitAdminClientEndpoints.deleteClient', async () => {
             ["content-type", "application/x-www-form-urlencoded"],
         ] 
         });
-    let event = new MockRequestEvent("1", getRequest, {clientId: "ABC"});
+    let event = new MockRequestEvent("1", getRequest, {client_id: "ABC"});
     event.locals.csrfToken = csrfToken;
     let status = 200;
     let resp1 : {[key:string]:any}|undefined = {};
@@ -197,7 +197,7 @@ test('SvelteKitAdminClientEndpoints.deleteClient', async () => {
     }
     expect(status).toBe(401);
 
-    event = new MockRequestEvent("1", getRequest, {clientId: "ABC"});
+    event = new MockRequestEvent("1", getRequest, {client_id: "ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
@@ -210,7 +210,7 @@ test('SvelteKitAdminClientEndpoints.deleteClient', async () => {
     }
     expect(status).toBe(200);
 
-    event = new MockRequestEvent("1", getRequest, {clientId: "bob_ABC"});
+    event = new MockRequestEvent("1", getRequest, {client_id: "bob_ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
@@ -227,7 +227,7 @@ test('SvelteKitAdminClientEndpoints.deleteClient', async () => {
             ["content-type", "application/x-www-form-urlencoded"],
         ] 
         });
-    event = new MockRequestEvent("1", postRequest, {clientId: "bob_ABC"});
+    event = new MockRequestEvent("1", postRequest, {client_id: "bob_ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
@@ -278,24 +278,24 @@ test('SvelteKitAdminClientEndpoints.createClient', async () => {
 
     let postRequest = new Request("http://ex.com/oauth/clients", {
         method: "POST",
-        body: "csrfToken="+csrfToken+"&clientName=newName&confidential=on&redirectUri=http://uri1.com/redirect&authorizationCode=on",
+        body: "csrfToken="+csrfToken+"&client_name=newName&confidential=on&redirect_uri=http://uri1.com/redirect&authorizationCode=on",
         headers: [
             ["cookie", "CSRFTOKEN="+csrfCookieValue],
             ["cookie", "SESSIONID="+sessionCookieValue],
             ["content-type", "application/x-www-form-urlencoded"],
         ] 
         });
-    event = new MockRequestEvent("1", postRequest, {clientId: "bob_ABC"});
+    event = new MockRequestEvent("1", postRequest, {client_id: "bob_ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.adminClientEndpoints.createClientEndpoint.actions.default(event);
     expect(resp1?.ok).toBe(true);
-    expect(resp1?.client?.clientName).toBe("newName");
+    expect(resp1?.client?.client_name).toBe("newName");
     expect(resp1?.plaintextSecret).toBeUndefined();
-    expect(resp1?.client?.clientSecret).not.toContain("pbkdf2:sha256");
-    expect(resp1?.client?.userId).toBeUndefined();
+    expect(resp1?.client?.client_secret).not.toContain("pbkdf2:sha256");
+    expect(resp1?.client?.userid).toBeUndefined();
 
 });
 
@@ -341,23 +341,23 @@ test('SvelteKitAdminClientEndpoints.createClientForUser', async () => {
 
     let postRequest = new Request("http://ex.com/oauth/clients?userid=bob", {
         method: "POST",
-        body: "csrfToken="+csrfToken+"&clientName=newName&confidential=on&redirectUri=http://uri1.com/redirect&authorizationCode=on&userId=bob",
+        body: "csrfToken="+csrfToken+"&client_name=newName&confidential=on&redirect_uri=http://uri1.com/redirect&authorizationCode=on&userid=bob",
         headers: [
             ["cookie", "CSRFTOKEN="+csrfCookieValue],
             ["cookie", "SESSIONID="+sessionCookieValue],
             ["content-type", "application/x-www-form-urlencoded"],
         ] 
         });
-    event = new MockRequestEvent("1", postRequest, {clientId: "bob_ABC"});
+    event = new MockRequestEvent("1", postRequest, {client_id: "bob_ABC"});
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     resp1 = await server.sessionServer?.adminClientEndpoints.createClientEndpoint.actions.default(event);
     expect(resp1?.ok).toBe(true);
-    expect(resp1?.client?.clientName).toBe("newName");
+    expect(resp1?.client?.client_name).toBe("newName");
     expect(resp1?.plaintextSecret).toBeUndefined();
-    expect(resp1?.client?.clientSecret).not.toContain("pbkdf2:sha256");
-    expect(resp1?.client?.userId).toBe("bob");
+    expect(resp1?.client?.client_secret).not.toContain("pbkdf2:sha256");
+    expect(resp1?.client?.userid).toBe("bob");
 
 });

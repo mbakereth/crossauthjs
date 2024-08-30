@@ -22,7 +22,7 @@ test('SessionCookie.createSessionKey', async () => {
     let key = await keyStorage.getKey(SessionCookie.hashSessionId(value));
     expect(key.expires).toBeDefined();
     expect(expires).toBeDefined();
-    expect(key.userId).toStrictEqual(bob.id);
+    expect(key.userid).toStrictEqual(bob.id);
     expect(key.expires?.getTime()).toBe(expires?.getTime());
     if (key.expires != undefined && expires != undefined) {
         expect(key.expires?.getTime()-dateCreated.getTime()).toBe(expires?.getTime()-dateCreated.getTime());

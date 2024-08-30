@@ -15,7 +15,7 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
     /** Name of user table (to Prisma, ie lowercase).  Default `user` */
     userTable? : string,
 
-    /** Name of user secrets table (to Prisma, ie lowercase).  Default `user` */
+    /** Name of user secrets table (to Prisma, ie lowercase).  Default `userSecrets` */
     userSecretsTable? : string,
 
     /** Name of the id column in the user table.  Can be set to `username` if that is your primary key.
@@ -29,9 +29,10 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
     includes? : string[];
 
     /**
-     * This works around a Fastify limitation.  If the id passed to 
+     * This works around a Fastify and Sveltekit limitation.  If the id passed to 
      * getUserById() is a string but is numeric, first try forcing it to
      * a number before selecting.  If that fails, try it as the string,
+     * Default true.
      */
     forceIdToNumber? : boolean,
 }
@@ -42,8 +43,8 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
  * 
  * By default, the Prisma name (ie the lowercased version) is called `user`.  It must have at least these fields:
  *    * `username String \@unique`
- *    * `usernameNormalized String \@unique`
- *    * `password String`
+ *    * `username_normalized String \@unique`
+ *    * `state String`
  * It must also contain an ID column, which is either an `Int` or `String`, eg
  *    * `id Int \@id \@unique \@default(autoincrement())
  * Alternatively you can set it to `username` if you don't have a separate ID field.
@@ -52,10 +53,15 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
  *  If the username is not the email address,
  *  it must contain these extra two fields:
  *     * `email String \@unique`
- *     * `emailNormalized String \@unique`
+ *     * `email_normalized String \@unique`
  * 
  * You can optionally check if a `passwordReset` field is set to `true` when validating users.  Enabling this requires
  * the user table to also have a `passwordReset Boolean` field.  Use this if you want to require your user to change his/her password.
+ * 
+ * If `normalizeUsername` is true, getting a user by username will match on normalized (converting dialetics)
+ * and lowercased username.  This is not true of matching by id, even if the id columns is the same as the username column.
+ * 
+ * If `normalizeEmail` is true, getting a user by username will matched on normalized, lowercase username.
 */
 export class PrismaUserStorage extends UserStorage {
     private userTable : string = "user";
@@ -68,7 +74,7 @@ export class PrismaUserStorage extends UserStorage {
 
     /**
      * Creates a PrismaUserStorage object, optionally overriding defaults.
-     * @param options see {@link PrismaUserStorage}
+     * @param options see {@link PrismaUserStorageOptions}
      */
     constructor(options : PrismaUserStorageOptions = {}) {
         super(options);
@@ -139,7 +145,7 @@ export class PrismaUserStorage extends UserStorage {
             delete secrets.user_id;
             delete prismaUser.secrets;
         }
-        return {user: {...prismaUser, id: prismaUser[this.idColumn]}, secrets: {userId: prismaUser[this.idColumn], ...secrets}};
+        return {user: {...prismaUser, id: prismaUser[this.idColumn]}, secrets: {userid: prismaUser[this.idColumn], ...secrets}};
     }
 
     /**
@@ -152,7 +158,7 @@ export class PrismaUserStorage extends UserStorage {
         username : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         const normalizedValue = PrismaUserStorage.normalize(username);
-        return this.getUser("usernameNormalized", normalizedValue, options);
+        return this.getUser("username_normalized", normalizedValue, options);
     }
 
     /**
@@ -168,7 +174,7 @@ export class PrismaUserStorage extends UserStorage {
         email : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         const normalizedValue = PrismaUserStorage.normalize(email);
-        return this.getUser("emailNormalized", normalizedValue, options);
+        return this.getUser("email_normalized", normalizedValue, options);
     }
 
     /**
@@ -198,19 +204,25 @@ export class PrismaUserStorage extends UserStorage {
     /**
      * If the given session key exist in the database, update it with the passed values.  If it doesn't
      * exist, throw a CreossauthError with InvalidKey.
+     * 
+     * Warning: the fields in `user` and `secrets` are not validated so, before calling this,
+     * you should check they are in `userEditableFields`.
+     * 
      * @param user the user to update.  The id to update is taken from this obkect, which must be present.  All other attributes are optional. 
      */
     async updateUser(user : Partial<User>, secrets?: Partial<UserSecrets>) : Promise<void> {
-        if (!(this.idColumn in user)) throw new CrossauthError(ErrorCode.InvalidKey);
-        if (secrets && !secrets.userId) secrets.userId = user[this.idColumn];
+        //if (!(this.idColumn in user)) throw new CrossauthError(ErrorCode.InvalidKey);
+        if (!(user.id)) throw new CrossauthError(ErrorCode.InvalidKey);
+        //if (secrets && !secrets.userid) secrets.userid = user[this.idColumn];
+        if (secrets && !secrets.userid) secrets = {...secrets, userid: user[this.idColumn]};
         try {
             let {id: dummyUserId, ...userData} = user;
-            let {userId: dummySecretsId, ...secretsData} = secrets??{};
+            let {userid: dummySecretsId, ...secretsData} = secrets??{};
             if ("email" in userData && userData.email) {
-                userData = {emailNormalized: PrismaUserStorage.normalize(userData.email), ...userData};
+                userData = {email_normalized: PrismaUserStorage.normalize(userData.email), ...userData};
             }
             if ("username" in userData && userData.username) {
-                userData = {usernameNormalized: PrismaUserStorage.normalize(userData.username), ...userData};
+                userData = {username_normalized: PrismaUserStorage.normalize(userData.username), ...userData};
             }
             if (!secrets) {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -232,7 +244,7 @@ export class PrismaUserStorage extends UserStorage {
                             },
                         });
                     } catch (e) {}
-                    let {userId: dummySecretsId, ...existingSecretsData} = existingSecrets??{};
+                    let {userid: dummySecretsId, ...existingSecretsData} = existingSecrets??{};
                     secretsData = {...existingSecretsData, ...secretsData}
                     // @ts-ignore
                     await tx[this.userTable].update({
@@ -266,6 +278,10 @@ export class PrismaUserStorage extends UserStorage {
 
     /**
      * Create a user
+     * 
+     * Warning: the fields in `user` and `secrets` are not validated so, before calling this,
+     * you should check they are in `userEditableFields`.
+     * 
      * @param user 
      * @param secrets 
      */
@@ -274,14 +290,14 @@ export class PrismaUserStorage extends UserStorage {
         let error : CrossauthError|undefined = undefined;
         if (secrets && !secrets.password) throw new CrossauthError(ErrorCode.PasswordFormat, "Password required when creating user");
         let newUser;
-        let usernameNormalized = "";
-        let emailNormalized = "";
+        let username_normalized = "";
+        let email_normalized = "";
         try {
             if ("email" in user && user.email) {
-                emailNormalized = PrismaUserStorage.normalize(user.email);
+                email_normalized = PrismaUserStorage.normalize(user.email);
             }
             if ("username" in user && user.username) {
-                usernameNormalized = PrismaUserStorage.normalize(user.username);
+                username_normalized = PrismaUserStorage.normalize(user.username);
             }
             if (secrets) {
 
@@ -289,8 +305,8 @@ export class PrismaUserStorage extends UserStorage {
                 newUser = await this.prismaClient[this.userTable].create({
                     data: {
                         ...user,
-                        emailNormalized,
-                        usernameNormalized,
+                        email_normalized,
+                        username_normalized,
                         secrets: { 
                             create: 
                                 secrets
@@ -303,8 +319,8 @@ export class PrismaUserStorage extends UserStorage {
             newUser = await this.prismaClient[this.userTable].create({
                     data: {
                         ...user,
-                        emailNormalized,
-                        usernameNormalized,
+                        email_normalized,
+                        username_normalized,
                     }
             });
             }
@@ -379,7 +395,7 @@ export class PrismaUserStorage extends UserStorage {
                 ...opts,
                 orderBy: [
                     {
-                        usernameNormalized: 'asc',
+                        username_normalized: 'asc',
                     },
                 ],
                 include: this.includesObject,
@@ -412,13 +428,13 @@ export interface PrismaKeyStorageOptions {
  * Implementation of {@link KeyStorage } where keys stored in a database managed by
  * the Prisma ORM.
  * 
- * By default, the Prisma name (ie the lowercased version) is called `session`.  It must have at least three fields:
- *    * `key String \@unique`
+ * By default, the Prisma name (ie the lowercased version) is called `key`.  It must have at least three fields:
+ *    * `value String \@unique`
  *    * `user_id String or Int`
  *    * `created DateTime`
  *    * `expires DateTime`
  * `key` must have `\@unique`.  It may also contain an ID column, which is not used.  If in the schema,
- * it must be autoincrement.  THe `userId` may be a `String` or `Int`.  If a database table is used for
+ * it must be autoincrement.  THe `userid` may be a `String` or `Int`.  If a database table is used for
  * user storage (eg {@link PrismaUserStorage} this should be a foreign key to the user table), in which case there
  * should also be a `user` field (see Prisma documentation on foreign keys).
  */
@@ -456,7 +472,7 @@ export class PrismaKeyStorage extends KeyStorage {
      * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidSession`, `UserNotExist` or `Connection`
      */
     private async getKeyWithTransaction(key : string, tx : any) : Promise<Key> {
-        let returnKey : Key = {userId: 0, value: "", created: new Date(), expires: undefined};
+        let returnKey : Key = {userid: 0, value: "", created: new Date(), expires: undefined};
         let error : CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -467,7 +483,7 @@ export class PrismaKeyStorage extends KeyStorage {
             });
             returnKey = {
                 ...prismaKey,
-                userId: prismaKey.user_id,
+                userid: prismaKey.user_id,
             }
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -482,14 +498,14 @@ export class PrismaKeyStorage extends KeyStorage {
     /**
      * Saves a key in the session table.
      * 
-     * @param userId user ID to store with the session key.  See {@link PrismaUserStorage} for how this may differ from `username`.
+     * @param userid user ID to store with the session key.  See {@link PrismaUserStorage} for how this may differ from `username`.
      * @param value the value of the key to store.
      * @param created the date/time the key was created.
      * @param expires the date/time the key expires.
      * @param extraFields these will be stored in the key table row
      * @throws {@link @crossauth/common!CrossauthError } if the key could not be stored.
      */
-    async saveKey(userId : string | number | undefined, 
+    async saveKey(userid : string | number | undefined, 
                       value : string, created : Date, 
                       expires : Date | undefined,
                       data? : string,
@@ -497,7 +513,7 @@ export class PrismaKeyStorage extends KeyStorage {
         let error : CrossauthError|undefined = undefined;
         try {
             let prismaData : {[key : string] : any} = {
-                user_id : userId,
+                user_id : userid,
                 value : value,
                 created : created,
                 expires : expires??null,
@@ -553,9 +569,9 @@ export class PrismaKeyStorage extends KeyStorage {
     /**
      * Deletes all keys from storage for the given user ID
      * 
-     * @param userId : user ID to delete keys for
+     * @param userid : user ID to delete keys for
      */
-    async deleteAllForUser(userId : string | number | undefined, prefix : string, except? : string) : Promise<void> {
+    async deleteAllForUser(userid : string | number | undefined, prefix : string, except? : string) : Promise<void> {
         let error : CrossauthError;
         try {
             if (except) {
@@ -563,7 +579,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                     where: {
                         AND: [
-                            { user_id: userId??null },
+                            { user_id: userid??null },
                             { value: {startsWith: prefix} },
                             { value: { not: except } },
                         ]
@@ -575,7 +591,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                     where: {
                         AND: [
-                            { user_id: userId??null },
+                            { user_id: userid??null },
                             { value: {startsWith: prefix} } ,
                         ]
                     }
@@ -592,7 +608,7 @@ export class PrismaKeyStorage extends KeyStorage {
         try {
             let andClause = [];
             for (let entry in key) {
-                if (entry == "userId") {
+                if (entry == "userid") {
                     andClause.push({user_id: key[entry]});
 
                 } else {
@@ -612,18 +628,18 @@ export class PrismaKeyStorage extends KeyStorage {
 }
 
     /**
-     * Deletes all keys from storage other than those with the given prefix
+     * Deletes all keys with the given prefix
      * 
-     * @param userId : user ID to delete keys for
+     * @param userid : user ID to delete keys for
      */
-    async deleteWithPrefix(userId : string | number | undefined, prefix : string) : Promise<void> {
+    async deleteWithPrefix(userid : string | number | undefined, prefix : string) : Promise<void> {
         let error : CrossauthError;
         try {
             // @ts-ignore - because referring to a table name in a variable doesn't have a type in Prisma
             return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                 where: {
                     AND: [
-                        { user_id: userId??null },
+                        { user_id: userid??null },
                         { value: {startsWith: prefix} },
                     ]
                 }
@@ -636,17 +652,17 @@ export class PrismaKeyStorage extends KeyStorage {
         if (error) throw error;
     }     
 
-    async getAllForUser(userId : string|number|undefined) : Promise<Key[]> {
+    async getAllForUser(userid : string|number|undefined) : Promise<Key[]> {
         let returnKeys : Key[] = [];
         let error : CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             let prismaKeys =  await this.prismaClient[this.keyTable].findMany({
                 where: {
-                    user_id: userId??null
+                    user_id: userid??null
                 }
             });
-            returnKeys = prismaKeys.map((v : Partial<Key>) => { return {...v, userId: v.user_id} });
+            returnKeys = prismaKeys.map((v : Partial<Key>) => { return {...v, userid: v.user_id} });
         } catch {
             error = new CrossauthError(ErrorCode.InvalidKey);
         }
@@ -752,7 +768,7 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
      * This is to work around a Prisma bug.  SQLite returns an error
      * when updating a client if inside a transaction.  
      * - `Update` `OAuthClient` table is updated, `OAuthClientAuthorization`
-     *            and `OAuthValidFlow` are updared with a delete and insert.
+     *            and `OAuthValidFlow` are updated with a delete and insert.
      *            Doesn't work with SQLite.
      * - `DeleteAndInsert` updated to the `OAuthClient`, 
      *                     `OAuthClientAuthorization` and `OAuthValidFlow` are
@@ -799,16 +815,16 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         }
     }
 
-    async getClientById(clientId : string) : Promise<OAuthClient> {
-        return (await this.getClientWithTransaction("clientId", clientId, this.prismaClient, true, undefined))[0];
+    async getClientById(client_id : string) : Promise<OAuthClient> {
+        return (await this.getClientWithTransaction("client_id", client_id, this.prismaClient, true, undefined))[0];
     }
 
-    async getClientByName(name : string, userId? : string|number|null) : Promise<OAuthClient[]> {
-        return await this.getClientWithTransaction("clientName", name, this.prismaClient, false, userId);
+    async getClientByName(name : string, userid? : string|number|null) : Promise<OAuthClient[]> {
+        return await this.getClientWithTransaction("client_name", name, this.prismaClient, false, userid);
     }
 
-    private async getClientWithTransaction(field : string, value : string, tx : any, unique : boolean, userId : string|number|null|undefined) : Promise<OAuthClient[]> {
-        const userWhere = (userId == undefined && !(userId === null)) ? {} : {user_id: userId};
+    private async getClientWithTransaction(field : string, value : string, tx : any, unique : boolean, userid : string|number|null|undefined) : Promise<OAuthClient[]> {
+        const userWhere = (userid == undefined && !(userid === null)) ? {} : {user_id: userid};
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             if (unique) {
@@ -817,18 +833,18 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                         [field]: value,
                         ...userWhere,
                     },
-                    include: {redirectUri: true, validFlow: true},
+                    include: {redirect_uri: true, valid_flow: true},
                 });
-                const redirectUriObjects = client.redirectUri;
-                const validFlowObjects = client.validFlow;
-                let userId = client.user_id;
-                if (userId === null) userId = undefined;
+                const redirect_uriObjects = client.redirect_uri;
+                const valid_flowObjects = client.valid_flow;
+                let userid = client.user_id;
+                if (userid === null) userid = undefined;
                 return [{
                     ...client, 
-                    userId : userId,
-                    clientSecret: client.clientSecret??undefined, 
-                    redirectUri: redirectUriObjects.map((x:{[key:string]:any}) => x.uri), 
-                    validFlow: validFlowObjects.map((x:{[key:string]:any}) => x.flow)
+                    userid : userid,
+                    client_secret: client.client_secret??undefined, 
+                    redirect_uri: redirect_uriObjects.map((x:{[key:string]:any}) => x.uri), 
+                    valid_flow: valid_flowObjects.map((x:{[key:string]:any}) => x.flow)
                 }];
             } else {
                 const clients = await tx[this.clientTable].findMany({
@@ -836,17 +852,17 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                         [field]: value,
                         ...userWhere,
                     },
-                    include: {redirectUri: true, validFlow: true},
+                    include: {redirect_uri: true, valid_flow: true},
                 });
                 for (let client of clients) {
-                    const redirectUriObjects = client.redirectUri;
-                    const validFlowObjects = client.validFlow;
-                    let userId = client.user_id;
-                    if (userId == null) userId = undefined;    
-                    client.userId = userId;
-                    client.clientSecret = client.clientSecret??undefined;
-                    client.redirectUri = redirectUriObjects.map((x:{[key:string]:any}) => x.uri);
-                    client.validFlow = validFlowObjects.map((x:{[key:string]:any}) => x.flow)
+                    const redirect_uriObjects = client.redirect_uri;
+                    const valid_flowObjects = client.valid_flow;
+                    let userid = client.user_id;
+                    if (userid == null) userid = undefined;    
+                    client.userid = userid;
+                    client.client_secret = client.client_secret??undefined;
+                    client.redirect_uri = redirect_uriObjects.map((x:{[key:string]:any}) => x.uri);
+                    client.valid_flow = valid_flowObjects.map((x:{[key:string]:any}) => x.flow)
                 }
                 return clients;
                 }
@@ -866,6 +882,10 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     async createClient(client : OAuthClient) : Promise<OAuthClient> {
         try {
             return this.prismaClient.$transaction(async (tx: any) => {
+                try {
+                    await this.getClientWithTransaction("client_id", client.client_id, tx, true, client.userid);
+                    throw new CrossauthError(ErrorCode.ClientExists);
+                } catch (e1) {}
                 return await this.createClientWithTransaction(client, tx);
             }, {timeout: this.transactionTimeout});
         } catch (e) {
@@ -878,56 +898,48 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     }
 
     private async createClientWithTransaction(client : OAuthClient, tx : any) : Promise<OAuthClient> {
-        const maxAttempts = 10;
-        const {redirectUri, validFlow, userId, ...prismaClientData} = client;
+        const {redirect_uri, valid_flow, userid, ...prismaClientData} = client;
         let newClient : OAuthClient|undefined;
-        if (userId) prismaClientData.user_id = userId;
+        if (userid) prismaClientData.user_id = userid;
         // validate redirect uri
-        if (redirectUri) {
-            for (let i=0; i<redirectUri.length; ++i) {
-                if (redirectUri[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
+        if (redirect_uri) {
+            for (let i=0; i<redirect_uri.length; ++i) {
+                if (redirect_uri[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
                 try {
-                    new URL(redirectUri[i]);
+                    new URL(redirect_uri[i]);
                 }
                 catch (e) {
-                    throw new CrossauthError(ErrorCode.InvalidRedirectUri, `Redriect uri ${redirectUri[i]} is not valid`);
+                    throw new CrossauthError(ErrorCode.InvalidRedirectUri, `Redriect uri ${redirect_uri[i]} is not valid`);
                 }
             }
         }
 
         // validate valid flows
-        if (validFlow) {
-            for (let i=0; i<validFlow.length; ++i) {
-                if (!OAuthFlows.isValidFlow(validFlow[i])) throw new CrossauthError(ErrorCode.InvalidOAuthFlow, "Invalid flow " + validFlow[i]);
+        if (valid_flow) {
+            for (let i=0; i<valid_flow.length; ++i) {
+                if (!OAuthFlows.isValidFlow(valid_flow[i])) throw new CrossauthError(ErrorCode.InvalidOAuthFlow, "Invalid flow " + valid_flow[i]);
             }
         }
+
         
-        
-        // create client (without redirect uri and valid flows) - may take seveal attempts to get a unique clientId
-        for (let attempt=0; attempt < maxAttempts; ++attempt) {
-            try {
-                // @ts-ignore  (because types only exist when do prismaClient.table...)
-                newClient = await tx[this.clientTable].create({
-                    data: prismaClientData,
-                });
-                break;
-            } catch (e) {
-                if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
-                    if (e.code == 'P2002') {
-                        if (attempt < maxAttempts) {
-                            CrossauthLogger.logger.debug(j({msg: `Attempt ${attempt} at creating a unique client ID failed`}));
-                        } else {
-                            CrossauthLogger.logger.debug(j({err: e}));
-                            throw new CrossauthError(ErrorCode.InvalidClientId, "Attempt to create an OAuth client with a clientId that already exists. Maximum attempts failed");
-                        }
-                    } else {
-                        CrossauthLogger.logger.debug(j({err: e}));
-                        throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
-                    }
+        try {
+            // @ts-ignore  (because types only exist when do prismaClient.table...)
+            newClient = await tx[this.clientTable].create({
+                data: prismaClientData,
+            });
+        } catch (e) {
+            if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
+                if (e.code == 'P2002') {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.ClientExists, "Attempt to create an OAuth client with a client_id that already exists. Maximum attempts failed");
                 } else {
                     CrossauthLogger.logger.debug(j({err: e}));
                     throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
                 }
+            } else {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.Connection, "Error saving OAuth client");
+
             }
         }
         if (!newClient) {
@@ -936,14 +948,14 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         }
 
         // create redirect uris
-        if (redirectUri) {
+        if (redirect_uri) {
             try {
-                for (let i=0; i<redirectUri.length; ++i) {
+                for (let i=0; i<redirect_uri.length; ++i) {
                     // @ts-ignore  (because types only exist when do prismaClient.table...)
                     await tx[this.redirectUriTable].create({
                         data: {
-                            client_id: newClient.clientId,
-                            uri: redirectUri[i],
+                            client_id: newClient.client_id,
+                            uri: redirect_uri[i],
                         }
                     });
                 }
@@ -964,14 +976,14 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         }
 
         // create valid flows
-        if (validFlow) {
+        if (valid_flow) {
             try {
-                for (let i=0; i<validFlow.length; ++i) {
+                for (let i=0; i<valid_flow.length; ++i) {
                     // @ts-ignore  (because types only exist when do prismaClient.table...)
                     await tx[this.validFlowTable].create({
                         data: {
-                            client_id: newClient.clientId,
-                            flow: validFlow[i],
+                            client_id: newClient.client_id,
+                            flow: valid_flow[i],
                         }
                     });
                 }
@@ -986,19 +998,19 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             }
         }
 
-        return {...newClient, redirectUri: redirectUri, validFlow: validFlow};
+        return {...newClient, redirect_uri: redirect_uri, valid_flow: valid_flow};
     }
 
     /**
      * 
-     * @param clientId the client to delete
+     * @param client_id the client to delete
      * @throws {@link @crossauth/common!CrossauthError } if the key could not be deleted.
      */
-    async deleteClient(clientId : string) : Promise<void> {
+    async deleteClient(client_id : string) : Promise<void> {
         try {
             //return await this.updateClientWithTransaction(client, this.prismaClient);
                 return this.prismaClient.$transaction(async (tx: any) => {
-            return await this.deleteClientWithTransaction(clientId, tx);
+            return await this.deleteClientWithTransaction(client_id, tx);
         }, {timeout: this.transactionTimeout});
         } catch (e) {
             if (e && typeof e == "object" && !("isCrossauthError" in e)) {
@@ -1010,12 +1022,12 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     }
 
 
-    private async deleteClientWithTransaction(clientId : string, tx : any) : Promise<void> {
+    private async deleteClientWithTransaction(client_id : string, tx : any) : Promise<void> {
             try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             await tx[this.clientTable].deleteMany({
             where: {
-                clientId: clientId
+                client_id: client_id
             }
         });
         } catch (e) {
@@ -1027,7 +1039,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     /**
      * If the given session key exist in the database, update it with the passed values.  If it doesn't
      * exist, throw a CreossauthError with InvalidKey.
-     * @param client the client to update.  It will be searched on its clientId, which cannot be updated.
+     * @param client the client to update.  It will be searched on its client_id, which cannot be updated.
      */
     async updateClient(client : Partial<OAuthClient>) : Promise<void> {
         try {
@@ -1049,19 +1061,19 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     // This gives a Rust error when used with a transaction on SQLlite
 
     private async updateClientWithTransaction_update(client : Partial<OAuthClient>, tx : any) : Promise<void> {
-        if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
-        const redirectUris = client.redirectUri;
-        const validFlows = client.validFlow;
+        if (!(client.client_id)) throw new CrossauthError(ErrorCode.InvalidClientId);
+        const redirect_uris = client.redirect_uri;
+        const validFlows = client.valid_flow;
 
         // validate redirect uris
-        if (redirectUris) {
-            for (let i=0; i<redirectUris.length; ++i) {
-                if (redirectUris[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
+        if (redirect_uris) {
+            for (let i=0; i<redirect_uris.length; ++i) {
+                if (redirect_uris[i].includes("#")) throw new CrossauthError(ErrorCode.InvalidRedirectUri, "Redirect Uri's may not contain page fragments");
                 try {
-                    new URL(redirectUris[i]);
+                    new URL(redirect_uris[i]);
                 }
                 catch (e) {
-                    throw new CrossauthError(ErrorCode.InvalidRedirectUri, `Redriect uri ${redirectUris[i]} is not valid`);
+                    throw new CrossauthError(ErrorCode.InvalidRedirectUri, `Redriect uri ${redirect_uris[i]} is not valid`);
                 }
             }
         }
@@ -1076,19 +1088,19 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     
         try {
             let data = {...client};
-            delete data.clientId;
-            delete data.redirectUri;
-            delete data.validFlow;
-            if ("userId" in data) {
-                data.user_id = data.userId;
-                delete data.userId;
+            delete data.client_id;
+            delete data.redirect_uri;
+            delete data.valid_flow;
+            if ("userid" in data) {
+                data.user_id = data.userid;
+                delete data.userid;
             }
 
             if (Object.keys(data).length > 0) {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
                 await tx[this.clientTable].update({
                     where: {
-                        clientId: client.clientId,
+                        client_id: client.client_id,
                     },
                     data: data
                 });
@@ -1098,20 +1110,20 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             throw new CrossauthError(ErrorCode.Connection, "Error updating client");
         }
 
-        if (redirectUris != undefined) {
+        if (redirect_uris != undefined) {
             try {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
                 await this.prismaClient[this.redirectUriTable].deleteMany({
                         where: {
-                        client_id: client.clientId
+                        client_id: client.client_id
                     }
                 });
-                for (let i=0; i<redirectUris.length; ++i) { 
+                for (let i=0; i<redirect_uris.length; ++i) { 
                     // @ts-ignore  (because types only exist when do prismaClient.table...)
                     await tx[this.redirectUriTable].create({
                         data: {
-                            client_id: client.clientId,
-                            uri: redirectUris[i],
+                            client_id: client.client_id,
+                            uri: redirect_uris[i],
                         }
                     });
                 }
@@ -1133,17 +1145,19 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
 
         if (validFlows != undefined) {
             try {
+                console.log("Deleting valid flows " + client.client_id);
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
                 await this.prismaClient[this.validFlowTable].deleteMany({
                     where: {
-                        client_id: client.clientId
+                        client_id: client.client_id
                     }
                 });
                 for (let i=0; i<validFlows.length; ++i) { 
                     // @ts-ignore  (because types only exist when do prismaClient.table...)
+                    console.log("Creating valid flow " + client.client_id + " " + validFlows[i]);
                     await tx[this.validFlowTable].create({
                         data: {
-                            client_id: client.clientId,
+                            client_id: client.client_id,
                             flow: validFlows[i],
                         }
                     });
@@ -1162,34 +1176,34 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     }
 
     private async updateClientWithTransaction_deleteAndInsert(client : Partial<OAuthClient>, tx : any) : Promise<void> {
-        if (!(client.clientId)) throw new CrossauthError(ErrorCode.InvalidClientId);
-        const existingClient = (await this.getClientWithTransaction("clientId", client.clientId, this.prismaClient, true, undefined))[0];
+        if (!(client.client_id)) throw new CrossauthError(ErrorCode.InvalidClientId);
+        const existingClient = (await this.getClientWithTransaction("client_id", client.client_id, this.prismaClient, true, undefined))[0];
         const newClient = {...existingClient, ...client};
-        if ("userId" in newClient) {
-            newClient.user_id = newClient.userId;
-            delete newClient.userId;
+        if ("userid" in newClient) {
+            newClient.user_id = newClient.userid;
+            delete newClient.userid;
         }
-        await this.deleteClientWithTransaction(client.clientId, tx);
+        await this.deleteClientWithTransaction(client.client_id, tx);
         await this.createClientWithTransaction(newClient, tx);
     }
 
-    async getClients(skip? : number, take? : number, userId? : string|number|null) : Promise<OAuthClient[]> {
+    async getClients(skip? : number, take? : number, userid? : string|number|null) : Promise<OAuthClient[]> {
         let opts : {[key:string]:number} = {};
         if (skip) opts.skip = skip;
         if (take) opts.take = take;
 
         try {
             let clients : OAuthClient[] = [];
-            if (userId || userId === null) {
+            if (userid || userid === null) {
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
                 clients = await this.prismaClient[this.clientTable].findMany({
                     ...opts,
                     where: {
-                        user_id: userId,
+                        user_id: userid,
                     },
                     orderBy: [
                         {
-                            clientName: 'asc',
+                            client_name: 'asc',
                         },
                     ],
                 });
@@ -1199,14 +1213,14 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                     ...opts,
                     orderBy: [
                         {
-                            clientName: 'asc',
+                            client_name: 'asc',
                         },
                     ],
                 });
             } 
 
             clients.forEach((client) => {
-                client.userId = client.user_id===null ? undefined : client.user_id; 
+                client.userid = client.user_id===null ? undefined : client.user_id; 
                 return client});
             return clients;
         }  catch (e) {
@@ -1259,13 +1273,13 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
         }
     }
 
-    async getAuthorizations(clientId : string, userId : string|number|undefined) : Promise<string[]> {
+    async getAuthorizations(client_id : string, userid : string|number|undefined) : Promise<(string|null)[]> {
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             let rows = await this.prismaClient[this.authorizationTable].findMany({
                 where: {
-                    client_id : clientId,
-                    user_id: userId??null,
+                    client_id : client_id,
+                    user_id: userid??null,
                 },
                 select: {
                     scope: true,
@@ -1274,27 +1288,27 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             return rows.map((row : {[key:string]:any}) => row.scope);
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
-            //CrossauthLogger.logger.error(j({msg: "Couldn't get authorizations", clientId: clientId, userId: userId, cerr: e}))
+            //CrossauthLogger.logger.error(j({msg: "Couldn't get authorizations", client_id: client_id, userid: userid, cerr: e}))
             throw new CrossauthError(ErrorCode.Connection);
         }
     }
 
-    async updateAuthorizations(clientId : string, userId : string|number|undefined, scopes : string[]) : Promise<void> {
+    async updateAuthorizations(client_id : string, userid : string|number|null, scopes : string[]) : Promise<void> {
         return this.prismaClient.$transaction(async (tx:any) => {
-            return await this.updateAuthorizationsWithTransaction(clientId, userId, scopes, tx);
+            return await this.updateAuthorizationsWithTransaction(client_id, userid, scopes, tx);
         }, {timeout: this.transactionTimeout});
     }
 
     /**
      * Saves a key in the session table.
      * 
-     * @param clientId the client to update
-     * @param userId the user ID to associate with the client, or undefined
+     * @param client_id the client to update
+     * @param userid the user ID to associate with the client, or undefined
      *        for a client not associated with a user
      * @param scopes the scopes that are authorized (new plus existing)
      * @throws {@link @crossauth/common!CrossauthError } if the client could not be stored.
      */
-    private async updateAuthorizationsWithTransaction(clientId : string, userId : string|number|undefined, scopes : string[], tx : any) : Promise<void> {
+    private async updateAuthorizationsWithTransaction(client_id : string, userid : string|number|null, scopes : string[], tx : any) : Promise<void> {
 
         try {
             // delete existing authorizations
@@ -1302,8 +1316,8 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             await tx[this.authorizationTable].deleteMany({
                 where: {
-                    client_id: clientId,
-                    user_id : userId??null
+                    client_id: client_id,
+                    user_id : userid??null
                 }
             });
 
@@ -1312,8 +1326,8 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             scopes.forEach((scope) => {
                 promises.push(tx[this.authorizationTable].create({
                     data: {
-                        client_id : clientId,
-                        user_id : userId??null,
+                        client_id : client_id,
+                        user_id : userid??null,
                         scope : scope,
                     },
                 }));

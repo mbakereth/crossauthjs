@@ -40,13 +40,13 @@ import { CrossauthError, j, CrossauthLogger, ErrorCode } from '@crossauth/common
  * | searchClientsEndpoint      | Returns a paginated set of clients or those matching search | See {@link SearchClientsPageData}                                                | *Not provided*                                                   |                                                                  |           |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | updateClientEndpoint       | Updates a client                                            | See {@link UpdateClientsPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link UpdateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | clientId  |
+ * |                            |                                                             |                                                                                  | See {@link UpdateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | createClientEndpoint       | Creates a new client                                        | See {@link CreateClientsPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link CreateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | clientId  |
+ * |                            |                                                             |                                                                                  | See {@link CreateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | deleteClientEndpoint       | Deletes a client                                            | See {@link DeleteClientsPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link DeleteClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | clientId  |
+ * |                            |                                                             |                                                                                  | See {@link DeleteClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  */
 export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints {
@@ -93,10 +93,10 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
         // check user owns client
         try {
-            const clientId = event.params.clientId;
-            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
-            const client = await this.clientStorage?.getClientById(clientId);
-            if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+            const client_id = event.params.client_id;
+            if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client = await this.clientStorage?.getClientById(client_id);
+            if (client?.userid != event.locals.user.id) return this.error(401, "Access denied");
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
@@ -107,7 +107,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
                 error: ce.message,
                 exception: ce,
                 validFlows: this.validFlows,
-                validFlowNames: this.validFlowNames,
+                valid_flowNames: this.valid_flowNames,
             }
         }
 
@@ -126,10 +126,10 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
  
         // check user owns client
         try {
-            const clientId = event.params.clientId;
-            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
-            const client = await this.clientStorage?.getClientById(clientId);
-            if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+            const client_id = event.params.client_id;
+            if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client = await this.clientStorage?.getClientById(client_id);
+            if (client?.userid != event.locals.user.id) return this.error(401, "Access denied");
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
@@ -157,10 +157,10 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
         // check user owns client
         try {
-            const clientId = event.params.clientId;
-            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
-            const client = await this.clientStorage?.getClientById(clientId);
-            if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+            const client_id = event.params.client_id;
+            if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client = await this.clientStorage?.getClientById(client_id);
+            if (client?.userid != event.locals.user.id) return this.error(401, "Access denied");
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
@@ -188,10 +188,10 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
 
         // check user owns client
         try {
-            const clientId = event.params.clientId;
-            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
-            const client = await this.clientStorage?.getClientById(clientId);
-            if (client?.userId != event.locals.user.id) return this.error(401, "Access denied");
+            const client_id = event.params.client_id;
+            if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client = await this.clientStorage?.getClientById(client_id);
+            if (client?.userid != event.locals.user.id) return this.error(401, "Access denied");
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);

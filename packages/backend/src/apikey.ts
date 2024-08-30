@@ -76,7 +76,7 @@ export class ApiKeyManager {
      * @param name a name for they key.  This is for the user to refer to it 
      *             (eg, for showing the keys the user has created or deleting 
      *             a key)
-     * @param userId id for the user who owns this key, which may be undefined 
+     * @param userid id for the user who owns this key, which may be undefined 
      *               for keys not associated with a user
      * @param data any application-specific extra data.
      *              If it contains an array called `scope` and this array 
@@ -89,7 +89,7 @@ export class ApiKeyManager {
      *          Authorization header (with the signature appended.)
      */
     async createKey(name: string,
-        userId: string | number | undefined,
+        userid: string | number | undefined,
         data?: { [key: string]: any },
         expiry?: number,
         extraFields?: { [key: string]: any }) : 
@@ -101,14 +101,14 @@ export class ApiKeyManager {
         const key = {
             name : name,
             value : value,
-            userId : userId,
+            userid : userid,
             data : KeyStorage.encodeData(data),
             expires : expires,
             created : created,
             ...extraFields,
         }
         await this.apiKeyStorage.saveKey(
-            userId, 
+            userid, 
             this.prefix+hashedKey, 
             created, 
             expires, 

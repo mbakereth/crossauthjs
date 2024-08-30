@@ -19,6 +19,9 @@ export enum ErrorCode {
     /** This is returned if an OAuth2 client id is invalid */
     InvalidClientId,
 
+    /** This is returned if attempting to make a client which already exists (client_id or name/userid) */
+    ClientExists,
+
     /** This is returned if an OAuth2 client secret is invalid */
     InvalidClientSecret,
 
@@ -193,6 +196,9 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.InvalidClientId) {
             _message = "Client id is invalid"
             _httpStatus = 401;
+        } else if (code == ErrorCode.ClientExists) {
+            _message = "Client ID or name already exists"
+            _httpStatus = 500;
         } else if (code == ErrorCode.InvalidClientSecret) {
             _message = "Client secret is invalid"
             _httpStatus = 401;

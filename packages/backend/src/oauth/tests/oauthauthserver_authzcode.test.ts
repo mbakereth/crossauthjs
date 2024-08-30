@@ -28,14 +28,15 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage, 
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
@@ -73,8 +74,8 @@ test('AuthorizationServer.AuthzCodeFlow.scopePersistence', async () => {
     const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState,
             user: {id: "bob", username: "bob", state: "active"}});
@@ -116,8 +117,8 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeDisallowed', async () => {
     const {error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             state: inputState,
             user: {id: "bob", username: "bob", state: "active"}});
     const scopes = await authStorage.getAuthorizations("ABC", "bob")
@@ -152,8 +153,8 @@ test('AuthorizationServer.AuthzCodeFlow.emptyScopeAllowed', async () => {
     const {error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             state: inputState,
             user: {id: "bob", username: "bob", state: "active"}});
     const scopes = await authStorage.getAuthorizations("ABC", "bob")
@@ -182,13 +183,14 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyFi
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
@@ -220,13 +222,14 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestPublicKeyPr
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
@@ -258,13 +261,14 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKeyFi
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
@@ -295,13 +299,14 @@ test('AuthorizationServer.AuthzCodeFlow.validAuthorizationCodeRequestSecretKey',
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
     const inputState = "ABCXYZ";
     const {code, state, error, error_description} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
@@ -331,13 +336,14 @@ test('AuthorizationServer.AuthzCodeFlow.invalidScope', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
     const inputState = "ABCXYZ";
     const {error} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "unregisteredScope", 
             state: inputState});
     expect(error).toBe("invalid_scope");
@@ -360,13 +366,14 @@ test('AuthorizationServer.AuthzCodeFlow.invalidRedirectUri', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
     const inputState = "ABCXYZ";
     const {error} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: "http://example.com/invalidRedirect", 
+            client_id: client.client_id, 
+            redirect_uri: "http://example.com/invalidRedirect", 
             scope: "read write", 
             state: inputState});
     expect(error).toBe("invalid_request");
@@ -406,13 +413,14 @@ test('AuthorizationServer.AuthzCodeFlow.invalidResponseType', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
     const inputState = "ABCXYZ";
     const {error} 
         = await authServer.authorizeGetEndpoint({
             responseType: "x", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState});
     expect(error).toBe("unsupported_response_type");
@@ -436,13 +444,14 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
     const inputState = "ABCXYZ";
     const {code, state, error} 
         = await authServer.authorizeGetEndpoint({
             responseType: "code", 
-            clientId: client.clientId, 
-            redirectUri: client.redirectUri[0], 
+            client_id: client.client_id, 
+            redirect_uri: client.redirect_uri[0], 
             scope: "read write", 
             state: inputState});
     expect(error).toBeUndefined();
@@ -451,9 +460,9 @@ test('AuthorizationServer.AuthzCodeFlow.invalidKey', async () => {
     const {access_token,  error: error2}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error2).toBeUndefined();
 
     const decodedAccessToken
@@ -467,9 +476,9 @@ test('AuthorizationServer.AuthzCodeFlow.accessToken', async () => {
     const {access_token, refresh_token, expires_in, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -533,10 +542,10 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowNoRolling', async () => 
     const {refresh_token, error, access_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
             scope: "read write",
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(refresh_token).toBeDefined();
 
@@ -559,9 +568,9 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowNoRolling', async () => 
     const {refresh_token: refresh_token2, access_token: access_token2, error: error2}
         = await authServer.tokenEndpoint({
             grantType: "refresh_token", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             refreshToken: refresh_token, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error2).toBeUndefined();
     expect(refresh_token2).toBeUndefined();
 
@@ -581,10 +590,10 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
     const {refresh_token, error, access_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
             scope: "read write",
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(refresh_token).toBeDefined();
 
@@ -608,9 +617,9 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
     const {refresh_token: refresh_token2, access_token: access_token2, error: error2}
         = await authServer.tokenEndpoint({
             grantType: "refresh_token", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             refreshToken: refresh_token, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error2).toBeUndefined();
     expect(refresh_token2).toBeDefined();
     expect(refresh_token2).not.toBe(refresh_token);
@@ -624,9 +633,9 @@ test('AuthorizationServer.AuthzCodeFlow.refreshTokenFlowRolling', async () => {
     expect(decodedAccessToken?.payload.sub).toBe("bob");
 
     valid
-        = await authServer.validRefreshToken(refresh_token??"");
+        = await authServer.validRefreshToken(refresh_token2??"");
     expect(valid).toBe(true);
-    refreshData = await authServer.getRefreshTokenData(refresh_token??"");
+    refreshData = await authServer.getRefreshTokenData(refresh_token2??"");
     expect(["read", "write"]).toContain(refreshData?.scope[0]);
     expect(["read", "write"]).toContain(refreshData?.scope[1]);
     expect(refreshData?.username).toBe("bob");
@@ -639,9 +648,9 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdToken', async () => {
     const {access_token, refresh_token, expires_in, error, error_description, id_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -682,9 +691,9 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenAllClaims', async 
     const {access_token, refresh_token, expires_in, error, error_description, id_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -726,9 +735,9 @@ test('AuthorizationServer.OidcAuthzCodeFlow.accessTokenIdTokenSCopedClaims', asy
     const {access_token, refresh_token, expires_in, error, error_description, id_token}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 

@@ -293,9 +293,9 @@ export class SessionManager {
      * @throws {@link @crossauth/common!CrossauthError} with 
      *         {@link @crossauth/common!ErrorCode} of `Connection`
      */
-    async logoutFromAll(userId : string | number, except? : string|undefined) : 
+    async logoutFromAll(userid : string | number, except? : string|undefined) : 
         Promise<void> {
-        /*await*/ return this.session.deleteAllForUser(userId, except);
+        /*await*/ return this.session.deleteAllForUser(userid, except);
     }
     
     /**
@@ -524,7 +524,7 @@ export class SessionManager {
      * @param sessionId the anonymous session cookie 
      * @param repeatParams if passed, these will be compared with `params` and
      *                     if they don't match, `PasswordMatch` is thrown.
-     * @return `userId` the id of the created user.  
+     * @return `userid` the id of the created user.  
      *         `userData` data that can be displayed to the user in the page to 
      *          complete 2FA set up (eg the secret key and QR codee for TOTP),
      * 
@@ -534,7 +534,7 @@ export class SessionManager {
         params : AuthenticationParameters, 
         sessionId : string,
         repeatParams? : AuthenticationParameters) : 
-            Promise<{userId: string|number, userData : {[key:string] : any}}> {
+            Promise<{userid: string|number, userData : {[key:string] : any}}> {
             if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call initiateTwoFactorSignup if no user storage provided");
             if (!this.authenticators[user.factor1]) throw new CrossauthError(ErrorCode.Configuration, "Authenticator cannot create users");
         if (!this.authenticators[user.factor2]) throw new CrossauthError(ErrorCode.Configuration, "Two factor authentication not enabled for user");
@@ -552,7 +552,7 @@ export class SessionManager {
             sessionData);
 
         const newUser = await this.userStorage.createUser(user, factor1Secrets);  
-        return {userId: newUser.id, userData};
+        return {userid: newUser.id, userData};
     }
 
     /**
@@ -601,7 +601,7 @@ export class SessionManager {
      * closed the browser before completing factor2 setup.  Call it if the user
      * signs up again with the same factor1 credentials.
      * @param sessionId the anonymous session ID for the user
-     * @returns `userId` the id of the created user
+     * @returns `userid` the id of the created user
      *          `userData` data that can be displayed to the user in the page to 
      *           complete 2FA set up (eg the secret key and QR codee for TOTP),
      *          `secrets` data that is saved in the session for factor2.  In the
@@ -611,7 +611,7 @@ export class SessionManager {
      */
     async repeatTwoFactorSignup(sessionId: string) :
         Promise<{
-            userId: string | number,
+            userid: string | number,
             userData: { [key: string]: any },
             secrets: Partial<UserSecretsInputFields>
         }> {
@@ -633,7 +633,7 @@ export class SessionManager {
         }
 
         const {user} = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
-        return {userId: user.id, userData, secrets};      
+        return {userid: user.id, userData, secrets};      
     }
   
     /**
@@ -901,8 +901,8 @@ export class SessionManager {
         CrossauthLogger.logger.debug(j({msg: "applyEmailVerificationToken"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Email verification not enabled");
         try {
-            let { userId, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
-            let {user} = await this.userStorage.getUserById(userId, {skipEmailVerifiedCheck: true});
+            let { userid, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
+            let {user} = await this.userStorage.getUserById(userid, {skipEmailVerifiedCheck: true});
             let oldEmail;
             if ("email" in user && user.email != undefined) {
                 oldEmail = user.email;
@@ -984,7 +984,7 @@ export class SessionManager {
             throw new CrossauthError(ErrorCode.UserNotExist, "Please specify a userername");
         }
         let { email, username, password, ...rest} = newUser;
-        rest.userId = currentUser.userId;
+        rest.userid = currentUser.userid;
         let hasEmail = false;
         if (email) {
             newEmail = email;

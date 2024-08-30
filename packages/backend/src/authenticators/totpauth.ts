@@ -66,7 +66,7 @@ export class TotpAuthenticator extends Authenticator {
         Promise<{qrUrl: string, secret: string, factor2: string}> {
         const data = KeyStorage.decodeData(sessionKey.data);
         //const data = getJsonData(sessionKey);
-        if (!("totpSecret" in data)) {
+        if (!("totpsecret" in data)) {
             throw new CrossauthError(ErrorCode.Unauthorized, 
                 "TOTP data not in session");
         }
@@ -74,7 +74,7 @@ export class TotpAuthenticator extends Authenticator {
             throw new CrossauthError(ErrorCode.Unauthorized, 
                 "TOTP factor name not in session");
         }
-        const savedSecret = data.totpSecret;
+        const savedSecret = data.totpsecret;
         const { qrUrl, secret } = 
             await this.createSecret(username, savedSecret);
 
@@ -87,7 +87,7 @@ export class TotpAuthenticator extends Authenticator {
      * code to display.
      * @param user the `username` is expected to be present.  All other fields 
      *             are ignored.
-     * @returns `userData` containing `username`, `totpSecret`, `factor2` and 
+     * @returns `userData` containing `username`, `totpsecret`, `factor2` and 
      *          `qr`.
      *          `sessionData` containing the same except `qr`.
      */
@@ -105,12 +105,12 @@ export class TotpAuthenticator extends Authenticator {
         const userData = {
             username: user.username,
             qr: qrUrl,
-            totpSecret: secret,
+            totpsecret: secret,
             factor2: this.factorName
         };
         const sessionData = {
             username: user.username,
-            totpSecret: secret,
+            totpsecret: secret,
             factor2: this.factorName
         }
         return { userData, sessionData};
@@ -122,8 +122,8 @@ export class TotpAuthenticator extends Authenticator {
      * @param username user to return this for
      * @param sessionKey the session key, which should cantain the 
      *                   `sessionData` from `prepareConfiguration`, 
-     * @returns `userData` containing `totpSecret`, `factor2` and `qr`.
-     *          `secrets` containing `totpSecret`.
+     * @returns `userData` containing `totpsecret`, `factor2` and `qr`.
+     *          `secrets` containing `totpsecret`.
      *          `newSessionData` containing the same except `qr`.
      */
     async reprepareConfiguration(username : string, sessionKey : Key) : 
@@ -135,8 +135,8 @@ export class TotpAuthenticator extends Authenticator {
         const { qrUrl, secret, factor2 } =
             await this.getSecretFromSession(username, sessionKey);
         return {
-            userData: { qr: qrUrl, totpSecret: secret, factor2: factor2 },
-            secrets: { totpSecret: secret },
+            userData: { qr: qrUrl, totpsecret: secret, factor2: factor2 },
+            secrets: { totpsecret: secret },
             newSessionData: undefined
         }
     }
@@ -145,7 +145,7 @@ export class TotpAuthenticator extends Authenticator {
      * Authenticates the user using the saved TOTP parameters and the passed 
      * code.
      * @param _user ignored
-     * @param secrets should contain `totpSecret` that was saved in the session
+     * @param secrets should contain `totpsecret` that was saved in the session
      *                data.
      * @param params should contain `otp`.
      */
@@ -153,12 +153,12 @@ export class TotpAuthenticator extends Authenticator {
         secrets: UserSecretsInputFields,
         params: AuthenticationParameters) : 
         Promise<void> {
-        if (!secrets.totpSecret || !params.otp) {
+        if (!secrets.totpsecret || !params.otp) {
             throw new CrossauthError(ErrorCode.InvalidToken, 
                 "TOTP secret or code not given");
         }
         const code = params.otp;
-        const secret = secrets.totpSecret;
+        const secret = secrets.totpsecret;
         if (!gAuthenticator.check(code, secret)) {
             throw new CrossauthError(ErrorCode.InvalidToken, 
                 "Invalid TOTP code");
@@ -166,21 +166,21 @@ export class TotpAuthenticator extends Authenticator {
     }
 
     /**
-     * Creates and returns a `totpSecret`
+     * Creates and returns a `totpsecret`
      * 
      * `allowEmptySecrets` is ignored.
      * 
      * @param username the user to create these for
      * @param _params ignored
      * @param _repeatParams  ignored
-     * @returns the `totpSecret` field will be populated.
+     * @returns the `totpsecret` field will be populated.
      */
     async createPersistentSecrets(username: string,
         _params: AuthenticationParameters,
         _repeatParams?: AuthenticationParameters) :
         Promise<Partial<UserSecretsInputFields>> {
         const { secret } = await this.createSecret(username);
-        return { totpSecret: secret };
+        return { totpsecret: secret };
     }
 
     /**
@@ -214,14 +214,14 @@ export class TotpAuthenticator extends Authenticator {
     }
 
     /**
-     * @returns `totpSecret`
+     * @returns `totpsecret`
      */
     secretNames() : string[] {
-        return ["totpSecret"];
+        return ["totpsecret"];
     }
 
     /**
-     * @returns `totpSecret`
+     * @returns `totpsecret`
      */
     transientSecretNames() : string[] {
         return ["otp"];

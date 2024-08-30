@@ -46,11 +46,11 @@
         {#if data?.clients}
             {#each data?.clients as client}
                 <tr>
-                <th><a class="plain" href="clients/edit/{client.clientId}">{client.clientName}</a></th>
+                <th><a class="plain" href="clients/edit/{client.client_id}">{client.client_name}</a></th>
                 {#if isAdmin}
-                    <th><a class="plain" href="clients/edit/{client.clientId}">{client.user?.username}</a></th>
+                    <th><a class="plain" href="clients/edit/{client.client_id}">{client.user?.username}</a></th>
                 {/if}
-                <td><a class="plain" href="clients/edit/{client.clientId}">{client.clientId}</a></td>
+                <td><a class="plain" href="clients/edit/{client.client_id}">{client.client_id}</a></td>
                 </tr>
             {/each}
         {/if}

@@ -54,14 +54,14 @@
                 <label for="search">Search</label><br>
                 <input type="text"id="search" name="search" size="20" value="{{ search }}" onkeyup="search()" />
                 <input type="hidden" name="next" value="{{ next }}"/>
-                <input type="hidden" id="userId" name="userId" value="{{ user.id }}"/>
+                <input type="hidden" id="userid" name="userid" value="{{ user.id }}"/>
             </p>
             </form>
             <form id="tableForm">
                 <input type="hidden" name="next" value="{{ next }}"/>
                 <input type="hidden" id="skip" name="skip" value="{{ skip }}"/>
                 <input type="hidden" id="take" name="take" value="{{ take }}"/>
-                <input type="hidden" id="userId" name="userId" value="{{ user.id }}"/>
+                <input type="hidden" id="userid" name="userid" value="{{ user.id }}"/>
 
                 <table>
                     <tr>
@@ -71,11 +71,11 @@
                     </tr>
                 {% for client in clients %}  
                     <tr>
-                        <td>{{ client.clientName }}</th>
-                        <td>{{ client.clientId }}</th>
+                        <td>{{ client.client_name }}</th>
+                        <td>{{ client.client_id }}</th>
                         <td>
-                            <a href="updateclient/{{ client.clientId }}?next={{ next }}">Edit...</a>
-                            <a href="deleteclient/{{ client.clientId }}?next={{ next }}">Delete...</a>
+                            <a href="updateclient/{{ client.client_id }}?next={{ next }}">Edit...</a>
+                            <a href="deleteclient/{{ client.client_id }}?next={{ next }}">Delete...</a>
                         </td>
                     </tr>
                 {% endfor %}
@@ -91,7 +91,7 @@
             </form>
 
         {% if isAdmin %}
-            <p><a href="createclient?next={{next}}{% if user %}&userId={{ user.id}}{% endif%}">Create client</a></p>
+            <p><a href="createclient?next={{next}}{% if user %}&userid={{ user.id}}{% endif%}">Create client</a></p>
             <p><a href="/admin/">Admin Home</a></p>
         {% else %}
             <p><a href="createclient?next={{next}}">Create client</a></p>

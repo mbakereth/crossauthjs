@@ -350,15 +350,15 @@ export class SvelteKitServer {
                 if (!(ret && ret.twofa) && !event.locals.user) {
                     if (this.sessionServer.isLoginPageProtected(event))  {
                         if (this.loginUrl) {
-                            /*let redirectUri = event.url.pathname;
+                            /*let redirect_uri = event.url.pathname;
                             if (event.url.searchParams) {
-                                redirectUri += "%3F";
+                                redirect_uri += "%3F";
                                 event.url.searchParams.forEach((value, key) => {
-                                    redirectUri += encodeURIComponent(key) + "%3D" + encodeURIComponent(value)
+                                    redirect_uri += encodeURIComponent(key) + "%3D" + encodeURIComponent(value)
                                 });
                             }*/
-                            let redirectUri =encodeURIComponent(event.request.url);
-                            return new Response(null, {status: 302, headers: {location: this.loginUrl + "?next=" + redirectUri}});
+                            let redirect_uri =encodeURIComponent(event.request.url);
+                            return new Response(null, {status: 302, headers: {location: this.loginUrl + "?next=" + redirect_uri}});
                         }
                         return this.sessionServer.error(401, "Unauthorized");
 

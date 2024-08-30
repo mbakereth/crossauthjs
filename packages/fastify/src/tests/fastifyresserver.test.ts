@@ -37,9 +37,9 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_authorized', async (
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 
@@ -82,9 +82,9 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_endpoint', async () 
     const {access_token, error, error_description}
         = await authServer.tokenEndpoint({
             grantType: "authorization_code", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             code: code, 
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(error_description).toBeUndefined();
 

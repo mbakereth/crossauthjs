@@ -139,18 +139,18 @@ const JSONHDR : [string,string] =
  * | POST   | /admin/updateuser          | id          | user_*, factor2, status                                              | message, user_*, allowedFactor2, enableOAuthClientManagement                                           | updatePasswordPage       | 
  * | POST   | /admin/api/updateuser      |             | user_*                                                               | emailVerificationRequired                                                                              |                          | 
  * | GET    | /admin/deleteuser          | id          | next                                                                 | next, isAdmin, user                                                                                    | deleteUserPAge           | 
- * | POST   | /admin/deleteuser          | id          | next                                                                 | message, next isAdmin, userId                                                                          | deleteUserPAge           | 
+ * | POST   | /admin/deleteuser          | id          | next                                                                 | message, next isAdmin, userid                                                                          | deleteUserPAge           | 
  * | POST   | /admin/api/deleteuser      | id          |                                                                      |                                                                                                        |                          | 
- * | GET    | /selectclient              |             | next, search, skip, take, haveNext, havePrevious, userId             | next, search, skip, take, haveNext, havePrevious, user, clients, isAdmin                               | selectClient             |
- * | GET    | /createclient              |             | next, userId                                                         | next, validFLows, flowNames, user, isAdmin                                                             | createClientPage         |
- * | POST   | /createclient              |             | next, clientName, confidential, redirectUris, (flows), userId        | message, client, next, validFLows, flowNames, user, isAdmin                                            | createClientPage         |
- * | POST   | /api/createclient          |             | clientName, confidential, redirectUris, (flows), userId              | client                                                                                                 |                          |
- * | GET    | /updateclient              | clientId    | next                                                                 | next, validFLows, flowNames, selectedFlows, redirectUris, clientId, clientName, user, isAdmin          | updateClientPage         |
- * | POST   | /updateclient              | clientId    | next, clientName, confidential, redirectUris, (flows), resetSecret   | message, next, validFLows, flowNames, selectedFlows, redirectUris, clientId, clientName, user, isAdmin | updateClientPage         |
- * | POST   | /api/updateclient          | clientId    | clientName, confidential, redirectUris, (flows), resetSecret         | client, newSecret                                                                                      |                          |
- * | GET    | /deleteclient              | clientId    | next, backUrl                                                        | next, backUrl, client                                                                                  | deleteClientPage         | 
- * | POST   | /deleteclient              | clientId    | next                                                                 | message, next, clientId                                                                                | deleteClientPage         | 
- * | POST   | /api/deleteclient          | clientId    |                                                                      |                                                                                                        |                          | 
+ * | GET    | /selectclient              |             | next, search, skip, take, haveNext, havePrevious, userid             | next, search, skip, take, haveNext, havePrevious, user, clients, isAdmin                               | selectClient             |
+ * | GET    | /createclient              |             | next, userid                                                         | next, validFLows, flowNames, user, isAdmin                                                             | createClientPage         |
+ * | POST   | /createclient              |             | next, client_name, confidential, redirect_uris, (flows), userid        | message, client, next, validFLows, flowNames, user, isAdmin                                            | createClientPage         |
+ * | POST   | /api/createclient          |             | client_name, confidential, redirect_uris, (flows), userid              | client                                                                                                 |                          |
+ * | GET    | /updateclient              | client_id    | next                                                                 | next, validFLows, flowNames, selectedFlows, redirect_uris, client_id, client_name, user, isAdmin          | updateClientPage         |
+ * | POST   | /updateclient              | client_id    | next, client_name, confidential, redirect_uris, (flows), resetSecret   | message, next, validFLows, flowNames, selectedFlows, redirect_uris, client_id, client_name, user, isAdmin | updateClientPage         |
+ * | POST   | /api/updateclient          | client_id    | client_name, confidential, redirect_uris, (flows), resetSecret         | client, newSecret                                                                                      |                          |
+ * | GET    | /deleteclient              | client_id    | next, backUrl                                                        | next, backUrl, client                                                                                  | deleteClientPage         | 
+ * | POST   | /deleteclient              | client_id    | next                                                                 | message, next, client_id                                                                                | deleteClientPage         | 
+ * | POST   | /api/deleteclient          | client_id    |                                                                      |                                                                                                        |                          | 
  *  
 */
 export class FastifyAdminEndpoints {
@@ -545,7 +545,7 @@ export class FastifyAdminEndpoints {
                             message: "User deleted",
                             csrfToken: request.csrfToken,
                             urlPrefix: this.adminPrefix, 
-                            userId : request.params.id,
+                            userid : request.params.id,
                             isAdmin: true,
                             next: next,
                         });
@@ -572,7 +572,7 @@ export class FastifyAdminEndpoints {
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                             urlPrefix: this.adminPrefix, 
-                            userId : request.params.id,
+                            userid : request.params.id,
                             isAdmin: true,
                             next: next,
                         });
@@ -714,7 +714,7 @@ export class FastifyAdminEndpoints {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
                     msg: "Change password failure",
-                    userId: request.params.id,
+                    userid: request.params.id,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
                 }));
@@ -806,7 +806,7 @@ export class FastifyAdminEndpoints {
                         (reply) => {
                         return reply.header(...JSONHDR).send({
                         ok: true,
-                        clientId : request.params.id,
+                        client_id : request.params.id,
                     })});
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 

@@ -14,8 +14,8 @@ async function main() {
 
     const oauthClient = new OAuthClientBackend(
         process.env["AUTH_SERVER_BASE_URL"], { 
-        clientId: process.env["CLIENT_ID"],
-        clientSecret: process.env["CLIENT_SECRET"],
+        client_id: process.env["CLIENT_ID"],
+        client_secret: process.env["CLIENT_SECRET"],
     });
 
     const username = await read({

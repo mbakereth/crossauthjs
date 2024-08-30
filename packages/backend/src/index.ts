@@ -10,6 +10,8 @@ export { InMemoryUserStorage, InMemoryKeyStorage, InMemoryOAuthClientStorage, In
 export type { InMemoryUserStorageOptions } from './storage/inmemorystorage';
 export { LdapUserStorage } from './storage/ldapstorage';
 export type  { LdapUser, LdapUserStorageOptions } from './storage/ldapstorage';
+export { PostgresUserStorage, PostgresKeyStorage, PostgresOAuthClientStorage, PostgresOAuthAuthorizationStorage } from './storage/postgresstorage';
+export type { PostgresUserStorageOptions, PostgresKeyStorageOptions, PostgresOAuthClientStorageOptions, PostgresOAuthAuthorizationStorageOptions } from './storage/postgresstorage';
 
 // authenticators
 export { Authenticator, PasswordAuthenticator } from './auth';

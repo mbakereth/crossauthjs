@@ -35,7 +35,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 
     /** 
      * You will have to create a route for the redirect Uri, using
-     * the `redirectUriEndpoint` load function.  But the URL for it
+     * the `redirect_uriEndpoint` load function.  But the URL for it
      * here.  It should be an absolute URL.
      * 
      * It should be a fully qualified URL as it is called from
@@ -43,7 +43,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * 
      * The default is "oauth/authzcode".
      */
-    redirectUri ?: string,
+    redirect_uri ?: string,
 
     /**
      * When using the BFF (backend-for-frontend) pattern, tokens are saved
@@ -556,11 +556,11 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * 
  * | Name                                  | Description                                                  | PageData (returned by load) or JSON returned by get/post                     | ActionData (return by actions)                                   | Form fields expected by actions or post/get input data          | 
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | authorizationCodeFlowEndpoint         | Starts the authorization code flow.                          | None - redirects to `redirectUri`                                            | *Not provided*                                                   | - `scope`                                                       |  
+ * | authorizationCodeFlowEndpoint         | Starts the authorization code flow.                          | None - redirects to `redirect_uri`                                            | *Not provided*                                                   | - `scope`                                                       |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | authorizationCodeFlowWithPKCEEndpoint | Starts the authorization code flow with PKCE.                | None - redirects to `redirectUri`                                            | *Not provided*                                                   | - `scope`                                                       |  
+ * | authorizationCodeFlowWithPKCEEndpoint | Starts the authorization code flow with PKCE.                | None - redirects to `redirect_uri`                                            | *Not provided*                                                   | - `scope`                                                       |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | redirectUriEndpoint                   | Redirect Uri for authorization code flows                    | See {@link OAuthTokenResponse}                                               | *Not provided*                                                   | As per OAuth Authorization Code Flow spec                       |  
+ * | redirect_uriEndpoint                   | Redirect Uri for authorization code flows                    | See {@link OAuthTokenResponse}                                               | *Not provided*                                                   | As per OAuth Authorization Code Flow spec                       |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | clientCredentialsFlowEndpoint         | Executes the client credentials flow                         | *Not provided*                                                               | See {@link OAuthTokenResponse}                                   | As per OAuth Client Credentials Flow spec                       |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
@@ -665,9 +665,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
-        setParameter("redirectUri", ParamType.String, this, options, "OAUTH_REDIRECTURI", true);
+        setParameter("redirect_uri", ParamType.String, this, options, "OAUTH_REDIRECTURI", true);
         setParameter("authorizedUrl", ParamType.String, this, options, "AUTHORIZED_URL", false);
-        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_validFlows");
         setParameter("bffMaxTries", ParamType.Number, this, options, "OAUTH_BFF_MAX_RETRIES");
         setParameter("bffSleepMilliseconds", ParamType.Number, this, options, "OAUTH_BFF_SLEEP_MILLISECONDS");
 
@@ -687,9 +687,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         }
 
         try {
-            new URL(this.redirectUri ?? "");
+            new URL(this.redirect_uri ?? "");
         } catch (e) {
-            throw new CrossauthError(ErrorCode.Configuration, "Invalid redirect Uri " + this.redirectUri);
+            throw new CrossauthError(ErrorCode.Configuration, "Invalid redirect Uri " + this.redirect_uri);
         }
 
         if (options.tokenEndpoints) this.tokenEndpoints = options.tokenEndpoints;
@@ -1851,7 +1851,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
     };
 
-    readonly redirectUriEndpoint = {
+    readonly redirect_uriEndpoint = {
 
         get: async (event : RequestEvent) => {
             if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {

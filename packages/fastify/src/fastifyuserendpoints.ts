@@ -1215,7 +1215,7 @@ export class FastifyUserEndpoints {
                             message: "User deleted",
                             csrfToken: request.csrfToken,
                             urlPrefix: this.prefix, 
-                            userId : request.user?.id,
+                            userid : request.user?.id,
                             isAdmin: false,
                             next: next,
                         });
@@ -1242,7 +1242,7 @@ export class FastifyUserEndpoints {
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                             urlPrefix: this.prefix, 
-                            userId : request.user?.id,
+                            userid : request.user?.id,
                             isAdmin: false,
                             next: next,
                         });
@@ -1276,7 +1276,7 @@ export class FastifyUserEndpoints {
                         (reply) => {
                         return reply.header(...JSONHDR).send({
                         ok: true,
-                        userId : request.user?.id,
+                        userid : request.user?.id,
                     })});
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 

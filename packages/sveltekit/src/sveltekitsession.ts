@@ -271,14 +271,14 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
 
     /**
      * Admin pages provide functionality for searching for OAuth clients.  By
-     * default the search string must exactly match the clientName exactly.  
+     * default the search string must exactly match the client_name exactly.  
      * Override this behaviour with this function
      * @param searchTerm the search term 
      * @param clientStorage the client storage to search
      * @returns array of matching users
      */
     clientSearchFn? : 
-        (searchTerm : string, clientStorage : OAuthClientStorage, skip: number, take: number, userId? : string|number|null) => Promise<OAuthClient[]>;
+        (searchTerm : string, clientStorage : OAuthClientStorage, skip: number, take: number, userid? : string|number|null) => Promise<OAuthClient[]>;
 
     /** Pass the Sveltekit redirect function */
     redirect? : any,
@@ -1258,7 +1258,7 @@ export class SvelteKitSessionServer {
      * in the reply.
      * 
      * An anonymous sessiin is a session cookie that is not associated
-     * with a user (`userId` is undefined).  It can be used to persist
+     * with a user (`userid` is undefined).  It can be used to persist
      * data between sessions just like a regular user session ID.
      * 
      * @param request the Fastify request

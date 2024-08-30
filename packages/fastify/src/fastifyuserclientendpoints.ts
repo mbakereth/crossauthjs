@@ -53,7 +53,7 @@ export class FastifyUserClientEndpoints {
     private clientManager : OAuthClientManager;
     private prefix = "/";
     private clientSearchFn : 
-        (searchTerm : string, clientStorage : OAuthClientStorage, userId? : string|number|null) => Promise<OAuthClient[]> =
+        (searchTerm : string, clientStorage : OAuthClientStorage, userid? : string|number|null) => Promise<OAuthClient[]> =
         defaultClientSearchFn;
     private validFlows : string[] = ["all"];
 
@@ -83,7 +83,7 @@ export class FastifyUserClientEndpoints {
         setParameter("updateClientPage", ParamType.String, this, options, "UPDATE_CLIENT_PAGE");
         setParameter("selectClientPage", ParamType.String, this, options, "SELECT_CLIENT_PAGE");
         setParameter("deleteClientPage", ParamType.String, this, options, "DELETE_CLIENT_PAGE");
-        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_validFlows");
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();
@@ -315,7 +315,7 @@ export class FastifyUserClientEndpoints {
      */
     addUpdateClientEndpoints() {
 
-        this.sessionServer.app.get(this.prefix+'updateclient/:clientId', 
+        this.sessionServer.app.get(this.prefix+'updateclient/:client_id', 
             async (request: FastifyRequest<{Params: UpdateClientParamType, Querystring: CreateClientQueryType }>,
                 reply: FastifyReply)  => {
                 if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
@@ -331,7 +331,7 @@ export class FastifyUserClientEndpoints {
                 }
                 let client : OAuthClient;
                 try {
-                    client = await this.clientStorage.getClientById(request.params.clientId);
+                    client = await this.clientStorage.getClientById(request.params.client_id);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.debug(j({err: e}));
@@ -344,13 +344,13 @@ export class FastifyUserClientEndpoints {
                 }
                 let next = request.query.next;
                 if (!next) {
-                    if (request.query.userId) next = this.prefix + "selectuser";
+                    if (request.query.userid) next = this.prefix + "selectuser";
                     else next = this.prefix + "selectclient";
                 }
                 let user : User|undefined = undefined;
                 try {
-                    if (request.query.userId) {
-                        let resp = await this.sessionServer.userStorage.getUserById(request.query.userId);
+                    if (request.query.userid) {
+                        let resp = await this.sessionServer.userStorage.getUserById(request.query.userid);
                         user = resp.user;
                     }
                 } catch (e) {
@@ -365,7 +365,7 @@ export class FastifyUserClientEndpoints {
                 }
                 let selectedFlows : {[key:string]:boolean} = {};
                 for (let flow of this.validFlows) {
-                    if (client.validFlow.includes(flow)) {
+                    if (client.valid_flow.includes(flow)) {
                         selectedFlows[flow] = true;
                     }
                 }
@@ -376,17 +376,17 @@ export class FastifyUserClientEndpoints {
                     flowNames: OAuthFlows.flowNames(this.validFlows),
                     selectedFlows : selectedFlows,
                     user : user,
-                    clientId: client.clientId,
-                    clientName: client.clientName,
+                    client_id: client.client_id,
+                    client_name: client.client_name,
                     confidential: client.confidential,
-                    redirectUris: client.redirectUri.join("\n"),
+                    redirect_uris: client.redirect_uri.join("\n"),
                     isAdmin: true,
                     next: next,
                 };
             return reply.view(this.updateClientPage, data);
         });
 
-        this.sessionServer.app.post(this.prefix+'updateclient/:clientId', 
+        this.sessionServer.app.post(this.prefix+'updateclient/:client_id', 
             async (request: FastifyRequest<{Params: UpdateClientParamType, Body: UpdateClientBodyType }>,
                 reply: FastifyReply) => {
                 if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
@@ -405,8 +405,8 @@ export class FastifyUserClientEndpoints {
                 let user : User|undefined = undefined;
                 try {
                     if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
-                    if (request.body.userId) {
-                        let resp = await this.sessionServer.userStorage.getUserById(request.body.userId);
+                    if (request.body.userid) {
+                        let resp = await this.sessionServer.userStorage.getUserById(request.body.userid);
                         user = resp.user;
                     }
                     return await this.updateClient(request, reply, 
@@ -472,7 +472,7 @@ export class FastifyUserClientEndpoints {
      */
     addApiUpdateClientEndpoints() {
 
-        this.sessionServer.app.post(this.prefix+'api/updateclient/:clientId', 
+        this.sessionServer.app.post(this.prefix+'api/updateclient/:client_id', 
             async (request: FastifyRequest<{Params: UpdateClientParamType, Body: UpdateClientBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
@@ -485,8 +485,8 @@ export class FastifyUserClientEndpoints {
 
                 try {
                     if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
-                    if (request.body.userId) {
-                        await this.sessionServer.userStorage.getUserById(request.body.userId);
+                    if (request.body.userid) {
+                        await this.sessionServer.userStorage.getUserById(request.body.userid);
                     }
                     return await this.updateClient(request, reply, 
                     (reply, client, newSecret) => {
@@ -528,7 +528,7 @@ export class FastifyUserClientEndpoints {
      */
     addDeleteClientEndpoints() {
 
-        this.sessionServer.app.get(this.prefix+'deleteclient/:clientId', 
+        this.sessionServer.app.get(this.prefix+'deleteclient/:client_id', 
             async (request: FastifyRequest<{ Params: DeleteClientParamType, Querystring: DeleteClientQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
@@ -540,11 +540,11 @@ export class FastifyUserClientEndpoints {
                 let client : OAuthClient;
                 if (!request.user) {
                     return reply.redirect(this.sessionServer.loginUrl+"?next=" +
-                        this.prefix+"deleteclient/"+request.params.clientId);
+                        this.prefix+"deleteclient/"+request.params.client_id);
                 }
                 try {
-                    client = await this.clientStorage.getClientById(request.params.clientId);
-                    if (client.userId != request.user.id) {
+                    client = await this.clientStorage.getClientById(request.params.client_id);
+                    if (client.userid != request.user.id) {
                         throw new CrossauthError(ErrorCode.InsufficientPriviledges,
                             "You may not delete this client");
                     }
@@ -569,7 +569,7 @@ export class FastifyUserClientEndpoints {
             return reply.view(this.deleteClientPage, data);
         });
 
-        this.sessionServer.app.post(this.prefix+'deleteclient/:clientId', 
+        this.sessionServer.app.post(this.prefix+'deleteclient/:client_id', 
             async (request: FastifyRequest<{ Params: DeleteClientParamType, Body: DeleteClientQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
@@ -582,7 +582,7 @@ export class FastifyUserClientEndpoints {
 
                 if (!request.user) {
                     return reply.redirect(this.sessionServer.loginUrl+"?next=" +
-                        this.prefix+"deleteclient/"+request.params.clientId);
+                        this.prefix+"deleteclient/"+request.params.client_id);
                 }
                 const next = this.prefix + "selectclient";
                 try {
@@ -592,7 +592,7 @@ export class FastifyUserClientEndpoints {
                             message: "Client deleted",
                             csrfToken: request.csrfToken,
                             urlPrefix: this.prefix, 
-                            clientId : request.params.clientId,
+                            client_id : request.params.client_id,
                             next: next,
                         });
                     }, request.user);
@@ -618,7 +618,7 @@ export class FastifyUserClientEndpoints {
                             errorCodeName: ErrorCode[error.code], 
                             csrfToken: request.csrfToken,
                             urlPrefix: this.prefix, 
-                            clientId : request.params.clientId,
+                            client_id : request.params.client_id,
                             validFlows: this.validFlows,
                             next: next,
                         });
@@ -634,7 +634,7 @@ export class FastifyUserClientEndpoints {
      */
     addApiDeleteClientEndpoints() {
 
-        this.sessionServer.app.post(this.prefix+'api/deleteclient/:clientId', 
+        this.sessionServer.app.post(this.prefix+'api/deleteclient/:client_id', 
             async (request: FastifyRequest<{ Params: DeleteClientParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
@@ -652,7 +652,7 @@ export class FastifyUserClientEndpoints {
                         (reply) => {
                         return reply.header(...JSONHDR).send({
                         ok: true,
-                        clientId : request.params.clientId,
+                        client_id : request.params.client_id,
                     })}, request.user);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
@@ -695,25 +695,25 @@ export class FastifyUserClientEndpoints {
         }
 
         const confidential = request.body.confidential == "true";
-        const clientName = request.body.clientName;
-        const redirectUris = request.body.redirectUris.trim().length == 0 ? 
-            [] : request.body.redirectUris.trim().split(/,?[ \t\n]+/);
+        const client_name = request.body.client_name;
+        const redirect_uris = request.body.redirect_uris.trim().length == 0 ? 
+            [] : request.body.redirect_uris.trim().split(/,?[ \t\n]+/);
 
         // validate redirect uris
-        let redirectUriErrors : string[] = [];
-        for (let uri of redirectUris) {
+        let redirect_uriErrors : string[] = [];
+        for (let uri of redirect_uris) {
             try {
                 OAuthClientManager.validateUri(uri);
             }
             catch (e) {
                 CrossauthLogger.logger.error(j({err: e}));
-                redirectUriErrors.push("["+uri+"]");
+                redirect_uriErrors.push("["+uri+"]");
             }
         }
-        if (redirectUriErrors.length > 0) {
+        if (redirect_uriErrors.length > 0) {
             throw new CrossauthError(ErrorCode.BadRequest, 
                 "The following redirect URIs are invalid: " 
-                    + redirectUriErrors.join(" "));
+                    + redirect_uriErrors.join(" "));
         }
 
         // get flows from booleans in body
@@ -728,8 +728,8 @@ export class FastifyUserClientEndpoints {
         if (request.body[OAuthFlows.OidcAuthorizationCode]) validFlows.push(OAuthFlows.OidcAuthorizationCode);
 
         const client = 
-            await this.clientManager.createClient(clientName,
-                redirectUris,
+            await this.clientManager.createClient(client_name,
+                redirect_uris,
                 validFlows,
                 confidential,
                 user?.id );
@@ -750,24 +750,24 @@ export class FastifyUserClientEndpoints {
             throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         }
 
-        const redirectUris = request.body.redirectUris.trim().length == 0 ? 
-            [] : request.body.redirectUris.trim().split(/,?[ \t\n]+/);
+        const redirect_uris = request.body.redirect_uris.trim().length == 0 ? 
+            [] : request.body.redirect_uris.trim().split(/,?[ \t\n]+/);
 
         // validate redirect uris
-        let redirectUriErrors : string[] = [];
-        for (let uri of redirectUris) {
+        let redirect_uriErrors : string[] = [];
+        for (let uri of redirect_uris) {
             try {
                 OAuthClientManager.validateUri(uri);
             }
             catch (e) {
                 CrossauthLogger.logger.error(j({err: e}));
-                redirectUriErrors.push("["+uri+"]");
+                redirect_uriErrors.push("["+uri+"]");
             }
         }
-        if (redirectUriErrors.length > 0) {
+        if (redirect_uriErrors.length > 0) {
             throw new CrossauthError(ErrorCode.BadRequest, 
                 "The following redirect URIs are invalid: " 
-                    + redirectUriErrors.join(" "));
+                    + redirect_uriErrors.join(" "));
         }
 
         // get flows from booleans in body
@@ -777,15 +777,15 @@ export class FastifyUserClientEndpoints {
         }
 
         const clientUpdate : Partial<OAuthClient> = {}
-        clientUpdate.clientName = request.body.clientName;
+        clientUpdate.client_name = request.body.client_name;
         clientUpdate.confidential = request.body.confidential == "true";
-        clientUpdate.validFlow = validFlows;
-        clientUpdate.redirectUri = redirectUris;
-        clientUpdate.userId = request.user.id;
+        clientUpdate.valid_flow = validFlows;
+        clientUpdate.redirect_uri = redirect_uris;
+        clientUpdate.userid = request.user.id;
         const resetSecret = request.body.resetSecret == "true";
         
         const {client, newSecret} = 
-            await this.clientManager.updateClient(request.params.clientId,
+            await this.clientManager.updateClient(request.params.client_id,
                 clientUpdate,
                 resetSecret);
         return successFn(reply, client, newSecret);
@@ -806,13 +806,13 @@ export class FastifyUserClientEndpoints {
             throw new CrossauthError(ErrorCode.InsufficientPriviledges);
         }
 
-        const client = await this.clientStorage.getClientById(request.params.clientId);
-        if (client.userId != user.id) {
+        const client = await this.clientStorage.getClientById(request.params.client_id);
+        if (client.userid != user.id) {
             throw new CrossauthError(ErrorCode.InsufficientPriviledges,
                 "You may not delete this client");
         }
         
-        await this.clientStorage.deleteClient(request.params.clientId);
+        await this.clientStorage.deleteClient(request.params.client_id);
         return successFn(reply);
     }
 }

@@ -41,9 +41,9 @@ test('OAuthClient.startAuthorizationCodeFlow', async () => {
     const {code, access_token} = await getAccessToken();
     
     const oauthClient = new OAuthClientBackend("http://authserver.com", { 
-        clientId: "ABC",
-        clientSecret: "DEF",
-        redirectUri: "http://client.com/authzcode"
+        client_id: "ABC",
+        client_secret: "DEF",
+        redirect_uri: "http://client.com/authzcode"
     });
     
 
@@ -72,9 +72,9 @@ test('OAuthClient.startAuthorizationCodeFlow', async () => {
 test('OAuthClient.clientCredentialsFlow', async () => {
     
     const oauthClient = new OAuthClientBackend("http://authserver.com", { 
-        clientId: "ABC",
-        clientSecret: "DEF",
-        redirectUri: "http://client.com/authzcode"
+        client_id: "ABC",
+        client_secret: "DEF",
+        redirect_uri: "http://client.com/authzcode"
     });
     
 
@@ -100,9 +100,9 @@ test('OAuthClient.clientCredentialsFlow', async () => {
 test('OAuthClient.passwordFlow', async () => {
     
     const oauthClient = new OAuthClientBackend("http://authserver.com", { 
-        clientId: "ABC",
-        clientSecret: "DEF",
-        redirectUri: "http://client.com/authzcode"
+        client_id: "ABC",
+        client_secret: "DEF",
+        redirect_uri: "http://client.com/authzcode"
     });
     
 

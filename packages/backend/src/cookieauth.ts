@@ -365,7 +365,7 @@ export class SessionCookie {
      * In the unlikely event of the key already existing, it is retried up to 10 times before throwing
      * an error with ErrorCode.KeyExists
      * 
-     * @param userId the user ID to store with the session key.
+     * @param userid the user ID to store with the session key.
      * @param extraFields Any fields in here will also be added to the session
      *        record
      * @returns the new session key
@@ -373,7 +373,7 @@ export class SessionCookie {
      *         {@link @crossauth/common!ErrorCode} `KeyExists` if maximum
      *          attempts exceeded trying to create a unique session id
      */
-    async createSessionKey(userId: string | number | undefined,
+    async createSessionKey(userid: string | number | undefined,
         extraFields: { [key: string]: any } = {}) : Promise<Key> {
         const maxTries = 10;
         let numTries = 0;
@@ -385,10 +385,10 @@ export class SessionCookie {
             const hashedSessionId = SessionCookie.hashSessionId(sessionId);
             try {
                 // save the new session - if it exists, an error will be thrown
-                if (this.idleTimeout > 0 && userId) {
+                if (this.idleTimeout > 0 && userid) {
                     extraFields = {...extraFields, lastActivity: new Date()};
                 }
-                await this.keyStorage.saveKey(userId, hashedSessionId, dateCreated, expires, undefined, extraFields);
+                await this.keyStorage.saveKey(userid, hashedSessionId, dateCreated, expires, undefined, extraFields);
                 succeeded = true;
             } catch (e) {
                 let ce = CrossauthError.asCrossauthError(e);
@@ -406,7 +406,7 @@ export class SessionCookie {
             }   
         }
         return {
-            userId : userId,
+            userid : userid,
             value : sessionId,
             created : dateCreated,
             expires : expires
@@ -517,8 +517,8 @@ export class SessionCookie {
     async getUserForSessionId(sessionId: string, options? : UserStorageGetOptions) : Promise<{user: User|undefined, key : Key}> {
         const key = await this.getSessionKey(sessionId);
         if (!this.userStorage) return {key, user: undefined};
-        if (key.userId) {
-            let {user} = await this.userStorage.getUserById(key.userId, options);
+        if (key.userid) {
+            let {user} = await this.userStorage.getUserById(key.userid, options);
             return {user, key};
         } else {
             return {user: undefined, key};
@@ -550,7 +550,7 @@ export class SessionCookie {
                 throw new CrossauthError(ErrorCode.Expired);
             }
         }
-        if (key.userId && this.idleTimeout > 0 && key.lastActive 
+        if (key.userid && this.idleTimeout > 0 && key.lastActive 
             && now > key.lastActive.getTime() + this.idleTimeout*1000) {
                 CrossauthLogger.logger.warn(j({msg: "Session cookie with expired idle time received", hashedSessionCookie: Crypto.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.Expired);
@@ -566,13 +566,13 @@ export class SessionCookie {
 
     /**
      * Deletes all keys for the given user
-     * @param userId the user to delete keys for
+     * @param userid the user to delete keys for
      * @param except if defined, don't delete this key
      */
-    async deleteAllForUser(userId : string | number, except: string|undefined) {
+    async deleteAllForUser(userid : string | number, except: string|undefined) {
         if (except) {
             except = SessionCookie.hashSessionId(except);
         }
-        await this.keyStorage.deleteAllForUser(userId, KeyPrefix.session, except);
+        await this.keyStorage.deleteAllForUser(userid, KeyPrefix.session, except);
     }
 }

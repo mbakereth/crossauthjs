@@ -2,10 +2,10 @@ import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, vi, beforeAll, afterAll } from 'vitest';
 import { OAuthAuthorizationServer } from '../authserver';
 import { createClient } from './common';
-import { UserStorage } from '../../storage';
+import { OAuthAuthorizationStorage, UserStorage } from '../../storage';
 import { TotpAuthenticator } from '../../authenticators/totpauth';
 import { EmailAuthenticator } from '../../authenticators/emailauth';
-import { InMemoryKeyStorage, InMemoryUserStorage } from '../../storage/inmemorystorage';
+import { InMemoryKeyStorage, InMemoryUserStorage, InMemoryOAuthAuthorizationStorage } from '../../storage/inmemorystorage';
 import { LocalPasswordAuthenticator } from '../..';
 import { authenticator as gAuthenticator } from 'otplib';
 import { CrossauthError, ErrorCode, UserInputFields } from '@crossauth/common';
@@ -64,10 +64,10 @@ async function createTotpAccount(username: string,
 
     const user = await userStorage.createUser(userInputs, {
         password: await lpAuthenticator.createPasswordHash(password),
-        totpSecret: resp.sessionData.totpSecret,
+        totpsecret: resp.sessionData.totpsecret,
         } );
 
-    return { user, totpSecret: resp.sessionData.totpSecret };
+    return { user, totpsecret: resp.sessionData.totpsecret };
 };
 
 async function createEmailAccount(username: string,
@@ -114,17 +114,18 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlow', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
-    const { totpSecret} = 
+    const { totpsecret} = 
         await createTotpAccount("bob", "bobPass123", userStorage);
     const {access_token, error, mfa_token}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("mfa_required");
     expect(access_token).toBeUndefined();
     expect(mfa_token).toBeDefined();
@@ -140,7 +141,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlow', async () => {
 
     const { challenge_type, oob_code, binding_method, error: error3} =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF",
             "otp",
             "totp");
@@ -151,13 +152,13 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlow', async () => {
 
     const maxTries = 2;
     for (let i=0; i<maxTries; ++i) {
-        const otp = gAuthenticator.generate(totpSecret);
-        const {access_token, scope, error: error4} =
+        const otp = gAuthenticator.generate(totpsecret);
+        const {access_token, scope, error: error4, error_description} =
         await authServer.tokenEndpoint({
             grantType: "http://auth0.com/oauth/grant-type/mfa-otp",
-            clientId : client.clientId,
+            client_id : client.client_id,
             scope: "read write",
-            clientSecret: "DEF",
+            client_secret: "DEF",
             mfaToken: mfa_token,
             otp: otp
         });
@@ -170,7 +171,6 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlow', async () => {
 
     }
 });
-
 
 test('AuthorizationServer.Mfa.invalidMfa1', async () => {
     const {clientStorage, client} = await createClient();
@@ -192,17 +192,18 @@ test('AuthorizationServer.Mfa.invalidMfa1', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
-    const { totpSecret} = 
+    const { totpsecret} = 
         await createTotpAccount("bob", "bobPass123", userStorage);
     const {access_token, error, mfa_token}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("mfa_required");
     expect(access_token).toBeUndefined();
     expect(mfa_token).toBeDefined();
@@ -218,7 +219,7 @@ test('AuthorizationServer.Mfa.invalidMfa1', async () => {
 
     const { challenge_type, oob_code, binding_method, error: error3} =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF",
             "otp",
             "totp");
@@ -229,13 +230,13 @@ test('AuthorizationServer.Mfa.invalidMfa1', async () => {
 
     const maxTries = 2;
     for (let i=0; i<maxTries; ++i) {
-        const otp = gAuthenticator.generate(totpSecret);
+        const otp = gAuthenticator.generate(totpsecret);
         const {access_token, error: error4} =
         await authServer.tokenEndpoint({
             grantType: "http://auth0.com/oauth/grant-type/mfa-otp",
-            clientId : client.clientId,
+            client_id : client.client_id,
             scope: "read write",
-            clientSecret: "DEF",
+            client_secret: "DEF",
             mfaToken: mfa_token+"x",
             otp: otp
         });
@@ -268,16 +269,17 @@ test('AuthorizationServer.Mfa.invalidMfa2', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
     await createTotpAccount("bob", "bobPass123", userStorage);
     const {access_token, error, mfa_token}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("mfa_required");
     expect(access_token).toBeUndefined();
     expect(mfa_token).toBeDefined();
@@ -293,7 +295,7 @@ test('AuthorizationServer.Mfa.invalidMfa2', async () => {
 
     const { challenge_type, error: error3} =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF"+"x",
             "otp",
             "totp");
@@ -322,16 +324,17 @@ test('AuthorizationServer.Mfa.invalidMfa3', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
     await createTotpAccount("bob", "bobPass123", userStorage);
     const {access_token, error, mfa_token}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("mfa_required");
     expect(access_token).toBeUndefined();
     expect(mfa_token).toBeDefined();
@@ -367,16 +370,17 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlow', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
     const {access_token, error, mfa_token}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("mfa_required");
     expect(access_token).toBeUndefined();
     expect(mfa_token).toBeDefined();
@@ -392,7 +396,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlow', async () => {
 
    const { challenge_type, oob_code, binding_method, error: error3} =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF",
             "oob",
             "email");
@@ -405,9 +409,9 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlow', async () => {
     const {access_token: access_token2, scope, error: error4} =
     await authServer.tokenEndpoint({
         grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
-        clientId : client.clientId,
+        client_id : client.client_id,
         scope: "read write",
-        clientSecret: "DEF",
+        client_secret: "DEF",
         mfaToken: mfa_token,
         oobCode: oob_code,
         bindingCode: otp
@@ -442,16 +446,17 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidMFAToken', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
     const {access_token, error, mfa_token}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("mfa_required");
     expect(access_token).toBeUndefined();
     expect(mfa_token).toBeDefined();
@@ -467,7 +472,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidMFAToken', async () => {
 
    const { challenge_type, oob_code, binding_method, error: error3} =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF",
             "oob",
             "email");
@@ -480,9 +485,9 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidMFAToken', async () => {
     const {access_token: access_token2, error: error4} =
     await authServer.tokenEndpoint({
         grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
-        clientId : client.clientId,
+        client_id : client.client_id,
         scope: "read write",
-        clientSecret: "DEF",
+        client_secret: "DEF",
         mfaToken: "XXX",
         oobCode: oob_code,
         bindingCode: otp
@@ -515,16 +520,17 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOTP', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
     const {access_token, error, mfa_token}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("mfa_required");
     expect(access_token).toBeUndefined();
     expect(mfa_token).toBeDefined();
@@ -540,7 +546,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOTP', async () => {
 
    const { challenge_type, oob_code, binding_method, error: error3} =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF",
             "oob",
             "email");
@@ -553,9 +559,9 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOTP', async () => {
     const {access_token: access_token2, error: error4} =
     await authServer.tokenEndpoint({
         grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
-        clientId : client.clientId,
+        client_id : client.client_id,
         scope: "read write",
-        clientSecret: "DEF",
+        client_secret: "DEF",
         mfaToken: mfa_token,
         oobCode: oob_code,
         bindingCode: otp+"0"
@@ -589,16 +595,17 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOOBCode', async () => {
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
     const {access_token, error, mfa_token}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("mfa_required");
     expect(access_token).toBeUndefined();
     expect(mfa_token).toBeDefined();
@@ -614,7 +621,7 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOOBCode', async () => {
 
    const { challenge_type, oob_code, binding_method, error: error3} =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF",
             "oob",
             "email");
@@ -627,9 +634,9 @@ test('AuthorizationServer.Mfa.passwordMfaOOBFlowInvalidOOBCode', async () => {
     const {access_token: access_token2, error: error4} =
     await authServer.tokenEndpoint({
         grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
-        clientId : client.clientId,
+        client_id : client.client_id,
         scope: "read write",
-        clientSecret: "DEF",
+        client_secret: "DEF",
         mfaToken: mfa_token,
         oobCode: oob_code+"0",
         bindingCode: otp
@@ -662,16 +669,17 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
-    const { totpSecret} = 
+    const { totpsecret} = 
         await createTotpAccount("bob", "bobPass123", userStorage);
 
     /// Make client
     const oauthClient = new OAuthClientBackend("http://authserver.com", { 
-        clientId: "ABC",
-        clientSecret: "DEF",
-        redirectUri: "http://client.com/authzcode"
+        client_id: "ABC",
+        client_secret: "DEF",
+        redirect_uri: "http://client.com/authzcode"
     });
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await oauthClient.loadConfig();
@@ -680,10 +688,10 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
     const firstTokenResponse = 
         await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
 
     fetchMocker.mockResponseOnce((_req) => {
         return JSON.stringify(firstTokenResponse)});
@@ -709,14 +717,14 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
     /// Make challenge request
     const challengeResponse =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF",
             "otp",
             "totp");
         
     const maxTries = 2;
     for (let i=0; i<maxTries; ++i) {
-        const otp = gAuthenticator.generate(totpSecret);
+        const otp = gAuthenticator.generate(totpsecret);
 
         fetchMocker.mockResponseOnce((_req) => {
             return JSON.stringify(challengeResponse)});
@@ -727,9 +735,9 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlowWithClient', async () => 
         const secondTokenResponse =
             await authServer.tokenEndpoint({
                 grantType: "http://auth0.com/oauth/grant-type/mfa-otp",
-                clientId : client.clientId,
+                client_id : client.client_id,
                 scope: "read write",
-                clientSecret: "DEF",
+                client_secret: "DEF",
                 mfaToken: mfa_token,
                 otp: otp
             });
@@ -775,15 +783,16 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
         validateScopes : true,
         validScopes: ["read", "write"],
         userStorage: userStorage,
+        authStorage: new InMemoryOAuthAuthorizationStorage(),
     });
 
     await createEmailAccount("bob", "bobPass123", userStorage);
 
     /// Make client
     const oauthClient = new OAuthClientBackend("http://authserver.com", { 
-        clientId: "ABC",
-        clientSecret: "DEF",
-        redirectUri: "http://client.com/authzcode"
+        client_id: "ABC",
+        client_secret: "DEF",
+        redirect_uri: "http://client.com/authzcode"
     });
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await oauthClient.loadConfig();
@@ -793,10 +802,10 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
     const firstTokenResponse
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
 
     fetchMocker.mockResponseOnce((_req) => {
         return JSON.stringify(firstTokenResponse)});
@@ -823,7 +832,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
 
    const challengeResponse =
         await authServer.mfaChallengeEndpoint(mfa_token ?? "",
-            client.clientId,
+            client.client_id,
             "DEF",
             "oob",
             "email");
@@ -843,9 +852,9 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOOBFlowWithClient', async () => 
     const secondTokenResponse =
         await authServer.tokenEndpoint({
             grantType: "http://auth0.com/oauth/grant-type/mfa-oob",
-            clientId : client.clientId,
+            client_id : client.client_id,
             scope: "read write",
-            clientSecret: "DEF",
+            client_secret: "DEF",
             mfaToken: mfa_token,
             oobCode: clientChallengeRequestReponse.oob_code,
             bindingCode: otp

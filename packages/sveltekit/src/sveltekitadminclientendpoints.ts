@@ -39,13 +39,13 @@ import type {
  * | searchClientsEndpoint      | Returns a paginated set of clients or those matching search | See {@link SearchClientsPageData}                                                | *Not provided*                                                   |                                                                  |           |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | updateClientEndpoint       | Updates a client                                            | See {@link UpdateClientsPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link UpdateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | clientId  |
+ * |                            |                                                             |                                                                                  | See {@link UpdateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | createClientEndpoint       | Creates a new client                                        | See {@link CreateClientsPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link CreateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | clientId  |
+ * |                            |                                                             |                                                                                  | See {@link CreateClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | deleteClientEndpoint       | Deletes a client                                            | See {@link DeleteClientsPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link DeleteClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | clientId  |
+ * |                            |                                                             |                                                                                  | See {@link DeleteClientsFormData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  */
 export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoints {
@@ -72,13 +72,13 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
     /**
      * See {@link SvelteKitSharedClientEndpoints.searchClients_internal}
      */
-    async searchClients(event : RequestEvent, searchTerm? : string, skip? : number, take? : number, userId? : number|string)
+    async searchClients(event : RequestEvent, searchTerm? : string, skip? : number, take? : number, userid? : number|string)
         : Promise<SearchClientsPageData> {
 
         if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
             throw this.error(401, "Unauthorized");
         
-        return this.searchClients_internal(event, searchTerm, skip, take, userId)
+        return this.searchClients_internal(event, searchTerm, skip, take, userid)
 
     }
 
@@ -162,13 +162,13 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
      */
     readonly searchClientsEndpoint = {
         load: async ( event: RequestEvent ) => {
-            let userId : number|undefined = undefined;
+            let userid : number|undefined = undefined;
                 try {
-                    userId = event.url.searchParams.get("userid") ? Number(event.url.searchParams.get("userid")) : undefined;
+                    userid = event.url.searchParams.get("userid") ? Number(event.url.searchParams.get("userid")) : undefined;
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({msg: "Invalid userId " + event.url.searchParams.get("userid")}));
+                    CrossauthLogger.logger.warn(j({msg: "Invalid userid " + event.url.searchParams.get("userid")}));
                 }
-            const resp = await this.searchClients(event, undefined, undefined, undefined, userId);
+            const resp = await this.searchClients(event, undefined, undefined, undefined, userid);
             delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),

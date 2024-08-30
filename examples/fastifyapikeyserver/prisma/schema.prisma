@@ -14,9 +14,9 @@ datasource db {
 model User {
     id                  Int         @id @unique @default(autoincrement())
     username            String      @unique
-    usernameNormalized  String      @unique
+    username_normalized  String      @unique
     email               String      @unique
-    emailNormalized     String      @unique
+    email_normalized     String      @unique
     factor1             String      @default("localpassword")
     factor2             String      @default("")
     state               String      @default("active")
@@ -39,5 +39,5 @@ model ApiKey {
 
     @@index([id])
     @@index([user_id])
-    @@unique([user_id, name], name: "userIdName")
+    @@unique([user_id, name], name: "useridName")
 }

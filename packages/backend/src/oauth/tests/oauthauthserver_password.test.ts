@@ -28,10 +28,10 @@ test('AuthorizationServer.passwordFlow.correctPassword', async () => {
     const {access_token, error}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "bobPass123" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBeUndefined();
     expect(access_token).toBeDefined();
     const sub = jwtDecode(access_token??"")?.sub;
@@ -59,10 +59,10 @@ test('AuthorizationServer.passwordFlow.incorrectPassword', async () => {
     const {access_token, error}
         = await authServer.tokenEndpoint({
             grantType: "password", 
-            clientId: client.clientId, 
+            client_id: client.client_id, 
             username: "bob",
             password: "wrong" ,
-            clientSecret: "DEF"});
+            client_secret: "DEF"});
     expect(error).toBe("access_denied");
     expect(access_token).toBeUndefined();
 

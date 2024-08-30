@@ -450,8 +450,8 @@ export class FastifyAuthorizationServer {
                     const authorized = request.body.authorized == "true";
                     return await this.authorize(request, reply, authorized, {
                         responseType: request.body.response_type,
-                        clientId : request.body.client_id,
-                        redirectUri: request.body.redirect_uri,
+                        client_id : request.body.client_id,
+                        redirect_uri: request.body.redirect_uri,
                         scope: request.body.scope,
                         state: request.body.state,
                         codeChallenge: request.body.code_challenge,
@@ -483,28 +483,28 @@ export class FastifyAuthorizationServer {
 
                 // OAuth spec says we may take client credentials from 
                 // authorization header
-                let clientId = request.body.client_id;
-                let clientSecret = request.body.client_secret;
+                let client_id = request.body.client_id;
+                let client_secret = request.body.client_secret;
                 if (request.headers.authorization) {
-                    let clientId1 : string|undefined;
-                    let clientSecret1 : string|undefined;
+                    let client_id1 : string|undefined;
+                    let client_secret1 : string|undefined;
                     const parts = request.headers.authorization.split(" ");
                     if (parts.length == 2 &&
                         parts[0].toLocaleLowerCase() == "basic") {
                         const decoded = Crypto.base64Decode(parts[1]);
                         const parts2 = decoded.split(":", 2);
                         if (parts2.length == 2) {
-                            clientId1 = parts2[0];
-                            clientSecret1 = parts2[1];
+                            client_id1 = parts2[0];
+                            client_secret1 = parts2[1];
                         }
                     }
-                    if (clientId1 == undefined || clientSecret1 == undefined) {
+                    if (client_id1 == undefined || client_secret1 == undefined) {
                         CrossauthLogger.logger.warn(j({
                             msg: "Ignoring malform authenization header " + 
                                 request.headers.authorization}));
                     } else {
-                        clientId = clientId1;
-                        clientSecret = clientSecret1;
+                        client_id = client_id1;
+                        client_secret = client_secret1;
                     }
                 }
 
@@ -531,7 +531,7 @@ export class FastifyAuthorizationServer {
                         this.csrfTokens.validateDoubleSubmitCsrfToken(csrfCookie, csrfHeader)
                     } catch (e) {
                         CrossauthLogger.logger.debug(j({err: e}));
-                        CrossauthLogger.logger.warn(j({cerr: e, msg: "Invalid csrf token", clientId: request.body.client_id}));
+                        CrossauthLogger.logger.warn(j({cerr: e, msg: "Invalid csrf token", client_id: request.body.client_id}));
                         return {
                             error: "access_denied",
                             error_description: "Invalid csrf token",
@@ -542,8 +542,8 @@ export class FastifyAuthorizationServer {
         
                 const resp = await this.authServer.tokenEndpoint({
                     grantType: request.body.grant_type,
-                    clientId : clientId,
-                    clientSecret : clientSecret,
+                    client_id : client_id,
+                    client_secret : client_secret,
                     scope: request.body.scope,
                     codeVerifier: request.body.code_verifier,
                     code: request.body.code,
@@ -640,34 +640,34 @@ export class FastifyAuthorizationServer {
 
                 // OAuth spec says we may take client credentials from 
                 // authorization header
-                let clientId = request.body.client_id;
-                let clientSecret = request.body.client_secret;
+                let client_id = request.body.client_id;
+                let client_secret = request.body.client_secret;
                 if (request.headers.authorization) {
-                    let clientId1 : string|undefined;
-                    let clientSecret1 : string|undefined;
+                    let client_id1 : string|undefined;
+                    let client_secret1 : string|undefined;
                     const parts = request.headers.authorization.split(" ");
                     if (parts.length == 2 &&
                         parts[0].toLocaleLowerCase() == "basic") {
                         const decoded = Crypto.base64Decode(parts[1]);
                         const parts2 = decoded.split(":", 2);
                         if (parts2.length == 2) {
-                            clientId1 = parts2[0];
-                            clientSecret1 = parts2[1];
+                            client_id1 = parts2[0];
+                            client_secret1 = parts2[1];
                         }
                     }
-                    if (clientId1 == undefined || clientSecret1 == undefined) {
+                    if (client_id1 == undefined || client_secret1 == undefined) {
                         CrossauthLogger.logger.warn(j({
                             msg: "Ignoring malform authenization header " + 
                                 request.headers.authorization}));
                     } else {
-                        clientId = clientId1;
-                        clientSecret = clientSecret1;
+                        client_id = client_id1;
+                        client_secret = client_secret1;
                     }
                 }
         
                 const resp = await this.authServer.deviceAuthorizationEndpoint({
-                    clientId : clientId,
-                    clientSecret : clientSecret,
+                    client_id : client_id,
+                    client_secret : client_secret,
                     scope: request.body.scope,
                 });
 
@@ -888,8 +888,8 @@ export class FastifyAuthorizationServer {
             // - create an authorization code
             return this.authorize(request, reply, true, {
                 responseType: query.response_type,
-                clientId : query.client_id,
-                redirectUri: query.redirect_uri,
+                client_id : query.client_id,
+                redirect_uri: query.redirect_uri,
                 scope: query.scope,
                 state: query.state,
                 codeChallenge: query.code_challenge,
@@ -910,7 +910,7 @@ export class FastifyAuthorizationServer {
                     user: request.user,
                     response_type: query.response_type,
                     client_id : query.client_id,
-                    client_name : client.clientName,
+                    client_name : client.client_name,
                     redirect_uri: query.redirect_uri,
                     scope: query.scope,
                     scopes: query.scope ? query.scope.split(" ") : undefined,
@@ -926,7 +926,7 @@ export class FastifyAuthorizationServer {
                     return reply.status(ce.httpStatus).view(this.errorPage, {
                         status: ce.httpStatus, 
                         errorMessage: "Invalid client given", 
-                        clientId: query.client_id, 
+                        client_id: query.client_id, 
                         user: request.user?.username, 
                         httpStatus: ce.httpStatus, 
                         errorCode: ErrorCode.UnauthorizedClient, 
@@ -944,16 +944,16 @@ export class FastifyAuthorizationServer {
         reply: FastifyReply,
         authorized: boolean, {
             responseType,
-            clientId,
-            redirectUri,
+            client_id,
+            redirect_uri,
             scope,
             state,
             codeChallenge,
             codeChallengeMethod,
         } : {
             responseType : string,
-            clientId : string,
-            redirectUri : string,
+            client_id : string,
+            redirect_uri : string,
             scope? : string,
             state : string,
             codeChallenge? : string,
@@ -967,8 +967,8 @@ export class FastifyAuthorizationServer {
         if (authorized) {
             const resp = await this.authServer.authorizeGetEndpoint({
                 responseType,
-                clientId,
-                redirectUri,
+                client_id,
+                redirect_uri,
                 scope,
                 state,
                 codeChallenge,
@@ -1003,8 +1003,8 @@ export class FastifyAuthorizationServer {
                 }
             }
 
-            return reply.redirect(this.authServer.redirectUri(
-                redirectUri,
+            return reply.redirect(this.authServer.redirect_uri(
+                redirect_uri,
                 code,
                 state
             )); 
@@ -1020,11 +1020,11 @@ export class FastifyAuthorizationServer {
                 errorCodeName: ce.codeName
             }));
             try {
-                OAuthClientManager.validateUri(redirectUri);
-                return reply.redirect(redirectUri); 
+                OAuthClientManager.validateUri(redirect_uri);
+                return reply.redirect(redirect_uri); 
             } catch (e) {
                 CrossauthLogger.logger.error(j({
-                    msg: `Couldn't send error message ${ce.codeName} to ${redirectUri}}`}));
+                    msg: `Couldn't send error message ${ce.codeName} to ${redirect_uri}}`}));
             }
         }
     }
@@ -1165,7 +1165,7 @@ export class FastifyAuthorizationServer {
                     authorizationNeeded: {
                         user,
                         client_id: ret.client_id,
-                        client_name: client.clientName,
+                        client_name: client.client_name,
                         scope: ret.scope,
                         scopes : ret.scope ? ret.scope.split(" ") : [],
                         csrfToken: request.csrfToken
@@ -1271,7 +1271,6 @@ export class FastifyAuthorizationServer {
         request: FastifyRequest<{ Body: DeviceBodyType }>,
         reply: FastifyReply) {
         try {
-            console.log("deviceCodePost", JSON.stringify(request.body))
             // this should not be called if a user is not logged in
             if (!request.user) throw new CrossauthError(ErrorCode.Unauthorized, "You are not logged in");
 
@@ -1361,13 +1360,13 @@ export class FastifyAuthorizationServer {
                 let userCode = request.body.user_code;
                 let scope : string|undefined = request.body.scope;
                 if (scope == "") undefined;
-                const clientId = request.body.client_id; 
+                const client_id = request.body.client_id; 
                 if (!userCode) throw new CrossauthError(ErrorCode.BadRequest, "user_code missing");
-                if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "client_id missing");
+                if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "client_id missing");
 
 
                 // validate the scopes
-                let ret = await this.authServer.validateAndPersistScope(clientId, scope, request.user);
+                let ret = await this.authServer.validateAndPersistScope(client_id, scope, request.user);
                 if (ret.error) {
                     throw CrossauthError.fromOAuthError(ret.error, ret.error_description);
                 }

@@ -133,10 +133,10 @@ async function createTotpAccount(server : FastifyServer) {
     } })
     body = JSON.parse(res.body)
     expect(body.ok).toBe(true);
-    expect(body.totpSecret.length).toBeGreaterThan(1);
+    expect(body.totpsecret.length).toBeGreaterThan(1);
 
     const sessionCookie = getSession(res);
-    const secret = body.totpSecret;
+    const secret = body.totpsecret;
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
         const code = gAuthenticator.generate(secret);
@@ -371,7 +371,7 @@ test('FastifyServer.loginTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret??"");
+        const code = gAuthenticator.generate(secrets.totpsecret??"");
         res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code,
@@ -419,7 +419,7 @@ test('FastifyServer.turnOnTotp', async () => {
     expect(body.template).toBe("configurefactor2.njk");
 
     //configure TOTP
-    const secret = body.args.totpSecret;
+    const secret = body.args.totpsecret;
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
         const code = gAuthenticator.generate(secret);
@@ -466,7 +466,7 @@ test('FastifyServer.turnOffTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret??"");
+        const code = gAuthenticator.generate(secrets.totpsecret??"");
         res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code
@@ -522,7 +522,7 @@ test('FastifyServer.reconfigureTotp', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret??"");
+        const code = gAuthenticator.generate(secrets.totpsecret??"");
         res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code,
@@ -543,7 +543,7 @@ test('FastifyServer.reconfigureTotp', async () => {
     const {csrfCookie: csrfCookie2, csrfToken: csrfToken2} = getCsrf(res);
 
     //configure TOTP
-    const secret = body.args.totpSecret;
+    const secret = body.args.totpsecret;
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
         const code = gAuthenticator.generate(secret);
@@ -558,7 +558,7 @@ test('FastifyServer.reconfigureTotp', async () => {
     expect(body.args.message).toBeDefined();
     const {user: user2, secrets: secrets2} = await userStorage.getUserByUsername("mary");
     expect(user2.factor2).toBe("totp");
-    expect(secrets2.totpSecret).toBe(secret);
+    expect(secrets2.totpsecret).toBe(secret);
 });
 
 test('FastifyServer.signupEmailWithoutEmailVerification', async () => {
@@ -754,7 +754,7 @@ test('FastifyServer.totpToEmail', async () => {
     const {secrets} = await userStorage.getUserByUsername("mary");
     // try twice as the code may be near expiry
     for (let tryNum=0; tryNum<2; ++tryNum) {
-        const code = gAuthenticator.generate(secrets.totpSecret??"");
+        const code = gAuthenticator.generate(secrets.totpsecret??"");
         res = await server.app.inject({ method: "POST", url: "/loginfactor2", cookies: {CSRFTOKEN: csrfCookie, SESSIONID: sessionCookie}, payload: {
             csrfToken: csrfToken,
             otp: code

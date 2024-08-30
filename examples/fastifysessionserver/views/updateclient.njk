@@ -13,22 +13,22 @@
             <p class="success">{{ message }}</p>
             {% if client %}
             <table>
-                {% if userId and isAdmin %}
+                {% if userid and isAdmin %}
                     <tr>
                         <td>User ID</td><td>{{ client.user_id }}</td>
                     </tr>
                 {% endif %}
                 <tr>
-                    <td>Client ID</td><td>{{ client.clientId }}</td>
+                    <td>Client ID</td><td>{{ client.client_id }}</td>
                 </tr>
                 <tr>
                     <td>Confidential</td><td>{{ client.confidential }}</td>
                 </tr>
                 {% if newSecret %}
                     <tr>
-                        <td>Client Secret</td><td>{{ client.clientSecret }}</td>
+                        <td>Client Secret</td><td>{{ client.client_secret }}</td>
                     </tr>
-                {% elif client.clientSecret %}
+                {% elif client.client_secret %}
                     <td>Client Secret</td><td>Unchanged</td>
                 {% else %}
                     <td>Client Secret</td><td>None set</td>
@@ -36,7 +36,7 @@
                 <tr>
                     <td>Redirect URIs</td>
                     <td>
-                        {% for uri in client.redirectUri%}
+                        {% for uri in client.redirect_uri%}
                             {{ uri }}<br>
                         {%endfor %}
                     </td>
@@ -44,13 +44,13 @@
                 <tr>
                     <td>Flows</td>
                     <td>
-                        {% for flow in client.validFlow%}
+                        {% for flow in client.valid_flow%}
                             {{ flow }}<br>
                         {%endfor %}
                     </td>
                 </tr>
             </table>
-            {% if client.clientSecret and newSecret %}
+            {% if client.client_secret and newSecret %}
                 <p>Make sure you write the client secret down.  If you lose it,
                     you will have to reset it.</p>
                 {% endif %}
@@ -64,23 +64,23 @@
             <form method="POST">
                 <input type="hidden" name="csrfToken" value="{{ csrfToken }}"/>
                 <input type="hidden" name="next" value="{{ next }}"/>
-                <input type="hidden" name="clientId" value="{{ clientId }}"/>
+                <input type="hidden" name="client_id" value="{{ client_id }}"/>
                 {% if user %}
-                    <input type="hidden" name="userId" value="{{ user.id }}"/>
+                    <input type="hidden" name="userid" value="{{ user.id }}"/>
                     {% if isAdmin %}
                         <p>
                             <label >User ID</label><br>
-                            {{ userId }}
+                            {{ userid }}
                         </p>
                     {% endif %}
                 {% endif %}
                 <p>
-                    <label for="clientName">Friendly name</label><br>
-                    <input type="text" name="clientName" size="20" value="{{ clientName }}" />
+                    <label for="client_name">Friendly name</label><br>
+                    <input type="text" name="client_name" size="20" value="{{ client_name }}" />
                 </p>
                 <p>
                     <label >Client ID</label><br>
-                    {{ clientId }}
+                    {{ client_id }}
                 </p>
                 <p>
                     <input type="checkbox" name="confidential" value="true" 
@@ -95,8 +95,8 @@
                 </p>
                 {% endif %}
                 <p>
-                    <label for="redirectUris">Redirect URIs (space separated)</label><br>
-                    <textarea name="redirectUris" rows="3" cols="40">{{ redirectUris }}</textarea>
+                    <label for="redirect_uris">Redirect URIs (space separated)</label><br>
+                    <textarea name="redirect_uris" rows="3" cols="40">{{ redirect_uris }}</textarea>
                 </p>
                 <h3>Enabled Flows</h3>
                 {% for flow in validFlows %}

@@ -4,9 +4,9 @@
     export let form;
     export let isAdmin;
     export let back;
-    let redirectUri = form?.formData?.redirectUri ?? "";
-    let validFlows = form?.formData?.validFlow ?? [];
-    let userId = form?.formData?.userId ?? data?.clientUserId;
+    let redirect_uri = form?.formData?.redirect_uri ?? "";
+    let validFlows = form?.formData?.valid_flow ?? [];
+    let userid = form?.formData?.userid ?? data?.clientUserId;
     let username = form?.formData?.username ?? data?.clientUsername;
 </script>
 
@@ -26,7 +26,7 @@
           <tbody>
             <tr>
                 <th>Client ID</th>
-                <td>{form.client.clientId}</td>
+                <td>{form.client.client_id}</td>
             </tr>
             <tr>
                 {#if isAdmin}
@@ -36,25 +36,25 @@
             </tr>
             <tr>
                 <th>Client Name</th>
-                <td>{form.client.clientName}</td>
+                <td>{form.client.client_name}</td>
             </tr>
             {#if form.client.confidential}
                 <tr>
                     <th>Client Secret</th>
-                    <td>{form.client?.clientSecret}</td>
+                    <td>{form.client?.client_secret}</td>
                 </tr>
             {/if}
             <tr>
                 <th>Redirect URIs</th>
                 <td>
-                    {form?.client.redirectUri?.join("<br>") ?? "None"}
+                    {form?.client.redirect_uri?.join("<br>") ?? "None"}
                 </td>
             </tr>
             <tr>
                 <th>Valid Flows</th>
                 <td>
-                    {#each form?.client.validFlow as item }
-                        { data?.validFlowNames[item] }<br>
+                    {#each form?.client.valid_flow as item }
+                        { data?.valid_flowNames[item] }<br>
                     {/each}
                 </td>
 
@@ -77,7 +77,7 @@
     <form method="POST">
 
         <!-- user - ignored if not an admin endpoint-->
-        <input readonly type="hidden" id="userId" name="userId" class="input input-bordered w-full max-w-xs mb-4" value={userId ?? ""}/>
+        <input readonly type="hidden" id="userid" name="userid" class="input input-bordered w-full max-w-xs mb-4" value={userid ?? ""}/>
 
          {#if isAdmin}
             <div class="form-control">
@@ -92,11 +92,11 @@
       
         <!-- client name -->
         <div class="form-control">
-            <label class="label" for="clientName">
+            <label class="label" for="client_name">
             <span class="label-text">Client Name</span>
             </label>
             <label class="input-group">
-                <input type="text" id="clientName" name="clientName" class="input input-bordered w-full max-w-xs mb-4" placeholder="Client name" value={form?.formData?.clientName ?? ""}/><br>
+                <input type="text" id="client_name" name="client_name" class="input input-bordered w-full max-w-xs mb-4" placeholder="Client name" value={form?.formData?.client_name ?? ""}/><br>
             </label>
         </div>
         <input type="hidden" name="csrfToken" value={data.csrfToken} />
@@ -114,11 +114,11 @@
 
         <!-- redirect URIs -->
         <div class="form-control">
-            <label class="label" for="redirectUri">
+            <label class="label" for="redirect_uri">
             <span class="label-text">Redirect URIs (space-separated)</span>
             </label>
             <label class="input-group">
-                <input type="text" id="redirectUri" name="redirectUri" class="input input-bordered w-full max-w-xs mb-4" placeholder="eg http://me.com/oauth/redirect" value={redirectUri}/><br>
+                <input type="text" id="redirect_uri" name="redirect_uri" class="input input-bordered w-full max-w-xs mb-4" placeholder="eg http://me.com/oauth/redirect" value={redirect_uri}/><br>
             </label>
         </div>
 
@@ -128,7 +128,7 @@
             <div class="form-control">
                 <span class="align-text-bottom mb-2">
                     <input type="checkbox" name={item} id={item} class="checkbox align-middle" value={item} checked={validFlows.includes(item)}/> 
-                    <span class="align-middle ml-2 text-sm">{ data?.validFlowNames[item] }
+                    <span class="align-middle ml-2 text-sm">{ data?.valid_flowNames[item] }
                     </span>
                 </span>
             </div>

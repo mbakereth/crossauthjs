@@ -48,10 +48,10 @@ async function createTotpAccount(username: string,
 
     const user = await userStorage.createUser(userInputs, {
         password: await lpAuthenticator.createPasswordHash(password),
-        totpSecret: resp.sessionData.totpSecret,
+        totpsecret: resp.sessionData.totpsecret,
         } );
 
-    return { user, totpSecret: resp.sessionData.totpSecret };
+    return { user, totpsecret: resp.sessionData.totpsecret };
 };
 
 async function createEmailAccount(username: string,
@@ -102,18 +102,18 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
     };
     const clientStorage = new InMemoryOAuthClientStorage();
     const authStorage = new InMemoryOAuthAuthorizationStorage();
-    const clientSecret = await Crypto.passwordHash("DEF", {
+    const client_secret = await Crypto.passwordHash("DEF", {
         encode: true,
         iterations: 1000,
         keyLen: 32,
     });
     const client = {
-        clientId : "ABC",
-        clientSecret: clientSecret,
-        clientName: "Test",
+        client_id : "ABC",
+        client_secret: client_secret,
+        client_name: "Test",
         confidential: true,
-        redirectUri: ["http://example.com/redirect"],
-        validFlow: OAuthFlows.allFlows(),
+        redirect_uri: ["http://example.com/redirect"],
+        valid_flow: OAuthFlows.allFlows(),
     };
     await clientStorage.createClient(client);
 
@@ -195,8 +195,8 @@ async function login(server : FastifyServer) : Promise<{sessionCookie : string, 
     return { sessionCookie, csrfCookie: csrfCookie2, csrfToken: csrfToken2 }
 }
 
-function getQueryParams(redirectUri : string) : {[key:string]:string} {
-    const parts1 = redirectUri.split("?");
+function getQueryParams(redirect_uri : string) : {[key:string]:string} {
+    const parts1 = redirect_uri.split("?");
     expect(parts1?.length).toBe(2);
     let params : {[key:string]:string} = {}
     if (parts1) {
@@ -380,7 +380,7 @@ test('FastifyAuthServer.getAccessTokenWithPasswordFlow', async () => {
 test('FastifyAuthServer.getAccessTokenWithPasswordMfaOtpFlow', async () => {
 
     let {server, userStorage} = await makeAppWithOptions();
-    const { totpSecret} = 
+    const { totpsecret} = 
         await createTotpAccount("mary", "maryPass123", userStorage);
 
     let res;
@@ -430,7 +430,7 @@ test('FastifyAuthServer.getAccessTokenWithPasswordMfaOtpFlow', async () => {
 
     const maxTries = 2;
     for (let i=0; i<maxTries; ++i) {
-        const otp = gAuthenticator.generate(totpSecret);
+        const otp = gAuthenticator.generate(totpsecret);
         res = await server.app.inject({ 
             method: "POST",
             url: '/token',

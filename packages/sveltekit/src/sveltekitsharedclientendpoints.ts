@@ -44,12 +44,12 @@ export type SearchClientsPageData = {
 export type UpdateClientPageData = {
     ok: boolean,
     client?: OAuthClient,
-    clientId?: string;
+    client_id?: string;
     clientUsername? : string,
     error? : string,
     exception?: CrossauthError,
     validFlows: string[],
-    validFlowNames: {[key:string]:string},
+    valid_flowNames: {[key:string]:string},
 };
 
 /**
@@ -80,7 +80,7 @@ export type CreateClientPageData = {
     error? : string,
     exception?: CrossauthError,
     validFlows: string[],
-    validFlowNames: {[key:string]:string},
+    valid_flowNames: {[key:string]:string},
 };
 
 /**
@@ -106,7 +106,7 @@ export type CreateClientFormData = {
 export type DeleteClientPageData = {
     ok: boolean,
     client?: OAuthClient,
-    clientId?: string;
+    client_id?: string;
     clientUsername? : string,
     error? : string,
     exception?: CrossauthError,
@@ -132,12 +132,12 @@ export type DeleteClientFormData = {
  * function for searching for a client.  This is the default 
  * @param searchTerm the search term passed in the query string
  * @param clientStorage the client storage to search
- * @param userId the user id to se3arch for, or null for clients not owned
+ * @param userid the user id to se3arch for, or null for clients not owned
  *        by a user
  * @returns An array of matching {@link @crossauth/common!OAuthClient} objects,
  */
 export async function defaultClientSearchFn(searchTerm: string,
-    clientStorage: OAuthClientStorage, skip: number, _take: number, userId? : string|number|null) : Promise<OAuthClient[]> {
+    clientStorage: OAuthClientStorage, skip: number, _take: number, userid? : string|number|null) : Promise<OAuthClient[]> {
         let clients : OAuthClient[] = [];
     if (skip > 0) return [];
     try {
@@ -151,7 +151,7 @@ export async function defaultClientSearchFn(searchTerm: string,
         }
         try {
             clients = 
-                await clientStorage.getClientByName(searchTerm, userId);
+                await clientStorage.getClientByName(searchTerm, userid);
             } catch (e2) {
             const ce2 = CrossauthError.asCrossauthError(e2);
             if (ce2.code != ErrorCode.UserNotExist) {
@@ -188,10 +188,10 @@ export class SvelteKitSharedClientEndpoints {
 
     /**
      * Function for searching the client table.  Default is to make
-     * an exact match search on `clientName`.
+     * an exact match search on `client_name`.
      */
     protected clientSearchFn : 
-        (searchTerm : string, clientStorage : OAuthClientStorage, skip: number, take: number, userId? : string|number|null) => Promise<OAuthClient[]> =
+        (searchTerm : string, clientStorage : OAuthClientStorage, skip: number, take: number, userid? : string|number|null) => Promise<OAuthClient[]> =
         defaultClientSearchFn;
     
     /**
@@ -215,7 +215,7 @@ export class SvelteKitSharedClientEndpoints {
     /**
      * Friendly names for `validFlows`
      */
-    protected validFlowNames : {[key:string]:string};
+    protected valid_flowNames : {[key:string]:string};
 
     /**
      * The OAuth client manager instantiated during construction
@@ -243,12 +243,12 @@ export class SvelteKitSharedClientEndpoints {
         this.redirect = options.redirect ?? redirect;
         this.error = options.error ?? error;
 
-        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_VALID_FLOWS");
+        setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_validFlows");
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {
                 this.validFlows = OAuthFlows.allFlows();
         }
-        this.validFlowNames = OAuthFlows.flowNames(this.validFlows);
+        this.valid_flowNames = OAuthFlows.flowNames(this.validFlows);
         this.clientManager = new OAuthClientManager(options);
         this.clientStorage = options.clientStorage;
 
@@ -293,7 +293,7 @@ export class SvelteKitSharedClientEndpoints {
      *   - `hasPrevious` whether there are more results before the ones that
      *      were returned.
      */
-    async searchClients_internal(event : RequestEvent, searchTerm? : string, skip? : number, take? : number, userId?: string|number)
+    async searchClients_internal(event : RequestEvent, searchTerm? : string, skip? : number, take? : number, userid?: string|number)
         : Promise<SearchClientsPageData> {
 
         try {
@@ -339,17 +339,17 @@ export class SvelteKitSharedClientEndpoints {
                     this.sessionServer.clientStorage, skip, take);
                 if (skip > 0) {
                     prevClients = await this.clientSearchFn(searchTerm, 
-                        this.sessionServer.clientStorage, skip-1, 1, userId);
+                        this.sessionServer.clientStorage, skip-1, 1, userid);
 
                 }
             } else {
                 clients = 
                     await this.sessionServer.clientStorage.getClients(skip, 
-                        take, userId);
+                        take, userid);
                 if (clients.length == take) {
                     nextClients = 
                         await this.sessionServer.clientStorage.getClients(skip+take, 
-                            1, userId);
+                            1, userid);
 
                 }
             }
@@ -362,7 +362,7 @@ export class SvelteKitSharedClientEndpoints {
                 hasPrevious: prevClients.length > 0,
                 hasNext: nextClients.length > 0,
                 search: searchTerm,
-                clientUserId : userId,
+                clientUserId : userid,
             }
 
         } catch (e) {
@@ -379,7 +379,7 @@ export class SvelteKitSharedClientEndpoints {
                 skip: skip ?? 0, 
                 take: take ?? 10,
                 search: searchTerm,
-                clientUserId : userId,
+                clientUserId : userid,
             }
         }
 
@@ -389,23 +389,23 @@ export class SvelteKitSharedClientEndpoints {
      * The base class of the load function for updating an OAuth client.
      * 
      * @param event the Sveltekit request event.  The following are taken:
-     *   - `clientId` from the URL path parameters
+     *   - `client_id` from the URL path parameters
      * @returns {@see UpdateClientPageData}
      */
     protected async loadClient_internal(event : RequestEvent) : Promise<UpdateClientPageData> {
-        const clientId = event.params.clientId;
+        const client_id = event.params.client_id;
         try {
-            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
+            if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
             if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
-            const client = await this.clientStorage.getClientById(clientId);
-            const userResp  = client.userId == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(client.userId);
+            const client = await this.clientStorage.getClientById(client_id);
+            const userResp  = client.userid == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(client.userid);
             const clientUsername = userResp?.user?.username;
             return {
                 ok: true,
                 client: client,
                 validFlows: this.validFlows,
-                validFlowNames: this.validFlowNames,
-                clientId,
+                valid_flowNames: this.valid_flowNames,
+                client_id,
                 clientUsername,
             }
         } catch (e) {
@@ -415,8 +415,8 @@ export class SvelteKitSharedClientEndpoints {
                 exception: ce,
                 ok: false,
                 validFlows: this.validFlows,
-                validFlowNames: this.validFlowNames,
-                clientId,
+                valid_flowNames: this.valid_flowNames,
+                client_id,
             }
         }
     }
@@ -425,9 +425,9 @@ export class SvelteKitSharedClientEndpoints {
      * The base class of the actions function for updating an OAuth client.
      * 
      * @param event the Sveltekit request event.  The following are taken:
-     *   - `clientId` from the URL path parameters
-     *   - `clientName` from the body form data
-     *   - `redirectUri` from the body form data (space-separated)
+     *   - `client_id` from the URL path parameters
+     *   - `client_name` from the body form data
+     *   - `redirect_uri` from the body form data (space-separated)
      *   - `confidential` from the body form data: 1, `on`, `yes` or `true` are true
      *   _ `resetSecret` if true (1, `on`, `yes` or `true`), create and return a new secret.  Ignored if not confidential
      *   - Flow names from {@link @crossauth/common/OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
@@ -437,8 +437,8 @@ export class SvelteKitSharedClientEndpoints {
         
         let formData : {[key:string]:string}|undefined = undefined;
         try {
-            const clientId = event.params.clientId;
-            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client_id = event.params.client_id;
+            if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
 
             // get form data
             var data = new JsonOrFormData();
@@ -446,7 +446,7 @@ export class SvelteKitSharedClientEndpoints {
             formData = data.toObject();
 
             // get client
-            //const client = await this.clientStorage?.getClientById(clientId);
+            //const client = await this.clientStorage?.getClientById(client_id);
             //if (!client) throw new CrossauthError(ErrorCode.InvalidClientId, "Client does not exist");
 
         // throw an error if the CSRF token is invalid
@@ -454,24 +454,24 @@ export class SvelteKitSharedClientEndpoints {
             throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
-        const redirectUri = !formData.redirectUri || formData.redirectUri.trim().length == 0 ? 
-            [] : formData.redirectUri.trim().split(/,?[ \t\n]+/);
+        const redirect_uri = !formData.redirect_uri || formData.redirect_uri.trim().length == 0 ? 
+            [] : formData.redirect_uri.trim().split(/,?[ \t\n]+/);
 
         // validate redirect uris
-        let redirectUriErrors : string[] = [];
-        for (let uri of redirectUri) {
+        let redirect_uriErrors : string[] = [];
+        for (let uri of redirect_uri) {
             try {
                 OAuthClientManager.validateUri(uri);
             }
             catch (e) {
                 CrossauthLogger.logger.error(j({err: e}));
-                redirectUriErrors.push("["+uri+"]");
+                redirect_uriErrors.push("["+uri+"]");
             }
         }
-        if (redirectUriErrors.length > 0) {
+        if (redirect_uriErrors.length > 0) {
             throw new CrossauthError(ErrorCode.BadRequest, 
                 "The following redirect URIs are invalid: " 
-                    + redirectUriErrors.join(" "));
+                    + redirect_uriErrors.join(" "));
         }
 
         // get flows from booleans in body
@@ -482,31 +482,31 @@ export class SvelteKitSharedClientEndpoints {
         }
         
         const clientUpdate : Partial<OAuthClient> = {}
-        clientUpdate.clientName = formData.clientName;
+        clientUpdate.client_name = formData.client_name;
         clientUpdate.confidential = data.getAsBoolean("confidential") ?? false;
-        clientUpdate.validFlow = validFlows;
-        clientUpdate.redirectUri = redirectUri;
+        clientUpdate.valid_flow = validFlows;
+        clientUpdate.redirect_uri = redirect_uri;
         if (isAdmin) {
-            let userId : string|number|undefined = formData.userId ?? undefined;
-            if (userId && this.sessionServer?.userStorage) {
-                const {user} = await this.sessionServer?.userStorage.getUserById(userId);
-                userId = user.id;
+            let userid : string|number|undefined = formData.userid ?? undefined;
+            if (userid && this.sessionServer?.userStorage) {
+                const {user} = await this.sessionServer?.userStorage.getUserById(userid);
+                userid = user.id;
             }
-            clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
+            clientUpdate.userid = formData.userid ? Number(formData.userid) : null;
 
         }
         const resetSecret = data.getAsBoolean("resetSecret");
         
         const {client: newClient, newSecret} = 
-            await this.clientManager.updateClient(clientId,
+            await this.clientManager.updateClient(client_id,
                 clientUpdate,
                 resetSecret);
         return {
             ok: true,
             client: newClient,
             formData: formData,
-            //plaintextSecret: resetSecret ? formData.clientSecret : undefined,
-            plaintextSecret: newSecret && newClient.clientSecret ? newClient.clientSecret : undefined,
+            //plaintextSecret: resetSecret ? formData.client_secret : undefined,
+            plaintextSecret: newSecret && newClient.client_secret ? newClient.client_secret : undefined,
 
         }
 
@@ -545,7 +545,7 @@ export class SvelteKitSharedClientEndpoints {
                     clientUserId = user.id;
                 }
     
-                const formClientUserId = data.get("userId");
+                const formClientUserId = data.get("userid");
                 if (formClientUserId  && this.sessionServer?.userStorage) {
                         const {user} = await this.sessionServer?.userStorage.getUserById(formClientUserId);
                         clientUserId = user.id;
@@ -563,7 +563,7 @@ export class SvelteKitSharedClientEndpoints {
             return {
                 ok: true,
                 validFlows: this.validFlows,
-                validFlowNames: this.validFlowNames,
+                valid_flowNames: this.valid_flowNames,
                 clientUserId,
                 clientUsername,
             }
@@ -574,7 +574,7 @@ export class SvelteKitSharedClientEndpoints {
                 exception: ce,
                 ok: false,
                 validFlows: this.validFlows,
-                validFlowNames: this.validFlowNames,
+                valid_flowNames: this.valid_flowNames,
             }
         }
     }
@@ -584,11 +584,11 @@ export class SvelteKitSharedClientEndpoints {
      * 
      * @param event the Sveltekit request event.  The following are taken:
      *   - `userid` from the URL query parameters.  Ignored if `isAdmin` is false.  Can be undefined
-     *   - `clientName` from the body form data
-     *   - `redirectUri` from the body form data (space-separated)
+     *   - `client_name` from the body form data
+     *   - `redirect_uri` from the body form data (space-separated)
      *   - `confidential` from the body form data: 1, `on`, `yes` or `true` are true
      *   - Flow names from {@link @crossauth/common/OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
-     * @returns {@see UpdateClientFormData}.  If a secret was created, it will be placed as plaintext in the client that is returned.  A random `clientId` is created.
+     * @returns {@see UpdateClientFormData}.  If a secret was created, it will be placed as plaintext in the client that is returned.  A random `client_id` is created.
      */
     protected async createClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<CreateClientFormData> {
         
@@ -603,7 +603,7 @@ export class SvelteKitSharedClientEndpoints {
             // get client user id 
             let clientUserId : string|number|undefined = undefined;
             if (isAdmin) {
-                const clientUserIdString = data.get("userId");
+                const clientUserIdString = data.get("userid");
                 if (clientUserIdString  && this.sessionServer?.userStorage) {
                     const {user} = await this.sessionServer?.userStorage.getUserById(clientUserIdString);
                     clientUserId = user.id;
@@ -621,24 +621,24 @@ export class SvelteKitSharedClientEndpoints {
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
             }
 
-            const redirectUri = !formData.redirectUri || formData.redirectUri.trim().length == 0 ? 
-                [] : formData.redirectUri.trim().split(/,?[ \t\n]+/);
+            const redirect_uri = !formData.redirect_uri || formData.redirect_uri.trim().length == 0 ? 
+                [] : formData.redirect_uri.trim().split(/,?[ \t\n]+/);
 
             // validate redirect uris
-            let redirectUriErrors : string[] = [];
-            for (let uri of redirectUri) {
+            let redirect_uriErrors : string[] = [];
+            for (let uri of redirect_uri) {
                 try {
                     OAuthClientManager.validateUri(uri);
                 }
                 catch (e) {
                     CrossauthLogger.logger.error(j({err: e}));
-                    redirectUriErrors.push("["+uri+"]");
+                    redirect_uriErrors.push("["+uri+"]");
                 }
             }
-            if (redirectUriErrors.length > 0) {
+            if (redirect_uriErrors.length > 0) {
                 throw new CrossauthError(ErrorCode.BadRequest, 
                     "The following redirect URIs are invalid: " 
-                        + redirectUriErrors.join(" "));
+                        + redirect_uriErrors.join(" "));
             }
 
             // get flows from booleans in body
@@ -649,17 +649,17 @@ export class SvelteKitSharedClientEndpoints {
             }
             
             const clientUpdate : Partial<OAuthClient> = {}
-            clientUpdate.clientName = formData.clientName;
+            clientUpdate.client_name = formData.client_name;
             clientUpdate.confidential = data.getAsBoolean("confidential")
-            clientUpdate.validFlow = validFlows;
-            clientUpdate.redirectUri = redirectUri;
+            clientUpdate.valid_flow = validFlows;
+            clientUpdate.redirect_uri = redirect_uri;
             if (isAdmin) {
-                clientUpdate.userId = formData.userId ? Number(formData.userId) : null;
+                clientUpdate.userid = formData.userid ? Number(formData.userid) : null;
             }
             
             const newClient = 
-                await this.clientManager.createClient(formData.clientName,
-                    redirectUri,
+                await this.clientManager.createClient(formData.client_name,
+                    redirect_uri,
                     validFlows,
                     data.getAsBoolean("confidential") ?? false,
                     clientUserId );
@@ -685,21 +685,21 @@ export class SvelteKitSharedClientEndpoints {
      * The base class of the load function for deleting an OAuth client.
      * 
      * @param event the Sveltekit request event.  The following are taken:
-     *   - `clientId` from the URL path parameters
+     *   - `client_id` from the URL path parameters
      * @returns {@see DeleteClientPageData}
      */
     protected async loadDeleteClient_internal(event : RequestEvent) : Promise<DeleteClientPageData> {
-        const clientId = event.params.clientId;
+        const client_id = event.params.client_id;
         try {
-            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
+            if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID specified");
             if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
-            const client = await this.clientStorage.getClientById(clientId);
-            const userResp  = client.userId == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(client.userId);
+            const client = await this.clientStorage.getClientById(client_id);
+            const userResp  = client.userid == undefined ? undefined : await this.sessionServer?.userStorage?.getUserById(client.userid);
             const clientUsername = userResp?.user?.username;
             return {
                 ok: true,
                 client: client,
-                clientId,
+                client_id,
                 clientUsername,
             }
         } catch (e) {
@@ -708,7 +708,7 @@ export class SvelteKitSharedClientEndpoints {
                 error: ce.message,
                 exception: ce,
                 ok: false,
-                clientId,
+                client_id,
             }
         }
     }
@@ -717,7 +717,7 @@ export class SvelteKitSharedClientEndpoints {
      * The base class of the actions function for deleting an OAuth client.
      * 
      * @param event the Sveltekit request event.  The following are taken:
-     *   - `clientId` from the URL path parameters
+     *   - `client_id` from the URL path parameters
      * @returns {@see DeleteClientFormData}
      */
     protected async deleteClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<DeleteClientFormData> {
@@ -728,17 +728,17 @@ export class SvelteKitSharedClientEndpoints {
                 throw new CrossauthError(ErrorCode.InvalidCsrf);
             }
 
-            const clientId = event.params.clientId;
-            if (!clientId) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
+            const client_id = event.params.client_id;
+            if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
 
             if (!this.clientStorage) throw new CrossauthError(ErrorCode.Configuration, "No client storage specified");
-            const client = await this.clientStorage?.getClientById(clientId);
+            const client = await this.clientStorage?.getClientById(client_id);
 
             if (!isAdmin) {
-                if (client.userId != event.locals.user?.id) throw this.error(401, "Unauthorized");
+                if (client.userid != event.locals.user?.id) throw this.error(401, "Unauthorized");
             }
         
-        await this.clientStorage.deleteClient(clientId);
+        await this.clientStorage.deleteClient(client_id);
         return {
             ok: true,
         }
