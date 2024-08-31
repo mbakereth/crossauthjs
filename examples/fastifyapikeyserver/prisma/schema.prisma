@@ -31,13 +31,13 @@ model ApiKey {
     id             Int       @id @unique @default(autoincrement())
     name           String    
     value          String    @unique
-    user_id        Int?
+    userid        Int?
     created        DateTime
     expires        DateTime?
     data           String?
-    user           User?      @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    user           User?      @relation(references: [id], fields: [userid], onDelete: Cascade)
 
     @@index([id])
-    @@index([user_id])
-    @@unique([user_id, name], name: "useridName")
+    @@index([userid])
+    @@unique([userid, name], name: "useridName")
 }

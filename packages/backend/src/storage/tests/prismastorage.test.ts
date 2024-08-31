@@ -9,11 +9,11 @@ var prismaClient = new PrismaClient();
 
 import { makeDBTests } from './dbtests';
 
-userStorage = new PrismaUserStorage({prismaClient: prismaClient, userEditableFields: ["email", "dummyField"]});
+userStorage = new PrismaUserStorage({prismaClient: prismaClient, userEditableFields: ["email", "dummyField"], useridForeignKeyColumn:"user_id"});
 let authenticator = new LocalPasswordAuthenticator(userStorage);
-const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient});
-const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient});
-const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient});
+const keyStorage = new PrismaKeyStorage({prismaClient: prismaClient, useridForeignKeyColumn:"user_id"});
+const clientStorage = new PrismaOAuthClientStorage({prismaClient: prismaClient, useridForeignKeyColumn:"user_id"});
+const authStorage = new PrismaOAuthAuthorizationStorage({prismaClient: prismaClient, useridForeignKeyColumn:"user_id"});
 
 // for all these tests, the database will have two users: bob and alice
 beforeEach(async () => {
@@ -43,8 +43,9 @@ beforeEach(async () => {
 });
 
 
-makeDBTests("PrismaStorage", userStorage, keyStorage, clientStorage, authStorage);
+makeDBTests("PrismaStorage", userStorage, keyStorage, clientStorage, authStorage, authenticator);
 
 afterAll(async () => {
     //await prismaClient.user.deleteMany({});
 });
+

@@ -575,7 +575,7 @@ export class InMemoryOAuthAuthorizationStorage extends OAuthAuthorizationStorage
      * @param scopes the scopes that have been authorized for the client
      */
     async updateAuthorizations(client_id: string,
-        userid: string | number | undefined,
+        userid: string | number | null,
         scopes: string[]) : Promise<void> {
         if (userid) {
             if (!(client_id in this.byClientAndUser)) this.byClientAndUser[client_id] = {};

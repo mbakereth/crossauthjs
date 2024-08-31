@@ -2,7 +2,7 @@ import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, vi, beforeAll, afterAll } from 'vitest';
 import { OAuthAuthorizationServer } from '../authserver';
 import { createClient } from './common';
-import { OAuthAuthorizationStorage, UserStorage } from '../../storage';
+import { UserStorage } from '../../storage';
 import { TotpAuthenticator } from '../../authenticators/totpauth';
 import { EmailAuthenticator } from '../../authenticators/emailauth';
 import { InMemoryKeyStorage, InMemoryUserStorage, InMemoryOAuthAuthorizationStorage } from '../../storage/inmemorystorage';
@@ -153,7 +153,7 @@ test('AuthorizationServer.Mfa.correctPasswordMfaOTPFlow', async () => {
     const maxTries = 2;
     for (let i=0; i<maxTries; ++i) {
         const otp = gAuthenticator.generate(totpsecret);
-        const {access_token, scope, error: error4, error_description} =
+        const {access_token, scope, error: error4} =
         await authServer.tokenEndpoint({
             grantType: "http://auth0.com/oauth/grant-type/mfa-otp",
             client_id : client.client_id,

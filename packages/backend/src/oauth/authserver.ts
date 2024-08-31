@@ -606,7 +606,7 @@ export class OAuthAuthorizationServer {
                 CrossauthLogger.logger.debug(j({
                     msg: "Updating authorizations for " + client_id + " to " + updatedScopes}));
                 await this.authStorage.updateAuthorizations(client_id,
-                    user?.id,
+                    user?.id ?? null,
                     updatedScopes);
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));

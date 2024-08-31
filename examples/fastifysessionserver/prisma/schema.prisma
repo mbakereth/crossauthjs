@@ -39,24 +39,24 @@ model User {
 }
 
 model UserSecrets {
-    user_id             Int         @unique
+    userid             Int         @unique
     password            String
     totpsecret          String      @default("")
 
-    user                User      @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    user                User      @relation(references: [id], fields: [userid], onDelete: Cascade)
 }
 
 model Key {
     id             Int       @id @unique @default(autoincrement())
     value          String    @unique
-    user_id        Int?
+    userid        Int?
     created        DateTime
     expires        DateTime
     data           String?
-    user           User?     @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    user           User?     @relation(references: [id], fields: [userid], onDelete: Cascade)
 
     @@index([id])
-    @@index([user_id])
+    @@index([userid])
 }
 
 //////////////////
@@ -66,16 +66,16 @@ model ApiKey {
     id             Int       @id @unique @default(autoincrement())
     name           String    
     value          String    @unique
-    user_id        Int?
+    userid        Int?
     created        DateTime
     expires        DateTime
-    lastActive     DateTime?
+    lastactive     DateTime?
     data           String?
-    user           User?      @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    user           User?      @relation(references: [id], fields: [userid], onDelete: Cascade)
 
     @@index([id])
-    @@index([user_id])
-    @@unique([user_id, name], name: "useridName")
+    @@index([userid])
+    @@unique([userid, name], name: "useridName")
 }
 
 /////////////////////
@@ -87,15 +87,15 @@ model OAuthClient {
     confidential   Boolean                   @default(true)
     client_name     String
     client_secret   String?
-    user_id        Int?
+    userid        Int?
 
     redirect_uri    OAuthClientRedirectUri[]
     valid_flow      OAuthClientValidFlow[]
     authorization  OAuthAuthorization[]
-    user           User?     @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    user           User?     @relation(references: [id], fields: [userid], onDelete: Cascade)
 
     @@index([client_id])
-    @@index([user_id])
+    @@index([userid])
 }
 
 model OAuthClientRedirectUri {
@@ -127,13 +127,13 @@ model OAuthClientValidFlow {
 model OAuthAuthorization {
     id             Int           @id @unique @default(autoincrement())
     client_id      String    
-    user_id        Int?
-    user           User?         @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    userid        Int?
+    user           User?         @relation(references: [id], fields: [userid], onDelete: Cascade)
     Client         OAuthClient?  @relation(references: [client_id], fields: [client_id], onDelete: Cascade)
     scope          String?
 
     @@index([id])
-    @@index([client_id, user_id])
-    @@unique([client_id, user_id, scope], name: "clientUserScope")
+    @@index([client_id, userid])
+    @@unique([client_id, userid, scope], name: "clientUserScope")
 }
 

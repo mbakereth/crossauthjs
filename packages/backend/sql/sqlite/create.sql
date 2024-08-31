@@ -2,19 +2,19 @@
 drop table if exists oauthauthorization;
 drop table if exists oauthclientredirecturi;
 drop table if exists oauthclientvalidflow;
-drop table if exists oauthclient cascade;
+drop table if exists oauthclient;
 
 drop table if exists keys;
 
 drop table if exists usersecrets;
-drop table if exists users cascade;
+drop table if exists users;
 drop index if exists usersecrets_userid_idx;
 drop index if exists keys_value_idx;
 
 /* users and usersecrets */
 
 create table users (
-    id                   serial            primary key,
+    id                   integer           primary key autoincrement,
     username             varchar(128)      unique,
     username_normalized   varchar(128)      unique,
     email                varchar(128)      unique,
@@ -42,7 +42,7 @@ create unique index usersecrets_userid_idx on usersecrets (userid);
 /* kesy */
 
 create table keys (
-    id             serial            primary key,
+    id             integer           primary key autoincrement,
     value          text              unique,
     userid         int               null references users,
     created        timestamp,
@@ -68,7 +68,7 @@ create unique index client_user_name_idx on oauthclient (userid, client_name);
 /* OAuth redirect Uri */
 
 create table oauthclientredirecturi (
-    id             serial           primary key,
+    id             integer          primary key autoincrement,
     client_id      varchar(128)     references oauthclient,
     uri            text
 );
@@ -79,7 +79,7 @@ create unique index redirecturi_client_id_uri_idx on oauthclientredirecturi (uri
 
 
 create table oauthclientvalidflow (
-    id             serial           primary key,
+    id             integer          primary key,
     client_id      varchar(128)     references oauthclient,
     flow           text
 );
@@ -89,7 +89,7 @@ create unique index redirecturi_client_id_flow_idx on oauthclientvalidflow (clie
 
 /* OAuth authorization */
 create table oauthauthorization (
-    id             serial           primary key,
+    id             integer          primary key autoincrement,
     client_id      varchar(128)     references oauthclient,  
     userid         int              null references users,
     scope          varchar(128)     null

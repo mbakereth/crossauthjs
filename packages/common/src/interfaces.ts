@@ -30,7 +30,7 @@ export interface Key {
     /** The date/time key was last used (eg last time a request was made
      * with this value as a session ID)
      */
-    lastActive? : Date,
+    lastactive? : Date,
 
     /** Additional key-specific data (eg new email address for email change).
      * 

@@ -437,7 +437,7 @@ export class SessionManager {
         if (this.session.idleTimeout > 0) {
             this.session.updateSessionKey({
                 value: key.value,
-                lastActive: new Date(),
+                lastactive: new Date(),
             });
         }
     }

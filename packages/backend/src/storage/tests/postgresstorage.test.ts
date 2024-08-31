@@ -4,7 +4,6 @@ import { PostgresUserStorage, PostgresKeyStorage, PostgresOAuthClientStorage, Po
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 import { makeDBTests } from './dbtests';
 
-
 var pool = new pg.Pool()
 let userStorage = new PostgresUserStorage(pool);
 let authenticator = new LocalPasswordAuthenticator(userStorage);
@@ -52,10 +51,12 @@ async function deleteAll() {
         await pgClient.query({text: `delete from usersecrets`});
         await pgClient.query({text: `delete from users`});
     } catch (e) {
+        console.log(e)
         throw e
     } finally {
         pgClient.release();
     }
 }
 
-makeDBTests("PostgresStorage", userStorage, keyStorage, clientStorage, authStorage);
+makeDBTests("PostgresStorage", userStorage, keyStorage, clientStorage, authStorage, authenticator);
+

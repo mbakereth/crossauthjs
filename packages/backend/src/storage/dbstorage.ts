@@ -426,8 +426,8 @@ export class DbUserStorage extends UserStorage {
             let placeholders: string[] = [];
             let values: any[] = [];
             const params = this.dbPool.parameters();
-            fields.push(this.idColumn);
-            placeholders.push("DEFAULT");
+            //fields.push(this.idColumn);
+            //placeholders.push("DEFAULT");
 
             for (let field in userData) {
                 if (userData[field] != undefined && field != "id") {
@@ -480,7 +480,12 @@ export class DbUserStorage extends UserStorage {
 
         } catch (e) {
             await dbClient.rollback();
-            throw e
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            if (ce.code == ErrorCode.ConstraintViolation) {
+                throw new CrossauthError(ErrorCode.UserExists, "User already exists");
+            }
+            throw ce;
         } finally {
             dbClient.release();
         }
@@ -705,15 +710,11 @@ export class DbKeyStorage extends KeyStorage {
             await dbClient.execute(query, values);
 
         } catch (e) {
-            if ((e instanceof Object && "code" in e) && (typeof (e.code) == "string")) {
-                if (e.code.startsWith("22") || e.code.startsWith("23")) {
-                    CrossauthLogger.logger.warn(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
-                    CrossauthLogger.logger.debug(j({err: e}));
-                    error = new CrossauthError(ErrorCode.KeyExists);
-                } else {
-                    CrossauthLogger.logger.debug(j({err: e}));
-                    error = new CrossauthError(ErrorCode.Connection, "Error saving key");
-                }
+            const ce = CrossauthError.asCrossauthError(e);
+            if (ce.code == ErrorCode.ConstraintViolation) {
+                CrossauthLogger.logger.warn(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+                CrossauthLogger.logger.debug(j({err: e}));
+                error = new CrossauthError(ErrorCode.KeyExists);
             } else {
                 CrossauthLogger.logger.debug(j({err: e}));
                 error = new CrossauthError(ErrorCode.Connection, "Error saving key");

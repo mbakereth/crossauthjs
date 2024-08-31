@@ -29,22 +29,22 @@ model User {
 }
 
 model UserSecrets {
-    user_id             Int         @unique
+    userid             Int         @unique
     password            String
     totpsecret          String      @default("")
 
-    user                User      @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    user                User      @relation(references: [id], fields: [userid], onDelete: Cascade)
 }
 
 model Key {
     id             Int       @id @unique @default(autoincrement())
     value          String    @unique
-    user_id        Int?
+    userid        Int?
     created        DateTime
     expires        DateTime
     data           String?
-    user           User?     @relation(references: [id], fields: [user_id], onDelete: Cascade)
+    user           User?     @relation(references: [id], fields: [userid], onDelete: Cascade)
 
     @@index([id])
-    @@index([user_id])
+    @@index([userid])
 }

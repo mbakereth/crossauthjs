@@ -550,8 +550,8 @@ export class SessionCookie {
                 throw new CrossauthError(ErrorCode.Expired);
             }
         }
-        if (key.userid && this.idleTimeout > 0 && key.lastActive 
-            && now > key.lastActive.getTime() + this.idleTimeout*1000) {
+        if (key.userid && this.idleTimeout > 0 && key.lastactive 
+            && now > key.lastactive.getTime() + this.idleTimeout*1000) {
                 CrossauthLogger.logger.warn(j({msg: "Session cookie with expired idle time received", hashedSessionCookie: Crypto.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.Expired);
         }

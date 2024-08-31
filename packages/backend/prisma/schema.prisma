@@ -47,7 +47,7 @@ model Key {
     user_id        Int?
     created        DateTime
     expires        DateTime
-    lastActive     DateTime?
+    lastactive     DateTime?
     data           String?
     user           User?      @relation(references: [id], fields: [user_id], onDelete: Cascade)
 

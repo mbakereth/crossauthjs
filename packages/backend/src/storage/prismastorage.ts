@@ -23,6 +23,11 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
      */
     idColumn? : string,
 
+    /** Name of the user id column in the user secrets.  
+     * Default `userid`.
+     */
+    useridForeignKeyColumn? : string,
+
     /** The prisma client instanfce.  Leave this out to have Crossauth create a default one */
     prismaClient? : any; // PrismaClient,
 
@@ -67,6 +72,7 @@ export class PrismaUserStorage extends UserStorage {
     private userTable : string = "user";
     private userSecretsTable : string = "userSecrets";
     private idColumn : string = "id";
+    private useridForeignKeyColumn : string = "userid";
     private prismaClient : PrismaClient;
     private includes : string[] = ["secrets"];
     private includesObject : {[key:string]:boolean} = {};
@@ -81,6 +87,7 @@ export class PrismaUserStorage extends UserStorage {
         setParameter("userTable", ParamType.String, this, options, "USER_TABLE");
         setParameter("userSecretsTable", ParamType.String, this, options, "USER_SECRETS_TABLE");
         setParameter("idColumn", ParamType.String, this, options, "USER_ID_COLUMN");
+        setParameter("useridForeignKeyColumn", ParamType.String, this, options, "USER_ID_FOREIGN_KEY_COLUMN");
         setParameter("includes", ParamType.String, this, options, "USER_INCLUDES");
         setParameter("forceIdToNumber", ParamType.String, this, options, "USER_FORCE_ID_TO_NUMBER");
 	    this.includes.forEach((item) => {this.includesObject[item] = true});
@@ -142,7 +149,7 @@ export class PrismaUserStorage extends UserStorage {
         }
         const secrets = prismaUser.secrets || {};
         if (prismaUser.secrets) {
-            delete secrets.user_id;
+            delete secrets[this.useridForeignKeyColumn];
             delete prismaUser.secrets;
         }
         return {user: {...prismaUser, id: prismaUser[this.idColumn]}, secrets: {userid: prismaUser[this.idColumn], ...secrets}};
@@ -240,7 +247,7 @@ export class PrismaUserStorage extends UserStorage {
                         // @ts-ignore  (because types only exist when do prismaClient.table...)
                         await tx[this.userSecretsTable].findUniqueOrThrow({
                             where: {
-                                user_id: user.id
+                                [this.useridForeignKeyColumn]: user.id
                             },
                         });
                     } catch (e) {}
@@ -259,12 +266,12 @@ export class PrismaUserStorage extends UserStorage {
                     // @ts-ignore
                     await tx[this.userSecretsTable].upsert({
                         where: {
-                            user_id: user.id,
+                            [this.useridForeignKeyColumn]: user.id,
                         },
                         update: 
                             secretsData,
                         create:
-                            {user_id: user.id,
+                            {[this.useridForeignKeyColumn]: user.id,
                             ...secretsData
                             }
                     });
@@ -422,6 +429,10 @@ export interface PrismaKeyStorageOptions {
     keyTable? : string,
     prismaClient? : any,
     transactionTimeout? : number,
+    /** Name of the user id column in the user secrets.  
+     * Default `userid`.
+     */
+    useridForeignKeyColumn? : string,
 }
 
 /**
@@ -430,7 +441,7 @@ export interface PrismaKeyStorageOptions {
  * 
  * By default, the Prisma name (ie the lowercased version) is called `key`.  It must have at least three fields:
  *    * `value String \@unique`
- *    * `user_id String or Int`
+ *    * `userid String or Int`
  *    * `created DateTime`
  *    * `expires DateTime`
  * `key` must have `\@unique`.  It may also contain an ID column, which is not used.  If in the schema,
@@ -442,6 +453,7 @@ export class PrismaKeyStorage extends KeyStorage {
     private keyTable : string = "key";
     private prismaClient : PrismaClient;
     private transactionTimeout = 5_000;
+    private useridForeignKeyColumn : string = "userid";
 
     /**
      * Constructor with user storage object to use plus optional parameters.
@@ -451,6 +463,7 @@ export class PrismaKeyStorage extends KeyStorage {
     constructor(options : PrismaKeyStorageOptions = {}) {
         super();
         setParameter("transactionTimeout", ParamType.Number, this, options, "TRANSACTION_TIMEOUT");
+        setParameter("useridForeignKeyColumn", ParamType.Number, this, options, "USER_ID_FOREIGN_KEY_COLUMN");
         if (options.keyTable) {
             this.keyTable = options.keyTable;
         }
@@ -483,7 +496,10 @@ export class PrismaKeyStorage extends KeyStorage {
             });
             returnKey = {
                 ...prismaKey,
-                userid: prismaKey.user_id,
+                userid: prismaKey[this.useridForeignKeyColumn],
+            }
+            if (this.useridForeignKeyColumn != "userid") {
+                delete returnKey[this.useridForeignKeyColumn]
             }
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -513,7 +529,7 @@ export class PrismaKeyStorage extends KeyStorage {
         let error : CrossauthError|undefined = undefined;
         try {
             let prismaData : {[key : string] : any} = {
-                user_id : userid,
+                [this.useridForeignKeyColumn] : userid,
                 value : value,
                 created : created,
                 expires : expires??null,
@@ -579,7 +595,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                     where: {
                         AND: [
-                            { user_id: userid??null },
+                            { [this.useridForeignKeyColumn]: userid??null },
                             { value: {startsWith: prefix} },
                             { value: { not: except } },
                         ]
@@ -591,7 +607,7 @@ export class PrismaKeyStorage extends KeyStorage {
                 return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                     where: {
                         AND: [
-                            { user_id: userid??null },
+                            { [this.useridForeignKeyColumn]: userid??null },
                             { value: {startsWith: prefix} } ,
                         ]
                     }
@@ -609,7 +625,7 @@ export class PrismaKeyStorage extends KeyStorage {
             let andClause = [];
             for (let entry in key) {
                 if (entry == "userid") {
-                    andClause.push({user_id: key[entry]});
+                    andClause.push({[this.useridForeignKeyColumn]: key[entry]});
 
                 } else {
                     andClause.push({[entry]: key[entry]});
@@ -639,7 +655,7 @@ export class PrismaKeyStorage extends KeyStorage {
             return /*await*/ this.prismaClient[this.keyTable].deleteMany({
                 where: {
                     AND: [
-                        { user_id: userid??null },
+                        { [this.useridForeignKeyColumn]: userid??null },
                         { value: {startsWith: prefix} },
                     ]
                 }
@@ -659,10 +675,16 @@ export class PrismaKeyStorage extends KeyStorage {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             let prismaKeys =  await this.prismaClient[this.keyTable].findMany({
                 where: {
-                    user_id: userid??null
+                    [this.useridForeignKeyColumn]: userid??null
                 }
             });
-            returnKeys = prismaKeys.map((v : Partial<Key>) => { return {...v, userid: v.user_id} });
+            returnKeys = prismaKeys.map((v : Partial<Key>) => { 
+                let ret = {...v, userid: v[this.useridForeignKeyColumn]}; 
+                if (this.useridForeignKeyColumn!="userid") {
+                    // @ts-ignore
+                    delete ret[this.useridForeignKeyColumn]; 
+                }
+                return ret; });
         } catch {
             error = new CrossauthError(ErrorCode.InvalidKey);
         }
@@ -782,6 +804,11 @@ export interface PrismaOAuthClientStorageOptions extends OAuthClientStorageOptio
      * Default `DeleteAndInsert`
      */
     updateMode? : "Update" | "DeleteAndInsert",
+
+    /** Name of the user id column in the user secrets.  
+     * Default `userid`.
+     */
+    useridForeignKeyColumn? : string,
 }
 
 /**
@@ -795,6 +822,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private prismaClient : any;// PrismaClient;
     private transactionTimeout = 5_000;
     private updateMode = "DeleteAndInsert";
+    private useridForeignKeyColumn = "userid";
 
     /**
      * Constructor with user storage object to use plus optional parameters.
@@ -808,6 +836,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         setParameter("validFlowTable", ParamType.String, this, options, "OAUTH_VALID_FLOW_TABLE");
         setParameter("transactionTimeout", ParamType.Number, this, options, "TRANSACTION_TIMEOUT");
         setParameter("updateMode", ParamType.String, this, options, "OAUTHCLIENT_UPDATE_MODE");
+        setParameter("useridForeignKeyColumn", ParamType.String, this, options, "USER_ID_FOREIGN_KEY_COLUMN");
         if (options.prismaClient == undefined) {
             this.prismaClient = new PrismaClient();
         } else {
@@ -824,7 +853,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     }
 
     private async getClientWithTransaction(field : string, value : string, tx : any, unique : boolean, userid : string|number|null|undefined) : Promise<OAuthClient[]> {
-        const userWhere = (userid == undefined && !(userid === null)) ? {} : {user_id: userid};
+        const userWhere = (userid == undefined && !(userid === null)) ? {} : {[this.useridForeignKeyColumn]: userid};
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             if (unique) {
@@ -837,8 +866,9 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 });
                 const redirect_uriObjects = client.redirect_uri;
                 const valid_flowObjects = client.valid_flow;
-                let userid = client.user_id;
+                let userid = client[this.useridForeignKeyColumn];
                 if (userid === null) userid = undefined;
+                if (this.useridForeignKeyColumn != "userid") delete client[this.useridForeignKeyColumn];
                 return [{
                     ...client, 
                     userid : userid,
@@ -857,9 +887,10 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 for (let client of clients) {
                     const redirect_uriObjects = client.redirect_uri;
                     const valid_flowObjects = client.valid_flow;
-                    let userid = client.user_id;
+                    let userid = client[this.useridForeignKeyColumn];
                     if (userid == null) userid = undefined;    
                     client.userid = userid;
+                    if (this.useridForeignKeyColumn != "userid")  delete client[this.useridForeignKeyColumn];
                     client.client_secret = client.client_secret??undefined;
                     client.redirect_uri = redirect_uriObjects.map((x:{[key:string]:any}) => x.uri);
                     client.valid_flow = valid_flowObjects.map((x:{[key:string]:any}) => x.flow)
@@ -900,7 +931,8 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
     private async createClientWithTransaction(client : OAuthClient, tx : any) : Promise<OAuthClient> {
         const {redirect_uri, valid_flow, userid, ...prismaClientData} = client;
         let newClient : OAuthClient|undefined;
-        if (userid) prismaClientData.user_id = userid;
+        if (userid) prismaClientData[this.useridForeignKeyColumn] = userid;
+        if (this.useridForeignKeyColumn != "userid") delete client[this.useridForeignKeyColumn];
         // validate redirect uri
         if (redirect_uri) {
             for (let i=0; i<redirect_uri.length; ++i) {
@@ -1091,8 +1123,8 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             delete data.client_id;
             delete data.redirect_uri;
             delete data.valid_flow;
-            if ("userid" in data) {
-                data.user_id = data.userid;
+            if ("userid" in data &&this.useridForeignKeyColumn != "userid") {
+                data[this.useridForeignKeyColumn] = data.userid;
                 delete data.userid;
             }
 
@@ -1179,8 +1211,8 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         if (!(client.client_id)) throw new CrossauthError(ErrorCode.InvalidClientId);
         const existingClient = (await this.getClientWithTransaction("client_id", client.client_id, this.prismaClient, true, undefined))[0];
         const newClient = {...existingClient, ...client};
-        if ("userid" in newClient) {
-            newClient.user_id = newClient.userid;
+        if ("userid" in newClient && this.useridForeignKeyColumn != "userid") {
+            newClient[this.useridForeignKeyColumn] = newClient.userid;
             delete newClient.userid;
         }
         await this.deleteClientWithTransaction(client.client_id, tx);
@@ -1199,7 +1231,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 clients = await this.prismaClient[this.clientTable].findMany({
                     ...opts,
                     where: {
-                        user_id: userid,
+                        [this.useridForeignKeyColumn]: userid,
                     },
                     orderBy: [
                         {
@@ -1220,7 +1252,11 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             } 
 
             clients.forEach((client) => {
-                client.userid = client.user_id===null ? undefined : client.user_id; 
+                if (this.useridForeignKeyColumn != "userid") {
+                    client.userid = client[this.useridForeignKeyColumn];
+                    delete client[this.useridForeignKeyColumn];
+                }
+                client.userid = client.userid===null ? undefined : client.userid; 
                 return client});
             return clients;
         }  catch (e) {
@@ -1246,6 +1282,11 @@ export interface PrismaOAuthAuthorizationStorageOptions extends OAuthClientStora
     prismaClient? : any; // PrismaClient,
 
     transactionTimeout? : number,
+
+    /** Name of the user id column in the user secrets.  
+     * Default `userid`.
+     */
+    useridForeignKeyColumn? : string,
 }
 
 /**
@@ -1256,6 +1297,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
     private authorizationTable : string = "oAuthAuthorization";
     private prismaClient : any;// PrismaClient;
     private transactionTimeout : number = 5_000;
+    private useridForeignKeyColumn = "userid";
 
     /**
      * Constructor with user storage object to use plus optional parameters.
@@ -1266,6 +1308,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
         super();
         setParameter("authorizationTable", ParamType.String, this, options, "OAUTH_CLIENT_TABLE");
         setParameter("transactionTimeout", ParamType.Number, this, options, "TRANSACTION_TIMEOUT");
+        setParameter("useridForeignKeyColumn", ParamType.String, this, options, "USER_ID_FOREIGN_KEY_COLUMN");
         if (options.prismaClient == undefined) {
             this.prismaClient = new PrismaClient();
         } else {
@@ -1279,7 +1322,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             let rows = await this.prismaClient[this.authorizationTable].findMany({
                 where: {
                     client_id : client_id,
-                    user_id: userid??null,
+                    [this.useridForeignKeyColumn]: userid??null,
                 },
                 select: {
                     scope: true,
@@ -1317,7 +1360,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             await tx[this.authorizationTable].deleteMany({
                 where: {
                     client_id: client_id,
-                    user_id : userid??null
+                    [this.useridForeignKeyColumn] : userid??null
                 }
             });
 
@@ -1327,7 +1370,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
                 promises.push(tx[this.authorizationTable].create({
                     data: {
                         client_id : client_id,
-                        user_id : userid??null,
+                        [this.useridForeignKeyColumn] : userid??null,
                         scope : scope,
                     },
                 }));

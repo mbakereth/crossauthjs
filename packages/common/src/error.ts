@@ -146,6 +146,9 @@ export enum ErrorCode {
     /** Thrown in the OAuth device code flow */
     ExpiredToken,
 
+    /** Thrown in database handlers where an insert causes a constraint violation */
+    ConstraintViolation,
+
     /** Thrown for an condition not convered above. */
     UnknownError,
 }
@@ -314,6 +317,9 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.ExpiredToken) {
             _message = "Token has expired";
             _httpStatus = 401;
+        } else if (code == ErrorCode.ConstraintViolation) {
+            _message = "Database update/insert caused a constraint violation";
+            _httpStatus = 500;
         } else {
             _message = "Unknown error";
             _httpStatus = 500;

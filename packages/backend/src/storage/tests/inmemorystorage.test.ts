@@ -250,7 +250,7 @@ test("InMemoryAuthorization.createAndGetWrongUser", async () => {
 
 test("InMemoryAuthorization.createAndGetForClient", async () => {
     const authStorage = new InMemoryOAuthAuthorizationStorage();
-    await authStorage.updateAuthorizations("ABC", undefined, ["read", "write"]);
+    await authStorage.updateAuthorizations("ABC", null, ["read", "write"]);
     const scopes = await authStorage.getAuthorizations("ABC", undefined);
     expect(scopes.length).toBe(2);
     expect(["read", "write"]).toContain(scopes[0]);
@@ -260,7 +260,7 @@ test("InMemoryAuthorization.createAndGetForClient", async () => {
 test("InMemoryAuthorization.createAndGetForUserAndClientDontOverlap", async () => {
     const authStorage = new InMemoryOAuthAuthorizationStorage();
     await authStorage.updateAuthorizations("ABC", 1, ["user1", "user2"]);
-    await authStorage.updateAuthorizations("ABC", undefined, ["client1", "client1"]);
+    await authStorage.updateAuthorizations("ABC", null, ["client1", "client1"]);
 
     const userScopes = await authStorage.getAuthorizations("ABC", 1);
     expect(userScopes.length).toBe(2);

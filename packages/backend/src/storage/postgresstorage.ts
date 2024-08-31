@@ -65,7 +65,7 @@ export class PostgresKeyStorage extends DbKeyStorage {
 // OAuthClientStorage
 
 /**
- * Optional parameters for {@link PostgresKeyStorage}.
+ * Optional parameters for {@link PostgresOAuthClientStorage}.
  * 
  * See {@link PostgresOAuthClientStorage.constructor} for definitions.
  */
@@ -73,13 +73,13 @@ export interface PostgresOAuthClientStorageOptions extends DbOAuthClientStorageO
 }
 
 /**
- * Implementation of {@link KeyStorage } where keys stored in a 
+ * Implementation of {@link OAuthClientStorage } where keys stored in a 
  * Postgres database.
  */
 export class PostgresOAuthClientStorage extends DbOAuthClientStorage {
 
     /**
-     * Creates a PostgresOAuthStorage object, optionally overriding defaults.
+     * Creates a PostgresOAuthClientStorage object, optionally overriding defaults.
      * @param pgPool the instance of the Posrgres client. 
      * @param options see {@link PostgresOAuthStorageOptions}.
      */
@@ -92,7 +92,7 @@ export class PostgresOAuthClientStorage extends DbOAuthClientStorage {
 // PostgresOAuthAuthorizationStorage
 
 /**
- * Optional parameters for {@link PostgresKeyStorage}.
+ * Optional parameters for {@link PostgresOAuthAuthorizationStorage}.
  * 
  * See {@link PostgresOAuthClientStorage.constructor} for definitions.
  */
@@ -100,7 +100,7 @@ export interface PostgresOAuthAuthorizationStorageOptions extends DbOAuthAuthori
 }
 
 /**
- * Implementation of {@link KeyStorage } where keys stored in a 
+ * Implementation of {@link OAuthAuthorizationStorage } where keys stored in a 
  * Postgres database.
  */
 export class PostgresOAuthAuthorizationStorage extends DbOAuthAuthorizationStorage {

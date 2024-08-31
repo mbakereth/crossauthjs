@@ -1,8 +1,29 @@
 import { test, expect } from 'vitest';
 import { UserStorage, KeyStorage, OAuthClientStorage, OAuthAuthorizationStorage } from '../../storage';
-import { OAuthClient } from '@crossauth/common';
+import { OAuthClient, CrossauthError, ErrorCode } from '@crossauth/common';
+import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 
-export function makeDBTests(prefix : string, userStorage : UserStorage, keyStorage : KeyStorage, clientStorage : OAuthClientStorage, authStorage : OAuthAuthorizationStorage) {
+export function makeDBTests(prefix : string, userStorage : UserStorage, keyStorage : KeyStorage, clientStorage : OAuthClientStorage, authStorage : OAuthAuthorizationStorage, authenticator : LocalPasswordAuthenticator) {
+
+
+    // test updating a field in the user table
+    test(prefix+ ".createUserExisting", async() => {
+
+        let ce : CrossauthError | undefined = undefined;
+        try {
+            await userStorage.createUser({
+                username: "bob", 
+                state: "active",
+                dummyfield: "abc", 
+                email: "bob@bob.com",
+            }, {
+                password: await authenticator.createPasswordHash("bobPass123"), 
+            });    
+        } catch (e) {
+            ce = CrossauthError.asCrossauthError(e)
+        }
+        expect(ce?.code).toBe(ErrorCode.UserExists);
+    })
 
     // test getting a user by username and by id
     test(prefix + '.getUser', async () => {
@@ -53,7 +74,7 @@ export function makeDBTests(prefix : string, userStorage : UserStorage, keyStora
 
     });
 
-    test(prefix + '.createGetAndDeleteKey', async () => {
+    test(prefix + '.createKey', async () => {
         const key = "ABCDEF123";
         const {user: bob} = await userStorage.getUserByUsername("bob");
         const now = new Date();
@@ -372,5 +393,5 @@ export function makeDBTests(prefix : string, userStorage : UserStorage, keyStora
         expect(["read", "delete"]).toContain(scopes[0]);
         expect(["read", "delete"]).toContain(scopes[1]);
     });
-    
+
 }
