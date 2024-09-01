@@ -544,11 +544,8 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
     request: FastifyRequest,
     reply?: FastifyReply,
     ) {
-        let sessionCookieValue = client.server.getSessionCookieValue(request);
-        if (!reply && !sessionCookieValue) {
-            throw new CrossauthError(ErrorCode.InvalidSession,
-                "No session data found containing tokens")
-        }
+        if (!client.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+            "Cannot update session data if sessions not enabled");
         let expires_in = oauthResponse.expires_in;
         if (!expires_in && oauthResponse.access_token) {
             const payload = jwtDecode(oauthResponse.access_token);
@@ -559,18 +556,31 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
                 "OAuth server did not return an expiry for the access token");
         }
         const expires_at = Date.now() + (expires_in)*1000;
-        if (!sessionCookieValue && reply) {
-            sessionCookieValue = 
-                await client.server.createAnonymousSession(request,
-                    reply,
-                    { [client.sessionDataName]: {...oauthResponse, expires_at} });
-        } else {
-            const existingData = 
-                await client.server.getSessionData(request, client.sessionDataName);
+        if (client.server.sessionServer) {
+            // if we have a real session server, we can create an anonymous session
+            // if there is no current session.  For session adapters, we assume
+            // that a session was already created, or updateSessionData creates
+            // one automatically.
+            let sessionCookieValue =  client.server.sessionServer.getSessionCookieValue(request);
+                if (!sessionCookieValue && reply) {
+                sessionCookieValue = 
+                    await client.server.createAnonymousSession(request,
+                        reply,
+                        { [client.sessionDataName]: {...oauthResponse, expires_at} });
+    
+            } else {
+                const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
+                await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
 
-                if (!client.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
-                    "Cannot update session data if sessions not enabled");
-                await client.server.sessionServer.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
+            }
+
+        } else /* No session server but might have session adapter */ {
+
+            if (!client.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+                "Cannot get session data if sessions not enabled");
+            const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
+
+            await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
         }
 
     }
@@ -1013,7 +1023,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         ip: request.ip,
                         user: request.user?.username
                     }));
-                if (this.server.sessionServer) {
+                if (this.server.sessionAdapter) {
                     // if sessions are enabled, require a csrf token
                     const {error, reply: reply1} = 
                         await server.errorIfCsrfInvalid(request,
@@ -1073,8 +1083,12 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 // get refresh token from body if present, otherwise
                 // try to find in session
                 let refreshToken : string | undefined = request.body.refreshToken;
-                if (!refreshToken && this.server.sessionServer) {
-                    const oauthData = await this.server.getSessionData(request, "oauth");
+                if (!refreshToken && this.server.sessionAdapter) {
+
+                    if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+                        "Cannot get session data if sessions not enabled");
+                    const oauthData =  await this.server.sessionAdapter.getSessionData(request, this.sessionDataName);
+        
                     if (!oauthData?.refresh_token) {
                         const ce = new CrossauthError(ErrorCode.BadRequest,
                             "No refresh token in session or in parameters");
@@ -1408,7 +1422,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     tokenName = tokenType.replace("have_", "");
                     isHave = true;
                 }
-                const oauthData = await this.server.getSessionData(request, "oauth");
+                if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+                    "Cannot get session data if sessions not enabled");
+                const oauthData =  await this.server.sessionAdapter.getSessionData(request, this.sessionDataName);
                 if (!oauthData) {
                     if (isHave) return reply.header(...JSONHDR).status(200).send({ok: false});
                     return reply.header(...JSONHDR).status(204).send();
@@ -1442,7 +1458,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             if (!request.csrfToken) {
                 return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
             }
-            const oauthData = await this.server.getSessionData(request, "oauth");
+            if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+                "Cannot get session data if sessions not enabled");
+            const oauthData =  await this.server.sessionAdapter.getSessionData(request, this.sessionDataName);
             if (!oauthData) {
                 return reply.header(...JSONHDR).status(204).send();
             }
@@ -1518,7 +1536,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         CrossauthLogger.logger.debug(j({msg: "Resource server URL " + url}))
                         const csrfRequired = 
                             (methods[i] != "GET" && methods[i] != "HEAD" && methods[i] != "OPTIONS");
-                        if (this.server.sessionServer && csrfRequired) {
+                        if (this.server.sessionAdapter && csrfRequired) {
                             // if sessions are enabled, require a csrf token
                             const {error, reply: reply1} =
                                 await server.errorIfCsrfInvalid(request,
@@ -1528,9 +1546,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         }
                 
                         try {
-                            const oauthData = 
-                                await this.server.getSessionData(request, 
-                                    "oauth");
+                            if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+                                    "Cannot get session data if sessions not enabled");
+                            const oauthData =  await this.server.sessionAdapter.getSessionData(request, this.sessionDataName);
                             if (!oauthData) {
                                 return reply.header(...JSONHDR).status(401)
                                     .send({ok: false});
@@ -1588,7 +1606,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     private async passwordPost(isApi: boolean,
         request: FastifyRequest<{ Body: PasswordBodyType }>,
         reply: FastifyReply) {
-        if (this.server.sessionServer) {
+        if (this.server.sessionAdapter) {
             // if sessions are enabled, require a csrf token
             const {error, reply: reply1} = 
                 await this.server.errorIfCsrfInvalid(request,
@@ -1847,7 +1865,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     private async deviceCodePost(isApi: boolean,
         request: FastifyRequest<{ Body: DeviceCodeBodyType }>,
         reply: FastifyReply) {
-        if (this.server.sessionServer) {
+        if (this.server.sessionAdapter) {
             // if sessions are enabled, require a csrf token
             const {error, reply: reply1} = 
                 await this.server.errorIfCsrfInvalid(request,
@@ -1938,7 +1956,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         reply: FastifyReply) {
         // CSRF protection is disabled because this just wraps the OAuth token
         // endpoint, which does nothing with cookies
-        /*if (this.server.sessionServer) {
+        /*if (this.server.sessionAdapter) {
             // if sessions are enabled, require a csrf token
             const {error, reply: reply1} = 
                 await this.server.errorIfCsrfInvalid(request,
@@ -2064,7 +2082,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         if (!request.csrfToken) {
             return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
         }
-        const oauthData = await this.server.getSessionData(request, "oauth");
+        if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+            "Cannot get session data if sessions not enabled");
+        const oauthData =  await this.server.sessionAdapter.getSessionData(request, this.sessionDataName);
         if (!oauthData?.refresh_token) {
             if (silent) {
                 return reply.header(...JSONHDR).status(204).send();
@@ -2095,19 +2115,16 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     }
 
     private async deleteTokens(request: FastifyRequest) : Promise<void> {
-        let sessionCookieValue = this.server.getSessionCookieValue(request);
-        if (!sessionCookieValue) {
-            throw new CrossauthError(ErrorCode.InvalidSession,
-                "No session data found containing tokens")
-        }
+        if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+            "Cannot delete tokens if sessions not enabled");
         if (!request.csrfToken) {
             throw new CrossauthError(ErrorCode.InvalidSession,
                 "Missing or incorrec CSRF token")
         }
 
-        if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
+        if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
             "Cannot delete session data if sessions not enabled");
-        await this.server.sessionServer.deleteSessionData(request, this.sessionDataName);
+        await this.server.sessionAdapter.deleteSessionData(request, this.sessionDataName);
     }
     
 }

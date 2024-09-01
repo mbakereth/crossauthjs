@@ -29,6 +29,7 @@ import { FastifyUserEndpoints, type UpdateUserBodyType } from './fastifyuserendp
 import { FastifyAdminEndpoints } from './fastifyadminendpoints'
 import { FastifyAdminClientEndpoints } from './fastifyadminclientendpoints'
 import { FastifyUserClientEndpoints } from './fastifyuserclientendpoints'
+import { FastifySessionAdapter } from './fastifysessionadapter';
 
 const JSONHDR : [string,string] = 
     ['Content-Type', 'application/json; charset=utf-8'];
@@ -771,7 +772,7 @@ function defaultUpdateUser(user: User,
  * Nunjucks, you can create
  * and pass in your own Fastify app.
  */
-export class FastifySessionServer {
+export class FastifySessionServer implements FastifySessionAdapter {
 
     /**
      * The Fastify app taken from constructor args.
@@ -897,6 +898,8 @@ export class FastifySessionServer {
         "/api/changefactor2",
     ]
     private editUserScope? : string;
+    readonly enableCsrfProtection = true;
+
 
     /**
      * Constructor
@@ -2758,51 +2761,7 @@ export class FastifySessionServer {
         return ret;
     }
 
-    /**
-     * Updates a field in the session data in the key storage record,
-     * 
-     * The `data` field is assumed to be JSON.  Just the field with the given
-     * name is updated and the rest is unchanged.
-     * @param request the Fastifdy request
-     * @param name the field within `data` to update
-     * @param value the value to set it to
-     */
-    async updateSessionData(request : FastifyRequest, name : string, value : {[key:string]:any}) {
-        if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
-        await this.sessionManager.updateSessionData(request.sessionId, name, value);
-    }
-
-    /**
-    * Deletes a field from the session data in the key storage record,
-    * 
-    * The `data` field is assumed to be JSON.  Just the field with the given
-    * name is updated and the rest is unchanged.
-    * @param request the Fastifdy request
-    * @param name the field within `data` to update
-    */
-   async deleteSessionData(request : FastifyRequest, name : string) {
-       if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
-       await this.sessionManager.deleteSessionData(request.sessionId, name);
-   }
-
-    async getSessionData(request : FastifyRequest, name : string) 
-        : Promise<{[key:string]:any}|undefined>{
-        try {
-            const data = request.sessionId ? 
-                await this.sessionManager.dataForSessionId(request.sessionId) : 
-                undefined;
-            if (data && name in data) return data[name];
-        } catch (e) {
-            CrossauthLogger.logger.error(j({
-                msg: "Couldn't get " + name + "from session",
-                cerr: e
-            }))
-            CrossauthLogger.logger.debug(j({err: e}));
-        }
-        return undefined;
-    }
-
-    async getSessionKey(request : FastifyRequest) : Promise<Key|undefined>{
+    /*async getSessionKey(request : FastifyRequest) : Promise<Key|undefined>{
         if (!request.sessionId) return undefined;
         try {
             const {key} = await this.sessionManager
@@ -2812,7 +2771,7 @@ export class FastifySessionServer {
             CrossauthLogger.logger.debug(j({err: e}));
         }
         return undefined;
-    }
+    }*/
 
     /** Returns whether there is a user logged in with a cookie-based session
      */
@@ -2832,4 +2791,68 @@ export class FastifySessionServer {
             (this.editUserScope && request.scope && 
                 request.scope.includes(this.editUserScope));
     }
+
+    ////////////////////////////////////////////////////////////////
+    // SessionAdapter interface
+
+    csrfProtectionEnabled() : boolean {
+        return this.enableCsrfProtection;
+    }
+
+    getCsrfToken(request : FastifyRequest) : string|undefined {
+        return request.csrfToken;
+    }
+
+    getUser(request : FastifyRequest) : User|undefined {
+        return request.user;
+    }
+
+    /**
+     * Updates a field in the session data in the key storage record,
+     * 
+     * The `data` field is assumed to be JSON.  Just the field with the given
+     * name is updated and the rest is unchanged.
+     * @param request the Fastifdy request
+     * @param name the field within `data` to update
+     * @param value the value to set it to
+     */
+    async updateSessionData(request : FastifyRequest, name : string, value : {[key:string]:any}): Promise<void> {
+        if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
+        await this.sessionManager.updateSessionData(request.sessionId, name, value);
+    }
+
+    /**
+    * Deletes a field from the session data in the key storage record,
+    * 
+    * The `data` field is assumed to be JSON.  Just the field with the given
+    * name is updated and the rest is unchanged.
+    * @param request the Fastifdy request
+    * @param name the field within `data` to update
+    */
+   async deleteSessionData(request : FastifyRequest, name : string) : Promise<void> {
+       if (!request.sessionId) {
+        //throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
+            CrossauthLogger.logger.warn(j({msg: "Attempt to delete session data when there is no session"}));
+       } else {
+            await this.sessionManager.deleteSessionData(request.sessionId, name);
+       }
+   }
+
+    async getSessionData(request : FastifyRequest, name : string) 
+        : Promise<{[key:string]:any}|undefined>{
+        try {
+            const data = request.sessionId ? 
+                await this.sessionManager.dataForSessionId(request.sessionId) : 
+                undefined;
+            if (data && name in data) return data[name];
+        } catch (e) {
+            CrossauthLogger.logger.error(j({
+                msg: "Couldn't get " + name + "from session",
+                cerr: e
+            }))
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
+        return undefined;
+    }
+
 }

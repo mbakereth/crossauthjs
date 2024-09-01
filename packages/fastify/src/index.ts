@@ -21,6 +21,7 @@ export { FastifyUserEndpoints } from './fastifyuserendpoints';
 export type { UpdateUserBodyType, ChangeFactor2QueryType, ChangeFactor2BodyType, ChangePasswordQueryType, ChangePasswordBodyType, ConfigureFactor2QueryType, ConfigureFactor2BodyType, RequestPasswordResetQueryType, RequestPasswordResetBodyType, ResetPasswordBodyType, VerifyTokenParamType,  } from './fastifyuserendpoints';
 export { FastifyUserClientEndpoints } from './fastifyuserclientendpoints';
 import { User, ApiKey } from '@crossauth/common';
+export { FastifySessionAdapter } from './fastifysessionadapter';
 
 declare module 'fastify' {
     export interface FastifyRequest {

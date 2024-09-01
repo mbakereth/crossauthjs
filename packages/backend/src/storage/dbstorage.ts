@@ -942,8 +942,20 @@ export class DbKeyStorage extends KeyStorage {
                     throw new CrossauthError(ErrorCode.DataFormat);
                 }
             }   
-            data[dataName] = value;
-    
+            //data[dataName] = value;
+            if (dataName.indexOf(".") > 0) {
+                let parts = dataName.split(".");
+                let data1 : any = data[parts[0]];
+                for (let i=1; i<parts.length-1 && data; i++) {
+                    data1 = data1[parts[i]];
+                };
+                if (data1) {
+                    data1[parts[parts.length-1]] = value;
+                }
+            } else {
+                data[dataName] = value;
+            }
+
             await this.updateKeyInTransaction(dbClient, {value: key.value, data: JSON.stringify(data)});
             await dbClient.commit();
         } catch (e) {
@@ -979,9 +991,21 @@ export class DbKeyStorage extends KeyStorage {
                     CrossauthLogger.logger.debug(j({err: e}));
                     throw new CrossauthError(ErrorCode.DataFormat);
                 }
-                if (dataName in data) {
-                    delete data[dataName];
-                    changed = true;
+                if (dataName.indexOf(".") > 0) {
+                    let parts = dataName.split(".");
+                    let data1 : any = data[parts[0]];
+                    for (let i=1; i<parts.length-1 && data; i++) {
+                        data1 = data1[parts[i]];
+                    };
+                    if (data1 && data1[parts[parts.length-1]]) {
+                        delete data1[parts[parts.length-1]];
+                        changed = true;
+                    }
+                } else {
+                    if (dataName in data) {
+                        delete data[dataName];
+                        changed = true;
+                    }
                 }
             }   
                 

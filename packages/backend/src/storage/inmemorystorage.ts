@@ -414,8 +414,17 @@ export class InMemoryKeyStorage extends KeyStorage {
                 throw new CrossauthError(ErrorCode.DataFormat);
             }
         }
-        data[dataName] = value;
-        key.data = JSON.stringify(data);
+        if (dataName.indexOf(".") > 0) {
+            let parts = dataName.split(".");
+            let data1 : any = data[parts[0]];
+            for (let i=1; i<parts.length-1 && data; i++) {
+                data1 = data1[parts[i]];
+            };
+            if (data1) data1[parts[parts.length-1]] = value;
+        } else {
+            data[dataName] = value;
+            key.data = JSON.stringify(data);
+        }
     }
 
     /**
@@ -434,8 +443,17 @@ export class InMemoryKeyStorage extends KeyStorage {
                     throw new CrossauthError(ErrorCode.DataFormat);
                 }
             }
-            if (dataName in data) delete data[dataName];
-            key.data = JSON.stringify(data);
+            if (dataName.indexOf(".") > 0) {
+                let parts = dataName.split(".");
+                let data1 : any = data[parts[0]];
+                for (let i=1; i<parts.length-1 && data; i++) {
+                    data1 = data1[parts[i]];
+                };
+                if (data1 && data1[parts[parts.length-1]]) delete data1[parts[parts.length-1]];
+            } else {
+                if (dataName in data) delete data[dataName];
+                key.data = JSON.stringify(data);    
+            }
         }
     
 

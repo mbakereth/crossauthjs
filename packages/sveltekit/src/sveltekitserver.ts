@@ -17,6 +17,8 @@ import {
     SvelteKitOAuthResourceServer,
     type SvelteKitOAuthResourceServerOptions } from './sveltekitresserver';
 import { OAuthTokenConsumer } from '@crossauth/backend';
+import { SvelteKitSessionAdapter } from './sveltekitsessionadapter';
+
 
 export interface SvelteKitServerOptions 
     extends SvelteKitSessionServerOptions, 
@@ -95,6 +97,9 @@ function defaultIsAdminFn(user : User) : boolean {
  * 
  * - `sessionServer`   Session cookie management server.  Uses sesion ID
  *                     and CSRF cookies.  See {@link SvelteKitSessionServer}.
+ * - `sessionAdapter`  If you are using only the oAuthClient and don't want
+ *                     to use Crossauth's session server, you can implement
+ *                     a minimal {@link SveltekitSessionAdapter} instead.
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link SvelteKitAuthorizationServer}
  * - `oAuthClient`     OAuth client.  See {@link SvelteKitOAuthClient}.
@@ -162,6 +167,11 @@ export class SvelteKitServer {
 
     /** The session server if one was requested during construction */
     readonly sessionServer? : SvelteKitSessionServer;
+
+    /** See class documentation.  If you pass `sessionServer` here instead,
+     * `sessionAdapter` will also be set to it
+     */
+    readonly sessionAdapter? : SvelteKitSessionAdapter;
 
     /** The api key server if one was requested during construction */
     readonly apiKeyServer? : SvelteKitApiKeyServer;
@@ -235,6 +245,7 @@ export class SvelteKitServer {
      */
     constructor({
         session,
+        sessionAdapter,
         apiKey,
         oAuthAuthServer,
         oAuthClient,
@@ -246,6 +257,7 @@ export class SvelteKitServer {
             keyStorage: KeyStorage, 
             options?: SvelteKitSessionServerOptions,
         },
+        sessionAdapter? : SvelteKitSessionAdapter,
         apiKey? : {
             keyStorage: KeyStorage,
             options? : SvelteKitApiKeyServerOptions
@@ -283,6 +295,9 @@ export class SvelteKitServer {
                     "If using session management, must supply authenticators")
             }
             this.sessionServer = new SvelteKitSessionServer(session.keyStorage, authenticators, {...session.options, ...options});
+            this.sessionAdapter = this.sessionServer;
+        } else if (sessionAdapter) {
+            this.sessionAdapter = sessionAdapter;
         }
 
         if (apiKey) {

@@ -159,6 +159,7 @@ test('SvelteKitClient.clientCredentials_post', async () => {
     });
     let event = new MockRequestEvent("1", postRequest, {});
     const resp = await server.oAuthClient?.clientCredentialsFlowEndpoint.post(event);
+    if (!(resp instanceof Response)) throw new CrossauthError(ErrorCode.Configuration, "Expected Response");
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(true);

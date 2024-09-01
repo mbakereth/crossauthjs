@@ -65,6 +65,7 @@ export type {
 } from './sveltekitsharedclientendpoints';
 export { SvelteKitUserClientEndpoints } from './sveltekituserclientendpoints';
 export { SvelteKitAdminClientEndpoints } from './sveltekitadminclientendpoints';
+export { SvelteKitSessionAdapter } from './sveltekitsessionadapter';
 
 declare global {
     namespace App {

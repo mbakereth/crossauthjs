@@ -70,7 +70,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * logged in here at the client.
      * 
      * In most cases you can ignore this and use 
-     * {@link SvelteKitSessionServerOptions.loginProtectedPageEndpoints}
+     * {@link SvelteKitsessionAdapterOptions.loginProtectedPageEndpoints}
      * to protect the endpoints that begin the flows.
      * 
      * See {@link @crossauth/common!OAuthFlows}.
@@ -300,7 +300,11 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     event: RequestEvent,
     ) {
-        let sessionCookieValue = client.server.sessionServer?.getSessionCookieValue(event);
+        if (!client.server.sessionAdapter) {
+            throw new CrossauthError(ErrorCode.Configuration, 
+                "Cannot update session data if not using sessions");
+
+        }
         let expires_in = oauthResponse.expires_in;
         if (!expires_in && oauthResponse.access_token) {
             const payload = jwtDecode(oauthResponse.access_token);
@@ -311,16 +315,31 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
                 "OAuth server did not return an expiry for the access token");
         }
         const expires_at = Date.now() + (expires_in)*1000;
-        if (!sessionCookieValue) {
-            sessionCookieValue = 
-                await client.server.sessionServer?.createAnonymousSession(event,
-                    { [client.sessionDataName]: {...oauthResponse, expires_at} });
+        if (client.server.sessionServer) {
+            // if we are using Crossauth's session server and there is nop
+            // session, we can create an anonymous one.
+            // For other session adapters, we assume the session was already
+            // creeated or that the session adapter can create one automaticall
+            // when updateSessionData is called
+            let sessionCookieValue = client.server.sessionServer?.getSessionCookieValue(event);
+            if (!sessionCookieValue) {
+                sessionCookieValue = 
+                    await client.server.sessionServer?.createAnonymousSession(event,
+                        { [client.sessionDataName]: {...oauthResponse, expires_at} });
+            } else {
+                const existingData = 
+                    await client.server.sessionAdapter?.getSessionData(event, client.sessionDataName);
+                await client.server.sessionAdapter?.updateSessionData(event,
+                    client.sessionDataName,
+                    { ...existingData??{},  ...oauthResponse, expires_at });
+            }
         } else {
             const existingData = 
-                await client.server.sessionServer?.getSessionData(event, client.sessionDataName);
-            await client.server.sessionServer?.updateSessionData(event,
+            await client.server.sessionAdapter?.getSessionData(event, client.sessionDataName);
+            await client.server.sessionAdapter?.updateSessionData(event,
                 client.sessionDataName,
                 { ...existingData??{},  ...oauthResponse, expires_at });
+
         }
 
 }
@@ -739,7 +758,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             throw new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is" + this.tokenResponseType + ", must provide authorizedUrl");
         }
         if ((this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "saveInSessionAndRedirect") &&
-            this.server.sessionServer == undefined) {
+            this.server.sessionAdapter == undefined) {
             throw new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is" + this.tokenResponseType + ", must activate the session server");
         }
         
@@ -802,7 +821,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             CrossauthLogger.logger.error(j({
                 msg: "Error receiving token",
                 cerr: ce,
-                user: event.locals.user?.user
+                user: this.server.sessionAdapter?.getUser(event)
             }));
             CrossauthLogger.logger.debug(j({err: e}));
             return {
@@ -919,7 +938,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         if (resp.error) {
             CrossauthLogger.logger.warn(j({
                 msg: "Error completing MFA",
-                user: event.locals.user?.user,
+                user: this.server.sessionAdapter?.getUser(event),
                 hashedMfaToken: formData.mfa_token ? Crypto.hash(formData.mfa_token) : undefined,
             }));
             return {
@@ -1033,21 +1052,21 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         onlyIfExpired : boolean) : Promise<(TokenReturn&{expires_at?: number})|Response|undefined> {
 
         try {
-            if (!this.server.sessionServer) {
+            if (!this.server.sessionAdapter) {
                 return {
                     ok: false,
                     error: "server_error",
                     error_description: "Refresh tokens if expired or silent refresh only available if sessions are enabled",
                 };
             }
-            if (this.server.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+            if (this.server.sessionAdapter.csrfProtectionEnabled() && !this.server.sessionAdapter.getCsrfToken(event)) {
                 return {
                     ok: false,
                     error: "access_denied",
                     error_description: "No CSRF token found"
                 }; 
             }
-            const oauthData = await this.server.sessionServer.getSessionData(event, this.sessionDataName);
+            const oauthData = await this.server.sessionAdapter.getSessionData(event, this.sessionDataName);
             if (!oauthData?.refresh_token) {
                 if (mode == "silent") {
                     return new Response(null, {status: 204});
@@ -1110,19 +1129,22 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             await data.loadData(event);
             formData = data.toObject();
 
-            if (!event.locals.user && 
+            /*if (!event.locals.user && 
                 (this.loginProtectedFlows.includes(OAuthFlows.Password) ||
                 this.loginProtectedFlows.includes(OAuthFlows.PasswordMfa))) {
                 const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use password flow");
 
                 return this.errorFn(this.server, event, ce);
-            }    
+            }*/    
 
             // if the session server and CSRF protection enabled, require a valid CSRF token
-            if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+            if (this.server.sessionAdapter && this.server.sessionAdapter.csrfProtectionEnabled()) {
                 try {
-                    const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                    if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+                    //const cookieValue = this.server.sessionAdapter.getCsrfCookieValue(event);
+                    //if (cookieValue) this.server.sessionAdapter.sessionManager.validateCsrfCookie(cookieValue);
+                    if (!this.server.sessionAdapter.getCsrfToken(event)) {
+                        throw new CrossauthError(ErrorCode.InvalidCsrf);
+                    }
                }
                catch (e) {
                 if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1173,18 +1195,19 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             await data.loadData(event);
             formData = data.toObject();
 
-            if (!event.locals.user && 
+            /*if (!event.locals.user && 
                 (this.loginProtectedFlows.includes(OAuthFlows.Password) ||
                 this.loginProtectedFlows.includes(OAuthFlows.PasswordMfa))) {
                 const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token");
                 throw ce;
-            }    
+            }    */
             
             // if the session server and CSRF protection enabled, require a valid CSRF token
-            if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+            if (this.server.sessionAdapter && this.server.sessionAdapter.csrfProtectionEnabled()) {
                 try {
-                    const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                    if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+                    if (!this.server.sessionAdapter.getCsrfToken(event)) {
+                        throw new CrossauthError(ErrorCode.InvalidCsrf);
+                    }
                 }
                 catch (e) {
                     if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1245,7 +1268,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
      */
     async bff(event : RequestEvent, opts: {method?: "GET"|"POST"|"PUT"|"HEAD"|"OPTIONS"|"PATCH"|"DELETE", headers? : Headers, url? : string} = {}) : Promise<Response> {
         try {
-            if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
+            if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
             if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
             if (!this.bffBaseUrl) throw new CrossauthError(ErrorCode.Configuration, "Must set bffBaseUrl to use bff()");
             if (!this.bffEndpointName) throw new CrossauthError(ErrorCode.Configuration, "Must set bffEndpointName to use bff()");
@@ -1267,7 +1290,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
 
                 const oauthData = 
-                    await this.server.sessionServer.getSessionData(event, 
+                    await this.server.sessionAdapter.getSessionData(event, 
                         this.sessionDataName);
                         if (!oauthData) {
                     if (i == this.bffMaxTries) {
@@ -1378,7 +1401,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     async allBff(event : RequestEvent, opts: {method?: "GET"|"POST"|"PUT"|"HEAD"|"OPTIONS"|"PATCH"|"DELETE", headers? : Headers} = {}) : Promise<Response> {
         try {
             CrossauthLogger.logger.debug(j({msg: "Called allBff", url: event.url.toString()}));
-            if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
+            if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
             if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
             if (!this.bffBaseUrl) throw new CrossauthError(ErrorCode.Configuration, "Must set bffBaseUrl to use bff()");
             if (!this.bffEndpointName) throw new CrossauthError(ErrorCode.Configuration, "Must set bffEndpointName to use bff()");
@@ -1440,7 +1463,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
     async tokens(event : RequestEvent, token: string|string[]) : Promise<{status: number, body?: {[key:string]:any}}> {
         try {
-            if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
+            if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
             if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
 
             if (!this.tokenEndpoints || this.tokenEndpoints.length == 0)
@@ -1449,7 +1472,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             let tokens = Array.isArray(token) ? token : [token];
 
             const oauthData = 
-                await this.server.sessionServer.getSessionData(event, 
+                await this.server.sessionAdapter.getSessionData(event, 
                     this.sessionDataName);
             if (!oauthData) {
                 throw new CrossauthError(ErrorCode.Unauthorized, "No access token found");
@@ -1525,10 +1548,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             formData = data.toObject();
                 
             // if the session server and CSRF protection enabled, require a valid CSRF token
-            if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+            if (this.server.sessionAdapter && this.server.sessionAdapter.csrfProtectionEnabled()) {
                 try {
-                    const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                    if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+                    if (!this.server.sessionAdapter.getCsrfToken(event)) {
+                        throw new CrossauthError(ErrorCode.InvalidCsrf);
+                    }
                 }
                 catch (e) {
                     if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1588,10 +1612,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             formData = data.toObject();
                 
             // if the session server and CSRF protection enabled, require a valid CSRF token
-            if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+            if (this.server.sessionAdapter && this.server.sessionAdapter.csrfProtectionEnabled()) {
                 try {
-                    const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                    if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+                    if (!this.server.sessionAdapter.getCsrfToken(event)) {
+                        throw new CrossauthError(ErrorCode.InvalidCsrf);
+                    }
                 }
                 catch (e) {
                     if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1631,24 +1656,21 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
     private async deleteSessionData(event: RequestEvent,
     ) {
-        let sessionCookieValue = this.server.sessionServer?.getSessionCookieValue(event);
-        if (!sessionCookieValue) {
-            throw new CrossauthError(ErrorCode.Unauthorized, "Not logged in");
-        }
         // if the session server and CSRF protection enabled, require a valid CSRF token
-        if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+        if (this.server.sessionAdapter && this.server.sessionAdapter.csrfProtectionEnabled()) {
             try {
-                const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
-            }
-            catch (e) {
+                if (!this.server.sessionAdapter.getCsrfToken(event)) {
+                    throw new CrossauthError(ErrorCode.InvalidCsrf);
+                }
+        }
+        catch (e) {
             if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
                 return this.errorFn(this.server, event, ce);
             }
 
         }
-        await this.server.sessionServer?.deleteSessionData(event,
+        await this.server.sessionAdapter?.deleteSessionData(event,
             this.sessionDataName);
     }
 
@@ -1673,11 +1695,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     return this.errorFn(this.server, event, ce);
                 }
 
-                if (!event.locals.user && 
+                /*if (!event.locals.user && 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }          
+                }  */        
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
                 const {url, error, error_description} = 
@@ -1724,11 +1746,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     }
                 }
 
-                if (!event.locals.user && 
+                /*if (!event.locals.user && 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }          
+                }        */  
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
                 const {url, error, error_description} = 
@@ -1780,11 +1802,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     return this.errorFn(this.server, event, ce);
                 }
 
-                if (!event.locals.user && 
+                /*if (!event.locals.user && 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }          
+                }    */      
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
                 const {url, error, error_description} = 
@@ -1835,11 +1857,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     }
                     }
 
-                if (!event.locals.user && 
+                /*if (!event.locals.user && 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }          
+                }   */       
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
                 const {url, error, error_description} = 
@@ -1892,12 +1914,12 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     return this.errorFn(this.server, event, ce);
                 }
 
-                if (!event.locals.user && 
+                /*if (!event.locals.user && 
                     (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode))) {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }    
+                }    */
 
                 const code = event.url.searchParams.get("code") ?? "";
                 const state = event.url.searchParams.get("state") ?? undefined;
@@ -1952,12 +1974,12 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     }
                 }
 
-                if (!event.locals.user && 
+                /*if (!event.locals.user && 
                     (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode))) {
                     throw this.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }    
+                }    */
                 
                 const code = event.url.searchParams.get("code") ?? "";
                 const state = event.url.searchParams.get("state") ?? undefined;
@@ -2044,10 +2066,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 await data.loadData(event);
                 formData = data.toObject();
 
-                if (!event.locals.user && 
+                /*if (!event.locals.user && 
                     (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
                     return this.error(401, "Must log in to use client credentials");
-                }    
+                }    */
                 
                 const resp = await this.clientCredentialsFlow(formData?.scope);
                 if (resp.error) {
@@ -2057,7 +2079,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         event,
                         ce);
                 }
-                return await this.receiveTokenFn(resp, this, event, false);
+                const resp1 = await this.receiveTokenFn(resp, this, event, false);
+                if (resp1 instanceof Response) return resp1;
+                return this.pack(resp1);
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -2089,14 +2113,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     await data.loadData(event);
                     formData = data.toObject();
     
-                    if (!event.locals.user && 
+                    /*if (!event.locals.user && 
                         (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
                             return {
                                 ok: false,
                                 error: "access_denied",
                                 error_description: "Must log in to use client credentials flow" ,
                             }
-                        }    
+                        } */   
                     
                     const resp = await this.clientCredentialsFlow(formData?.scope);
                     if (resp.error) {
@@ -2146,20 +2170,21 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 await data.loadData(event);
                 formData = data.toObject();
 
-                if (!event.locals.user && 
+                /*if (!event.locals.user && 
                     (this.loginProtectedFlows.includes(OAuthFlows.RefreshToken))) {
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token flow");
 
                     return this.errorFn(this.server, event, ce);
-                }    
+                }    */
 
                 // if the session server and CSRF protection enabled, require a valid CSRF token
-                if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+                if (this.server.sessionAdapter && this.server.sessionAdapter.csrfProtectionEnabled()) {
                     try {
-                        const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                        if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
-                   }
-                   catch (e) {
+                        if (!this.server.sessionAdapter.getCsrfToken(event)) {
+                            throw new CrossauthError(ErrorCode.InvalidCsrf);
+                        }
+                    }
+                    catch (e) {
                     if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
                         return this.errorFn(this.server, event, ce);
@@ -2170,8 +2195,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // get refresh token from body if present, otherwise
                 // try to find in session
                 let refreshToken : string | undefined = formData.refresh_token;
-                if (!refreshToken && this.server.sessionServer) {
-                    const oauthData = await this.server.sessionServer.getSessionData(event, this.sessionDataName);
+                if (!refreshToken && this.server.sessionAdapter) {
+                    const oauthData = await this.server.sessionAdapter.getSessionData(event, this.sessionDataName);
                     if (!oauthData?.refresh_token) {
                         const ce = new CrossauthError(ErrorCode.BadRequest,
                             "No refresh token in session or in parameters");
@@ -2223,31 +2248,32 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     await data.loadData(event);
                     formData = data.toObject();
     
-                    if (!event.locals.user && 
+                    /*if (!event.locals.user && 
                         (this.loginProtectedFlows.includes(OAuthFlows.RefreshToken))) {
                         const ce = new CrossauthError(ErrorCode.Unauthorized, "Must log in to use refresh token");
                         throw ce;
-                    }    
+                    }    */
                     
                     // if the session server and CSRF protection enabled, require a valid CSRF token
-                    if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+                    if (this.server.sessionAdapter && this.server.sessionAdapter.csrfProtectionEnabled()) {
                         try {
-                            const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
-                            if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
-                    }
-                    catch (e) {
-                        if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
-                        const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
-                        throw ce;
-                    }
+                            if (!this.server.sessionAdapter.getCsrfToken(event)) {
+                                throw new CrossauthError(ErrorCode.InvalidCsrf);
+                            }
+                        }
+                        catch (e) {
+                            if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                            const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
+                            throw ce;
+                        }
         
                     }
 
                     // get refresh token from body if present, otherwise
                     // try to find in session
                     let refreshToken : string | undefined = formData.refresh_token;
-                    if (!refreshToken && this.server.sessionServer) {
-                        const oauthData = await this.server.sessionServer.getSessionData(event, this.sessionDataName);
+                    if (!refreshToken && this.server.sessionAdapter) {
+                        const oauthData = await this.server.sessionAdapter.getSessionData(event, this.sessionDataName);
                         if (!oauthData?.refresh_token) {
                             const ce = new CrossauthError(ErrorCode.BadRequest,
                                 "No refresh token in session or in parameters");
@@ -2446,8 +2472,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 //throw this.error(ce.httpStatus, ce.message);
                 return json({
                     ok: false,
-                    user: event.locals.user,
-                    csrfToken: event.locals.csrfToken,
+                    user: this.server.sessionAdapter?.getUser(event),
+                    csrfToken: this.server.sessionAdapter?.getCsrfToken(event),
                     errorCode: ce.code,
                     errorCodeName: ce.codeName,
                     errorMessage: ce.message,
@@ -2471,8 +2497,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     //throw this.error(ce.httpStatus, ce.message);
                     return {
                         ok: false,
-                        user: event.locals.user,
-                        csrfToken: event.locals.csrfToken,
+                        user: this.server.sessionAdapter?.getUser(event),
+                        csrfToken: this.server.sessionAdapter?.getCsrfToken(event),
                         errorCode: ce.code,
                         errorCodeName: ce.codeName,
                         errorMessage: ce.message,

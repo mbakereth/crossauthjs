@@ -16,14 +16,15 @@ import {
     ErrorCode,
     CrossauthLogger,
     j } from '@crossauth/common';
-import type { Key } from '@crossauth/common';
 import {
     KeyStorage,
     OAuthClientStorage,
     Authenticator,
+    Crypto,
     setParameter,
     ParamType } from '@crossauth/backend';
 import { FastifySessionServer } from './fastifysession';
+import { FastifySessionAdapter } from './fastifysessionadapter';
 import type {
     FastifySessionServerOptions,
     CsrfBodyType } from './fastifysession';
@@ -152,6 +153,9 @@ function defaultIsAdminFn(user : User) : boolean {
  * 
  * - `sessionServer`   Session cookie management server.  Uses sesion ID
  *                     and CSRF cookies.  See {@link FastifySessionServer}.
+ * - `sessionAdapter`  If you want an OAuth client but not want to use
+ *                     Fastify's session server, you can provide your own
+ *                     with this.  Won't work with auth server.
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link FastifyAuthorizationServer}
  * - `oAuthClient`     OAuth client.  See {@link FastifyOAuthClient}.
@@ -194,6 +198,13 @@ export class FastifyServer {
 
     /** See class comment */
     readonly sessionServer? : FastifySessionServer; 
+
+    /** 
+     * See class comment
+     * 
+     * Will be the same as `sessionServer` if that is passed instawd
+     */
+    readonly sessionAdapter? : FastifySessionAdapter; 
 
     /** See class comment */
     readonly oAuthAuthServer? : FastifyAuthorizationServer;
@@ -255,7 +266,9 @@ export class FastifyServer {
      *       {@link FastifyServerOptions}.
      *
      */
-    constructor({ session,
+    constructor({ 
+        session,
+        sessionAdapter,
         apiKey,
         oAuthAuthServer,
         oAuthClient,
@@ -265,6 +278,7 @@ export class FastifyServer {
                     keyStorage: KeyStorage, 
                     options?: FastifySessionServerOptions,
                 },
+            sessionAdapter?: FastifySessionAdapter,
             apiKey?: {
                 keyStorage: KeyStorage,
                 options? : FastifyApiKeyServerOptions
@@ -343,7 +357,11 @@ export class FastifyServer {
                 session.keyStorage,
                 authenticators,
                 { ...options, ...session.options });
-            this.sessionServer = sessionServer; // for testing only
+            this.sessionServer = sessionServer; 
+            this.sessionAdapter = this.sessionServer;
+        } else if (sessionAdapter) {
+            this.sessionAdapter = sessionAdapter;
+
         }
 
         if (apiKey) {
@@ -427,7 +445,8 @@ export class FastifyServer {
         errorFn?: FastifyErrorFn)
         : Promise<{ reply: FastifyReply, error: boolean }> {
         try {
-            this.validateCsrfToken(request);
+            //this.validateCsrfToken(request);
+            if (!request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf)
             return {error: false, reply};
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -590,44 +609,16 @@ export class FastifyServer {
         }
     }    
 
-    /**
-     * Returns the field with the given name from the `data` field in the
-     * session record.
-     * 
-     * The `data` field is assumed to be JSON
-     * 
-     * @param request the Fastify request
-     * @param name the field to return
-     * @returns the parsed value or undefined if it was not set.
-     */
-    async getSessionData(request : FastifyRequest, name : string, ) 
-    : Promise<{[key:string]:any}|undefined> {
-        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
-            "Cannot update session data if sessions not enabled");
-       return  await this.sessionServer.getSessionData(request, name);
-    }
-
-    /**
+    /*
      * Gets the sessin key from the request or undefined if there isn't one.
      * @param request the Fastify request
      * @returns the session key or undefined
      */
-    async getSessionKey(request : FastifyRequest) : Promise<Key|undefined> {
+    /*async getSessionKey(request : FastifyRequest) : Promise<Key|undefined> {
         if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
             "Cannot update session data if sessions not enabled");
        return  await this.sessionServer.getSessionKey(request);
-    }
-
-    /**
-     * Returns the value odf the CSRF cookie.
-     * 
-     * Throws an exception if sessions are not enabled.
-     */
-    getSessionCookieValue(request : FastifyRequest) : string|undefined {
-        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
-            "Cannot update session data if sessions not enabled");
-        return  this.sessionServer.getSessionCookieValue(request);
-    }
+    }*/
 
     /**
      * Creates a session ID but not associated with a user in the database.
@@ -667,5 +658,19 @@ export class FastifyServer {
         })),
         );
 
+    }
+
+    /**
+     * Returns a hash of the session ID.  Used for logging (for security,
+     * the actual session ID is not logged)
+     * @param request the Fastify request
+     * @returns hash of the session ID
+     */
+    getHashOfSessionId(request : FastifyRequest) : string {
+        if (!request.sessionId) return "";
+        try {
+            return Crypto.hash(request.sessionId);
+        } catch (e) {}
+        return "";
     }
 }

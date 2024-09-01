@@ -20,8 +20,8 @@ import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
 import { SvelteKitAdminEndpoints} from './sveltekitadminendpoints';
 import { SvelteKitUserClientEndpoints} from './sveltekituserclientendpoints';
 import { SvelteKitAdminClientEndpoints} from './sveltekitadminclientendpoints';
-
-import { SvelteKitServer } from './sveltekitserver'
+import { SvelteKitSessionAdapter } from './sveltekitsessionadapter';
+import { SvelteKitServer } from './sveltekitserver';
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 
@@ -371,7 +371,7 @@ function defaultUpdateUser(user: User,
  * You shouldn't have to instantiate this directly.  It is created when
  * you create a {@link SveltekitServer} object.
  */
-export class SvelteKitSessionServer {
+export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
 
     /**
      * Hook to check if the user is logged in and set data in `locals`
@@ -475,8 +475,8 @@ export class SvelteKitSessionServer {
     private adminPageEndpoints : string[] = [];
     private adminApiEndpoints : string[] = [];
     readonly unauthorizedUrl : string|undefined = undefined;
-
     readonly enableCsrfProtection = true;
+
 
     /** Whether email verification is enabled.
      * 
@@ -1072,64 +1072,7 @@ export class SvelteKitSessionServer {
             return Crypto.hash(event.locals.sessionId);
         } catch (e) {}
         return "";
-    }
-
-    /**
-     * Returns the data stored along with the session server-side, with the
-     * given name
-     * @param event the Sveltekit request event
-     * @param name tjhe data name to return
-     * @returns an object or undefined.
-     */
-    async getSessionData(event : RequestEvent, name : string) : Promise<{[key:string]: any}|undefined> {
-        try {
-            const data = event.locals.sessionId ? 
-                await this.sessionManager.dataForSessionId(event.locals.sessionId) : 
-                undefined;
-            if (data && name in data) return data[name];
-        } catch (e) {
-            CrossauthLogger.logger.error(j({
-                msg: "Couldn't get " + name + "from session",
-                cerr: e
-            }))
-            CrossauthLogger.logger.debug(j({err: e}));
-        }
-        return undefined;
-
-    }
-
-    /**
-     * Updates or sets the given field in the session `data` field.
-     * 
-     * The `data` field in the session record is assumed to be JSON
-     * 
-     * @param event the Sveltekit request event
-     * @param name the name of the field to set
-     * @param value the value to set it to.
-     */
-    async updateSessionData(event : RequestEvent, 
-        name : string, 
-        value : {[key:string]:any}) {
-        if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
-            "No session present");
-            await this.sessionManager.updateSessionData(event.locals.sessionId, name, value);
-    }
-
-    /**
-     * Deletes the given field from the session `data` field.
-     * 
-     * The `data` field in the session record is assumed to be JSON
-     * 
-     * @param event the Sveltekit request event
-     * @param name the name of the field to set
-     */
-    async deleteSessionData(event : RequestEvent, 
-        name : string) {
-        if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
-            "No session present");
-            await this.sessionManager.deleteSessionData(event.locals.sessionId, name);
-    }
-    
+    }    
     
     /**
      * Returns whether or not 2FA authentication was initiated as a result
@@ -1337,4 +1280,77 @@ export class SvelteKitSessionServer {
 
     }
 
+    ////////////////////////////////////////////////////////////////
+    // SessionAdapter interface
+
+    csrfProtectionEnabled() : boolean {
+        return this.enableCsrfProtection;
+    }
+
+
+    getCsrfToken(event : RequestEvent) : string|undefined {
+        return event.locals.csrfToken;
+    }
+
+    getUser(event : RequestEvent) : User|undefined {
+        return event.locals.user;
+    }
+
+    /**
+     * Returns the data stored along with the session server-side, with the
+     * given name
+     * @param event the Sveltekit request event
+     * @param name tjhe data name to return
+     * @returns an object or undefined.
+     */
+    async getSessionData(event : RequestEvent, name : string) : Promise<{[key:string]: any}|undefined> {
+        try {
+            const data = event.locals.sessionId ? 
+                await this.sessionManager.dataForSessionId(event.locals.sessionId) : 
+                undefined;
+            if (data && name in data) return data[name];
+        } catch (e) {
+            CrossauthLogger.logger.error(j({
+                msg: "Couldn't get " + name + "from session",
+                cerr: e
+            }))
+            CrossauthLogger.logger.debug(j({err: e}));
+        }
+        return undefined;
+
+    }
+
+    /**
+     * Updates or sets the given field in the session `data` field.
+     * 
+     * The `data` field in the session record is assumed to be JSON
+     * 
+     * @param event the Sveltekit request event
+     * @param name the name of the field to set
+     * @param value the value to set it to.
+     */
+    async updateSessionData(event : RequestEvent, 
+        name : string, 
+        value : {[key:string]:any}) {
+        if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
+            "No session present");
+            await this.sessionManager.updateSessionData(event.locals.sessionId, name, value);
+    }
+
+    /**
+     * Deletes the given field from the session `data` field.
+     * 
+     * The `data` field in the session record is assumed to be JSON
+     * 
+     * @param event the Sveltekit request event
+     * @param name the name of the field to set
+     */
+    async deleteSessionData(event : RequestEvent, 
+        name : string) {
+        if (!event.locals.sessionId)  {
+            CrossauthLogger.logger.debug(j({msg: `Attempting to delete session data ${name} when no session is present`}))
+        } else {
+            await this.sessionManager.deleteSessionData(event.locals.sessionId, name);
+        }
+    }
 }
