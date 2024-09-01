@@ -74,6 +74,34 @@ export interface FastifyOAuthClientOptions extends OAuthClientOptions {
     deviceCodeFlowPage? : string,
 
     /**
+     * The template file to show the result in the `deletetokens` endpoint.
+     * 
+     * Default `deletetokens.njk`
+     */
+    deleteTokensPage? : string,
+
+    /**
+     * Tthe `deletetokens` GET endpoint.
+     * 
+     * Default undefined - don't create the endpoint
+     */
+    deleteTokensGetUrl? : string,
+
+    /**
+     * Whether to add the `deletetokens` POST endpoint.
+     * 
+     * Default undefined - don't create the endpoint
+     */
+    deleteTokensPostUrl? : string,
+
+    /**
+     * Whether to add the `api/deletetokens` POST endpoint.
+     * 
+     * Default undefined - don't create the endpoint
+     */
+    apiDeleteTokensPostUrl? : string,
+
+    /**
      * The template file for asking the user for an OTP in the password MFA
      * flow.
      */
@@ -544,7 +572,8 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
                 { ...existingData??{},  ...oauthResponse, expires_at });
         }
 
-}
+    }
+
 async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     client: FastifyOAuthClient,
     request: FastifyRequest,
@@ -699,6 +728,8 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
  * | POST   | `have_access_token` | For BFF mode, returns whether an acccess token is saved      |                                                     | `ok`                                                      |                          | 
  * | POST   | `have_refresh_token`| For BFF mode, returns whether a refresh token is saved       |                                                     | `ok`                                                      |                          | 
  * | POST   | `have_id_token`     | For BFF mode, returns whether an ID token is saved           |                                                     | `ok`                                                      |                          | 
+ * | POST   | `deletetokens`      | Deletes all BFF tokens and displays a page                   | None                                                | `ok`                                                      | `deleteTokensPage`       | 
+ * | POST   | `api/deletetokens`  | Delertes all tokens and returns JSON                         | None                                                | `ok`                                                      |                          | 
  */
 export class FastifyOAuthClient extends OAuthClientBackend {
     server : FastifyServer;
@@ -707,6 +738,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
     errorPage : string = "error.njk";
     passwordFlowPage : string = "passwordflow.njk"
     deviceCodeFlowPage : string = "devicecodeflow.njk"
+    deleteTokensPage : string = "deletetokens.njk"
+    deleteTokensGetUrl : string|undefined = undefined;
+    deleteTokensPostUrl : string|undefined = undefined;
+    apiDeleteTokensPostUrl : string|undefined = undefined;
     mfaOtpPage : string = "mfaotp.njk"
     mfaOobPage : string = "mfaoob.njk"
     authorizedPage : string = "authorized.njk";
@@ -778,6 +813,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         setParameter("passwordOobUrl", ParamType.String, this, options, "OAUTH_PASSWORD_OOB_URL");
         setParameter("passwordFlowPage", ParamType.String, this, options, "OAUTH_PASSWORD_FLOW_PAGE");
         setParameter("deviceCodeFlowPage", ParamType.String, this, options, "OAUTH_DEVICECODE_FLOW_PAGE");
+        setParameter("deleteTokensPage", ParamType.String, this, options, "OAUTH_DELETE_TOKENS_PAGE");
+        setParameter("deleteTokensGetUrl", ParamType.String, this, options, "OAUTH_DELETE_TOKENS_GET_URL");
+        setParameter("deleteTokensPostUrl", ParamType.String, this, options, "OAUTH_DELETE_TOKENS_POST_URL");
+        setParameter("apiDeleteTokensPostUrl", ParamType.String, this, options, "OAUTHAPI__DELETE_TOKENS_POST_URL");
         setParameter("mfaOtpPage", ParamType.String, this, options, "OAUTH_MFA_OTP_PAGE");
         setParameter("mfaOobPage", ParamType.String, this, options, "OAUTH_MFA_OOB_PAGE");
         setParameter("deviceCodeFlowUrl", ParamType.String, this, options, "OAUTH_DEVICECODE_FLOW_URL");
@@ -785,6 +824,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         setParameter("bffEndpointName", ParamType.String, this, options, "OAUTH_BFF_ENDPOINT_NAME");
         setParameter("bffBaseUrl", ParamType.String, this, options, "OAUTH_BFF_BASEURL");
         setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_validFlows");
+
+        if (this.deleteTokensGetUrl?.startsWith("/")) this.deleteTokensGetUrl = this.deleteTokensGetUrl.substring(1);
+        if (this.deleteTokensPostUrl?.startsWith("/")) this.deleteTokensPostUrl = this.deleteTokensPostUrl.substring(1);
+        if (this.deleteTokensPostUrl?.startsWith("/")) this.deleteTokensPostUrl = this.deleteTokensPostUrl.substring(1);
 
         if (this.validFlows.length == 1 && this.validFlows[0] == OAuthFlows.All) {
             this.validFlows = OAuthFlows.allFlows();
@@ -1251,12 +1294,100 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     }));
                 return await this.deviceCodePoll(true, request, reply);
             });
-
-
         }
 
+        ///////// Delete tokens
 
-        // Token endpoints
+        if (this.deleteTokensGetUrl) {
+
+            this.server.app.get(this.prefix+this.deleteTokensGetUrl, 
+                async (request : FastifyRequest, 
+                    reply : FastifyReply) =>  {
+                        CrossauthLogger.logger.info(j({
+                            msg: "Page visit",
+                            method: 'GET',
+                            url: this.prefix + this.deleteTokensGetUrl,
+                            ip: request.ip,
+                            user: request.user?.username
+                        }));
+                        return reply.view(this.deleteTokensPage, 
+                        {
+                            user: request.user?.username,
+                            csrfToken: request.csrfToken,
+                        });            
+            });
+        }
+
+        if (this.deleteTokensPostUrl) {
+
+            this.server.app.post(this.prefix+this.deleteTokensPostUrl, 
+                async (request : FastifyRequest, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + this.deleteTokensPostUrl,
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                try {
+                    await this.deleteTokens(request);
+                    return reply.view(this.deleteTokensPage, 
+                        {
+                            ok: true,
+                            user: request.user?.username,
+                            csrfToken: request.csrfToken,
+                        });            
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    CrossauthLogger.logger.debug(j({err: ce}));
+                    CrossauthLogger.logger.error(j({msg: "Couldn't delete oauth tokens", cerr: ce}));
+                    return reply.view(this.deleteTokensPage, 
+                        {
+                            ok: false,
+                            user: request.user?.username,
+                            csrfToken: request.csrfToken,
+                            errorMessage: ce.message,
+                            errorCode: ce.code,
+                            errorCodeName: ce.codeName,
+                        });            
+                }
+            });
+        }
+
+        if (this.apiDeleteTokensPostUrl) {
+
+            this.server.app.post(this.prefix+this.apiDeleteTokensPostUrl, 
+                async (request : FastifyRequest, 
+                    reply : FastifyReply) =>  {
+                    CrossauthLogger.logger.info(j({
+                        msg: "Page visit",
+                        method: 'POST',
+                        url: this.prefix + this.apiDeleteTokensPostUrl,
+                        ip: request.ip,
+                        user: request.user?.username
+                    }));
+                try {
+                    await this.deleteTokens(request);
+                    return reply.header(...JSONHDR).send('{"ok": true}');
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    CrossauthLogger.logger.debug(j({err: ce}));
+                    CrossauthLogger.logger.error(j({msg: "Couldn't delete oauth tokens", cerr: ce}));
+                    return reply.header(...JSONHDR).status(ce.httpStatus)
+                        .send(JSON.stringify({
+                            ok: false,
+                            errorMessage: ce.message,
+                            errorCode: ce.code,
+                            errorCodeName: ce.codeName,
+                            csrfToken: request.csrfToken
+                        }));            
+                }
+            });
+        }
+
+        ///////// Token endpoints
+
         for (let tokenType of this.tokenEndpoints) {
             this.server.app.post(this.prefix+tokenType, 
                 async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
@@ -1957,8 +2088,23 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             );
         if (!silent) {
             if (resp == undefined) return this.receiveTokenFn({}, this, request, reply);
-            if (resp != undefined) return resp; // XXX
+            if (resp != undefined) return resp; 
         }
         return reply.header(...JSONHDR).status(200).send({ok: true, expires_at: resp?.expires_at});
-    };
+    }
+
+    private async deleteTokens(request: FastifyRequest) : Promise<void> {
+        let sessionCookieValue = this.server.getSessionCookieValue(request);
+        if (!sessionCookieValue) {
+            throw new CrossauthError(ErrorCode.InvalidSession,
+                "No session data found containing tokens")
+        }
+        if (!request.csrfToken) {
+            throw new CrossauthError(ErrorCode.InvalidSession,
+                "Missing or incorrec CSRF token")
+        }
+        await this.server.deleteSessionData(request,
+            this.sessionDataName);
+    }
+    
 }

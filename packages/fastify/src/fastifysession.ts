@@ -2759,7 +2759,7 @@ export class FastifySessionServer {
     }
 
     /**
-     * Updates a field in the sessiin data in the key storage record,
+     * Updates a field in the session data in the key storage record,
      * 
      * The `data` field is assumed to be JSON.  Just the field with the given
      * name is updated and the rest is unchanged.
@@ -2771,6 +2771,19 @@ export class FastifySessionServer {
         if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
         await this.sessionManager.updateSessionData(request.sessionId, name, value);
     }
+
+    /**
+    * Deletes a field from the session data in the key storage record,
+    * 
+    * The `data` field is assumed to be JSON.  Just the field with the given
+    * name is updated and the rest is unchanged.
+    * @param request the Fastifdy request
+    * @param name the field within `data` to update
+    */
+   async deleteSessionData(request : FastifyRequest, name : string) {
+       if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
+       await this.sessionManager.deleteSessionData(request.sessionId, name);
+   }
 
     async getSessionData(request : FastifyRequest, name : string) 
         : Promise<{[key:string]:any}|undefined>{

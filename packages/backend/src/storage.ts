@@ -277,6 +277,15 @@ export abstract class KeyStorage {
         value: any | undefined) : Promise<void>;
 
     /**
+     * The `data` field in a key entry is a JSON string.  This class should
+     * atomically update a field in it.
+     * @param keyName the name of they to update, as it appears in the table.
+     * @param dataName the field name to update
+     */
+    abstract deleteData(keyName: string,
+        dataName: string) : Promise<void>;
+
+    /**
      * Returns an object decoded from the data field as a JSON string
      * @param data the JSON string to decode
      * @returns the parse JSON object

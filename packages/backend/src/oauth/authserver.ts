@@ -1182,7 +1182,7 @@ export class OAuthAuthorizationServer {
                         error_description: "Code has expired",
                     }
                 }
-                else if (!(data.success == true)) {
+                else if (!(data.ok == true)) {
                     return {
                         error: "authorization_pending",
                         error_description: "Waiting for user code to be entered",
@@ -1311,13 +1311,13 @@ export class OAuthAuthorizationServer {
 
         // create a device code
         let deviceCode = undefined; 
-        let success = false;
+        let ok = false;
         const created = new Date();
         const expirySecs = this.userCodeExpiry;
         const expires = 
             new Date(created.getTime() + this.userCodeExpiry*1000 + 
                     this.clockTolerance*1000);
-        for (let i=0; i<10 && !success; ++i) {
+        for (let i=0; i<10 && !ok; ++i) {
             try {
                 deviceCode = Crypto.randomValue(this.deviceCodeLength);
                 await this.keyStorage.saveKey(undefined,
@@ -1325,12 +1325,12 @@ export class OAuthAuthorizationServer {
                     created,
                     expires,
                     JSON.stringify({scope: scope, client_id: client_id}));
-                success = true;
+                ok = true;
             } catch (e) {
                 CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
             }
         }
-        if (!success || !deviceCode) {
+        if (!ok || !deviceCode) {
             return {
                 error: "server_error",
                 error_description: "Couldn't create device code",
@@ -1339,8 +1339,8 @@ export class OAuthAuthorizationServer {
 
         // create a user code
         let userCode = undefined; 
-        success = false;
-        for (let i=0; i<10 && !success; ++i) {
+        ok = false;
+        for (let i=0; i<10 && !ok; ++i) {
             try {
                 userCode = Crypto.randomBase32(this.userCodeLength);
                 await this.keyStorage.saveKey(undefined,
@@ -1348,12 +1348,12 @@ export class OAuthAuthorizationServer {
                     created,
                     expires,
                     JSON.stringify({deviceCode: deviceCode}));
-                success = true;
+                ok = true;
             } catch (e) {
                 CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
             }
         }
-        if (!success || !userCode) {
+        if (!ok || !userCode) {
             await this.deleteDeviceCode(deviceCode);
             return {
                 error: "server_error",
@@ -1478,8 +1478,8 @@ export class OAuthAuthorizationServer {
         }
 
         // check if the user code was already used.  This gets deleted after
-        // the token endpoint returns success
-        if (userCodeData.success == true) {
+        // the token endpoint returns ok
+        if (userCodeData.ok == true) {
             return {
                 ok: false,
                 error: "access_denied",
@@ -1488,7 +1488,7 @@ export class OAuthAuthorizationServer {
             };
         }
 
-        // check scopes - if they are not authorized, don't set to success
+        // check scopes - if they are not authorized, don't set to ok
         // but tell the caller to request authority
         let hasAllScopes = false;
         CrossauthLogger.logger.debug(j({
@@ -1531,10 +1531,10 @@ export class OAuthAuthorizationServer {
     
         }
 
-        // success - store this in the user code, along with the userid
+        // ok - store this in the user code, along with the userid
         try {
             if (user?.id) await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "userid", user.id);
-            await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "success", true);
+            await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "ok", true);
         } catch (e) {
             // error updating device code data, so delete both device code and user code
             const ce = CrossauthError.asCrossauthError(e);
@@ -1628,9 +1628,9 @@ export class OAuthAuthorizationServer {
             }
         }
 
-        // success - store this in the user code, along with the userid
+        // ok - store this in the user code, along with the userid
         try {
-            await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "success", true);
+            await this.keyStorage.updateData(KeyPrefix.deviceCode + userCodeData.deviceCode, "ok", true);
         } catch (e) {
             // error updating device code data, so delete both device code and user code
             const ce = CrossauthError.asCrossauthError(e);

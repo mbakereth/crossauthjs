@@ -266,7 +266,7 @@ export interface SvelteKitAuthorizationServerOptions
  * |                             |                                                            |   - `error_description`                                                      |                                                                  |                                                                 | 
  * | --------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | authorizeEndpoint           | The OAuth `authorize` endpoint                             | `load`:                                                                      | `default`:                                                       | `authorized` true if the user clicks authorized                 | 
- * |                             |                                                            |   - `succcess` (true or false)                                               |   - `success`: true or false                                     | `response_type` OAuth response type (take from PageData)        | 
+ * |                             |                                                            |   - `succcess` (true or false)                                               |   - `ok`: true or false                                     | `response_type` OAuth response type (take from PageData)        | 
  * |                             |                                                            |   - `authorizationNeeded`:                                                   |   - `formData`: fata submitted from in the form                  | `client_id` take from PageData                                  |  
  * |                             |                                                            |     - `user`: the user object                                                |   - `error` an OAuth error type                                  | `redirect_uri` take from PageData                               |   
  * |                             |                                                            |     - `response_type`: OAuth response type                                   |   - `error_description` text error description                   | `scope` take from PageData                                      |  
@@ -712,7 +712,7 @@ export class SvelteKitAuthorizationServer {
             const client = await this.clientStorage.getClientById(ret.client_id);
 
             // if the user needs to authorize scopes, tell the caller this
-            // - user code will have not been set to success in the above call yet
+            // - user code will have not been set to ok in the above call yet
             if (ret.scopeAuthorizationNeeded) {
                 return {
                     ok: true,

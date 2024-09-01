@@ -58,6 +58,10 @@ const server = new FastifyServer({
     },
     oAuthClient: {
         authServerBaseUrl: process.env["AUTH_SERVER_BASE_URL"],
+        options: {
+            deleteTokensGetUrl: "deletetokens",
+            deleteTokensPostUrl: "deletetokens",
+        }
     }}, {
     userStorage, 
     authenticators: {

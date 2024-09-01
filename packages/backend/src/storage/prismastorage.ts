@@ -761,6 +761,43 @@ export class PrismaKeyStorage extends KeyStorage {
 
                   
     }
+
+    /**
+     * See {@link KeyStorage}.
+     */
+    async deleteData(keyName : string, dataName: string) : Promise<void> {
+        try {
+
+            let changed = false;
+            await this.prismaClient.$transaction(async (tx: any) =>{
+                let data : {[key:string] : any} = {};
+                const key = await this.getKeyWithTransaction(keyName, tx);
+                if (key.data && key.data != "") {
+                    try {
+                        data = JSON.parse(key.data);
+                    } catch (e) {
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        throw new CrossauthError(ErrorCode.DataFormat);
+                    }
+                    if (dataName in data) {
+                        delete data[dataName];
+                        changed = true;
+                    }
+                }   
+        
+                if (changed)
+                    await this.updateKeyWithTransaction({value: key.value, data: JSON.stringify(data)}, tx)
+            }, {timeout: this.transactionTimeout});
+        } catch (e) {
+            if (e && typeof e == "object" && !("isCrossauthError" in e)) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.Connection, "Failed updating session data");
+            }
+            throw e;
+        }
+
+                  
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////

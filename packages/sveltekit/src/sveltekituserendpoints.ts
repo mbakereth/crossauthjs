@@ -241,7 +241,7 @@ export type UpdateUserReturn = {
  * |                            |                                                            |    -  `name` name that is in user's `factor2`                                |  - see {@link SveltekitEndpoint.signup} return                   |  - see {@link SveltekitUserEndpoint.signup} event               |           |
  * |                            |                                                            |    -  `friendlyName` for showing in form                                     |                                                                  |                                                                 |           |
  * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------- |
- * | loginEndpoint              | Logs a user in                                             | - `next` page to redirect to on success                                      | `login`: starts login                                            | `login`:                                                        |           |
+ * | loginEndpoint              | Logs a user in                                             | - `next` page to redirect to on ok                                      | `login`: starts login                                            | `login`:                                                        |           |
  * |                            |                                                            |                                                                              |  - see {@link SveltekitEndpoint.login} return                    |  - see {@link SveltekitUserEndpoint.login} event                |           |
  * |                            |                                                            |                                                                              | `factor2`: submit 2FA data to complete login                     | `factor2`:                                                      |           |
  * |                            |                                                            |                                                                              |  - see {@link SveltekitEndpoint.loginFactor2} return             |  - see {@link SveltekitUserEndpoint.loginFactor2} event         |           |
@@ -251,13 +251,13 @@ export type UpdateUserReturn = {
  * | logoutEndpoint             | Logs a user out                                            | Just `baseEndpoint` data                                                     | `default`:                                                       | `default`:                                                      |           |
  * |                            |                                                            |                                                                              |  - see {@link SveltekitUserEndpoint.logout} return               |  - see {@link SveltekitUserEndpoint.logout} event               |           |
  * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------- |
- * | changeFactor2Endpoint      | Change user's factor2 method or reconfigure existing       | - `next` page to redirect to on success                                      | `change`: change to a different factor2                          | `change`:                                                       |           |
+ * | changeFactor2Endpoint      | Change user's factor2 method or reconfigure existing       | - `next` page to redirect to on ok                                      | `change`: change to a different factor2                          | `change`:                                                       |           |
  * |                            |                                                            | - `required` if true, this was called because the user must                  |  - see {@link SveltekitUserEndpoint.changeFactor2} return        |  - see {@link SveltekitUserEndpoint.changeFactor2} event        |           |
  * |                            |                                                            |    eg if user's `state` set to `factor2ResetRequired`                        | `factor2`: submit 2FA data to complete login                     | `factor2`:                                                      |           |
  * |                            |                                                            | - `username` the user's username (`user` not set if not fully logged in yet) |  - see {@link SveltekitUserEndpoint.loginFactor2} return         |  - see {@link SveltekitUserEndpoint.loginFactor2} event         |           |
  * |                            |                                                            | - `allowedFactor2` see PageData for `signupEndpoint`                         |                                                                  |                                                                 |           |
  * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------- |
- * | changePasswordEndpoint     | Change user's factor2 method or reconfigure existing       | - `next` page to redirect to on success                                      | `default`:                                                       | `default`:                                                      |           |
+ * | changePasswordEndpoint     | Change user's factor2 method or reconfigure existing       | - `next` page to redirect to on ok                                      | `default`:                                                       | `default`:                                                      |           |
  * |                            |                                                            | - `required` if true, this was called because the user must                  |  - see {@link SveltekitUserEndpoint.changePassword} return       |  - see {@link SveltekitUserEndpoint.changePassword} event       |           |
  * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------- |
  * | configureFactor2Endpoint   | Configure secrets for user's factor2                       | Just `baseEndpoint` data                                                     | `default`:                                                       | `default`:                                                      |           |
@@ -266,7 +266,7 @@ export type UpdateUserReturn = {
  * | deleteUserEndpoint         | Delete the logged in user                                  | Just `baseEndpoint` data                                                     | `default`:                                                       | `default`:                                                      |           |
  * |                            |                                                            |                                                                              |  - see {@link SveltekitUserEndpoint.deleteUser} return           |  - see {@link SveltekitUserEndpoint.deleteUser} event           |           |
  * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------- |
- * | resetPasswordEndpoint      | Requests and password reset and emails token to user       | - `next` page to redirect to on success                                      | `default`:                                                       | `default`:                                                      |           |
+ * | resetPasswordEndpoint      | Requests and password reset and emails token to user       | - `next` page to redirect to on ok                                      | `default`:                                                       | `default`:                                                      |           |
  * |                            |                                                            | - `required` if true, this was called because the user must                  |  - see {@link SveltekitUserEndpoint.requestPasswordReset} return |  - see {@link SveltekitUserEndpoint.requestPasswordReset} event |           |
  * |                            |                                                            |                                                                              |                                                                  |                                                                 |           |
  * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------- |
@@ -278,7 +278,7 @@ export type UpdateUserReturn = {
  * | -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------- |
  * | verifyEmailTokenEndpoint   | Validates an email verification token emailed to user      | - `user` corresponding {@link @crossauth/common!User} if token is valid      | *None provided*                                                  |                                                                 | `token`   |
  * |                            |                                                            | - `error` error message if token validation failed                           |                                                                  |                                                                 |           |
- * |                            |                                                            | - `success` true if validation was successful, false otherwise               |                                                                  |                                                                 |           |
+ * |                            |                                                            | - `ok` true if validation was successful, false otherwise               |                                                                  |                                                                 |           |
  */
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
@@ -598,7 +598,7 @@ export class SvelteKitUserEndpoints {
      * 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *     even if factor2 authentication is required, this will still
      *     be true if there was no error.
@@ -790,7 +790,7 @@ export class SvelteKitUserEndpoints {
      * 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *     even if factor2 authentication is required, this will still
      *     be true if there was no error.
@@ -1066,7 +1066,7 @@ export class SvelteKitUserEndpoints {
 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *   - `user` the user successful
      *   - `error` an error message or undefined
@@ -1113,7 +1113,7 @@ export class SvelteKitUserEndpoints {
 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *   - `user` the user if successful
      *   - `error` an error message or undefined
@@ -1208,9 +1208,9 @@ export class SvelteKitUserEndpoints {
 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
-     *   - `action` the URL to load on success.  This was the one originally
+     *   - `action` the URL to load on ok.  This was the one originally
      *     requested by the user before being redirected to 2FA authentication.
      *   - `factor2` the user's factor2
      *   - `error` an error message or undefined
@@ -1255,7 +1255,7 @@ export class SvelteKitUserEndpoints {
 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *   - `user` the user if successful
      *   - `error` an error message or undefined
@@ -1392,7 +1392,7 @@ export class SvelteKitUserEndpoints {
 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *   - `error` an error message or undefined
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
@@ -1445,7 +1445,7 @@ export class SvelteKitUserEndpoints {
      * 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *     even if factor2 authentication is required, this will still
      *     be true if there was no error.
@@ -1530,7 +1530,7 @@ export class SvelteKitUserEndpoints {
      * 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *     even if factor2 authentication is required, this will still
      *     be true if there was no error.
@@ -1648,7 +1648,7 @@ export class SvelteKitUserEndpoints {
      * 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *     even if factor2 authentication is required, this will still
      *     be true if there was no error.

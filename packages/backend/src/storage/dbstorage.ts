@@ -958,6 +958,48 @@ export class DbKeyStorage extends KeyStorage {
             dbClient.release()
         }         
     }
+
+    /**
+     * See {@link KeyStorage}.
+     */
+    async deleteData(keyName : string, dataName: string) : Promise<void> {
+        const dbClient = await this.dbPool.connect();
+
+        try {
+
+            await dbClient.startTransaction();
+
+            const key = await this.getKeyInTransaction(dbClient, keyName);
+            let data : {[key:string] : any} = {};
+            let changed = false;
+            if (key.data && key.data != "") {
+                try {
+                    data = JSON.parse(key.data);
+                } catch (e) {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.DataFormat);
+                }
+                if (dataName in data) {
+                    delete data[dataName];
+                    changed = true;
+                }
+            }   
+                
+            if (changed)
+                await this.updateKeyInTransaction(dbClient, {value: key.value, data: JSON.stringify(data)});
+            await dbClient.commit();
+        } catch (e) {
+            await dbClient.rollback();
+
+            if (e && typeof e == "object" && !("isCrossauthError" in e)) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.Connection, "Failed updating session data");
+            }
+            throw e;
+        } finally {
+            dbClient.release()
+        }         
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////

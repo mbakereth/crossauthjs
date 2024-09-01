@@ -217,9 +217,9 @@ export class SvelteKitAdminEndpoints {
      * @param take overrides the take term from the query
      * 
      * @return an object with the following members:
-     *   - `success` true or false depending on whether there was an error
+     *   - `ok` true or false depending on whether there was an error
      *   - `users` the matching array of users
-     *   - `error` error message if `success` is false
+     *   - `error` error message if `ok` is false
      *   - `exception` a {@link @crossauth/common!CrossauthError} if there was
      *      an error.
      *   - `search` the search term that was used
@@ -339,7 +339,7 @@ export class SvelteKitAdminEndpoints {
      * 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *     even if factor2 authentication is required, this will still
      *     be true if there was no error.
@@ -426,7 +426,7 @@ export class SvelteKitAdminEndpoints {
 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *   - `user` the user if successful
      *   - `error` an error message or undefined
@@ -547,7 +547,7 @@ export class SvelteKitAdminEndpoints {
      * 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *     even if factor2 authentication is required, this will still
      *     be true if there was no error.
@@ -675,7 +675,7 @@ export class SvelteKitAdminEndpoints {
 
      * @returns object with:
      * 
-     *   - `success` true if creation and login were successful, 
+     *   - `ok` true if creation and login were successful, 
      *      false otherwise.
      *   - `error` an error message or undefined
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an

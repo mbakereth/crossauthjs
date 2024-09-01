@@ -688,7 +688,7 @@ test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowManual', async () => {
         cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
     body = JSON.parse(res.body);
     expect(body.template).toBe("device.njk");
-    expect(body.args.success).toBe(false);
+    expect(body.args.ok).toBe(false);
     expect(body.args.completed).toBe(false);
         
     // device POST endpoint - should ask for authorization
@@ -702,7 +702,7 @@ test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowManual', async () => {
         cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
     body = JSON.parse(res.body);
     expect(body.template).toBe("device.njk");
-    expect(body.args.success).toBe(true);
+    expect(body.args.ok).toBe(true);
     expect(body.args.completed).toBe(false);
     expect(body.args.authorizationNeeded).toBeDefined();
     expect(body.args.authorizationNeeded.client_id).toBeDefined();
@@ -740,7 +740,7 @@ test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowManual', async () => {
         cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
     body = JSON.parse(res.body);
     expect(body.template).toBe("device.njk");
-    expect(body.args.success).toBe(true);
+    expect(body.args.ok).toBe(true);
     expect(body.args.completed).toBe(true);
     expect(body.error).toBeUndefined();
 
@@ -804,7 +804,7 @@ test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowAuto', async () => {
         cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
     body = JSON.parse(res.body);
     expect(body.template).toBe("device.njk");
-    expect(body.args.success).toBe(true);
+    expect(body.args.ok).toBe(true);
     expect(body.args.completed).toBe(false);
     expect(body.args.authorizationNeeded).toBeDefined();
     expect(body.args.authorizationNeeded.client_id).toBeDefined();
@@ -841,7 +841,7 @@ test('FastifyAuthServer.getAccessTokenWithDeviceCodeFlowAuto', async () => {
         cookies: {SESSIONID: sessionCookie, CSRFTOKEN: csrfCookie}});
     body = JSON.parse(res.body);
     expect(body.template).toBe("device.njk");
-    expect(body.args.success).toBe(true);
+    expect(body.args.ok).toBe(true);
     expect(body.args.completed).toBe(true);
     expect(body.error).toBeUndefined();
 

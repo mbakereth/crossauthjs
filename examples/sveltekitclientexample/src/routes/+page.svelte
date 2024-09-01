@@ -65,6 +65,7 @@
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-missing-attribute -->
 <p><a class="cursor-pointer" on:click={() => {deviceCodeFlowForm.submit()}}>Device Code Flow</a></p>
 <p><a href="flows/authzcodeflow?scope=read+write+openid+email">OIDC Authorization Code Flow</a></p>
+<p><a href="deletetokens">Delete my tokens</a></p>
 
 <div class="mt-4">
     <form method="POST" action="/bff/resource" use:enhance={({ formData }) => {

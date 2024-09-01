@@ -280,9 +280,9 @@ export class SvelteKitSharedClientEndpoints {
      * @param take overrides the take term from the query
      * 
      * @return an object with the following members:
-     *   - `success` true or false depending on whether there was an error
+     *   - `ok` true or false depending on whether there was an error
      *   - `clients` the matching array of clients
-     *   - `error` error message if `success` is false
+     *   - `error` error message if `ok` is false
      *   - `exception` a {@link @crossauth/common!CrossauthError} if there was
      *      an error.
      *   - `search` the search term that was used

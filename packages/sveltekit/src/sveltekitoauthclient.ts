@@ -35,7 +35,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 
     /** 
      * You will have to create a route for the redirect Uri, using
-     * the `redirect_uriEndpoint` load function.  But the URL for it
+     * the `redirectUriEndpoint` load function.  But the URL for it
      * here.  It should be an absolute URL.
      * 
      * It should be a fully qualified URL as it is called from
@@ -560,7 +560,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | authorizationCodeFlowWithPKCEEndpoint | Starts the authorization code flow with PKCE.                | None - redirects to `redirect_uri`                                            | *Not provided*                                                   | - `scope`                                                       |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | redirect_uriEndpoint                   | Redirect Uri for authorization code flows                    | See {@link OAuthTokenResponse}                                               | *Not provided*                                                   | As per OAuth Authorization Code Flow spec                       |  
+ * | redirectUriEndpoint                   | Redirect Uri for authorization code flows                    | See {@link OAuthTokenResponse}                                               | *Not provided*                                                   | As per OAuth Authorization Code Flow spec                       |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | clientCredentialsFlowEndpoint         | Executes the client credentials flow                         | *Not provided*                                                               | See {@link OAuthTokenResponse}                                   | As per OAuth Client Credentials Flow spec                       |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
@@ -591,15 +591,17 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | refreshTokenEndpoint                  | For BFF only, return the refresh token payload or error      | JSON of the refresh token payload                                            | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | idTokenEndpoint                       | For BFF only, return the id token payload or error           | POST: JSON of the id token payload                                                 | *Not provided*                                                   |                                                                 |  
+ * | idTokenEndpoint                       | For BFF only, return the id token payload or error           | POST: JSON of the id token payload                                           | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | havAeccessTokenEndpoint               | For BFF only, return whether access token present            | POST: `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | havAeccessTokenEndpoint               | For BFF only, return whether access token present            | POST: `ok` of false or true                                                  | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | haveRefreshTokenEndpoint              | For BFF only, return whether refresh token present           | POST: `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | haveRefreshTokenEndpoint              | For BFF only, return whether refresh token present           | POST: `ok` of false or true                                                  | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | haveIdTokenEndpoint                   | For BFF only, return whether id token present                | POST: `ok` of false or true                                                        | *Not provided*                                                   |                                                                 |  
+ * | haveIdTokenEndpoint                   | For BFF only, return whether id token present                | POST: `ok` of false or true                                                  | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | tokensEndpoint                        | For BFF only, a JSON object of all of the above              | POST: All of the above, keyed on `access_token`, `have_access_token`, etc.         | *Not provided*                                                   |                                                                 |  
+ * | tokensEndpoint                        | For BFF only, return a JSON object of all of the above       | POST: All of the above, keyed on `access_token`, `have_access_token`, etc.   | *Not provided*                                                   |                                                                 |  
+ * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
+ * | deleteTokensEndpoint                  | For BFF only, deletes tokens saved for session               | POST:  `ok` of false or true                                                 | `default`: `ok` of false or true                                 | *None*                                                          |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  */
 export class SvelteKitOAuthClient extends OAuthClientBackend {
@@ -1627,6 +1629,29 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         }
     }
 
+    private async deleteSessionData(event: RequestEvent,
+    ) {
+        let sessionCookieValue = this.server.sessionServer?.getSessionCookieValue(event);
+        if (!sessionCookieValue) {
+            throw new CrossauthError(ErrorCode.Unauthorized, "Not logged in");
+        }
+        // if the session server and CSRF protection enabled, require a valid CSRF token
+        if (this.server.sessionServer && this.server.sessionServer.enableCsrfProtection) {
+            try {
+                const cookieValue = this.server.sessionServer.getCsrfCookieValue(event);
+                if (cookieValue) this.server.sessionServer.sessionManager.validateCsrfCookie(cookieValue);
+            }
+            catch (e) {
+            if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+            const ce = new CrossauthError(ErrorCode.Unauthorized, "CSRF token not present");
+                return this.errorFn(this.server, event, ce);
+            }
+
+        }
+        await this.server.sessionServer?.deleteSessionData(event,
+            this.sessionDataName);
+    }
+
 
     ////////////////////////////////////////////////////////////////
     // Endpoints
@@ -1851,7 +1876,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
     };
 
-    readonly redirect_uriEndpoint = {
+    readonly redirectUriEndpoint = {
 
         get: async (event : RequestEvent) => {
             if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
@@ -2400,6 +2425,63 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         actions: {
             default: async ( event : RequestEvent ) => 
                 await this.passwordFlow_action(event, (e: RequestEvent, formData: {[key:string]:string}) => this.passwordOob(e, formData)),
+        }
+    };
+
+    /////
+    // Delete tokens
+
+    readonly deleteTokensEndpoint = {
+
+        post: async (event : RequestEvent) => {
+            try {
+                await this.deleteSessionData(event);
+                return json({ok: true});
+            } catch (e) {
+                if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug({err: e});
+                CrossauthLogger.logger.error({cerr: e});
+                //throw this.error(ce.httpStatus, ce.message);
+                return json({
+                    ok: false,
+                    user: event.locals.user,
+                    csrfToken: event.locals.csrfToken,
+                    errorCode: ce.code,
+                    errorCodeName: ce.codeName,
+                    errorMessage: ce.message,
+                    exception: ce
+                }, {status: ce.httpStatus});
+
+            }
+        },
+
+        actions: {
+            default: async ( event : RequestEvent ) => {
+                try {
+                    await this.deleteSessionData(event);
+                    return {ok: true};
+                } catch (e) {
+                    if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                    if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                    const ce = CrossauthError.asCrossauthError(e);
+                    CrossauthLogger.logger.debug({err: e});
+                    CrossauthLogger.logger.error({cerr: e});
+                    //throw this.error(ce.httpStatus, ce.message);
+                    return {
+                        ok: false,
+                        user: event.locals.user,
+                        csrfToken: event.locals.csrfToken,
+                        errorCode: ce.code,
+                        errorCodeName: ce.codeName,
+                        errorMessage: ce.message,
+                        exception: ce
+                    };
+    
+                }
+    
+            }        
         }
     };
 

@@ -74,7 +74,7 @@ export interface FastifyAuthorizationServerOptions
      *   - `errorCode`,
      *   - `errorCodeName`
      *   - `errorMessage`
-     *   - `success`
+     *   - `ok`
      *   - `authorizationNeeded`
      *      - `client_id`
      *      - `client_name`
@@ -1156,7 +1156,7 @@ export class FastifyAuthorizationServer {
             const client = await this.clientStorage.getClientById(ret.client_id);
 
             // if the user needs to authorize scopes, tell the caller this
-            // - user code will have not been set to success in the above call yet
+            // - user code will have not been set to ok in the above call yet
             if (ret.scopeAuthorizationNeeded) {
                 return {
                     ok: true,
@@ -1206,7 +1206,7 @@ export class FastifyAuthorizationServer {
 
             // no user code given - ask for it$
             const data = {
-                success: false,
+                ok: false,
                 completed: false,
                 user_code: request.query.user_code,
                 csrfToken: request.csrfToken,
@@ -1223,7 +1223,7 @@ export class FastifyAuthorizationServer {
                 CrossauthLogger.logger.debug({err: ce});
                 CrossauthLogger.logger.error({cerr: ce});
                 const data = {
-                    success: false,
+                    ok: false,
                     completed: false,
                     status: ce.httpStatus,
                     errorMessage: ce.message,
@@ -1239,7 +1239,7 @@ export class FastifyAuthorizationServer {
                     ...data});
             } else if (ret.authorizationNeeded) {
                 const data = {
-                    success: true,
+                    ok: true,
                     completed: false,
                     retryAllowed: ret.retryAllowed,
                     authorizationNeeded: ret.authorizationNeeded,
@@ -1255,7 +1255,7 @@ export class FastifyAuthorizationServer {
             }
 
             const data = {
-                success: true,
+                ok: true,
                 completed: true,
             };
             if (isApi) {
@@ -1291,7 +1291,7 @@ export class FastifyAuthorizationServer {
                         CrossauthLogger.logger.debug({err: ce});
                         CrossauthLogger.logger.error({cerr: ce});
                         const data =  {
-                            success: false,
+                            ok: false,
                             completed: false,
                             status: ce.httpStatus,
                             errorMessage: ce.message,
@@ -1307,7 +1307,7 @@ export class FastifyAuthorizationServer {
                             ...data});
                     } else if (ret.authorizationNeeded) {
                         const data = {
-                            success: true,
+                            ok: true,
                             completed: false,
                             retryAllowed: ret.retryAllowed,
                             authorizationNeeded: ret.authorizationNeeded,
@@ -1323,7 +1323,7 @@ export class FastifyAuthorizationServer {
                     }
 
                     const data = {
-                        success: true,
+                        ok: true,
                         completed: true,
                         csrfToken: request.csrfToken,
                     };
@@ -1335,7 +1335,7 @@ export class FastifyAuthorizationServer {
                     // user code not given - display error
                     const ce = CrossauthError.fromOAuthError("unauthorized", "Please enter the code");
                     const data = {
-                        success: false,
+                        ok: false,
                         completed: false,
                         user_code: request.body.user_code,
                         retryAllowed: true,
@@ -1378,7 +1378,7 @@ export class FastifyAuthorizationServer {
                 }
 
                 const data = {
-                    success: true,
+                    ok: true,
                     completed: true,
                     csrfToken: request.csrfToken,
                 };
@@ -1398,7 +1398,7 @@ export class FastifyAuthorizationServer {
             CrossauthLogger.logger.debug({err: ce});
             CrossauthLogger.logger.error({cerr: ce});
             const data = {
-                success: false,
+                ok: false,
                 status: ce.httpStatus,
                 errorMessage: ce.message,
                 errorCode: ce.code,

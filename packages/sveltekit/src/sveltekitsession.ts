@@ -1113,7 +1113,23 @@ export class SvelteKitSessionServer {
         if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
             "No session present");
             await this.sessionManager.updateSessionData(event.locals.sessionId, name, value);
-        }
+    }
+
+    /**
+     * Deletes the given field from the session `data` field.
+     * 
+     * The `data` field in the session record is assumed to be JSON
+     * 
+     * @param event the Sveltekit request event
+     * @param name the name of the field to set
+     */
+    async deleteSessionData(event : RequestEvent, 
+        name : string) {
+        if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
+            "No session present");
+            await this.sessionManager.deleteSessionData(event.locals.sessionId, name);
+    }
+    
     
     /**
      * Returns whether or not 2FA authentication was initiated as a result

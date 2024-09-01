@@ -418,6 +418,27 @@ export class InMemoryKeyStorage extends KeyStorage {
         key.data = JSON.stringify(data);
     }
 
+    /**
+     * See {@link KeyStorage}.
+     */
+        async deleteData(keyName : string, dataName: string) : Promise<void> {
+            const key = await this.getKey(keyName);
+            let data : {[key:string] : any};
+            if (!key.data || key.data == "") {
+                return;
+            } else {
+                try {
+                    data = JSON.parse(key.data);
+                } catch (e) {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.DataFormat);
+                }
+            }
+            if (dataName in data) delete data[dataName];
+            key.data = JSON.stringify(data);
+        }
+    
+
 }
 
 /**
