@@ -470,7 +470,7 @@ export class SessionManager {
      * @param value new value to store
      */
         async updateManySessionData(sessionId: string,
-            dataArray: {dataName: string, value: { [key: string]: any }}[]) : Promise<void> {
+            dataArray: {dataName: string, value: any }[]) : Promise<void> {
             //const sessionId = this.session.unsignCookie(sessionCookieValue);
             const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
             CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));

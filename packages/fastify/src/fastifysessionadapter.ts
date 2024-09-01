@@ -17,7 +17,7 @@ export abstract class FastifySessionAdapter {
      * @param name the field within `data` to update
      * @param value the value to set it to
      */
-    abstract updateSessionData(request : FastifyRequest, name : string, value : {[key:string]:any}) : Promise<void> ;
+    abstract updateSessionData(request : FastifyRequest, name : string, value : any) : Promise<void> ;
 
     /**
      * Same as `updateData` but updates many within same transaction
@@ -27,7 +27,7 @@ export abstract class FastifySessionAdapter {
      * @param request the Fastifdy request
      * @param dataArray data to update
      */
-    abstract updateManySessionData(request : FastifyRequest, dataArray: {dataName : string, value : {[key:string]:any}}[]) : Promise<void> ;
+    abstract updateManySessionData(request : FastifyRequest, dataArray: {dataName : string, value : any}[]) : Promise<void> ;
 
     /**
     * Deletes a field from the session data in the key storage record,

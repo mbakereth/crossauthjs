@@ -2816,12 +2816,12 @@ export class FastifySessionServer implements FastifySessionAdapter {
      * @param name the field within `data` to update
      * @param value the value to set it to
      */
-    async updateSessionData(request : FastifyRequest, name : string, value : {[key:string]:any}): Promise<void> {
+    async updateSessionData(request : FastifyRequest, name : string, value :any): Promise<void> {
         if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
         await this.sessionManager.updateSessionData(request.sessionId, name, value);
     }
 
-    async updateManySessionData(request : FastifyRequest, dataArray: {dataName : string, value : {[key:string]:any}}[]) : Promise<void> {
+    async updateManySessionData(request : FastifyRequest, dataArray: {dataName : string, value :any}[]) : Promise<void> {
         if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
             "No session present");
             await this.sessionManager.updateManySessionData(request.sessionId, dataArray);

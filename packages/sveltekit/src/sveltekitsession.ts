@@ -1331,13 +1331,13 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      */
     async updateSessionData(event : RequestEvent, 
         name : string, 
-        value : {[key:string]:any}) {
+        value : any) {
         if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
             "No session present");
             await this.sessionManager.updateSessionData(event.locals.sessionId, name, value);
     }
 
-    async updateManySessionData(event : RequestEvent, dataArray: {dataName : string, value : {[key:string]:any}}[]) : Promise<void> {
+    async updateManySessionData(event : RequestEvent, dataArray: {dataName : string, value : any}[]) : Promise<void> {
         if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
             "No session present");
             await this.sessionManager.updateManySessionData(event.locals.sessionId, dataArray);

@@ -17,7 +17,7 @@ export abstract class SvelteKitSessionAdapter {
      * @param name the field within `data` to update
      * @param value the value to set it to
      */
-    abstract updateSessionData(event : RequestEvent, name : string, value : {[key:string]:any}) : Promise<void> ;
+    abstract updateSessionData(event : RequestEvent, name : string, value : any) : Promise<void> ;
 
 
     /**
@@ -28,7 +28,7 @@ export abstract class SvelteKitSessionAdapter {
      * @param request the Fastifdy request
      * @param dataArray data to update
      */
-    abstract updateManySessionData(event : RequestEvent, dataArray: {dataName : string, value : {[key:string]:any}}[]) : Promise<void> ;
+    abstract updateManySessionData(event : RequestEvent, dataArray: {dataName : string, value : any}[]) : Promise<void> ;
 
     /**
     * Deletes a field from the session data in the key storage record,
