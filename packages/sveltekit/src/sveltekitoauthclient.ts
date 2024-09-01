@@ -327,18 +327,26 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
                     await client.server.sessionServer?.createAnonymousSession(event,
                         { [client.sessionDataName]: {...oauthResponse, expires_at} });
             } else {
-                const existingData = 
+                /*const existingData = 
                     await client.server.sessionAdapter?.getSessionData(event, client.sessionDataName);
                 await client.server.sessionAdapter?.updateSessionData(event,
                     client.sessionDataName,
-                    { ...existingData??{},  ...oauthResponse, expires_at });
+                    { ...existingData??{},  ...oauthResponse, expires_at });*/
+                await client.server.sessionAdapter?.updateSessionData(event,
+                    client.sessionDataName,
+                    {...oauthResponse, expires_at });
+
             }
         } else {
-            const existingData = 
+            /*const existingData = 
             await client.server.sessionAdapter?.getSessionData(event, client.sessionDataName);
             await client.server.sessionAdapter?.updateSessionData(event,
                 client.sessionDataName,
-                { ...existingData??{},  ...oauthResponse, expires_at });
+                { ...existingData??{},  ...oauthResponse, expires_at });*/
+
+            await client.server.sessionAdapter?.updateSessionData(event,
+                client.sessionDataName,
+                { ...oauthResponse, expires_at });
 
         }
 

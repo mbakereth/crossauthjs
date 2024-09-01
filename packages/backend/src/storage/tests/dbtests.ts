@@ -5,7 +5,56 @@ import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 
 export function makeDBTests(prefix : string, userStorage : UserStorage, keyStorage : KeyStorage, clientStorage : OAuthClientStorage, authStorage : OAuthAuthorizationStorage, authenticator : LocalPasswordAuthenticator) {
 
+    test(prefix+".updateWithDots", async() => {
+        const keyName = "ABCDEF789";
+        const now = new Date();
+        const expiry = new Date();
+        let bob = await userStorage.getUserByUsername("bob");
+        await keyStorage.saveKey(bob.user.id, keyName, now, expiry, JSON.stringify({part1: {part2: "2"}}));
+        await keyStorage.updateData(keyName, "part1.part2", {part3: "3", part4: "4"});
+        await keyStorage.updateData(keyName, "part1.part5", "5");
+    
+        const key = await keyStorage.getKey(keyName);
+        let data = JSON.parse(key.data ?? "{}");
+        expect(data?.part1?.part2?.part3).toBe("3");
+        expect(data?.part1?.part2?.part4).toBe("4");
+        expect(data?.part1?.part5).toBe("5");
+    });
 
+    test(prefix+"InMemoryKeyStorage.updateManyWithDots", async() => {
+        const keyName = "ABCDEF789";
+        const now = new Date();
+        const expiry = new Date();
+        let bob = await userStorage.getUserByUsername("bob");
+        await keyStorage.saveKey(bob.user.id, keyName, now, expiry, JSON.stringify({part1: {part2: "2"}}));
+        await keyStorage.updateManyData(keyName, 
+            [{dataName: "part1.part2", value: {part3: "3", part4: "4"}}, 
+                {dataName: "part1.part5", value: "5"}]);
+    
+        const key = await keyStorage.getKey(keyName);
+        let data = JSON.parse(key.data ?? "{}");
+        expect(data?.part1?.part2?.part3).toBe("3");
+        expect(data?.part1?.part2?.part4).toBe("4");
+        expect(data?.part1?.part5).toBe("5");
+    });
+
+    
+    test(prefix+".deleteWithDots", async() => {
+        const keyName = "ABCDEF789";
+        const now = new Date();
+        const expiry = new Date();
+        let bob = await userStorage.getUserByUsername("bob");
+        await keyStorage.saveKey(bob.user.id, keyName, now, expiry, JSON.stringify({part1: {part2:{part3: "3", part4: "4"}, part5: "5"}}));
+        await keyStorage.deleteData(keyName, "part1.part2.part3");
+        await keyStorage.deleteData(keyName, "part1.part5");
+    
+        const key = await keyStorage.getKey(keyName);
+        let data = JSON.parse(key.data ?? "{}");
+        expect(data?.part1?.part2?.part4).toBeDefined();
+        expect(data?.part1?.part2?.part3).toBeUndefined();
+        expect(data?.part1?.part5).toBeUndefined();
+    });
+    
     // test updating a field in the user table
     test(prefix+ ".createUserExisting", async() => {
 

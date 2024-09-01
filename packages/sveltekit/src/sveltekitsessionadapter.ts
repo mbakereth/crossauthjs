@@ -19,6 +19,17 @@ export abstract class SvelteKitSessionAdapter {
      */
     abstract updateSessionData(event : RequestEvent, name : string, value : {[key:string]:any}) : Promise<void> ;
 
+
+    /**
+     * Same as `updateData` but updates many within same transaction
+     * 
+     * The `data` field is assumed to be JSON.  Just the field with the given
+     * name is updated and the rest is unchanged.
+     * @param request the Fastifdy request
+     * @param dataArray data to update
+     */
+    abstract updateManySessionData(event : RequestEvent, dataArray: {dataName : string, value : {[key:string]:any}}[]) : Promise<void> ;
+
     /**
     * Deletes a field from the session data in the key storage record,
     * 

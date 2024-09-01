@@ -1337,6 +1337,12 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             await this.sessionManager.updateSessionData(event.locals.sessionId, name, value);
     }
 
+    async updateManySessionData(event : RequestEvent, dataArray: {dataName : string, value : {[key:string]:any}}[]) : Promise<void> {
+        if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
+            "No session present");
+            await this.sessionManager.updateManySessionData(event.locals.sessionId, dataArray);
+    }
+
     /**
      * Deletes the given field from the session `data` field.
      * 

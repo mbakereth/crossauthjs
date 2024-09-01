@@ -460,6 +460,24 @@ export class SessionManager {
         await this.keyStorage.updateData(hashedSessionKey, name, value);
     }
 
+    /**
+     * Update field sin the session data.
+     * 
+     * The `data` field in the session entry is assumed to be a JSON string.
+     * The field with the given name is updated or set if not already set.
+     * @param sessionId the session Id to update.
+     * @param name of the field.
+     * @param value new value to store
+     */
+        async updateManySessionData(sessionId: string,
+            dataArray: {dataName: string, value: { [key: string]: any }}[]) : Promise<void> {
+            //const sessionId = this.session.unsignCookie(sessionCookieValue);
+            const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
+            CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
+            await this.keyStorage.updateManyData(hashedSessionKey, dataArray);
+        }
+    
+
 
     /**
     * Deletes a field from the session data.

@@ -924,52 +924,53 @@ export class DbKeyStorage extends KeyStorage {
      * See {@link KeyStorage}.
      */
     async updateData(keyName : string, dataName: string, value: any|undefined) : Promise<void> {
-        const dbClient = await this.dbPool.connect();
 
-        try {
-
-            await dbClient.startTransaction();
-
-            const key = await this.getKeyInTransaction(dbClient, keyName);
-            let data : {[key:string] : any};
-            if (!key.data || key.data == "") {
-                data = {}
-            } else {
-                try {
-                    data = JSON.parse(key.data);
-                } catch (e) {
-                    CrossauthLogger.logger.debug(j({err: e}));
-                    throw new CrossauthError(ErrorCode.DataFormat);
-                }
-            }   
-            //data[dataName] = value;
-            if (dataName.indexOf(".") > 0) {
-                let parts = dataName.split(".");
-                let data1 : any = data[parts[0]];
-                for (let i=1; i<parts.length-1 && data; i++) {
-                    data1 = data1[parts[i]];
-                };
-                if (data1) {
-                    data1[parts[parts.length-1]] = value;
-                }
-            } else {
-                data[dataName] = value;
-            }
-
-            await this.updateKeyInTransaction(dbClient, {value: key.value, data: JSON.stringify(data)});
-            await dbClient.commit();
-        } catch (e) {
-            await dbClient.rollback();
-
-            if (e && typeof e == "object" && !("isCrossauthError" in e)) {
-                CrossauthLogger.logger.debug(j({err: e}));
-                throw new CrossauthError(ErrorCode.Connection, "Failed updating session data");
-            }
-            throw e;
-        } finally {
-            dbClient.release()
-        }         
+        return await this.updateManyData(keyName, [{dataName, value}]);
     }
+
+    /**
+     * See {@link KeyStorage}.
+     */
+        async updateManyData(keyName : string, dataArray: {dataName: string, value: any | undefined}[]) : Promise<void> {
+            const dbClient = await this.dbPool.connect();
+    
+            try {
+    
+                await dbClient.startTransaction();
+    
+                const key = await this.getKeyInTransaction(dbClient, keyName);
+                let data : {[key:string] : any};
+                if (!key.data || key.data == "") {
+                    data = {}
+                } else {
+                    try {
+                        data = JSON.parse(key.data);
+                    } catch (e) {
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        throw new CrossauthError(ErrorCode.DataFormat);
+                    }
+                }   
+                for (let item of dataArray) {
+                    let ret = this.updateDataInternal(data, item.dataName, item.value);
+                    if (!ret) throw new CrossauthError(ErrorCode.BadRequest, `Parents of ${item.dataName} not found in key data`);
+                    data = ret;
+                }
+    
+                await this.updateKeyInTransaction(dbClient, {value: key.value, data: JSON.stringify(data)});
+                await dbClient.commit();
+            } catch (e) {
+                await dbClient.rollback();
+    
+                if (e && typeof e == "object" && !("isCrossauthError" in e)) {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw new CrossauthError(ErrorCode.Connection, "Failed updating session data");
+                }
+                throw e;
+            } finally {
+                dbClient.release()
+            }         
+        }
+    
 
     /**
      * See {@link KeyStorage}.
@@ -991,22 +992,7 @@ export class DbKeyStorage extends KeyStorage {
                     CrossauthLogger.logger.debug(j({err: e}));
                     throw new CrossauthError(ErrorCode.DataFormat);
                 }
-                if (dataName.indexOf(".") > 0) {
-                    let parts = dataName.split(".");
-                    let data1 : any = data[parts[0]];
-                    for (let i=1; i<parts.length-1 && data; i++) {
-                        data1 = data1[parts[i]];
-                    };
-                    if (data1 && data1[parts[parts.length-1]]) {
-                        delete data1[parts[parts.length-1]];
-                        changed = true;
-                    }
-                } else {
-                    if (dataName in data) {
-                        delete data[dataName];
-                        changed = true;
-                    }
-                }
+                changed = this.deleteDataInternal(data, dataName);
             }   
                 
             if (changed)

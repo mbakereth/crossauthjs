@@ -569,8 +569,9 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
                         { [client.sessionDataName]: {...oauthResponse, expires_at} });
     
             } else {
-                const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
-                await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
+                // const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
+                //await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
+                await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, {...oauthResponse, expires_at });
 
             }
 
@@ -578,9 +579,9 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
 
             if (!client.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
                 "Cannot get session data if sessions not enabled");
-            const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
-
-            await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
+            //const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
+            //await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
+            await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...oauthResponse, expires_at });
         }
 
     }

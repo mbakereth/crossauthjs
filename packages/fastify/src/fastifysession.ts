@@ -2821,6 +2821,12 @@ export class FastifySessionServer implements FastifySessionAdapter {
         await this.sessionManager.updateSessionData(request.sessionId, name, value);
     }
 
+    async updateManySessionData(request : FastifyRequest, dataArray: {dataName : string, value : {[key:string]:any}}[]) : Promise<void> {
+        if (!request.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
+            "No session present");
+            await this.sessionManager.updateManySessionData(request.sessionId, dataArray);
+    }
+
     /**
     * Deletes a field from the session data in the key storage record,
     * 

@@ -402,6 +402,13 @@ export class InMemoryKeyStorage extends KeyStorage {
      * See {@link KeyStorage}.
      */
     async updateData(keyName : string, dataName: string, value: any|undefined) : Promise<void> {
+        return await this.updateManyData(keyName, [{dataName, value}]);
+    }
+
+    /**
+     * See {@link KeyStorage}.
+     */
+    async updateManyData(keyName : string, dataArray: {dataName: string, value: any|undefined}[]) : Promise<void> {
         const key = await this.getKey(keyName);
         let data : {[key:string] : any};
         if (!key.data || key.data == "") {
@@ -414,49 +421,33 @@ export class InMemoryKeyStorage extends KeyStorage {
                 throw new CrossauthError(ErrorCode.DataFormat);
             }
         }
-        if (dataName.indexOf(".") > 0) {
-            let parts = dataName.split(".");
-            let data1 : any = data[parts[0]];
-            for (let i=1; i<parts.length-1 && data; i++) {
-                data1 = data1[parts[i]];
-            };
-            if (data1) data1[parts[parts.length-1]] = value;
-        } else {
-            data[dataName] = value;
-            key.data = JSON.stringify(data);
+        for (let item of dataArray) {
+            let ret = this.updateDataInternal(data, item.dataName, item.value);
+            if (ret) key.data = JSON.stringify(data);
+            else throw new CrossauthError(ErrorCode.BadRequest, `parents of ${item.dataName} not found in key data`)    
         }
     }
+    
 
     /**
      * See {@link KeyStorage}.
      */
-        async deleteData(keyName : string, dataName: string) : Promise<void> {
-            const key = await this.getKey(keyName);
-            let data : {[key:string] : any};
-            if (!key.data || key.data == "") {
-                return;
-            } else {
-                try {
-                    data = JSON.parse(key.data);
-                } catch (e) {
-                    CrossauthLogger.logger.debug(j({err: e}));
-                    throw new CrossauthError(ErrorCode.DataFormat);
-                }
-            }
-            if (dataName.indexOf(".") > 0) {
-                let parts = dataName.split(".");
-                let data1 : any = data[parts[0]];
-                for (let i=1; i<parts.length-1 && data; i++) {
-                    data1 = data1[parts[i]];
-                };
-                if (data1 && data1[parts[parts.length-1]]) delete data1[parts[parts.length-1]];
-            } else {
-                if (dataName in data) delete data[dataName];
-                key.data = JSON.stringify(data);    
+    async deleteData(keyName : string, dataName: string) : Promise<void> {
+        const key = await this.getKey(keyName);
+        let data : {[key:string] : any};
+        if (!key.data || key.data == "") {
+            return;
+        } else {
+            try {
+                data = JSON.parse(key.data);
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                throw new CrossauthError(ErrorCode.DataFormat);
             }
         }
-    
-
+        let changed = this.deleteDataInternal(data, dataName);
+        if (changed) key.data = JSON.stringify(data);
+    }
 }
 
 /**

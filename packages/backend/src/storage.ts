@@ -269,7 +269,8 @@ export abstract class KeyStorage {
      * The `data` field in a key entry is a JSON string.  This class should
      * atomically update a field in it.
      * @param keyName the name of they to update, as it appears in the table.
-     * @param dataName the field name to update
+     * @param dataName the field name to update.  This can contain dots, eg
+     *        `part1.part2`, which means `part2` within `part1` is updated. 
      * @param value the new value.
      */
     abstract updateData(keyName: string,
@@ -277,10 +278,22 @@ export abstract class KeyStorage {
         value: any | undefined) : Promise<void>;
 
     /**
+     * Same as `updateData` but updates several keys.
+     * 
+     * Ensure it is done as a single transaction.
+     * 
+     * @param keyName the key to update
+     * @param dataArray dataName and value pairs
+     */
+    abstract updateManyData(keyName: string,
+        dataArray: {dataName: string, value: any | undefined}[]) : Promise<void>;
+
+    /**
      * The `data` field in a key entry is a JSON string.  This class should
      * atomically update a field in it.
      * @param keyName the name of they to update, as it appears in the table.
-     * @param dataName the field name to update
+     * @param dataName the field name to delete.  This can contain dots, eg
+     *        `part1.part2`, which means `part2` within `part1` is deleted. 
      */
     abstract deleteData(keyName: string,
         dataName: string) : Promise<void>;
@@ -307,6 +320,61 @@ export abstract class KeyStorage {
         if (!data) return "{}";
         return JSON.stringify(data);
     }
+
+    /**
+     * Helper function for imnpklementing `updateData`
+     * @param data parsed data string extracted from the key.  
+     * @param dataName name of field to update (may contain dots)
+     * @param value the value to set it to
+     * @returns new data object if changes were made, undefined otherwise
+     */
+    protected updateDataInternal(data : {[key:string]: any}, dataName: string, value: any|undefined) : {[key:string]: any}|undefined {
+        if (dataName.indexOf(".") > 0) {
+            let parts = dataName.split(".");
+            let data1 : any = data;
+            for (let i=0; i<parts.length-1 && data; i++) {
+                data1 = data1[parts[i]];
+            };
+            if (data1) {
+                data1[parts[parts.length-1]] = value;
+                return data;
+            }
+        } else {
+            data[dataName] = value;
+            return data;
+        }
+    }
+    
+    /**
+     * Helper function for imnpklementing `deleteData`
+     * @param data parsed data string extracted from the key.  Resutls will be
+     *        written back to this
+     * @param dataName name of field to delete (may contain dots)
+     * @returns true if modifications were made, false otherwise
+     */
+    protected deleteDataInternal(data : {[key:string]: any}, dataName: string) : boolean {
+        if (dataName.indexOf(".") > 0) {
+            let parts = dataName.split(".");
+            let data1 : any = data;
+            for (let i=0; i<parts.length-1 && data; i++) {
+                data1 = data1[parts[i]];
+            };
+            if (data1 && data1[parts[parts.length-1]]) {
+                delete data1[parts[parts.length-1]];
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            if (dataName in data) {
+                delete data[dataName];
+                return true;    
+            } else {
+                return false;
+            }
+        }
+    }
+    
 }
 
 /**
