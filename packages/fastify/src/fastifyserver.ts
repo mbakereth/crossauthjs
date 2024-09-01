@@ -588,40 +588,7 @@ export class FastifyServer {
             .send(status==401 ? ERROR_401 : ERROR_500);
 
         }
-    }
-
-    /**
-     * Updates or sets the given field in the session `data` field.
-     * 
-     * The `data` field in the session record is assumed to be JSON
-     * 
-     * @param request the Fastify request
-     * @param name the name of the field to set
-     * @param value the value to set it to.
-     */
-    async updateSessionData(request : FastifyRequest, 
-        name : string, 
-        value : {[key:string]:any}) {
-        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
-            "Cannot update session data if sessions not enabled");
-        await this.sessionServer.updateSessionData(request, name, value);
-    }
-
-    /**
-     * Removes a given field from the sesion Data
-     * 
-     * The `data` field in the session record is assumed to be JSON
-     * 
-     * @param request the Fastify request
-     * @param name the name of the field remove set
-     */
-    async deleteSessionData(request : FastifyRequest, 
-        name : string) {
-        if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
-            "Cannot delete session data if sessions not enabled");
-        await this.sessionServer.deleteSessionData(request, name);
-    }
-    
+    }    
 
     /**
      * Returns the field with the given name from the `data` field in the

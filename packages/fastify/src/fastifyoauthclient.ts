@@ -567,9 +567,10 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
         } else {
             const existingData = 
                 await client.server.getSessionData(request, client.sessionDataName);
-            await client.server.updateSessionData(request,
-                client.sessionDataName,
-                { ...existingData??{},  ...oauthResponse, expires_at });
+
+                if (!client.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
+                    "Cannot update session data if sessions not enabled");
+                await client.server.sessionServer.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
         }
 
     }
@@ -2103,8 +2104,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             throw new CrossauthError(ErrorCode.InvalidSession,
                 "Missing or incorrec CSRF token")
         }
-        await this.server.deleteSessionData(request,
-            this.sessionDataName);
+
+        if (!this.server.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
+            "Cannot delete session data if sessions not enabled");
+        await this.server.sessionServer.deleteSessionData(request, this.sessionDataName);
     }
     
 }
