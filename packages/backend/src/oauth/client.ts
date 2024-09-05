@@ -85,7 +85,7 @@ export class OAuthClientBackend extends OAuthClientBase {
         setParameter("verifierLength", ParamType.String, this, options, "OAUTH_VERIFIER_LENGTH");
         setParameter("client_secret", ParamType.String, tmp, options, "OAUTH_CLIENT_SECRET");
         setParameter("codeChallengeMethod", ParamType.String, this, options, "OAUTH_CODE_CHALLENGE_METHOD");
-        setParameter("deviceAuthorizationUrl", ParamType.String, options1, options, "OAUTH_DEVICE_AUTHORIZATION_URL");
+        setParameter("deviceAuthorizationUrl", ParamType.String, this, options, "OAUTH_DEVICE_AUTHORIZATION_URL");
         if (this.deviceAuthorizationUrl.startsWith("/")) this.deviceAuthorizationUrl = this.deviceAuthorizationUrl.substring(1);
 
         if (tmp.client_secret) this.client_secret = tmp.client_secret;
