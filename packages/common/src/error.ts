@@ -149,6 +149,10 @@ export enum ErrorCode {
     /** Thrown in database handlers where an insert causes a constraint violation */
     ConstraintViolation,
 
+    /** Thrown if a method is unimplemented, typically when a feature
+     * is not yet supported in this language. */
+    NotImplemented,
+
     /** Thrown for an condition not convered above. */
     UnknownError,
 }
@@ -320,6 +324,9 @@ export class CrossauthError extends Error {
         } else if (code == ErrorCode.ConstraintViolation) {
             _message = "Database update/insert caused a constraint violation";
             _httpStatus = 500;
+        } else if (code == ErrorCode.NotImplemented) {
+            _message = "This method has not been implemented";
+            _httpStatus = 500;
         } else {
             _message = "Unknown error";
             _httpStatus = 500;
@@ -427,7 +434,7 @@ export class CrossauthError extends Error {
  *        can be in a string or number.
  * @returns the string version of the response code.
  */
-export function httpStatus(status: string|number) : string {
+export function httpStatusName(status: string|number) : string {
     if (typeof status == "number") status = ""+status;
     if (status in FriendlyHttpStatus) return FriendlyHttpStatus[status];
     return FriendlyHttpStatus['500'];
