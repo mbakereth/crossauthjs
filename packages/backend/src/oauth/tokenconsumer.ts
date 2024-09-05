@@ -155,7 +155,7 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
                     const now = new Date();
                     if (tokenInStorage.expires && 
                         tokenInStorage.expires?.getTime() < now.getTime()) {
-                        CrossauthLogger.logger.error(j({"Access token expired in storage but not in JWT"}));
+                        CrossauthLogger.logger.error(j({msg: "Access token expired in storage but not in JWT"}));
                         return undefined;
                     }
                 } catch (e) {
