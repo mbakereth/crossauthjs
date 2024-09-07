@@ -17,8 +17,6 @@
     "test": "dotenv -e .env.unittest vitest",
     "testonce": "dotenv -e .env.unittest vitest run",
     "doc": "typedoc",
-    "preinstall": "echo 'prisma not needed in this module'",
-    "postinstall": "echo 'prisma not needed in this module'",
     "prisma": "echo 'prisma not needed in this module'"
   },
   "devDependencies": {
