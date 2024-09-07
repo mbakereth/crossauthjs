@@ -46,3 +46,13 @@ test('Crypto.symmetricEncryption', async () => {
     const recoveredText = Crypto.symmetricDecrypt(ciphertext, key);
     expect(recoveredText).toBe(plaintext);
 });
+
+test('Crypto.symmetricEncryptionWithIv', async () => {
+    const key = "xkDDElW4zZTLdIZ3AS0v0gJbh_SZZSAo6YuWDeEtBaU";
+    const plaintext = "This is the plaintext";
+    const iv  = Buffer.from("ABCDEFGHIJKLMNOP");
+    const ciphertext = Crypto.symmetricEncrypt(plaintext, key, iv);
+    expect(ciphertext).toBe("QUJDREVGR0hJSktMTU5PUA.vm3j7WeBpDGM76GhB0K4gQlE7nnkUGQvVe4hoPtocSI")
+    const recoveredText = Crypto.symmetricDecrypt(ciphertext, key);
+    expect(recoveredText).toBe(plaintext);
+});

@@ -332,8 +332,8 @@ export class Crypto {
      * @param keyString the symmetric key
      * @returns Encrypted text Base64-url encoded.
      */
-    static symmetricEncrypt(plaintext : string, keyString : string) {
-        const iv = randomBytes(16);
+    static symmetricEncrypt(plaintext : string, keyString : string, iv : Buffer|undefined = undefined) {
+        if (!iv) iv = randomBytes(16);
         let key = Buffer.from(keyString, 'base64url');
         var encrypt = createCipheriv('aes-256-cbc', key, iv);
         let encrypted = encrypt.update(plaintext);

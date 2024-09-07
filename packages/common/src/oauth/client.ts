@@ -544,10 +544,11 @@ export abstract class OAuthClientBase {
             error: "invalid_request",
             error_description: "Cannot make client credentials flow without client id"
         }; 
-        if (!this.#client_secret) return {
+        // Actually you can if it is not a confidential client (although not recommended)
+        /*if (!this.#client_secret) return {
             error: "invalid_request",
             error_description: "Cannot make client credentials flow without client secret"
-        }; 
+        }; */
 
         const url = this.oidcConfig.token_endpoint;
 

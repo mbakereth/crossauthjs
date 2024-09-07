@@ -43,7 +43,7 @@ test('InMemoryKeyStorage.createGetAndDeleteSession', async () => {
     let sessionKey = await keyStorage.getKey(key);
     expect(sessionKey.userid).toBe(bob.id);
     expect(sessionKey.expires).toStrictEqual(expiry);
-    keyStorage.deleteKey(key);
+    await keyStorage.deleteKey(key);
     await expect(async () => {await keyStorage.getKey(key)}).rejects.toThrowError();
 });
 
@@ -164,7 +164,7 @@ test("InMemoryKeyStorage.getAllForUser", async() => {
     const key3 = "XYZ123456";
     const keyStorage = new InMemoryKeyStorage();
     const {user: bob} = await userStorage.getUserByUsername("bob");
-    await keyStorage.deleteAllForUser(bob.id, "");
+    await keyStorage.deleteAllForUser(bob.id, ""); // TODO: this and the next lien do nothing
     await keyStorage.deleteAllForUser(undefined, "");
     const now = new Date();
     const expiry = new Date();
