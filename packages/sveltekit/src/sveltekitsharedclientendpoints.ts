@@ -221,7 +221,7 @@ export class SvelteKitSharedClientEndpoints {
     /**
      * The OAuth client manager instantiated during construction
      */
-    protected clientManager : OAuthClientManager;
+    protected clientManager? : OAuthClientManager;
 
     /**
      * Taken from the {@link SvelteKitSessionServerOptions}
@@ -250,7 +250,8 @@ export class SvelteKitSharedClientEndpoints {
                 this.validFlows = OAuthFlows.allFlows();
         }
         this.valid_flowNames = OAuthFlows.flowNames(this.validFlows);
-        this.clientManager = new OAuthClientManager(options);
+        if (options.clientStorage)
+            this.clientManager = new OAuthClientManager(options);
         this.clientStorage = options.clientStorage;
 
     }
@@ -498,6 +499,7 @@ export class SvelteKitSharedClientEndpoints {
         }
         const resetSecret = data.getAsBoolean("resetSecret");
         
+        if (!this.clientManager) throw new CrossauthError(ErrorCode.Configuration, "Cannot call this endpoint as you did not provide a clientStorage");
         const {client: newClient, newSecret} = 
             await this.clientManager.updateClient(client_id,
                 clientUpdate,
@@ -658,6 +660,7 @@ export class SvelteKitSharedClientEndpoints {
                 clientUpdate.userid = formData.userid ? Number(formData.userid) : null;
             }
             
+            if (!this.clientManager) throw new CrossauthError(ErrorCode.Configuration, "Cannot call this endpoint as you did not provide a clientStorage");
             const newClient = 
                 await this.clientManager.createClient(formData.client_name,
                     redirect_uri,
