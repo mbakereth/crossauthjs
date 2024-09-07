@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { PrismaClient } from '@prisma/client'
 import { LocalPasswordAuthenticator } from '@crossauth/backend';
 import {
@@ -136,4 +137,3 @@ main()
     await prisma.$disconnect()
     process.exit(1)
   })
-

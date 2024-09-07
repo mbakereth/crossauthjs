@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 /**
  * You can implement your own logger.  Crossauth only needs these functions
  * and variables to be present.

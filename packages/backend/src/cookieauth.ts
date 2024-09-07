@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import type { User, Key } from '@crossauth/common';
 import { KeyPrefix } from '@crossauth/common';
 import { ErrorCode, CrossauthError } from '@crossauth/common';

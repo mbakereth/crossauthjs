@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { UserStorage, KeyStorage } from '../storage';
 import { DbUserStorage, DbKeyStorage, DbOAuthClientStorage, DbOAuthAuthorizationStorage } from './dbstorage';
 import type { DbUserStorageOptions, DbKeyStorageOptions, DbOAuthClientStorageOptions, DbOAuthAuthorizationStorageOptions } from './dbstorage';

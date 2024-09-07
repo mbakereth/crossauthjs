@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { JsonWebKey } from 'crypto';
 
 export type TokenEndpointAuthMethod = "client_secret_post" | "client_secret_basic" | "client_secret_jwt" | "private_key_jwt";
@@ -74,4 +75,3 @@ export const DEFAULT_OIDCCONFIG : OpenIdConfiguration = {
     request_uri_parameter_supported : true,
     require_request_uri_registration : false,
 };
-

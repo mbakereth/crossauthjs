@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { UserStorage, type UserStorageGetOptions, type UserStorageOptions } from '../storage';
 import { type User, type UserSecrets, type UserInputFields, type UserSecretsInputFields } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
@@ -289,12 +290,12 @@ export class LdapUserStorage extends UserStorage {
      */
     static sanitizeLdapDn(dn : string) : string {
         return dn.replace("\\", "\\\\")
-                 .replace(",", "\\,")
-                 .replace("+", "\\+")
-                 .replace('"', '\\"')
-                 .replace("<", "\\<")
-                 .replace(">", "\\>")
-                 .replace("#", "\\#")
+                 .replace(",", "\,")
+                 .replace("+", "\+")
+                 .replace('"', '\"')
+                 .replace("<", "\<")
+                 .replace(">", "\>")
+                 .replace("#", "\#")
                  .trim()
     }
 
@@ -305,8 +306,8 @@ export class LdapUserStorage extends UserStorage {
      */
     static sanitizeLdapDnForSerach(dn : string) : string {
         return LdapUserStorage.sanitizeLdapDn(dn)
-                 .replace("*", "\\*")
-                 .replace("(", "\\(")
-                 .replace(")", "\\)");
+                 .replace("*", "\*")
+                 .replace("(", "\(")
+                 .replace(")", "\)");
     }
 };

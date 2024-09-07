@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import createFetchMock from 'vitest-fetch-mock';
 import { test, expect, vi, beforeAll, afterAll } from 'vitest';
 import { OAuthAuthorizationServer } from '../authserver';

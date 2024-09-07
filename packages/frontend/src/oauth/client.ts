@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 //import { URLSearchParams } from "url";
 import {
     OAuthClientBase,
@@ -678,4 +679,3 @@ export class OAuthClient extends OAuthClientBase {
         location.href = resp.url;
     }
 }
-

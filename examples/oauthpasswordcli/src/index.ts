@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { OAuthClientBackend } from '@crossauth/backend';
 import { read } from 'read';
 
@@ -112,4 +113,3 @@ main()
     console.error(e);
     process.exit(1)
   })
-

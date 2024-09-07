@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import pg from 'pg';
 import { beforeEach, afterEach } from 'vitest';
 import { PostgresUserStorage, PostgresKeyStorage, PostgresOAuthClientStorage, PostgresOAuthAuthorizationStorage } from '../postgresstorage';
@@ -59,4 +60,3 @@ async function deleteAll() {
 }
 
 makeDBTests("PostgresStorage", userStorage, keyStorage, clientStorage, authStorage, authenticator);
-

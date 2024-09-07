@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import path from 'path';
 import fastify from 'fastify';
 import { getTestUserStorage }  from './inmemorytestdata';
@@ -102,4 +103,3 @@ export async function login(server: FastifyServer,
     return {csrfCookie, csrfToken, sessionCookie, status: res.statusCode};
 
 }
-

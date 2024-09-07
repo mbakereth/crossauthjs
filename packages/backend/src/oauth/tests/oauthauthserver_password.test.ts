@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { test, expect } from 'vitest';
 import { OAuthAuthorizationServer } from '../authserver';
 import { createClient } from './common';
@@ -67,4 +68,3 @@ test('AuthorizationServer.passwordFlow.incorrectPassword', async () => {
     expect(access_token).toBeUndefined();
 
 });
-

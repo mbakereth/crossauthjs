@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { SvelteKitServer } from './sveltekitserver';
 import { SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions } from './sveltekitsession';
@@ -455,7 +456,7 @@ export class SvelteKitSharedClientEndpoints {
         }
 
         const redirect_uri = !formData.redirect_uri || formData.redirect_uri.trim().length == 0 ? 
-            [] : formData.redirect_uri.trim().split(/,?[ \t\n]+/);
+            [] : formData.redirect_uri.trim().split(/[, ][ \t\n]*/);
 
         // validate redirect uris
         let redirect_uriErrors : string[] = [];
@@ -622,7 +623,7 @@ export class SvelteKitSharedClientEndpoints {
             }
 
             const redirect_uri = !formData.redirect_uri || formData.redirect_uri.trim().length == 0 ? 
-                [] : formData.redirect_uri.trim().split(/,?[ \t\n]+/);
+                [] : formData.redirect_uri.trim().split(/[, ][ \t\n]*/);
 
             // validate redirect uris
             let redirect_uriErrors : string[] = [];

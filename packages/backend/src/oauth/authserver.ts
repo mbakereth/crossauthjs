@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import jwt, { type Algorithm } from 'jsonwebtoken';
 import {
     OAuthClientManager,

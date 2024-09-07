@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { beforeEach, afterAll } from 'vitest';
 import { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage } from '../prismastorage';
 import { PrismaClient } from '@prisma/client';
@@ -48,4 +49,3 @@ makeDBTests("PrismaStorage", userStorage, keyStorage, clientStorage, authStorage
 afterAll(async () => {
     //await prismaClient.user.deleteMany({});
 });
-

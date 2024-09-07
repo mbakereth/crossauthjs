@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import * as jose from 'jose'
 import { CrossauthLogger, j } from '../logger';
 import { CrossauthError, ErrorCode } from '../error';

@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 
 import { MockResolver, MockRequestEvent } from './sveltemocks';
 import { SvelteKitServer } from '../sveltekitserver';
@@ -399,5 +400,3 @@ export async function getAccessToken() {
             client_secret: "DEF"});
     return {authServer, client, code, clientStorage, access_token, error, error_description, refresh_token, expires_in};
 };
-
-

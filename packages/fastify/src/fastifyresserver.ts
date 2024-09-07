@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { type FastifyRequest, type FastifyReply, type FastifyInstance } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http'
 import {
@@ -88,7 +89,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
         this.userStorage = options.userStorage;
 
         if (options.protectedEndpoints) {
-            const regex = /^[!#\$%&'\(\)\*\+,\\.\/a-zA-Z\[\]\^_`-]+/;
+            const regex = /^[!#\$%&'\(\)\*\+,\.\/a-zA-Z\[\]\^_`-]+/;
             for (const [key, value] of Object.entries(options.protectedEndpoints)) {
                 if (!key.startsWith("/")) {
                     throw new CrossauthError(ErrorCode.Configuration, "protected endpoints must be absolute paths without the protocol and hostname");

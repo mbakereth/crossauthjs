@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { beforeAll, afterEach, expect, test, vi } from 'vitest'
 import { makeAppWithOptions, login } from './admincommon';
 import { OAuthFlows } from '@crossauth/common';

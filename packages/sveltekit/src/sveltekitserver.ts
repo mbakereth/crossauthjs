@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { SvelteKitSessionServer, type SvelteKitSessionServerOptions } from './sveltekitsession';
 import { SvelteKitApiKeyServer, type SvelteKitApiKeyServerOptions } from './sveltekitapikey';
 import { SvelteKitAuthorizationServer, type SvelteKitAuthorizationServerOptions } from './sveltekitoauthserver';

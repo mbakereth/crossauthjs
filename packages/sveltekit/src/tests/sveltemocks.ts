@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { type Cookies, type RequestEvent, type MaybePromise, type ResolveOptions } from '@sveltejs/kit';
 import cookie, { type CookieParseOptions, type CookieSerializeOptions } from 'cookie';
 
@@ -146,4 +147,3 @@ export class MockResolver {
     }
     mockResolve : MockResolve;
 }
-

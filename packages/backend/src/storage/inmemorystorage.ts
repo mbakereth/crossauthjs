@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { UserStorage, KeyStorage, type UserStorageGetOptions, type UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage, type OAuthAuthorizationStorageOptions } from '../storage';
 import { type User, type UserSecrets, type Key, type UserInputFields, type UserSecretsInputFields, type OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';

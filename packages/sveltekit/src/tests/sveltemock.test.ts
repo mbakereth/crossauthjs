@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { MockRequestEvent, MockCookies } from './sveltemocks';
 import { test, expect } from 'vitest';
 
@@ -41,4 +42,3 @@ test('SvelteMocks.MockCookies', async () => {
     value1 = await cookies.get("cookie1");
     expect(value1).toBe(undefined);
 });
-

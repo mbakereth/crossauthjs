@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 /**
  * Indicates the type of error reported by {@link @crossauth/common!CrossauthError}
  */
@@ -434,7 +435,7 @@ export class CrossauthError extends Error {
  *        can be in a string or number.
  * @returns the string version of the response code.
  */
-export function httpStatusName(status: string|number) : string {
+export function httpStatus(status: string|number) : string {
     if (typeof status == "number") status = ""+status;
     if (status in FriendlyHttpStatus) return FriendlyHttpStatus[status];
     return FriendlyHttpStatus['500'];
@@ -486,4 +487,3 @@ const FriendlyHttpStatus : {[key:string]:string} = {
     '504': 'Gateway Timeout',
     '505': 'HTTP Version Not Supported',
 };
-

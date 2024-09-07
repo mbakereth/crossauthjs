@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { setParameter, ParamType } from './utils';
 import type { User, UserSecrets, Key, UserInputFields, UserSecretsInputFields, OAuthClient } from '@crossauth/common';
@@ -511,4 +512,3 @@ export abstract class OAuthAuthorizationStorage {
         userid: string | number | null,
         authorizations: (string | null)[]) : Promise<void>;
 }
-

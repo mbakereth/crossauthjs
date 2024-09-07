@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import {
     type FastifyRequest,
     type FastifyReply } from 'fastify';
@@ -1704,4 +1705,3 @@ export class FastifyUserEndpoints {
         await this.sessionServer.userStorage.deleteUserById(request.user.id);
         return successFn(reply);
     }}
-

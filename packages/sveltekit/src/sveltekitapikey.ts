@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { ApiKeyManager, UserStorage, KeyStorage } from '@crossauth/backend';
 import type { ApiKeyManagerOptions } from '@crossauth/backend';
 import { CrossauthLogger, j } from '@crossauth/common';

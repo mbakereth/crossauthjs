@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { beforeAll, afterEach, expect, test, vi } from 'vitest'
 import { ErrorCode } from '@crossauth/common';
 import { makeAppWithOptions, login } from './admincommon';
@@ -189,4 +190,3 @@ test('FastifyServer.admin.deleteUser', async () => {
     } catch {}
     expect(userStillExists).toBe(false);
 });
-

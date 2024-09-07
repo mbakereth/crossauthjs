@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { CrossauthError } from "@crossauth/common";
 import { OAuthAutoRefresher } from './autorefresher.ts';
 import { OAuthDeviceCodePoller } from './devicecodepoller.ts';

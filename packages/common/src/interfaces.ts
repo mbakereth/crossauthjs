@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 /**
  * A key (eg session ID, email reset token) as stored in a database table.
  * 

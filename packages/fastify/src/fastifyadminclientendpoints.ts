@@ -1,3 +1,4 @@
+// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { FastifyAdminEndpoints } from './fastifyadminendpoints';
 import {
     type FastifyRequest,
@@ -476,7 +477,7 @@ export class FastifyAdminClientEndpoints {
                     client_id: client.client_id,
                     client_name: client.client_name,
                     confidential: client.confidential,
-                    redirect_uris: client.redirect_uri.join("\n"),
+                    redirect_uris: client.redirect_uri.join(" "),
                     isAdmin: true,
                     next: next,
                 };
@@ -846,7 +847,7 @@ export class FastifyAdminClientEndpoints {
         const confidential = request.body.confidential == "true";
         const client_name = request.body.client_name;
         const redirect_uris = request.body.redirect_uris.trim().length == 0 ? 
-            [] : request.body.redirect_uris.trim().split(/,?[ \t\n]+/);
+            [] : request.body.redirect_uris.trim().split(/[, ][ \t\n]*/);
 
         // validate redirect uris
         let redirect_uriErrors : string[] = [];
@@ -907,7 +908,7 @@ export class FastifyAdminClientEndpoints {
         }
 
         const redirect_uris = request.body.redirect_uris.trim().length == 0 ? 
-            [] : request.body.redirect_uris.trim().split(/,?[ \t\n]+/);
+            [] : request.body.redirect_uris.trim().split(/[, ][ \t\n]*/);
 
         // validate redirect uris
         let redirect_uriErrors : string[] = [];
@@ -966,4 +967,3 @@ export class FastifyAdminClientEndpoints {
         return successFn(reply);
     }
 }
-
