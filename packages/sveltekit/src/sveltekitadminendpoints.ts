@@ -747,7 +747,7 @@ export class SvelteKitAdminEndpoints {
         }
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
-            const resp = await this.sessionServer.userStorage.getUserById(userid);
+            const resp = await this.sessionServer.userStorage.getUserById(userid, {skipEmailVerifiedCheck: true, skipActiveCheck: true});
             return {user: resp.user};
         } catch (e) {
             return {exception: CrossauthError.asCrossauthError(e)};

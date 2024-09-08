@@ -1221,7 +1221,6 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
 
         if (validFlows != undefined) {
             try {
-                console.log("Deleting valid flows " + client.client_id);
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
                 await this.prismaClient[this.validFlowTable].deleteMany({
                     where: {
@@ -1230,7 +1229,6 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 });
                 for (let i=0; i<validFlows.length; ++i) { 
                     // @ts-ignore  (because types only exist when do prismaClient.table...)
-                    console.log("Creating valid flow " + client.client_id + " " + validFlows[i]);
                     await tx[this.validFlowTable].create({
                         data: {
                             client_id: client.client_id,
