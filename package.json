@@ -11,7 +11,6 @@
     "doc": "typedoc --entryPoints packages/common packages/backend packages/fastify"
   },
   "author": "Matthew Baker",
-  "license": "MIT",
   "devDependencies": {
     "typedoc": "^0.25.4"
   }
