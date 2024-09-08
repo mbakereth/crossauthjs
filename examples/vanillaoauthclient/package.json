@@ -1,6 +1,7 @@
 {
   "name": "vanillaoauthclient",
   "version": "0.0.0",
+  "license": "Apache-2.0",
   "description": "",
   "scripts": {
     "dev": "ws --port 8080 --hostname localhost -d ."

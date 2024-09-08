@@ -1,6 +1,7 @@
 {
 	"name": "sveltekitclientexample",
 	"version": "0.0.1",
+        "license": "Apache-2.0",
 	"private": true,
 	"scripts": {
 		"dev": "NODE_PATH=`pwd`/node_modules dotenv -e .env.dev vite dev",
