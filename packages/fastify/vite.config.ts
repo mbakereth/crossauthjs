@@ -10,6 +10,7 @@ import { join, dirname } from 'path'
 export default defineConfig({
   build: {
     ssr: true,
+    minify: 'esbuild',
     lib: {
       entry: resolve(__dirname, "./src/index.ts"),
       fileName: "index",

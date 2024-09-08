@@ -10,6 +10,7 @@ export default defineConfig({
   build: {
     minify: false,
     ssr: false,
+    minify: 'esbuild',
     lib: {
       entry: resolve(__dirname, "./src/index.ts"),
       fileName: "index",
