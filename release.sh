@@ -8,12 +8,9 @@ if [ $# = 0 ]; then
     exit 0
 fi
 
-bash ./bumpversion $1
+bash ./bumpversion.sh $1
+bash ./build.sh $1
 
-for dir in packages/*; do
-    echo "Building $dir..."
-    (cd $dir; pnpm build)
-done
 git commit -a
 git push
 
