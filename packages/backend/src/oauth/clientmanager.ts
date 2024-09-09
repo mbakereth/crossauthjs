@@ -105,10 +105,14 @@ export class OAuthClientManager {
         for (let tryNum=0; tryNum<5; ++tryNum) {
             try {
                 newClient = await this.clientStorage.createClient(client);
-                client.client_id = OAuthClientManager.randomClientId()
+                break;
             } catch (e) {
-                const ce = CrossauthError.asCrossauthError(e);
-                if (ce.code != ErrorCode.ClientExists) throw e;
+                if (tryNum == 4) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    if (ce.code != ErrorCode.ClientExists) throw e;                        
+                } else {
+                    client.client_id = OAuthClientManager.randomClientId();
+                }
             }           
         }
         if (!newClient) throw new CrossauthError(ErrorCode.ClientExists);

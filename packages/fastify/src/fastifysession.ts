@@ -1491,25 +1491,23 @@ export class FastifySessionServer implements FastifySessionAdapter {
                         }
 
                     } else if (user.state == UserState.passwordResetNeeded || user.state == UserState.passwordAndFactor2ResetNeeded) {
-                        if (this.endpoints.includes("requestpasswordreset")) {
-                            CrossauthLogger.logger.debug(j({msg: "Password reset needed - sending redirect"}));
-                            return reply.redirect("/requestpasswordreset?required=true&next="+encodeURIComponent("login?next="+next));
-                        } else {
-                            const ce = new CrossauthError(ErrorCode.PasswordResetNeeded)
-                            return this.handleError(ce, request, reply, (reply, error) => {
-                                return reply.view(this.loginPage, {
-                                    errorMessage: error.message,
-                                    errorMessages: error.messages, 
-                                    errorCode: error.code, 
-                                    errorCodeName: ErrorCode[error.code], 
-                                    next: next, 
-                                    persist: request.body.persist,
-                                    username: request.body.username,
-                                    csrfToken: request.csrfToken,
-                                    urlPrefix: this.prefix, 
-                                });                      
-                            });
-                        }
+                         
+                        CrossauthLogger.logger.debug(j({msg: "Password reset needed - sending error"}));
+                        const ce = new CrossauthError(ErrorCode.PasswordResetNeeded);
+                        return this.handleError(ce, request, reply, (reply, error) => {
+                            return reply.view(this.loginPage, {
+                                errorMessage: error.message,
+                                errorMessages: error.messages, 
+                                errorCode: error.code, 
+                                errorCodeName: ErrorCode[error.code], 
+                                next: next, 
+                                persist: request.body.persist,
+                                username: request.body.username,
+                                csrfToken: request.csrfToken,
+                                urlPrefix: this.prefix, 
+                            });                      
+                        });
+                        
 
                     } else if (this.allowedFactor2.length > 0 && 
                         (user.state == UserState.factor2ResetNeeded || 

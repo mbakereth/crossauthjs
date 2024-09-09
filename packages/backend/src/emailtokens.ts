@@ -407,16 +407,17 @@ export class TokenEmailer {
      *        templates
      */
     async sendPasswordResetToken(userid : string | number,
-        extraData : {[key:string]:any} = {}) : Promise<void> {
+        extraData : {[key:string]:any} = {}, asAdmin=false) : Promise<void> {
         if (!this.passwordResetTextBody && !this.passwordResetHtmlBody) {
             let error = new CrossauthError(ErrorCode.Configuration, 
                 "Either passwordResetTextBody or passwordResetTextBody must be set to send email verification emails");
                 throw error;
         }
         let {user} = await this.userStorage.getUserById(userid, {
-            skipActiveCheck: true
+            skipActiveCheck: true,
         });
-        if (user.state != UserState.active && user.state != UserState.passwordResetNeeded && user.state != UserState.passwordAndFactor2ResetNeeded) {
+        if (!asAdmin &&
+            (user.state != UserState.active && user.state != UserState.passwordResetNeeded && user.state != UserState.passwordAndFactor2ResetNeeded)) {
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
         let email = (user.email??user.username).toLowerCase();

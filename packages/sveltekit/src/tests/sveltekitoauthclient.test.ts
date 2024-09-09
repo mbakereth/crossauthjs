@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { MockRequestEvent } from './sveltemocks';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
-import {  makeServer, getAccessToken, oidcConfiguration } from './testshared';
+import {  makeServer, getAccessToken, oidcConfiguration, getCsrfToken } from './testshared';
 import createFetchMock from 'vitest-fetch-mock';
 
 let fetchMocker = createFetchMock(vi);
@@ -210,22 +210,28 @@ test('SvelteKitClient.clientCredentials_action', async () => {
 test('SvelteKitClient.refreshTokenFlow_post', async () => {
     const {authServer, refresh_token} = await getAccessToken();
 
-    const {server} = await makeServer(true, false, false, true);
+    const {server, resolver, handle} = await makeServer(true, false, false, true);
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
     // @ts-ignore
     fetchMocker.mockResponseOnce((request) => {return JSON.stringify({url: request.url, body: JSON.parse(request.body.toString())})});
 
+    const {csrfToken, csrfCookieValue} = await getCsrfToken(server, resolver, handle);
     // clientCredentialsFlow post endpoint
     let postRequest = new Request(`http://server.com/refreshTokenFlow`, {
         method: "POST",
         body: JSON.stringify({
             refresh_token: refresh_token,
+            csrfToken,
          }),
-         headers: {"content-type": "application/json"},
+         headers: [
+            ["cookie", "CSRFTOKEN="+csrfCookieValue],
+            ["content-type", "application/json"],
+        ] 
         });
     let event = new MockRequestEvent("1", postRequest, {});
+    event.locals.csrfToken = csrfToken;
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
     const resp = await server.oAuthClient?.refreshTokenFlowEndpoint.post(event);
     expect(resp.status).toBe(200);
@@ -249,7 +255,8 @@ test('SvelteKitClient.refreshTokenFlow_post', async () => {
 test('SvelteKitClient.refreshTokenFlow_action', async () => {
     const {refresh_token} = await getAccessToken();
 
-    const {server} = await makeServer(true, false, false, true, {tokenResponseType: "sendInPage"});
+    const {server, resolver, handle} = await makeServer(true, false, false, true, {tokenResponseType: "sendInPage"});
+    const {csrfToken} = await getCsrfToken(server, resolver, handle);
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
@@ -265,6 +272,7 @@ test('SvelteKitClient.refreshTokenFlow_action', async () => {
          headers: {"content-type": "application/json"},
         });
     let event = new MockRequestEvent("1", postRequest, {});
+    event.locals.csrfToken = csrfToken;
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
     const resp = await server.oAuthClient?.refreshTokenFlowEndpoint.actions.default(event);
     const url = ("url" in resp)  ? resp.url : undefined;
@@ -278,7 +286,7 @@ test('SvelteKitClient.refreshTokenFlow_action', async () => {
 test('SvelteKitClient.passwordFlow_post', async () => {
     const {authServer} = await getAccessToken();
 
-    const {server} = await makeServer(true, false, false, true);
+    const {server} = await makeServer(true, false, false, true, {enableCsrfProtection: false});
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
@@ -320,7 +328,7 @@ test('SvelteKitClient.passwordFlow_post', async () => {
 
 test('SvelteKitClient.passwordFlow_action', async () => {
 
-    const {server} = await makeServer(true, false, false, true, {tokenResponseType: "sendInPage"});
+    const {server} = await makeServer(true, false, false, true, {tokenResponseType: "sendInPage", enableCsrfProtection: false});
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 
@@ -353,7 +361,7 @@ test('SvelteKitClient.passwordFlow_action', async () => {
 test('SvelteKitClient.passwordMfaFlow_post', async () => {
     const {authServer} = await getAccessToken();
 
-    const {server} = await makeServer(true, false, false, true);
+    const {server} = await makeServer(true, false, false, true, {enableCsrfProtection: false});
 
     if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
 

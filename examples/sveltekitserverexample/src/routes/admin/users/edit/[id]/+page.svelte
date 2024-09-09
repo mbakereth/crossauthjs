@@ -29,7 +29,12 @@
 <h1>Update Details for {data.editUser.username}</h1>
 
 {#if form?.ok}
-    <p class="bg-success p-2 rounded text-slate-900">The user's details have been updated</p>
+    <p class="bg-success p-2 rounded text-slate-900">
+        The user's details have been updated.
+        {#if form?.info}
+        <br>{ form?.info }
+        {/if}
+    </p>
     <p><a href="/admin/users">Users</a></p>
 {:else}
     {#if form?.error} 

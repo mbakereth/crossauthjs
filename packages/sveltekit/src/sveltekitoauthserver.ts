@@ -457,7 +457,9 @@ export class SvelteKitAuthorizationServer {
             // resource owner did not grant access
             const ce = new CrossauthError(ErrorCode.Unauthorized,  
                 "You have not granted access");
-            CrossauthLogger.logger.error(j({
+                CrossauthLogger.logger.debug(j({err: ce}));
+                CrossauthLogger.logger.error(j({cerr: ce}));
+                        CrossauthLogger.logger.error(j({
                 msg: errorDescription,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName

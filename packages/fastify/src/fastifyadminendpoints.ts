@@ -445,10 +445,10 @@ export class FastifyAdminEndpoints {
                     this.sessionServer.userStorage.getUserById(request.params.id);
                 user = user1;
                 return await this.updateUser(user, request, reply, 
-                (reply, _user, emailVerificationRequired) => {
-                    const message = emailVerificationRequired 
-                        ? "Please click on the link in your email to verify your email address."
-                        : "User's details have been updated";
+                (reply, _user, emailVerificationRequired, passwordResetNeeded) => {
+                    let message = "User's details have been updated.";
+                    if (emailVerificationRequired) message =  "User's details have been updated and sent and an email verification link.";
+                    else if (passwordResetNeeded) message = "User's details have been updated and sent and a password reset token sent."
                     return reply.view(this.adminUpdateUserPage, {
                         csrfToken: request.csrfToken,
                         message: message,
@@ -953,7 +953,7 @@ export class FastifyAdminEndpoints {
 
     private async updateUser(user : User, request : FastifyRequest<{ Body: AdminUpdateUserBodyType }>, 
         reply : FastifyReply, 
-        successFn : (res : FastifyReply, user : User, emailVerificationRequired : boolean)
+        successFn : (res : FastifyReply, user : User, emailVerificationRequired : boolean, passwordResetNeeded: boolean)
         => void) {
 
         if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateUser unless a user storage is provided");
@@ -989,12 +989,12 @@ export class FastifyAdminEndpoints {
         }
 
         // update the user
-        let emailVerificationNeeded = 
+        let resp = 
             // this surely isn't right
             //await this.sessionServer.sessionManager.updateUser(request.user, user,);
             await this.sessionServer.sessionManager.updateUser(user, user, true);
 
-        return successFn(reply, request.user, emailVerificationNeeded);
+        return successFn(reply, request.user, resp.emailVerificationTokenSent, resp.passwordResetTokenSent);
     }
 
     private async changePassword(user : User, request : FastifyRequest<{ Body: AdminChangePasswordBodyType }>, 

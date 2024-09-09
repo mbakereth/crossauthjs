@@ -883,7 +883,6 @@ export class FastifyAdminClientEndpoints {
                 validFlows.push(flow);
             }
         
-
         const client = 
             await this.clientManager.createClient(client_name,
                 redirect_uris,

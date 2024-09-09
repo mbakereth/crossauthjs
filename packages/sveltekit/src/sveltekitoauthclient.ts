@@ -221,6 +221,7 @@ async function jsonError(_server: SvelteKitServer,
     _event: RequestEvent,
     ce: CrossauthError) : Promise<Response> {
     CrossauthLogger.logger.debug(j({err: ce}));
+    CrossauthLogger.logger.error(j({cerr: ce}));
     return json({
             ok: false,
             status: ce.httpStatus,
@@ -2476,8 +2477,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                 if (SvelteKitServer.isSvelteKitError(e)) throw e;
                 const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.debug({err: e});
-                CrossauthLogger.logger.error({cerr: e});
+                CrossauthLogger.logger.debug({err: ce});
+                CrossauthLogger.logger.error({cerr: ce});
                 //throw this.error(ce.httpStatus, ce.message);
                 return json({
                     ok: false,
@@ -2486,7 +2487,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     errorCode: ce.code,
                     errorCodeName: ce.codeName,
                     errorMessage: ce.message,
-                    exception: ce
                 }, {status: ce.httpStatus});
 
             }
@@ -2501,8 +2501,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                     if (SvelteKitServer.isSvelteKitError(e)) throw e;
                     const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.debug({err: e});
-                    CrossauthLogger.logger.error({cerr: e});
+                    CrossauthLogger.logger.debug({err: ce});
+                    CrossauthLogger.logger.error({cerr: ce});
                     //throw this.error(ce.httpStatus, ce.message);
                     return {
                         ok: false,
@@ -2511,7 +2511,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         errorCode: ce.code,
                         errorCodeName: ce.codeName,
                         errorMessage: ce.message,
-                        exception: ce
                     };
     
                 }

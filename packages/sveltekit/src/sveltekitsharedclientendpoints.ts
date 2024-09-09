@@ -30,7 +30,8 @@ export type SearchClientsPageData = {
     take : number,
     search? : string,
     error? : string,
-    exception?: CrossauthError,
+    errorCode?: number,
+    errorCodeName?: string,
     hasPrevious : boolean,
     hasNext : boolean,
     clientUserId? : string|number,
@@ -48,7 +49,8 @@ export type UpdateClientPageData = {
     client_id?: string;
     clientUsername? : string,
     error? : string,
-    exception?: CrossauthError,
+    errorCode? : number,
+    errorCodeName?: string,
     validFlows: string[],
     valid_flowNames: {[key:string]:string},
 };
@@ -63,7 +65,8 @@ export type UpdateClientFormData = {
     ok : boolean,
     client?: OAuthClient,
     error? : string,
-    exception?: CrossauthError,
+    errorCode? : number,
+    errorCodeName?: string,
     formData?: {[key:string]:string},
     plaintextSecret? : string,
 };
@@ -79,7 +82,8 @@ export type CreateClientPageData = {
     clientUserId? : string|number,
     clientUsername? : string,
     error? : string,
-    exception?: CrossauthError,
+    errorCode? : number,
+    errorCodeName?: string,
     validFlows: string[],
     valid_flowNames: {[key:string]:string},
 };
@@ -94,7 +98,8 @@ export type CreateClientFormData = {
     ok : boolean,
     client?: OAuthClient,
     error? : string,
-    exception?: CrossauthError,
+    errorCode? : number,
+    errorCodeName?: string,
     formData?: {[key:string]:string},
 };
 
@@ -110,7 +115,8 @@ export type DeleteClientPageData = {
     client_id?: string;
     clientUsername? : string,
     error? : string,
-    exception?: CrossauthError,
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -122,7 +128,8 @@ export type DeleteClientPageData = {
 export type DeleteClientFormData = {
     ok : boolean,
     error? : string,
-    exception?: CrossauthError,
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -372,10 +379,13 @@ export class SvelteKitSharedClientEndpoints {
                  SvelteKitServer.isSvelteKitRedirect(e)) 
                 throw e;
             const ce = CrossauthError.asCrossauthError(e);
-            return {
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
+                    return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 hasPrevious: false,
                 hasNext : false,
                 skip: skip ?? 0, 
@@ -412,9 +422,12 @@ export class SvelteKitSharedClientEndpoints {
             }
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't load client");
-            return {
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
+                    return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 validFlows: this.validFlows,
                 valid_flowNames: this.valid_flowNames,
@@ -516,9 +529,12 @@ export class SvelteKitSharedClientEndpoints {
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't update client");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -572,9 +588,12 @@ export class SvelteKitSharedClientEndpoints {
             }
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't initialize new client");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 validFlows: this.validFlows,
                 valid_flowNames: this.valid_flowNames,
@@ -676,9 +695,12 @@ export class SvelteKitSharedClientEndpoints {
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't create client");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -708,9 +730,12 @@ export class SvelteKitSharedClientEndpoints {
             }
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't load client");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 client_id,
             }
@@ -750,9 +775,12 @@ export class SvelteKitSharedClientEndpoints {
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't delete client");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
             }
         } 

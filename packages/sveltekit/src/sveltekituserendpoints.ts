@@ -26,10 +26,11 @@ import { JsonOrFormData } from './utils';
 export type LoginReturn = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
     formData?: {[key:string]:string},
     factor2Required?: boolean,
     ok: boolean
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -41,7 +42,8 @@ export type LoginReturn = {
 export type LogoutReturn = {
     ok: boolean,
     error?: string,
-    exception?: CrossauthError,
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -59,11 +61,12 @@ export type SignupReturn = {
         factor2: string,
     },
     error?: string,
-    exception?: CrossauthError,
     formData?: {[key:string]:string|undefined},
     ok: boolean,
     factor2Required?: boolean,
     emailVerificationRequired? : boolean
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -81,10 +84,11 @@ export type ConfigureFactor2Return = {
         factor2: string,
     },
     error?: string,
-    exception?: CrossauthError,
     formData?: {[key:string]:string|undefined},
     ok: boolean,
     emailVerificationRequired? : boolean
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -96,8 +100,9 @@ export type ConfigureFactor2Return = {
 export type VerifyEmailReturn = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
     ok: boolean
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -110,8 +115,9 @@ export type RequestPasswordResetReturn = {
     user? : User,
     formData?: {[key:string]:string|undefined},
     error?: string,
-    exception?: CrossauthError,
     ok: boolean
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -125,8 +131,9 @@ export type ResetPasswordReturn = {
     user? : User,
     formData?: {[key:string]:string|undefined},
     error?: string,
-    exception?: CrossauthError,
     ok: boolean,
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -140,8 +147,9 @@ export type RequestFactor2Return = {
     action?: string,
     factor2?: string,
     error?: string,
-    exception?: CrossauthError,
     csrfToken? : string,
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -153,9 +161,10 @@ export type RequestFactor2Return = {
 export type ChangePasswordReturn = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
     formData?: {[key:string]:string},
     ok: boolean
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -167,7 +176,6 @@ export type ChangePasswordReturn = {
 export type ChangeFactor2Return = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
     formData?: {[key:string]:string},
     ok: boolean,
     factor2Data?:  {
@@ -176,6 +184,8 @@ export type ChangeFactor2Return = {
         csrfToken?: string | undefined,
         factor2: string,
     },
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -187,8 +197,9 @@ export type ChangeFactor2Return = {
 export type DeleteUserReturn = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
     ok: boolean
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 /**
@@ -200,10 +211,11 @@ export type DeleteUserReturn = {
 export type UpdateUserReturn = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
     formData?: {[key:string]:string},
     emailVerificationNeeded: boolean,
     ok: boolean
+    errorCode? : number,
+    errorCodeName?: string,
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -285,7 +297,7 @@ export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
     private changePasswordUrl = "/changepassword";
     private changeFactor2Url = "/changefactor2";
-    private requestPasswordResetUrl = "/resetpassword";
+    //private requestPasswordResetUrl = "/resetpassword";
     private loginRedirectUrl = "/";
     private loginUrl = "/login";
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 
@@ -416,7 +428,13 @@ export class SvelteKitUserEndpoints {
             if (user.state == UserState.passwordChangeNeeded) {
                 this.sessionServer.redirect(302, this.changePasswordUrl + "?required=true&next="+encodeURIComponent("login?next="+next));
             } else if (user.state == UserState.passwordResetNeeded) {
-                this.sessionServer.redirect(302, this.requestPasswordResetUrl);
+                //this.sessionServer.redirect(302, this.requestPasswordResetUrl);
+                throw new CrossauthError(ErrorCode.PasswordResetNeeded, "Please click on the link we sent you to reset your password")
+    
+            } else if (user.state == UserState.passwordAndFactor2ResetNeeded) {
+                //this.sessionServer.redirect(302, this.requestPasswordResetUrl);
+                throw new CrossauthError(ErrorCode.PasswordResetNeeded, "Please click on the link we sent you to reset your password")
+    
             } else if (this.sessionServer.allowedFactor2.length > 0 && 
                 user.state == UserState.factor2ResetNeeded || 
                 !this.sessionServer.allowedFactor2Names.includes(user.factor2?user.factor2:"none")) {
@@ -435,12 +453,15 @@ export class SvelteKitUserEndpoints {
             // hack - let Sveltekit redirect through
             if (typeof e == "object" && e != null && "status" in e && "location" in e) throw e
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
                 ok: false,
                 formData,
-            }
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
+}
         }
     }
 
@@ -562,10 +583,13 @@ export class SvelteKitUserEndpoints {
             return { ok: true }
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
             };
         }
     }
@@ -773,11 +797,14 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't sign up");
+            CrossauthLogger.logger.debug(j({err: ce}))
+            CrossauthLogger.logger.error(j({cerr: ce}))
             return {
                 error: ce.message,
-                exception: ce,
                 ok: false,
                 formData,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName
             }
         }
     }
@@ -830,10 +857,13 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: e}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
             };
         }
     }
@@ -869,6 +899,7 @@ export class SvelteKitUserEndpoints {
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
+
 
             // get factor2 type from session data 
             const sessionData = await this.sessionServer.getSessionData(event, "2fa");
@@ -924,10 +955,13 @@ export class SvelteKitUserEndpoints {
                     factor2: factor2,
                 };
 
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: e}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 formData: formData,
                 factor2Data: factor2Data,
                 emailVerificationRequired: this.sessionServer.enableEmailVerification,
@@ -1012,10 +1046,13 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: e}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 formData: formData,
             }
         }
@@ -1048,9 +1085,12 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            CrossauthLogger.logger.debug(j({err: e}));
+            CrossauthLogger.logger.error(j({cerr: e}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -1094,10 +1134,13 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
             };
         }
 
@@ -1187,9 +1230,12 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -1238,9 +1284,12 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "2FA failed");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
             }
         }
@@ -1377,10 +1426,13 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't change password");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
                 ok: false,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 formData,
             }
         }
@@ -1426,9 +1478,12 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't delete account");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
             }
         }
@@ -1498,23 +1553,26 @@ export class SvelteKitUserEndpoints {
             }
 
             // update the user
-            let emailVerificationNeeded = 
+            let {emailVerificationTokenSent} = 
                 await this.sessionServer.sessionManager.updateUser(event.locals.user, user);
-            if (!emailVerificationNeeded) {
+            if (!emailVerificationTokenSent) {
                 const resp = await this.sessionServer.userStorage.getUserById(event.locals.user.id);
                 event.locals.user = resp.user;
             }
             return {
                 ok: true,
                 formData: formData,
-                emailVerificationNeeded,
+                emailVerificationNeeded: emailVerificationTokenSent,
             };
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
                 emailVerificationNeeded: false,
@@ -1633,9 +1691,12 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -1745,9 +1806,12 @@ export class SvelteKitUserEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -1777,7 +1841,6 @@ export class SvelteKitUserEndpoints {
         actions: {
             default: async ( event : RequestEvent ) => {
                 const resp = await this.signup(event);
-                delete resp?.exception;
                 return resp;
             }        
         }
@@ -1796,17 +1859,15 @@ export class SvelteKitUserEndpoints {
                     if (resp?.ok == true && !resp?.factor2Required) 
                       this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
                         if (resp && (
-                            resp?.exception?.code == ErrorCode.UserNotExist ||
-                            resp?.exception?.code == ErrorCode.PasswordInvalid)) {
+                            resp?.errorCode == ErrorCode.UserNotExist ||
+                            resp?.errorCode == ErrorCode.PasswordInvalid)) {
                                 resp.error = "Username or password is invalid";
                         }
-                        delete resp?.exception;
                         return resp;
             },
             factor2: async ( event : RequestEvent ) => {
                 const resp = await this.loginFactor2(event);
                 if (resp?.ok == true && !resp?.factor2Required) this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
-                delete resp?.exception;
                 return resp;
         
             },
@@ -1826,7 +1887,6 @@ export class SvelteKitUserEndpoints {
         actions : {
             default: async ( event : RequestEvent ) => {
                 const resp = await this.logout(event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -1841,12 +1901,10 @@ export class SvelteKitUserEndpoints {
         actions : {
             change: async ( event : RequestEvent ) => {
                 const resp = await this.changeFactor2(event);
-                delete resp?.exception;
                 return resp;
             },
             reconfigure: async ( event : RequestEvent ) => {
                 const resp = await this.reconfigureFactor2(event);
-                delete resp?.exception;
                 return resp;
             },
         },
@@ -1897,7 +1955,6 @@ export class SvelteKitUserEndpoints {
         actions : {
             default: async ( event : RequestEvent ) => {
                 const resp = await this.changePassword(event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -1929,7 +1986,6 @@ export class SvelteKitUserEndpoints {
         actions : {
             default: async ( event : RequestEvent ) => {
                 const resp = await this.configureFactor2(event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -1944,7 +2000,6 @@ export class SvelteKitUserEndpoints {
         actions : {
             default: async ( event : RequestEvent ) => {
                 const resp = await this.deleteUser(event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -1959,7 +2014,6 @@ export class SvelteKitUserEndpoints {
         actions : {
             default: async ( event : RequestEvent ) => {
                 const resp = await this.requestPasswordReset(event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -1982,28 +2036,66 @@ export class SvelteKitUserEndpoints {
     readonly passwordResetTokenEndpoint  = {
         actions : {
             default: async ( event : RequestEvent  ) => {
-        
-                // we already visited this URL and used it to initiate 2FA
-                // - execute as normal to perform password reset
-                const resp = await this.resetPassword(event);
-                delete resp?.exception;
-                return resp;    
-            }
-        },
-        load: async ( event : RequestEvent ) => {
-            try {
-                const resp = await this.validatePasswordResetToken(event);
+                let resp = await this.validatePasswordResetToken(event);
                 if (!resp?.user) throw new CrossauthError(ErrorCode.InvalidToken, "The password reset token is invalid");
                 if (resp.user.factor2 != "" && !event.locals.sessionId) {
                     // If we have 2FA, we need to create an anonymous session with
                     // user.username set for the 2FA hook to pick up the 2FA config
                     await this.sessionServer.createAnonymousSession(event, {user: {username: resp.user.username}});
                 }
-                return {
-                    tokenValidated: resp?.ok ?? false,
-                    error: resp?.error,
-                    ...this.baseEndpoint(event),
-                };    
+                if (resp?.error) {
+                    return {
+                        ok: false,
+                        tokenValidated: false,
+                        error: resp?.error,
+                        ...this.baseEndpoint(event),
+                    };    
+                }
+
+                try {
+                    resp = await this.resetPassword(event);
+                    return resp;    
+                } catch (e) {
+                    const ce = CrossauthError.asCrossauthError(e);
+                    if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                    if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                    CrossauthLogger.logger.debug(j({err: ce}));
+                    CrossauthLogger.logger.error(j({cerr: ce}));
+                    return {
+                        ok: false,
+                        tokenValidated: false,
+                        error: resp?.error,
+                        errorCode: ce.code,
+                        errorCodeName: ce.codeName,
+                        ...this.baseEndpoint(event),
+                    };    
+
+                }
+                    
+            }
+        },
+        load: async ( event : RequestEvent ) => {
+            try {
+                if (event.request.method != "POST") {
+                    const resp = await this.validatePasswordResetToken(event);
+                    if (!resp?.user) throw new CrossauthError(ErrorCode.InvalidToken, "The password reset token is invalid");
+                    if (resp.user.factor2 != "" && !event.locals.sessionId) {
+                        // If we have 2FA, we need to create an anonymous session with
+                        // user.username set for the 2FA hook to pick up the 2FA config
+                        await this.sessionServer.createAnonymousSession(event, {user: {username: resp.user.username}});
+                    }
+                    return {
+                        tokenValidated: resp?.ok ?? false,
+                        error: resp?.error,
+                        ...this.baseEndpoint(event),
+                    };    
+                } else {
+                    return {
+                        tokenValidated: false,
+                        ...this.baseEndpoint(event),
+                    };    
+
+                }
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug(j({err: ce}));
@@ -2011,7 +2103,9 @@ export class SvelteKitUserEndpoints {
                 return {
                     tokenValidated: false,
                     error: ce.message,
-                    ...this.baseEndpoint(event),
+                    errorCode: ce.code,
+                    errorCodeName: ce.codeName,
+                       ...this.baseEndpoint(event),
                 };    
             }
         },
@@ -2021,7 +2115,6 @@ export class SvelteKitUserEndpoints {
         actions : {
             default: async ( event ) =>  {
                 const resp = await this.updateUser(event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -2039,7 +2132,6 @@ export class SvelteKitUserEndpoints {
     readonly verifyEmailTokenEndpoint  : SveltekitEndpoint = {
         load: async ( event ) => {
             const resp = await this.verifyEmail(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,

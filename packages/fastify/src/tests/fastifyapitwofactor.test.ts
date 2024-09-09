@@ -51,8 +51,6 @@ async function makeAppWithOptions(options : FastifyServerOptions = {}) : Promise
         return {template: template, args: args};
     });
     app.setErrorHandler(function (error, _request, reply) {
-        // Log error
-        //console.log(error)
         // Send error response
         const ce = CrossauthError.asCrossauthError(error);
         return reply.status(ce.httpStatus).send({ ok: false })

@@ -3,7 +3,6 @@
     export let data;
     export let factor2Data;
 </script>
-<h2>Configure Two-Factor Authentication</h2>
 
 <ol class="list-decimal ml-4">
     <li class="mb-2">Install Google Authenticator on your phone from the App Store or Play Store</li>

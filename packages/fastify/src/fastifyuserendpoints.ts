@@ -1335,10 +1335,10 @@ export class FastifyUserEndpoints {
         }
 
         // update the user
-        let emailVerificationNeeded = 
+        let resp = 
             await this.sessionServer.sessionManager.updateUser(request.user, user);
 
-        return successFn(reply, request.user, emailVerificationNeeded);
+        return successFn(reply, request.user, resp.emailVerificationTokenSent);
     }
 
     private async changeFactor2(request : FastifyRequest<{ Body: ChangeFactor2BodyType }>, 

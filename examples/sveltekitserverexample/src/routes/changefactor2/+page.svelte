@@ -1,5 +1,6 @@
 <script>
  import ConfigureTotp from '$lib/components/ConfigureTotp.svelte';
+ import ConfigureDummyFactor2 from '$lib/components/ConfigureDummyFactor2.svelte';
  import { goto } from '$app/navigation';
 	/** @type {import('./$types').PageData} */
     export let data;
@@ -12,6 +13,8 @@
         if (factor2 == data.allowedFactor2[i].name)  {
             configurable = data.allowedFactor2[i].configurable;
         }
+    console.log(data)
+    console.log(form)
 </script>
 <svelte:head>
     <title>Change Two-Factor Authentication</title>
@@ -23,6 +26,8 @@
     <p><a href="/account">Your Account</a></p>
 {:else if form?.factor2Data?.factor2 == "totp"}
     <ConfigureTotp data={data} factor2Data={form?.factor2Data}/>
+{:else if form?.factor2Data?.factor2 == "dummy"}
+    <ConfigureDummyFactor2 data={data} factor2Data={form?.factor2Data}/>
 {:else}
     {#if form?.error} 
         <p class="bg-error p-2 rounded text-slate-900">Error: {form?.error}</p>

@@ -18,9 +18,11 @@ import { JsonOrFormData } from './utils';
 export type AdminUpdateUserReturn = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
+    errorCode?: number,
+    errorCodeName?: string,
     formData?: {[key:string]:string},
     ok: boolean,
+    info? : string
 };
 
 /**
@@ -32,7 +34,8 @@ export type AdminUpdateUserReturn = {
 export type AdminChangePasswordReturn = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
+    errorCode?: number,
+    errorCodeName?: string,
     formData?: {[key:string]:string},
     ok: boolean
 };
@@ -52,7 +55,8 @@ export type AdminCreateUserReturn = {
         factor2: string,
     },
     error?: string,
-    exception?: CrossauthError,
+    errorCode?: number,
+    errorCodeName?: string,
     formData?: {[key:string]:string|undefined},
     ok: boolean,
 };
@@ -66,7 +70,8 @@ export type AdminCreateUserReturn = {
 export type AdminDeleteUserReturn = {
     user? : User,
     error?: string,
-    exception?: CrossauthError,
+    errorCode?: number,
+    errorCodeName?: string,
     ok: boolean
 };
 
@@ -83,7 +88,8 @@ export type SearchUsersReturn = {
     take : number,
     search? : string,
     error? : string,
-    exception?: CrossauthError,
+    errorCode?: number,
+    errorCodeName?: string,
     hasPrevious : boolean,
     hasNext : boolean,
 };
@@ -304,10 +310,13 @@ export class SvelteKitAdminEndpoints {
 
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 hasPrevious: false,
                 hasNext : false,
                 skip: skip ?? 0, 
@@ -385,7 +394,7 @@ export class SvelteKitAdminEndpoints {
                 CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.factor2ResetNeeded}`, 
                 username: user.username}));
             } 
-        
+
             // validate the new user using the implementor-provided function
             let errors = this.sessionServer.validateUserFn(user);
             if (errors.length > 0) {
@@ -393,11 +402,14 @@ export class SvelteKitAdminEndpoints {
             }
 
             // update the user
-            await this.sessionServer.sessionManager.updateUser(user, user, true);
-
+            const resp = await this.sessionServer.sessionManager.updateUser(user, user, true, true);
+            let info: string|undefined = undefined;
+            if (resp.emailVerificationTokenSent) info = "An email verification token has been sent to the user";
+            else if (resp.passwordResetTokenSent) info = "A password reset token has been sent to the user";
             return {
                 ok: true,
                 formData: formData,
+                info
             };
 
         } catch (e) {
@@ -406,9 +418,12 @@ export class SvelteKitAdminEndpoints {
             if (SvelteKitServer.isSvelteKitError(e, 401)) throw e;
 
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -510,9 +525,12 @@ export class SvelteKitAdminEndpoints {
             if (SvelteKitServer.isSvelteKitError(e, 401)) throw e;
 
             let ce = CrossauthError.asCrossauthError(e, "Couldn't change password");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -659,9 +677,12 @@ export class SvelteKitAdminEndpoints {
 
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't create user");
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 ok: false,
                 formData,
             }
@@ -708,9 +729,12 @@ export class SvelteKitAdminEndpoints {
     
             } catch (e) {
                 let ce = CrossauthError.asCrossauthError(e, "Couldn't delete account");
-                return {
+                CrossauthLogger.logger.debug(j({err: ce}));
+                CrossauthLogger.logger.error(j({cerr: ce}));
+                    return {
                     error: ce.message,
-                    exception: ce,
+                    errorCode: ce.code,
+                    errorCodeName: ce.codeName,
                     ok: false,
                 }
             }
@@ -731,7 +755,6 @@ export class SvelteKitAdminEndpoints {
         load: async ( event: RequestEvent ) => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             const resp = await this.searchUsers(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -762,10 +785,11 @@ export class SvelteKitAdminEndpoints {
                     return {
                         ok: false,
                         error: getUserResp.exception?.message ?? "Couldn't get user",
+                        errorCode: getUserResp.exception?.code,
+                        errorCodeName: getUserResp.exception?.codeName,
                     }
                 }
                 const resp = await this.updateUser(getUserResp.user, event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -798,10 +822,11 @@ export class SvelteKitAdminEndpoints {
                     return {
                         ok: false,
                         error: getUserResp.exception?.message ?? "Couldn't get user",
+                        errorCode: getUserResp.exception?.code,
+                        errorCodeName: getUserResp.exception?.codeName,
                     }
                 }
                 const resp = await this.changePassword(getUserResp.user, event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -839,7 +864,6 @@ export class SvelteKitAdminEndpoints {
         actions: {
             default: async ( event : RequestEvent ) => {
                 const resp = await this.createUser(event);
-                delete resp?.exception;
                 return resp;
             }        
         }
@@ -849,7 +873,6 @@ export class SvelteKitAdminEndpoints {
         actions : {
             default: async ( event : RequestEvent ) => {
                 const resp = await this.deleteUser(event);
-                delete resp?.exception;
                 return resp;
             }
         },
@@ -858,6 +881,8 @@ export class SvelteKitAdminEndpoints {
             if (getUserResp.exception || !getUserResp.user) {
                 return {
                     error: "User doesn't exist",
+                    errorCode: getUserResp.exception?.code,
+                    errorCodeName: getUserResp.exception?.codeName,
                     ...this.baseEndpoint(event),
                 }
             }

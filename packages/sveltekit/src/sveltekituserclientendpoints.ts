@@ -101,12 +101,13 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
-            CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({cerr: e}));
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
                 validFlows: this.validFlows,
                 valid_flowNames: this.valid_flowNames,
             }
@@ -134,12 +135,13 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
-            CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({cerr: e}));
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
             }
         }
  
@@ -165,12 +167,13 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
-            CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({cerr: e}));
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
             }
         }
 
@@ -196,12 +199,13 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             const ce = CrossauthError.asCrossauthError(e);
-            CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({cerr: e}));
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 ok: false,
                 error: ce.message,
-                exception: ce,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
             }
         }
 
@@ -247,7 +251,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
     readonly searchClientsEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.searchClients(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -261,7 +264,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
     readonly updateClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.loadClient(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -270,7 +272,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         actions: {
             default: async (event : RequestEvent) => {
                 let resp = await this.updateClient(event);
-                delete resp?.exception;
                 return resp;
             }
         }
@@ -282,7 +283,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
     readonly createClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.emptyClient(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -291,7 +291,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         actions: {
             default: async (event : RequestEvent) => {
                 let resp = await this.createClient(event);
-                delete resp?.exception;
                 return resp;
             }
         }
@@ -303,7 +302,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
     readonly deleteClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.loadDeleteClient(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -312,7 +310,6 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
         actions: {
             default: async (event : RequestEvent) => {
                 let resp = await this.deleteClient(event);
-                delete resp?.exception;
                 return resp;
             }
         }

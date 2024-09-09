@@ -5,6 +5,8 @@
     export let data;
     /** @type {import('./$types').ActionData} */
     export let form;
+    console.log("data", data)
+    console.log("form", form)
 </script>
 <svelte:head>
     <title>Password Reset</title>

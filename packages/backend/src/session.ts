@@ -719,7 +719,11 @@ export class SessionManager {
             state: !skipEmailVerification && this.enableEmailVerification ? "awaitingemailverification" : "active",
             factor2: data.factor2,
         }
-        await this.userStorage.updateUser(newUser, newSecrets);
+        if (authenticator.secretNames().length > 0)
+            await this.userStorage.updateUser(newUser, newSecrets);
+        else
+            await this.userStorage.updateUser(newUser);
+
         if (!skipEmailVerification && newSignup && this.enableEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(user.id, undefined)
         }
@@ -1010,7 +1014,7 @@ export class SessionManager {
      * @param newUser the new user details
      * @returns true if email verification is now needed, false otherwise
      */
-    async updateUser(currentUser: User, newUser : User, skipEmailVerification = false) : Promise<boolean> {
+    async updateUser(currentUser: User, newUser : User, skipEmailVerification = false, asAdmin=false) : Promise<{emailVerificationTokenSent: boolean, passwordResetTokenSent: boolean}> {
         let newEmail : string|undefined = undefined;
         if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateUser if no user storage provided");
         if (!("id" in currentUser) || currentUser.id == undefined) {
@@ -1042,8 +1046,15 @@ export class SessionManager {
             if (email) rest.email = email;
             if (username) rest.username = username;
         }
+        if (newUser.state == UserState.passwordResetNeeded || newUser.state == UserState.passwordAndFactor2ResetNeeded) {
+            await this.tokenEmailer?.sendPasswordResetToken(currentUser.id, {}, asAdmin)
+        }
         await this.userStorage.updateUser(rest)
-        return !skipEmailVerification && this.enableEmailVerification && hasEmail;
+        return {
+            emailVerificationTokenSent: !skipEmailVerification && this.enableEmailVerification && hasEmail,
+            passwordResetTokenSent: newUser.state == UserState.passwordResetNeeded || newUser.state == UserState.passwordAndFactor2ResetNeeded,
+        }
+            
     }
 
     /**
@@ -1076,14 +1087,14 @@ export class SessionManager {
 
         // delete all password reset tokens
         try {
-            this.emailTokenStorage.deleteAllForUser(user.id, 
+            await this.emailTokenStorage.deleteAllForUser(user.id, 
                 KeyPrefix.passwordResetToken);
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: user.username}));
             CrossauthLogger.logger.debug(j({err: e}));
         }
 
-        return user;
+        return {...user, state: newState};
     }
 
 }

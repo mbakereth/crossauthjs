@@ -22,6 +22,14 @@
     <form method="POST" action="?/factor2">
         <Totp data={data} error={form?.error}/>
     </form>
+{:else if form?.errorCodeName == "PasswordResetNeeded"}
+{#if form?.error} 
+    <p class="bg-error p-2 rounded text-slate-900">
+        Please click on the link we emailed you to reset your password 
+        before logging in.
+    </p>
+{/if}
+
 {:else}
 
     <form method="POST" action="?/login">

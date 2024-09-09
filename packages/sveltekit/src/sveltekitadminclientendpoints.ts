@@ -170,7 +170,6 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
                     CrossauthLogger.logger.warn(j({msg: "Invalid userid " + event.url.searchParams.get("userid")}));
                 }
             const resp = await this.searchClients(event, undefined, undefined, undefined, userid);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -184,7 +183,6 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
     readonly updateClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.loadClient(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -193,7 +191,6 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
         actions: {
             default: async (event : RequestEvent) => {
                 let resp = await this.updateClient(event);
-                delete resp.exception;
                 return resp;
             }
         }
@@ -205,7 +202,6 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
     readonly createClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.emptyClient(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -214,7 +210,6 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
         actions: {
             default: async (event : RequestEvent) => {
                 let resp = await this.createClient(event);
-                delete resp.exception;
                 return resp;
             }
         }
@@ -226,7 +221,6 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
     readonly deleteClientEndpoint = {
         load: async ( event: RequestEvent ) => {
             const resp = await this.loadDeleteClient(event);
-            delete resp?.exception;
             return {
                 ...this.baseEndpoint(event),
                 ...resp,
@@ -235,7 +229,6 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
         actions: {
             default: async (event : RequestEvent) => {
                 let resp = await this.deleteClient(event);
-                delete resp.exception;
                 return resp;
             }
         }
