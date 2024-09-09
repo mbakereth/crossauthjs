@@ -189,6 +189,22 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      * The default is empty
      */
     loginProtectedApiEndpoints?: string[],    
+
+    /**
+     * This overrides `loginProtectedPageEndpoints`
+     * 
+     * The default is empty.
+     * 
+     */
+    loginProtectedExceptionPageEndpoints?: string[],
+
+    /**
+     * This overrides `loginProtectedPageEndpoints`
+     * 
+     * The default is empty
+     */
+    loginProtectedExceptionApiEndpoints?: string[],    
+    
     
     /**
      * See `adminPageEndpoints`
@@ -473,6 +489,8 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     private factor2ProtectedApiEndpoints : string[] = [];
     private loginProtectedPageEndpoints : string[] = [];
     private loginProtectedApiEndpoints : string[] = [];
+    private loginProtectedExceptionPageEndpoints : string[] = [];
+    private loginProtectedExceptionApiEndpoints : string[] = [];
     private adminPageEndpoints : string[] = [];
     private adminApiEndpoints : string[] = [];
     readonly unauthorizedUrl : string|undefined = undefined;
@@ -566,6 +584,8 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         setParameter("factor2ProtectedApiEndpoints", ParamType.JsonArray, this, options, "FACTOR2_PROTECTED_API_ENDPOINTS");
         setParameter("loginProtectedPageEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_PAGE_ENDPOINTS");
         setParameter("loginProtectedApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_API_ENDPOINTS");
+        setParameter("loginProtectedExceptionPageEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_EXCEPTION_PAGE_ENDPOINTS");
+        setParameter("loginProtectedExceptionApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_EXCEPTION_API_ENDPOINTS");
         setParameter("adminPageEndpoints", ParamType.JsonArray, this, options, "ADMIN_PAGE_ENDPOINTS");
         setParameter("adminApiEndpoints", ParamType.JsonArray, this, options, "ADMIN_API_ENDPOINTS");
         setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
@@ -1103,21 +1123,33 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      * Returns whether a page being visited as part of a request event is
      * configured to be protected by login.  
      * 
-     * See {@link SvelteKitSessionServerOptions.loginProtectedPageEndpoints}.
+     * See {@link SvelteKitSessionServerOptions.loginProtectedPageEndpoints} and
+     * {@link SvelteKitSessionServerOptions.loginProtectedExceptionPageEndpoints}.
      * 
      * @param event the request event
      * @returns true or false
      */
     isLoginPageProtected(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
+
+        // login page is never protected
         if (url.pathname == this.loginUrl) return false;
+
+        // return false for loginProtectedExceptionPageEndpoints
+        let isNotProtected = false;
+        this.loginProtectedExceptionPageEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isNotProtected);
+        if (isNotProtected) return true;
+
+        // set protected to true for any pages that are in loginProtectedPageEndpoints
         let isProtected = false;
         return this.loginProtectedPageEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
                 accumulator || minimatch(url.pathname, currentValue),
             isProtected);
 
-        //return (this.loginProtectedPageEndpoints.includes(url.pathname));
     }
  
     /**
@@ -1131,7 +1163,18 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      */
     isLoginApiProtected(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
-        //return (this.loginProtectedApiEndpoints.includes(url.pathname));
+
+        // login page is never protected
+        if (url.pathname == this.loginUrl) return false;
+
+        // return false for loginProtectedExceptionApiEndpoints
+        let isNotProtected = false;
+        this.loginProtectedExceptionApiEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isNotProtected);
+        if (isNotProtected) return true;
+
         let isProtected = false;
         return this.loginProtectedApiEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
