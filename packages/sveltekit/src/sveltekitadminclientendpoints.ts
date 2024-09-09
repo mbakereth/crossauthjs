@@ -61,7 +61,7 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
     ) {
         super(sessionServer, options);
         this.sessionServer = sessionServer;
-        setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
+        setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
         if (options.clientSearchFn) this.clientSearchFn = options.clientSearchFn;
         this.redirect = options.redirect;
         this.error = options.error;

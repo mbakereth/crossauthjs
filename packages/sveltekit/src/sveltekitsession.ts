@@ -492,6 +492,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     readonly enablePasswordReset = false;
 
     private factor2Url : string = "/factor2";
+    private loginUrl = "/login";
 
     /**
      * Use these to access the `load` and `action` endpoints for functions
@@ -567,6 +568,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         setParameter("loginProtectedApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_API_ENDPOINTS");
         setParameter("adminPageEndpoints", ParamType.JsonArray, this, options, "ADMIN_PAGE_ENDPOINTS");
         setParameter("adminApiEndpoints", ParamType.JsonArray, this, options, "ADMIN_API_ENDPOINTS");
+        setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
         setParameter("unauthorizedUrl", ParamType.JsonArray, this, options, "UNAUTHORIZED_PAGE");
         let options1 : {allowedFactor2?: string[]} = {}
         setParameter("allowedFactor2", ParamType.JsonArray, options1, options, "ALLOWED_FACTOR2");
@@ -1108,6 +1110,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      */
     isLoginPageProtected(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
+        if (url.pathname == this.loginUrl) return false;
         let isProtected = false;
         return this.loginProtectedPageEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
