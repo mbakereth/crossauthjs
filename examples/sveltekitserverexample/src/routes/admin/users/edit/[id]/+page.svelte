@@ -4,6 +4,8 @@
     export let data;
 	/** @type {import('./$types').ActionData} */
 	export let form;
+    let selectedAdmin = form?.formData?.admin != undefined ? (form?.formData ? "1" : "0") : 
+        (data.editUser?.admin != undefined ? (data.editUser.admin? "1" : "0") : "0");
     let selectedState = form?.formData.state ?? data.editUser.state;
     let states = [
         {name: "active", friendlyName: "Active"},
@@ -77,6 +79,18 @@
             <label class="input-group">
                 <input type="email" id="user_email" name="user_email" class="input input-bordered w-full max-w-xs mb-4" placeholder="Email" value={form?.formData?.user_email ?? data?.editUser?.email ?? ""}/><br>
             </label>
+        </div>
+
+        <!-- Admin-->
+        <p class="label-text">Admin</p>
+        <input type="hidden" name="type_admin" value="boolean"/> 
+        <div class="form-control">
+            <span class="align-text-bottom mb-2">
+                <input type="radio" name="user_admin" id={"admin_1"} class="radio align-middle" value="1" bind:group={selectedAdmin} /> 
+                <span class="align-bottom ml-2 text-sm mr-2">Yes</span>
+                <input type="radio" name="user_admin" id={"admin_0"} class="radio align-middle" value="0" bind:group={selectedAdmin} /> 
+                <span class="align-bottom ml-2 text-sm">No</span>
+            </span>
         </div>
 
         <!-- state-->

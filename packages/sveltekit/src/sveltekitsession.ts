@@ -346,7 +346,18 @@ function defaultCreateUser(event : RequestEvent,
         let name = field.replace(/^user_/, ""); 
         if (field.startsWith("user_") && 
             (callerIsAdmin || userEditableFields.includes(name))) {
-            user[name] = data[field];
+            if ("type_" + name in data) {
+                if (data["type_" + name] == "string") {
+                    user[name] = data[field];
+                } else if (data["type_" + name] == "number" || data["type_" + name] == "integer" || data["type_" + name] == "float") {
+                    user[name] = Number(data[field]);
+                } else if (data["type_" + name] == "boolean") {
+                    const c = data[field]?.toLocaleLowerCase();
+                    user[name] = (c == "1" || c == "y" || c == "t" || c == "yes" || c == "true")
+                } 
+            } else {
+                user[name] = data[field];
+            }
         }
     }
     user.factor1 = "localpassword";
@@ -375,7 +386,18 @@ function defaultUpdateUser(user: User,
         let name = field.replace(/^user_/, ""); 
         if (field.startsWith("user_") && 
             (callerIsAdmin || userEditableFields.includes(name))) {
-            user[name] = data[field];
+            if ("type_" + name in data) {
+                if (data["type_" + name] == "string") {
+                    user[name] = data[field];
+                } else if (data["type_" + name] == "number" || data["type_" + name] == "integer" || data["type_" + name] == "float") {
+                    user[name] = Number(data[field]);
+                } else if (data["type_" + name] == "boolean") {
+                    const c = data[field]?.toLocaleLowerCase();
+                    user[name] = (c == "1" || c == "y" || c == "t" || c == "yes" || c == "true")
+                } 
+            } else {
+                user[name] = data[field];
+            }
         }
     }
     return user;
