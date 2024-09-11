@@ -1159,11 +1159,11 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
 
         // return false for loginProtectedExceptionPageEndpoints
         let isNotProtected = false;
-        this.loginProtectedExceptionPageEndpoints.reduce(
+        isNotProtected = this.loginProtectedExceptionPageEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
                 accumulator || minimatch(url.pathname, currentValue),
             isNotProtected);
-        if (isNotProtected) return true;
+        if (isNotProtected) return false;
 
         // set protected to true for any pages that are in loginProtectedPageEndpoints
         let isProtected = false;
@@ -1191,11 +1191,11 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
 
         // return false for loginProtectedExceptionApiEndpoints
         let isNotProtected = false;
-        this.loginProtectedExceptionApiEndpoints.reduce(
+        isNotProtected = this.loginProtectedExceptionApiEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
                 accumulator || minimatch(url.pathname, currentValue),
             isNotProtected);
-        if (isNotProtected) return true;
+        if (isNotProtected) return false;
 
         let isProtected = false;
         return this.loginProtectedApiEndpoints.reduce(
