@@ -14,7 +14,4 @@ bash ./build.sh $1
 git commit -a
 git push
 
-for dir in packages/*; do
-    echo "Publishing $dir..."
-    (cd $dir; pnpm publish)
-done
+bash ./publish.sh
