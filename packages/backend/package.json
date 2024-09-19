@@ -24,7 +24,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "dotenv -e .env.unittest vitest",
+    "test": "dotenv -e .env.unittest vitest --exclude *dbtests*",
     "testonce": "dotenv -e .env.unittest vitest run",
     "doc": "typedoc",
     "prisma": "dotenv -e .env.unittest pnpm exec prisma"

@@ -273,10 +273,23 @@ export class Crypto {
      * @param timestamp optionally, a timestamp to include in the signed date as a Unix date
      * @returns Base64-url encoded hash
      */
-    static sign(payload : {[key:string]: any}|string, secret: string, salt? : string, timestamp? : number) : string {
-        if (typeof payload != "string") {
-            payload = Crypto.signableToken(payload, salt, timestamp);
-        }
+    static sign(payload : {[key:string]: any}, secret: string, salt? : string, timestamp? : number) : string {
+        const payloadStr = Crypto.signableToken(payload, salt, timestamp);
+        const hmac = createHmac(SIGN_DIGEST, secret);
+        return payloadStr + "." + hmac.update(payloadStr).digest('base64url');
+
+    }
+
+    /**
+     * This can be called for a string payload that is a cryptographically
+     * secure random string.  No salt is added and the token is assumed to
+     * be Base64Url already
+     * 
+     * @param payload string to sign 
+     * @param salt optionally, a salt to concatenate with the payload (must be a string)
+     * @returns Base64-url encoded hash
+     */
+    static signSecureToken(payload : string, secret: string) : string {
         const hmac = createHmac(SIGN_DIGEST, secret);
         return payload + "." + hmac.update(payload).digest('base64url');
 
@@ -311,6 +324,33 @@ export class Crypto {
         }
         return payload;        
     }
+
+    /**
+     * Validates a signature signed with `signSecureToken` and, if valid, 
+     * return the unstringified payload
+     * @param signedMessage signed message (base64-url encoded)
+     * @param secret secret key, which must be a string
+     * @returns if signature is valid, the payload as a string
+     * @throws {@link @crossauth/common!CrossauthError} with 
+     *         {@link @crossauth/common!ErrorCode} of `InvalidKey` if signature
+     *         is invalid or has expired.  
+     */
+    static unsignSecureToken(signedMessage : string, secret : string) : string {
+        const parts = signedMessage.split(".");
+        if (parts.length != 2) throw new CrossauthError(ErrorCode.InvalidKey);
+        const msg = parts[0];
+        const sig = parts[1];
+        const payload = msg;
+        const hmac = createHmac(SIGN_DIGEST, secret);
+        const newSig = hmac.update(msg).digest('base64url');
+        if (newSig.length != sig.length)
+            throw new CrossauthError(ErrorCode.InvalidKey, "Signature does not match payload");
+        if  (!timingSafeEqual(Buffer.from(newSig), Buffer.from(sig))) {
+            throw new CrossauthError(ErrorCode.InvalidKey, "Signature does not match payload");
+        }
+        return payload;        
+    }
+    
 
     /**
      * XOR's two arrays of base64url-encoded strings

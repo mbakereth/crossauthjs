@@ -120,13 +120,12 @@ export class DoubleSubmitCsrfToken {
     /**
      * Returns a {@link Cookie } object with the given session key.
      * 
-     * This class is compatible, for example, with Express.
-     * 
      * @param token the value of the csrf token, with signature
      * @returns a {@link Cookie } object,
      */
     makeCsrfCookie(token : string) : Cookie {
-        const cookieValue = Crypto.sign({v: token}, this.secret, "")
+        //const cookieValue = Crypto.sign({v: token}, this.secret, "")
+        const cookieValue = Crypto.signSecureToken(token, this.secret)
         let options : CookieOptions = {}
         if (this.domain) {
             options.domain = this.domain;
@@ -153,7 +152,8 @@ export class DoubleSubmitCsrfToken {
     }
 
     unsignCookie(cookieValue : string) : string {
-        return Crypto.unsign(cookieValue, this.secret).v;
+        //return Crypto.unsign(cookieValue, this.secret).v;
+        return Crypto.unsignSecureToken(cookieValue, this.secret);
     }
 
     /**
@@ -211,7 +211,8 @@ export class DoubleSubmitCsrfToken {
         // cookie contains unmasked token and signature.  Verify the signature
         let cookieToken : string;
         try {
-            cookieToken = Crypto.unsign(cookieValue, this.secret).v;
+            //cookieToken = Crypto.unsign(cookieValue, this.secret).v;
+            cookieToken = Crypto.unsignSecureToken(cookieValue, this.secret);
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             throw new CrossauthError(ErrorCode.InvalidCsrf, "Invalid CSRF cookie");
@@ -236,7 +237,8 @@ export class DoubleSubmitCsrfToken {
      */
     validateCsrfCookie(cookieValue : string)  {
         try {
-            return Crypto.unsign(cookieValue, this.secret).v;
+            //return Crypto.unsign(cookieValue, this.secret).v;
+            return Crypto.unsignSecureToken(cookieValue, this.secret);
         } catch (e) {
             // Crypto will give us InvalidKey.  Throw a more meaningful error
             CrossauthLogger.logger.error(j({err: e}));
@@ -424,7 +426,8 @@ export class SessionCookie {
      * @returns a {@link Cookie } object,
      */
     makeCookie(sessionKey : Key, persist? : boolean) : Cookie {
-        let signedValue = Crypto.sign({v: sessionKey.value}, this.secret, "");
+        //let signedValue = Crypto.sign({v: sessionKey.value}, this.secret, "");
+        let signedValue = Crypto.signSecureToken(sessionKey.value, this.secret);
         let options : CookieOptions = {}
         if (persist == undefined) persist = this.persist;
         if (this.domain) {
@@ -499,7 +502,8 @@ export class SessionCookie {
      *         is invalid. 
      */
     unsignCookie(cookieValue : string) : string {
-        return Crypto.unsign(cookieValue, this.secret).v;
+        //return Crypto.unsign(cookieValue, this.secret).v;
+        return Crypto.unsignSecureToken(cookieValue, this.secret);
     }
 
     /**

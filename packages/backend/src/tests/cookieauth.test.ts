@@ -64,7 +64,7 @@ test('DoubleSubmitCsrfToken.signAndUnsignCookie', async () => {
     const auth = new DoubleSubmitCsrfToken({secret: secret});
     const token = auth.createCsrfToken();
     const cookie = auth.makeCsrfCookie(token);
-    const cookieToken = Crypto.unsign(cookie.value, secret).v;
+    const cookieToken = Crypto.unsignSecureToken(cookie.value, secret);
     expect(cookieToken).toBe(token);
 });
 

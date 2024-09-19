@@ -168,12 +168,12 @@ export class DbUserStorage extends UserStorage {
 
             let user : User|undefined = undefined;
             let secrets : UserSecrets|undefined = undefined;
-
+            let params = this.dbPool.parameters();
             try {
                 await dbClient.startTransaction();
 
                 // get user
-                let query = `select * from ${this.userTable} where ${field} = $1`;
+                let query = `select * from ${this.userTable} where ${field} = ` + params.nextParameter();
                 let res = await dbClient.execute(query, [value]);
                 if (res.length == 0) {
                     throw new CrossauthError(ErrorCode.UserNotExist);
@@ -197,7 +197,8 @@ export class DbUserStorage extends UserStorage {
                 if (!user) throw new CrossauthError(ErrorCode.UserNotExist);
 
                 // get secrets
-                query = `select * from ${this.userSecretsTable} where ${this.useridForeignKeyColumn} = $1`;
+                params = this.dbPool.parameters();
+                query = `select * from ${this.userSecretsTable} where ${this.useridForeignKeyColumn} = ` + params.nextParameter();
                 res = await dbClient.execute(query, [user.id]);
                     if (res.length == 0) {
                     throw new CrossauthError(ErrorCode.UserNotExist);
@@ -502,9 +503,11 @@ export class DbUserStorage extends UserStorage {
             await dbClient.startTransaction();
 
 
-            let query = `delete from ${this.userSecretsTable} where ${this.useridForeignKeyColumn}=\$1`;
+            let params = this.dbPool.parameters();
+            let query = `delete from ${this.userSecretsTable} where ${this.useridForeignKeyColumn}=` + params.nextParameter();
             await dbClient.execute(query, [userid]);
-            query = `delete from ${this.userTable} where username=\$1`;
+            params = this.dbPool.parameters();
+            query = `delete from ${this.userTable} where username=` + params.nextParameter();
                 await dbClient.execute(query, [username]);
     
             await dbClient.commit();
@@ -535,10 +538,11 @@ export class DbUserStorage extends UserStorage {
 
             await dbClient.startTransaction();
 
-
-            let query =  `delete from ${this.userSecretsTable} where ${this.useridForeignKeyColumn}=\$1`;
+            let params = this.dbPool.parameters();
+            let query =  `delete from ${this.userSecretsTable} where ${this.useridForeignKeyColumn}=` + params.nextParameter();
             await dbClient.execute(query, [id]);
-            query =  `delete from ${this.userTable} where ${this.idColumn}=\$1`;
+            params = this.dbPool.parameters();
+            query =  `delete from ${this.userTable} where ${this.idColumn}=` + params.nextParameter();
             await dbClient.execute(query, [id]);
     
             await dbClient.commit();
@@ -693,12 +697,17 @@ export class DbKeyStorage extends KeyStorage {
         let error : CrossauthError|undefined = undefined;
 
         let fields : string[] = [this.useridForeignKeyColumn, "value", "created", "expires", "data"];
-        let placeholders: string[] = ["$1", "$2", "$3", "$4", "$5"];
+        let params = this.dbPool.parameters();
+        let placeholders: string[] = []
+        for (let i=0; i<5; ++i) {
+            placeholders.push(params.nextParameter())
+        }
+        //let placeholders: string[] = ["$1", "$2", "$3", "$4", "$5"];
         let values: any[] = [userid ?? null, value, created, expires ?? null, data ?? ""];
-        let i = 6;
         for (let field in extraFields) {
             fields.push(field);
-            placeholders.push("$"+i++);
+            //placeholders.push("$"+i++);
+            placeholders.push(params.nextParameter());
             values.push(extraFields[field]);
         }
         let fieldsString = fields.join(", ");
@@ -732,7 +741,9 @@ export class DbKeyStorage extends KeyStorage {
         const dbClient = await this.dbPool.connect();
 
         try {
-            let query = `delete from ${this.keyTable} where value=\$1`;
+            let params = this.dbPool.parameters();
+            let query = `delete from ${this.keyTable} where value=`;
+            query += params.nextParameter();
             CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
             await dbClient.execute(query, [value]);
         } finally {
@@ -747,18 +758,19 @@ export class DbKeyStorage extends KeyStorage {
             let query;
             let values : any[] = [];
             let exceptClause = "";
-            let i = 1;
+            let params = this.dbPool.parameters();
             if (userid) {
-                query = `delete from ${this.keyTable} where ${this.useridForeignKeyColumn} = $1 and value like $2 `;
+                const param1 = params.nextParameter();
+                const param2 = params.nextParameter();
+                query = `delete from ${this.keyTable} where ${this.useridForeignKeyColumn} = ${param1} and value like ${param2} `;
                 values = [userid];
-                i++;
             } else {
-                query = `delete from ${this.keyTable} where ${this.useridForeignKeyColumn} is null and value like $1`;
+                const param1 = params.nextParameter();
+                query = `delete from ${this.keyTable} where ${this.useridForeignKeyColumn} is null and value like ${param1}`;
             }
             values.push(prefix+"%");
-            i++;
             if (except) {
-                exceptClause = "and value != $" + i;
+                exceptClause = "and value != " + params.nextParameter();
                 values.push(except);
             }
             query += " " + exceptClause;

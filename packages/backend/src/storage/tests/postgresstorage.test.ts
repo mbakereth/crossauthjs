@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import pg from 'pg';
-import { beforeEach, afterEach } from 'vitest';
+import { beforeEach } from 'vitest';
 import { PostgresUserStorage, PostgresKeyStorage, PostgresOAuthClientStorage, PostgresOAuthAuthorizationStorage } from '../postgresstorage';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
 import { makeDBTests } from './dbtests';
@@ -36,21 +36,19 @@ beforeEach(async () => {
 
 });
 
-afterEach(async () => {
-    //await deleteAll();
-});
-
 async function deleteAll() {
     const pgClient = await pool.connect();
     // delete users
     try {
-        await pgClient.query({text: `delete from oauthauthorization`,});
-        await pgClient.query({text: `delete from oauthclientredirecturi`,});
-        await pgClient.query({text: `delete from oauthclientvalidflow`,});
-        await pgClient.query({text: `delete from oauthclient`,});
-        await pgClient.query({text: `delete from keys`,});
-        await pgClient.query({text: `delete from usersecrets`});
-        await pgClient.query({text: `delete from users`});
+        Promise.all([
+            pgClient.query({text: `delete from oauthauthorization`,}),
+            pgClient.query({text: `delete from oauthclientredirecturi`,}),
+            pgClient.query({text: `delete from oauthclientvalidflow`,}),
+            pgClient.query({text: `delete from oauthclient`,}),
+            pgClient.query({text: `delete from keys`,}),
+            pgClient.query({text: `delete from usersecrets`}),
+            pgClient.query({text: `delete from users`})
+        ]);
     } catch (e) {
         console.log(e)
         throw e
