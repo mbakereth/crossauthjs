@@ -141,7 +141,6 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
      * @param token The token to validate
      * @param tokenType If defined, the `type` claim in the payload must
      *        match this value
-     * @returns 
      */
     async tokenAuthorized(token: string,
         tokenType: "access" | "refresh" | "id") : 

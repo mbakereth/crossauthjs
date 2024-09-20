@@ -95,6 +95,7 @@ export class Crypto {
     static base64Decode(encoded : string) : string {
         return Buffer.from(encoded, 'base64').toString('utf-8');
     }
+
     /**
      * Base64-encodes UTF-8 text
      * @param text UTF-8 text
@@ -178,6 +179,7 @@ export class Crypto {
     }
 
     static Base32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".split(""); // not real base32 - omits 1,i,0,o
+
     /**
      * Creates a random base-23 string
      * @param length length of the string to create
@@ -286,7 +288,7 @@ export class Crypto {
      * be Base64Url already
      * 
      * @param payload string to sign 
-     * @param salt optionally, a salt to concatenate with the payload (must be a string)
+     * @param secret the secret to sign with
      * @returns Base64-url encoded hash
      */
     static signSecureToken(payload : string, secret: string) : string {
