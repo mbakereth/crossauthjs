@@ -200,7 +200,7 @@ export class DoubleSubmitCsrfToken {
      *     * The signature in the cookie must match the token in the cookie
      *     * The token in the cookie must matched the value in the form or header after unmasking
      * 
-     * @param cookieValue the CSRDF cookie value to validate.
+     * @param cookieValue the CSRF cookie value to validate.
      * @param formOrHeaderValue the value from the csrfToken form header or the X-CROSSAUTH-CSRF header.
      * @throws {@link @crossauth/common!CrossauthError} with {@link @crossauth/common!ErrorCode} of `InvalidKey`
      */

@@ -249,6 +249,7 @@ export abstract class OAuthTokenConsumerBase {
         if (!decoded) return undefined;
         if (decoded.type != tokenType) {
             CrossauthLogger.logger.error(j({msg: tokenType + " expected but got " + decoded.type}));
+            return undefined;
         }
         if (decoded.iss != this.authServerBaseUrl) {
             CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: await this.hash(decoded.jti)}));

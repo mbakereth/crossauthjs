@@ -51,6 +51,7 @@ export class OAuthResourceServer {
         : Promise<{[key:string]: any}|undefined> {
             try {
                 const payload = jose.decodeJwt(accessToken);
+                // TODO: shouldn't this be aud?
                 if (payload.iss && payload.iss in this.tokenConsumers)
                     return await this.tokenConsumers[payload.iss].tokenAuthorized(accessToken, "access");
                 throw new CrossauthError(ErrorCode.Unauthorized, "Invalid issuer in access token");
