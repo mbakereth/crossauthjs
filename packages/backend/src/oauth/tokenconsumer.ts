@@ -52,7 +52,7 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
     /**
      * Value passed to the constructor.  The `aud` claim must match it
      */
-    protected readonly audience : string;
+    readonly audience : string;
 
     /**
      * Value passed to the constructor. If true, access tokens are saved

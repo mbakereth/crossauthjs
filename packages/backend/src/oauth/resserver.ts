@@ -29,7 +29,7 @@ export class OAuthResourceServer {
     constructor(tokenConsumers : OAuthTokenConsumer[], _options : OAuthResourceServerOptions = {}) {
 
         for (let consumer of tokenConsumers) {
-            this.tokenConsumers[consumer.authServerBaseUrl] = consumer;
+            this.tokenConsumers[consumer.audience] = consumer;
 
         }
     }
