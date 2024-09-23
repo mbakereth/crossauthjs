@@ -930,7 +930,6 @@ export class FastifySessionServer implements FastifySessionAdapter {
         setParameter("configureFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
         setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
-        setParameter("persistSessionId", ParamType.Boolean, this, options, "PERSIST_SESSION_ID");
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
