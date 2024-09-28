@@ -80,7 +80,9 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_authorized', async
     // create resource server
     const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
     const resserver = new SvelteKitOAuthResourceServer(
-        [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver",
+            {authServerBaseUrl: issuer})],
         {userStorage}
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
@@ -127,7 +129,9 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_hook', async () =>
     // create resource server
     const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
     const resserver = new SvelteKitOAuthResourceServer(
-        [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver",
+            {authServerBaseUrl: issuer})],
         {
             userStorage,
             protectedEndpoints: {

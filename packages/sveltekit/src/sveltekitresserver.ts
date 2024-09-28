@@ -243,6 +243,13 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                             const userResp = 
                                 await this.userStorage.getUserByUsername(resp.sub);
                             if (userResp) user = userResp.user;
+                        } else if (resp.sub) {
+                            event.locals.user = {
+                                id: resp.userid ?? resp.sub,
+                                username: resp.sub,
+                                state: resp.state ?? "active"
+
+                            }
                         }
                         return {authorized: true, tokenPayload: resp, user: user};
                     } else {

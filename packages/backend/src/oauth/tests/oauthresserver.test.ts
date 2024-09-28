@@ -27,7 +27,8 @@ test('ResourceServer.validAccessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumer({
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -56,7 +57,8 @@ test('ResourceServer.invalidPublicKey', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key-wrong.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumer({
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -97,7 +99,8 @@ test('ResourceServer.invalidAccessToken', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumer({
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -125,7 +128,8 @@ test('ResourceServer.validCodeChallenge', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumer({
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -166,7 +170,8 @@ test('ResourceServer.validAud', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumer({
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -195,8 +200,8 @@ test('ResourceServer.invalidAud', async () => {
     expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = new OAuthResourceServer(
-        [new OAuthTokenConsumer({
-            audience: "wrongresourceserver",
+        [new OAuthTokenConsumer(
+            "wrongresourceserver", {
             jwtKeyType: "RS256",
             jwtPublicKey: publicKey,
             clockTolerance: 10
@@ -226,7 +231,8 @@ test('ResourceServer.invalidIsser', async () => {
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = 
         new OAuthResourceServer(
-            [new OAuthTokenConsumer({
+            [new OAuthTokenConsumer(
+                process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {
                 jwtKeyType: "RS256",
                 jwtPublicKey: publicKey,
                 clockTolerance: 10,
@@ -257,7 +263,8 @@ test('ResourceServer.persistAccessToken', async () => {
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');
     const resserver = 
         new OAuthResourceServer(
-            [new OAuthTokenConsumer({
+            [new OAuthTokenConsumer(
+                process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {
                 jwtKeyType: "RS256",
                 jwtPublicKey: publicKey,
                 clockTolerance: 10,
@@ -285,7 +292,8 @@ test('ResourceServer.validateWithJwks', async () => {
 
     const resserver = 
         new OAuthResourceServer(
-            [new OAuthTokenConsumer({
+            [new OAuthTokenConsumer(
+                process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {
                 clockTolerance: 10,
         })]);
 

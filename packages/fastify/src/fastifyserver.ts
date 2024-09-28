@@ -228,6 +228,8 @@ export class FastifyServer {
     /** Config for `@fastify/cors` */
     private cors : {[key:string]:any} | undefined;
 
+    private audience : string = "";
+
     /**
      * Integrates fastify session, API key and OAuth servers
      * @param config object with entries as follow:
@@ -411,8 +413,10 @@ export class FastifyServer {
         }
 
         if (oAuthResServer) {
+            this.audience = ""
+            setParameter("audience", ParamType.String, this, options, "OAUTH_AUDIENCE", true);
             this.oAuthResServer = new FastifyOAuthResourceServer(this.app, 
-                [new OAuthTokenConsumer(options)],
+                [new OAuthTokenConsumer(this.audience, options)],
                 {...oAuthResServer.options, ...options}
             )
         }

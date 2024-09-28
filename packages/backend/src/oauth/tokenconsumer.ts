@@ -69,16 +69,14 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
      * 
      * @param options see {@link OAuthTokenConsumerOptions}
      */
-    constructor(options : OAuthTokenConsumerOptions = {}) {
+    constructor(audience: string, options : OAuthTokenConsumerOptions = {}) {
 
         const options1 : {
             jwtKeyType? : string,
-            audience : string,
-        } = {audience: ""};
+        } = {};
         setParameter("jwtKeyType", ParamType.String, options1, options, "JWT_KEY_TYPE");
-        setParameter("audience", ParamType.String, options1, options, "OAUTH_AUDIENCE", true);
-        super(options1.audience, {...options, ...options1});
-        this.audience = options1.audience;
+        super(audience, {...options, ...options1});
+        this.audience = audience;
 
         setParameter("authServerBaseUrl", ParamType.String, this, options, "AUTH_SERVER_BASE_URL", true);
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");

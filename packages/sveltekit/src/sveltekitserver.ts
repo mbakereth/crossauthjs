@@ -207,6 +207,8 @@ export class SvelteKitServer {
     /** OAuth resource server instance */
     readonly oAuthResServer? : SvelteKitOAuthResourceServer;
 
+    private audience = "";
+
     /**
      * Constructor.
      * 
@@ -341,8 +343,10 @@ export class SvelteKitServer {
         
 
         if (oAuthResServer) {
+            setParameter("audience", ParamType.String, this, options, "OAUTH_AUDIENCE", true);
             this.oAuthResServer = new SvelteKitOAuthResourceServer( 
-                [new OAuthTokenConsumer(options)],
+
+                [new OAuthTokenConsumer(this.audience, options)],
                 {...oAuthResServer.options, ...options}
             )
         }

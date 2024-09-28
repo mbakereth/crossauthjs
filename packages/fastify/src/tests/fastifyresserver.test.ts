@@ -54,7 +54,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_authorized', async (
     const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
     const resserver = new FastifyOAuthResourceServer(
         app,
-        [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
+        [new OAuthTokenConsumer(process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {authServerBaseUrl: issuer})],
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await resserver.tokenConsumers[0].loadConfig();
@@ -99,7 +99,7 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_endpoint', async () 
     const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
     const resserver = new FastifyOAuthResourceServer(
         app,
-        [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
+        [new OAuthTokenConsumer(process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {authServerBaseUrl: issuer})],
         {protectedEndpoints: {"/endpoint" : {}}}
     );
     app.get('/endpoint',  async (request : FastifyRequest, reply : FastifyReply) =>  {
