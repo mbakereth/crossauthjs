@@ -699,7 +699,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     private bffMaxTries : number = 1;
     private bffSleepMilliseconds : number = 500;
     readonly jwtTokens : string[] = ["access", "id", "refresh"]
-    readonly hook? : (input: {event: RequestEvent}) => MaybePromise<Response|undefined>;
+    readonly hook : (input: {event: RequestEvent}) => MaybePromise<Response|undefined>;
     private testMiddleware = false;
     // @ts-ignore
     private testEvent : RequestEvent|undefined = undefined;

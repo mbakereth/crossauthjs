@@ -402,6 +402,11 @@ export class SvelteKitServer {
                 await this.apiKeyServer.hook({event});
             }
 
+            // OAuth client hook
+            if (this.oAuthClient) {
+                await this.oAuthClient.hook({event});
+            }
+
             // OAuth res server hook
             if (this.oAuthResServer?.hook) {
                 const resp = await this.oAuthResServer.hook({event});
