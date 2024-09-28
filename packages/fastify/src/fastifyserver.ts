@@ -103,6 +103,12 @@ export interface FastifyServerOptions extends
 
     isAdminFn?: (user : User) => boolean;
 
+    /**
+     * Config for `@fastify/cors`
+     */
+    cors? : {[key:string]:any}
+
+
 };
 
 /**
@@ -458,15 +464,17 @@ export class FastifyServer {
             try {
                 if (errorFn) {
                     const ce = CrossauthError.asCrossauthError(e);
-                    return errorFn(this, request, reply, ce);
+                    return {error: true, reply: await errorFn(this, request, reply, ce)};
                 } else if (this.sessionServer?.errorPage) {
+                    const ce = new CrossauthError(ErrorCode.InvalidCsrf, "CSRF Token not provided")
                     return {error: true, reply: reply.status(401)
                         .view(this.sessionServer?.errorPage??"",
                         {
-                            errorMessage: "CSRF Token not provided",
-                            status: 401,
-                            code: ErrorCode.InvalidCsrf,
-                            codeName: ErrorCode[ErrorCode.InvalidCsrf]
+                            errorMessage: ce.message,
+                            errorMessages: ce.messages,
+                            status: ce.httpStatus,
+                            errorCode: ErrorCode.InvalidCsrf,
+                            errorCodeName: ErrorCode[ErrorCode.InvalidCsrf]
                         })};
                 }
             } catch (e2) {

@@ -1184,3 +1184,9 @@ export interface MfaAuthenticatorResponse {
     oob_channel? : string,
     name?: string,
 }
+
+export interface MfaAuthenticatorsResponse {
+    authenticators?: MfaAuthenticatorResponse[],
+    error?: string,
+    error_description?: string,
+}

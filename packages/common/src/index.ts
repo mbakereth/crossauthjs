@@ -21,6 +21,7 @@ export {
     OAuthFlows,
     type OAuthTokenResponse,
     type MfaAuthenticatorResponse,
+    type MfaAuthenticatorsResponse,
     type OAuthDeviceAuthorizationResponse,
     type OAuthDeviceResponse} from './oauth/client';
 export { OAuthTokenConsumerBase } from './oauth/tokenconsumer';

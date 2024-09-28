@@ -605,3 +605,43 @@ test('FastifyOAuthClient.deviceCodeFlow', async () => {
     expect(body.body.client_secret).toBe("DEF");
     expect(body.body.device_code).toBe(authResp.device_code);
 });
+
+test('FastifyOAuthClient.middleware', async () => { 
+    const { server, access_token, sessionCookie } = await getAccessTokenThroughClient({
+        tokenResponseType: "saveInSessionAndLoad",
+        bffBaseUrl: "http://res.com",
+        bffEndpoints: [{ url: "/test", methods: ["GET"],
+        tokenResponseType: "saveInSessionAndRedirect" }],
+
+    });
+
+    expect(access_token).toBeDefined();
+    //if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    let res;
+    let body;
+
+    // get the csrf token
+    res = await server.app.inject({ method: "GET", url: "/passwordflow" })
+    body = JSON.parse(res.body);
+    expect(body.template).toBe("passwordflow.njk");
+    
+
+    // insert payload
+    if (!server.sessionServer) throw new Error("No session server");
+    const sessionManager = server.sessionServer["sessionManager"];
+    const sessionId = sessionManager.getSessionId(sessionCookie);
+    let sessionData = await sessionManager.dataForSessionId(sessionId);
+    sessionData.oauth.id_payload = {"sub": "bob"}
+    await sessionManager.updateSessionData(sessionId, "oauth", sessionData["oauth"]);
+
+    // call an endpoint
+    if (server.oAuthClient) {
+        server.oAuthClient["testMiddleware"] = true;
+        await server.app.inject({ method: "GET", url: "/passwordflow", cookies: {SESSIONID: sessionCookie} })
+        const request = server.oAuthClient["requestObj"];
+        expect(request?.user?.username).toBe("bob");
+        expect(request?.idTokenPayload?.sub).toBe("bob");
+    
+    }
+});

@@ -84,9 +84,9 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_authorized', async
         {userStorage}
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.tokenConsumers[issuer].loadConfig();
+    await resserver.tokenConsumers[0].loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.tokenConsumers[issuer].loadJwks();
+    await resserver.tokenConsumers[0].loadJwks();
 
     // simulate a get request on the res server
     // authorizationCodeFlow get endpoint
@@ -136,9 +136,9 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_hook', async () =>
         }
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.tokenConsumers[issuer].loadConfig();
+    await resserver.tokenConsumers[0].loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.tokenConsumers[issuer].loadJwks();
+    await resserver.tokenConsumers[0].loadJwks();
 
     // simulate a get request on the res server
     // authorizationCodeFlow get endpoint

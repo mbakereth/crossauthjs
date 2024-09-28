@@ -74,9 +74,11 @@ declare global {
             interface Locals {
                 user?: User,
                 csrfToken?: string,
-                authType? : string,
+                //authType? : string,
+                authType : "cookie" | "oauth" | "oidc" | "apiKey" | undefined,
                 apiKey?: ApiKey,
                 accessTokenPayload?: {[key:string]:any},
+                idTokenPayload?: {[key:string]:any},
                 authError?: string,
                 authErrorDescription?: string,
                 sessionId? : string,

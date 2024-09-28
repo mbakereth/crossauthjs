@@ -57,9 +57,9 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_authorized', async (
         [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.tokenConsumers[issuer].loadConfig();
+    await resserver.tokenConsumers[0].loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.tokenConsumers[issuer].loadJwks();
+    await resserver.tokenConsumers[0].loadJwks();
     // @ts-ignore
     const reply : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token}
@@ -110,9 +110,9 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_endpoint', async () 
     let body;
 
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.tokenConsumers[issuer].loadConfig();
+    await resserver.tokenConsumers[0].loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.tokenConsumers[issuer].loadJwks();
+    await resserver.tokenConsumers[0].loadJwks();
     // @ts-ignore
     const reply : FastifyRequest = {
         headers: {authorization: "Bearer " + access_token}

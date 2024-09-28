@@ -93,7 +93,7 @@ export class Crypto {
      * @returns URF-8 text
      */
     static base64Decode(encoded : string) : string {
-        return Buffer.from(encoded, 'base64').toString('utf-8');
+        return Buffer.from(encoded, 'base64url').toString('utf-8');
     }
 
     /**
@@ -102,7 +102,7 @@ export class Crypto {
      * @returns Base64 text
      */
     static base64Encode(text : string) : string {
-        return Buffer.from(text, 'utf-8').toString('base64');
+        return Buffer.from(text, 'utf-8').toString('base64url');
     }
 
     /**
