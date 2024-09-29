@@ -56,7 +56,7 @@ export interface ReturnBase {
 
 /**
  * Return type for {@link SvelteKitUserEndpoints.verifyEmail}
- * {@link SvelteKitUserEndpoints.verifyEmailEndpoint} action. 
+ * {@link SvelteKitUserEndpoints.verifyEmailTokenEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */

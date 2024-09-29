@@ -56,11 +56,17 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
  * 
  * If you do set `protectedEndpoints` in 
  * {@link FastifyOAuthResourceServer.constructor}
- * then a `preHandler` iscreated.
+ * then a `preHandler` is created.
+ * 
+ * **Middleware**
+ * 
  * The preHandler
  * hook will set the `accessTokenPayload`, `user` and `scope` fields 
  * on the Fastify request object based on the content
  * of the access token in the `Authorization` header if it is valid.
+ * If a user storage is provided,
+ * it will be used to look the user up.  Otherwise a minimal user object
+ * is created.
  * If it is not valid it will set the `authError` and `authErrorDescription`.
  * If the access token is invalid, or there is an error, a 401 or 500
  * response is sent before executing your endpoint code.  As per
@@ -76,7 +82,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
     /**
      * Constructor
      * @param app the Fastify app
-     * @param tokenConsumers the token consumers, one per issuer
+     * @param tokenConsumers the token consumers, one per issuer and audience
      * @param options See {@link FastifyOAuthResourceServerOptions}
      */
     constructor(

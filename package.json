@@ -8,7 +8,7 @@
     "test": "echo 'No tests defined'",
     "test-all": "pnpm -r run testonce",
     "build-all": "pnpm -r build",
-    "doc": "typedoc --entryPoints packages/common packages/backend packages/fastify"
+    "doc": "typedoc --entryPoints packages/common packages/backend packages/fastify packages/frontend packages/sveltekit"
   },
   "author": "Matthew Baker",
   "devDependencies": {

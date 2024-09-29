@@ -7,7 +7,7 @@ const AUTOREFRESH_RETRIES = 2;
 const AUTOREFRESH_RETRY_INTERVAL_SECS = 30;
 
 /**
- * Used by {@link OAuthClient} and {@link OAuthBsffClient} to automatically
+ * Used by {@link OAuthClient} and {@link OAuthBffClient} to automatically
  * refresh access and ID tokens
  */
 export class OAuthAutoRefresher {

@@ -1,4 +1,5 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
+
 /**
  * A key (eg session ID, email reset token) as stored in a database table.
  * 
@@ -77,8 +78,7 @@ export function getJsonData(key : Key) : {[key:string]:any} {
  * Describes a user as fetched from the user storage (eg, database table),
  * excluding auto-generated fields such as an auto-generated ID
  * 
- * This is extendible with additional fields - provide them to the 
- * {@link @crossauth/backend!UserStorage} class as `extraFields`.
+ * This is extendible with additional fields.
  * 
  * You may want to do this if you want to pass additional user data back to the 
  * caller, eg real name.
@@ -112,9 +112,7 @@ export interface UserInputFields {
     admin? : boolean,
 
     /**
-     * This is included as any other fields in your user table will 
-     * automatically be added to the user object if they are included in 
-     * `extraFields` in {@link @crossauth/backend!UserStorage}.
+     * This allows you to add your own fields
      */
     [ key : string ] : any,
 }
@@ -193,7 +191,7 @@ export interface OAuthClient {
     /**
      * An array of OAuth flows allowed for this client.  
      * 
-     * See {@link @crossauth/common!OAuthFlows}.
+     * See {@link OAuthFlows}.
      */
     valid_flow : string[],
 

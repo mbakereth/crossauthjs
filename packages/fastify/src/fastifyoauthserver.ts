@@ -29,7 +29,7 @@ import {
     type User } from '@crossauth/common';
 import { FastifyServer, ERROR_500, DEFAULT_ERROR } from './fastifyserver';
 
-interface DevicePageData {
+export interface DevicePageData {
     authorizationNeeded?: {
         user: User,
         client_id : string,

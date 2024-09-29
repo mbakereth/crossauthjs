@@ -18,8 +18,8 @@ import { error, redirect } from '@sveltejs/kit';
 // Return types
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.searchClient}
- *  {@link SvelteKitAdminClientEndpoints.searchClient} load.
+ * Return type for {@link SvelteKitUserClientEndpoints.searchClients}
+ *  {@link SvelteKitAdminClientEndpoints.searchClients} load.
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
@@ -57,7 +57,7 @@ export type UpdateClientPageData = {
 
 /**
  * Return type for {@link SvelteKitUserClientEndpoints.updateClientEndpoint}
- *  {@link SvelteKitAdminClientEndpoints.updateClienEndpoint} actions.
+ *  {@link SvelteKitAdminClientEndpoints.updateClientEndpoint} actions.
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
@@ -72,7 +72,7 @@ export type UpdateClientFormData = {
 };
 
 /**
- * Return type for {@link SvelteKitUserClientEndpoints.createClientEndpoints}
+ * Return type for {@link SvelteKitUserClientEndpoints.createClientEndpoint}
  *  {@link SvelteKitAdminClientEndpoints.createClient} load.
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
@@ -284,7 +284,7 @@ export class SvelteKitSharedClientEndpoints {
      *      or the empty string.
      *   - `skip` the number to start returning from.  0 if not defined
      *   - `take` the maximum number to return.  10 if not defined.
-     * @param search overrides the search term from the query.
+     * @param searchTerm overrides the search term from the query.
      * @param skip overrides the skip term from the query
      * @param take overrides the take term from the query
      * 
@@ -402,7 +402,7 @@ export class SvelteKitSharedClientEndpoints {
      * 
      * @param event the Sveltekit request event.  The following are taken:
      *   - `client_id` from the URL path parameters
-     * @returns {@see UpdateClientPageData}
+     * @returns {@link UpdateClientPageData}
      */
     protected async loadClient_internal(event : RequestEvent) : Promise<UpdateClientPageData> {
         const client_id = event.params.client_id;
@@ -445,8 +445,8 @@ export class SvelteKitSharedClientEndpoints {
      *   - `redirect_uri` from the body form data (space-separated)
      *   - `confidential` from the body form data: 1, `on`, `yes` or `true` are true
      *   _ `resetSecret` if true (1, `on`, `yes` or `true`), create and return a new secret.  Ignored if not confidential
-     *   - Flow names from {@link @crossauth/common/OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
-     * @returns {@see UpdateClientFormData}.  If a new secret was created, it will be placed as plaintext in the client that is returned.
+     *   - Flow names from {@link @crossauth/common!OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
+     * @returns {@link UpdateClientFormData}.  If a new secret was created, it will be placed as plaintext in the client that is returned.
      */
     protected async updateClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<UpdateClientFormData> {
         
@@ -547,7 +547,7 @@ export class SvelteKitSharedClientEndpoints {
      * @param event the Sveltekit request event.  The following are taken:
      *   - `userid` from the body parameters parameters.  Ignored if `isAdmin` is false.  Can be undefined
      *   - 
-     * @returns {@see CreateClientPageData}.  
+     * @returns {@link CreateClientPageData}.  
      */
     protected async emptyClient_internal(event : RequestEvent, isAdmin : boolean) : Promise<CreateClientPageData> {
         try {
@@ -609,8 +609,8 @@ export class SvelteKitSharedClientEndpoints {
      *   - `client_name` from the body form data
      *   - `redirect_uri` from the body form data (space-separated)
      *   - `confidential` from the body form data: 1, `on`, `yes` or `true` are true
-     *   - Flow names from {@link @crossauth/common/OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
-     * @returns {@see UpdateClientFormData}.  If a secret was created, it will be placed as plaintext in the client that is returned.  A random `client_id` is created.
+     *   - Flow names from {@link @crossauth/common!OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
+     * @returns {@link UpdateClientFormData}.  If a secret was created, it will be placed as plaintext in the client that is returned.  A random `client_id` is created.
      */
     protected async createClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<CreateClientFormData> {
         
@@ -712,7 +712,7 @@ export class SvelteKitSharedClientEndpoints {
      * 
      * @param event the Sveltekit request event.  The following are taken:
      *   - `client_id` from the URL path parameters
-     * @returns {@see DeleteClientPageData}
+     * @returns {@link DeleteClientPageData}
      */
     protected async loadDeleteClient_internal(event : RequestEvent) : Promise<DeleteClientPageData> {
         const client_id = event.params.client_id;
@@ -747,7 +747,7 @@ export class SvelteKitSharedClientEndpoints {
      * 
      * @param event the Sveltekit request event.  The following are taken:
      *   - `client_id` from the URL path parameters
-     * @returns {@see DeleteClientFormData}
+     * @returns {@link DeleteClientFormData}
      */
     protected async deleteClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<DeleteClientFormData> {
         

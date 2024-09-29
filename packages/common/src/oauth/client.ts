@@ -190,7 +190,7 @@ export interface OAuthDeviceResponse {
  * Node.  This base class contains all the non-interpreter specific 
  * functionality.  What is missing is the cryptography which is included
  * in derived Node-only and Browser-only classes.  
- * See {@link @crossauth/backend!OAuthClientBackend}.
+ * See `@crossauth/backend/OAuthClientBackend`.
  * 
  * Flows supported are Authorization Code Flow with and without PKCE,
  * Client Credentials, Refresh Token, Password and Password MFA.  The
@@ -309,7 +309,7 @@ export abstract class OAuthClientBase {
      *        Otherwise, performs a fetch by appending
      *        `/.well-known/openid-configuration` to the 
      *        `authServerBaseUrl`.
-     * @throws {@link @crossauth/common!CrossauthError} with the following {@link @crossauth/common!ErrorCode}s
+     * @throws {@link CrossauthError} with the following {@link ErrorCode}s
      *   - `Connection` if data from the URL could not be fetched or parsed.
      */
     async loadConfig(oidcConfig? : OpenIdConfiguration) : Promise<void> {

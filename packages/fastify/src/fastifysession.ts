@@ -679,7 +679,7 @@ function defaultUpdateUser(user: User,
 // CLASSES
 
 /**
- * This class adds user endpoints to the Fastidfy session server.
+ * This class adds user endpoints to the Fastify session server.
  * 
  * You shouldn't have create create this directly - it is created by
  * {@link FastifyServer}.
@@ -750,7 +750,7 @@ function defaultUpdateUser(user: User,
  * be redirected to the page for entering the second factor.
  * 
  * For API endpoints., the response will be
- * `{"ok": true, "factor2Reqiored': true}`.  The user should then make a POST
+ * `{"ok": true, "factor2Required': true}`.  The user should then make a POST
  * request to the same endpoint but with the 2FA field in the body instead
  * of the original request body, eg `{"otp": 123456}`.  If the factor is
  * valid, the JSON data from the original post will be submittd.
@@ -772,6 +772,16 @@ function defaultUpdateUser(user: User,
  * If you are serving other endpoints, or you want to use something other than 
  * Nunjucks, you can create
  * and pass in your own Fastify app.
+
+ *  **Middleware**
+ *
+ *  This class registers one middleware function to fill in the following
+ *  fields in the request:
+ *
+ *     - `user` a {@link @crossauth/common!User}` object 
+ *     - `authType`: set to `cookie` or undefined 
+ *     - `csrfToken`: a CSRF token that can be used in POST requests
+ *     - `sessionId` a session ID if one is created
  */
 export class FastifySessionServer implements FastifySessionAdapter {
 

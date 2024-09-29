@@ -57,7 +57,7 @@ export interface Jwks {
 
 /**
  * This is the detault configuration for 
- * {@link @crossauth/backend!OAuthAuthorizationServer}.wellknown
+ * `@crossauth/backend/OAuthAuthorizationServer.wellknown`
  */
 export const DEFAULT_OIDCCONFIG : OpenIdConfiguration = {
     issuer: "",

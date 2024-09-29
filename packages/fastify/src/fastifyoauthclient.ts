@@ -732,7 +732,19 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
  * 
  * This pattern avoids you having to store the access token in the frontend.
  * 
- * **Endpoints provided by this class**
+ *  **Middleware**
+ *
+ *  This class provides middleware that works with the BFF method.
+ *
+ *  If an ID token is saved in the session and it is valid, the following
+ *  state attributes are set in the request object:
+ *
+ *     - `idPayload` the payload from the ID token
+ *     - `user` a :class:`crossauth_backend.User` object created from the ID
+ *        token
+ *     - `authType` set to `oidc`
+ *
+ *  **Endpoints provided by this class**
  * 
  * In addition to the BFF endpoints above, this class provides the following 
  * endpoints. The ENDPOINT column values can be overridden in 

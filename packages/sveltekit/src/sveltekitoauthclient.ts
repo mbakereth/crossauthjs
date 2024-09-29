@@ -71,7 +71,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * logged in here at the client.
      * 
      * In most cases you can ignore this and use 
-     * {@link SvelteKitsessionAdapterOptions.loginProtectedPageEndpoints}
+     * {@link SvelteKitSessionServerOptions.loginProtectedPageEndpoints}
      * to protect the endpoints that begin the flows.
      * 
      * See {@link @crossauth/common!OAuthFlows}.
@@ -165,7 +165,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 
     /**
      * Endpoints to provide to acces tokens through the BFF mechanism,
-     * See {@link FastifyOAuthClient} class documentation for full description.
+     * See {@link SvelteKitOAuthClient} class documentation for full description.
      */
     tokenEndpoints? : ("access_token"|"refresh_token"|"id_token"|
         "have_access_token"|"have_refresh_token"|"have_id_token")[],
@@ -601,6 +601,18 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * of these endpoints, eg `method`, you set `matchSubUrls` to true, then
  * `method/XXX`, `method/YYY` will match as well as `method`.
  * 
+ *  **Middleware**
+ *
+ *  This class provides middleware that works with the BFF method.
+ *
+ *  If an ID token is saved in the session and it is valid, the following
+ *  state attributes are set in the request object:
+ *
+ *     - `idPayload` the payload from the ID token
+ *     - `user` a :class:`crossauth_backend.User` object created from the ID
+ *        token
+ *     - `authType` set to `oidc`
+ *
  * **Endpoints provided by this class**
  * 
  * | Name                                  | Description                                                  | PageData (returned by load) or JSON returned by get/post                     | ActionData (return by actions)                                   | Form fields expected by actions or post/get input data          | 
@@ -672,7 +684,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     readonly error : any;
 
     /** 
-     * See {@link FastifyOAuthClientOptions}
+     * See {@link SvelteKitOAuthClientOptions}
      */
     loginProtectedFlows : string[] = [];
     private tokenResponseType :  
@@ -705,9 +717,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     private testEvent : RequestEvent|undefined = undefined;
     /**
      * Constructor
-     * @param server the {@link FastifyServer} instance
+     * @param server the {@link SvelteKitServer} instance
      * @param authServerBaseUrl the `iss` claim in the access token must match this value
-     * @param options See {@link FastifyOAuthClientOptions}
+     * @param options See {@link SvelteKitOAuthClientOptions}
      */
     constructor(server: SvelteKitServer,
         authServerBaseUrl: string,

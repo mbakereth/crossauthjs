@@ -139,7 +139,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * This class provides a complete (but without HTML files) auth backend server 
  * for Fastify applications
  * 
- * If you do not pass an Fastify app to this class, it will create one.  
+ * If you do not pass a Fastify app to this class, it will create one.  
  * By default, pages are rendered
  * with Nunjucks.  If you prefer another renderer that is compatible with 
  * Fastify, create your
@@ -161,7 +161,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * - `sessionServer`   Session cookie management server.  Uses sesion ID
  *                     and CSRF cookies.  See {@link FastifySessionServer}.
  * - `sessionAdapter`  If you want an OAuth client but not want to use
- *                     Fastify's session server, you can provide your own
+ *                     Crossauth's session server, you can provide your own
  *                     with this.  Won't work with auth server.
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link FastifyAuthorizationServer}
@@ -183,7 +183,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * **Authenticators**
  * 
  * One and two factor authentication is supported.  Authentication is provided
- * by classes implementing {@link Authenticator}.  They are passed as an 
+ * by classes implementing {@link @crossauth/backend!Authenticator}.  They are passed as an 
  * object to this class, keyed on the name that appears in the user record
  * as `factor1` or `factor2`.  
  * 

@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 /**
- * Indicates the type of error reported by {@link @crossauth/common!CrossauthError}
+ * Indicates the type of error reported by {@link CrossauthError}
  */
 export enum ErrorCode {
 
@@ -351,7 +351,7 @@ export class CrossauthError extends Error {
      * OAuth defines certain error types.  To convert the error in an OAuth
      * response into a CrossauthError object, call this function.
      * 
-     * @param error as returned by an OAuth call (converted to an {@link @crossauth/common!ErrorCode}).
+     * @param error as returned by an OAuth call (converted to an {@link ErrorCode}).
      * @param error_description as returned by an OAuth call (put in the `message`)
      * @returns a `CrossauthError` instance.
      */
@@ -399,7 +399,7 @@ export class CrossauthError extends Error {
      * it.  
      * If not and it is an object with `errorCode` in it, creates a 
      * CrossauthError from that and `errorMessage`, if present.
-     * Otherwise creates a `CrossauthError` object with {@link @crossauth/common!ErrorCode}
+     * Otherwise creates a `CrossauthError` object with {@link ErrorCode}
      * of `Unknown` from it, setting the `message` if possible.
      * 
      * @param e the error to convert.

@@ -27,7 +27,7 @@ export interface SvelteKitOAuthResourceServerOptions extends OAuthResourceServer
 
     /**
      * If you enabled `protectedEndpoints` in 
-     * {@link FastifyOAuthResourceServer.constructor}
+     * {@link SvelteKitOAuthResourceServer.constructor}
      * and the access token is invalid, a 401 reply will be sent before
      * your endpoint is hit.  This will be the body,  Default {}.
      */
@@ -49,17 +49,22 @@ export interface SvelteKitOAuthResourceServerOptions extends OAuthResourceServer
  * 
  * There are two way of using this class.  If you don't set
  * `protectedEndpoints` in 
- * {@link SvelteKitAuthResourceServer.constructor}, then in your
+ * {@link SvelteKitOAuthResourceServer.constructor}, then in your
  * protected endpoints, call {@link SvelteKitOAuthResourceServer.authorized}
  * to check if the access token is valid and get any user credentials.
  * 
  * If you do set `protectedEndpoints` in 
  * {@link SvelteKitOAuthResourceServer.constructor}
  * then a hook is created.
+ * 
+ * **Middleware**
  * The hook
  * hook will set the `accessTokenPayload`, `user` and `scope` fields 
  * on the event locals based on the content
  * of the access token in the `Authorization` header if it is valid.
+ * If a user storage is provided,
+ * it will be used to look the user up.  Otherwise a minimal user object
+ * is created.
  * If it is not valid it will set the `authError` and `authErrorDescription`.
  * If the access token is invalid, or there is an error, a 401 or 500
  * response is sent before executing your endpoint code.  As per
@@ -79,7 +84,7 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
 
     /**
      * Constructor
-     * @param tokenConsumers the token consumers, one per issuer
+     * @param tokenConsumers the token consumers, one per issuer and audience
      * @param options See {@link SvelteKitOAuthResourceServerOptions}
      */
     constructor(

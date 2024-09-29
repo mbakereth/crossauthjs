@@ -73,7 +73,7 @@ RouteId extends string | null = string
         baseUrl? : string} = {}) {
         this.cookies = new MockCookies(cookies, request);
         this.fetch = fetch;
-        this.locals = {};
+        this.locals = {authType: undefined};
         this.params = params;
         this.request = request;
         try {

@@ -2,7 +2,7 @@
 import { OAuthClientBase, CrossauthError, CrossauthLogger, j } from "@crossauth/common";
 
 /**
- * Used by {@link OAuthClient} and {@link OAuthBsffClient} to poll for 
+ * Used by {@link OAuthClient} and {@link OAuthBffClient} to poll for 
  * authorization in the device code flow
  */
 export class OAuthDeviceCodePoller {

@@ -100,7 +100,7 @@ function defaultIsAdminFn(user : User) : boolean {
  *                     and CSRF cookies.  See {@link SvelteKitSessionServer}.
  * - `sessionAdapter`  If you are using only the oAuthClient and don't want
  *                     to use Crossauth's session server, you can implement
- *                     a minimal {@link SveltekitSessionAdapter} instead.
+ *                     a minimal {@link SvelteKitSessionAdapter} instead.
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link SvelteKitAuthorizationServer}
  * - `oAuthClient`     OAuth client.  See {@link SvelteKitOAuthClient}.
@@ -158,7 +158,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * **Use in Pages**
  *
  * For instructions about how to use this class in your endpoints, see
- * {@link SvelkteKitUserEndpoints} and {@link SvelteKitAdminEndpoints}
+ * {@link SvelteKitUserEndpoints} and {@link SvelteKitAdminEndpoints}
  * for cookie-based session management.
  */
 export class SvelteKitServer {
@@ -223,7 +223,7 @@ export class SvelteKitServer {
      *     documentation).  The value is an object with a `keyStorage` field
      *     which must be present and should be the {@link KeyStorage} instance
      *     where API keys are stored.  A field called `options` whose
-     *     value is an {@link SveltekitApiKeyServerOptions} may also be
+     *     value is an {@link SvelteKitApiKeyServerOptions} may also be
      *     provided.
      *   - `oAuthAuthServer` if passed, instantiate the session server (see class
      *      documentation).  The value is an object with a `keyStorage` field
