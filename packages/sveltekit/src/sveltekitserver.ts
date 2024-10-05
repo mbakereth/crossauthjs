@@ -347,7 +347,7 @@ export class SvelteKitServer {
             this.oAuthResServer = new SvelteKitOAuthResourceServer( 
 
                 [new OAuthTokenConsumer(this.audience, options)],
-                {...oAuthResServer.options, ...options}
+                {sessionAdapter: this.sessionAdapter, ...oAuthResServer.options, ...options}
             )
         }
 
