@@ -417,7 +417,7 @@ export class FastifyServer {
             setParameter("audience", ParamType.String, this, options, "OAUTH_AUDIENCE", true);
             this.oAuthResServer = new FastifyOAuthResourceServer(this.app, 
                 [new OAuthTokenConsumer(this.audience, options)],
-                {...oAuthResServer.options, ...options}
+                {sessionAdapter: this.sessionAdapter, ...oAuthResServer.options, ...options}
             )
         }
     }
