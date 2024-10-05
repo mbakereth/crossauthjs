@@ -1625,7 +1625,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             for (let i in methods) {
                 this.server.app.route({
                     method: methods[i],
-                    url: this.prefix + this.bffEndpointName + url,
+                    url: this.prefix + this.bffEndpointName + route, // was url
                     handler: async (request : FastifyRequest<{Body: CsrfBodyType}>, 
                         reply : FastifyReply) =>  {
                         CrossauthLogger.logger.info(j({

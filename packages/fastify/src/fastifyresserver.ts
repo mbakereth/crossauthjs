@@ -14,6 +14,7 @@ import {
     UserStorage } from '@crossauth/backend';
 import type { OAuthResourceServerOptions } from '@crossauth/backend';
 import { OAuthTokenConsumer } from '@crossauth/backend';
+import { FastifySessionAdapter } from './fastifysessionadapter';
 
 /**
  * Options for {@link FastifyOAuthResourceServer}
@@ -40,6 +41,27 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
      * given scopes are not present.
      */
     protectedEndpoints? : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean}},
+
+    /**
+     * Where access tokens may be found (in this order).
+     * 
+     * If this contains `session`, must also provide the session adapter
+     * 
+     * Default `header`
+     */
+    tokenLocations? : ("beader"|"session")[]
+
+    /**
+     * If tokenLocations contains `session`, tokens are keyed on this name.
+     * 
+     * Default `oauth` 
+     */
+    sessionDataName? : string
+
+    /**
+     * If `tokenLocations` contains `session`, must provide a session adapter
+     */
+    sessionAdapter? : FastifySessionAdapter;
 }
 
 /**
@@ -79,6 +101,10 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
     private protectedEndpoints : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean}} = {};
     private errorBody : {[key:string]:any} = {};
 
+    private sessionDataName : string = "oauth";
+    private tokenLocations : ("header"|"session")[] = ["header"];
+    private sessionAdapter? : FastifySessionAdapter;
+
     /**
      * Constructor
      * @param app the Fastify app
@@ -92,7 +118,10 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
         super(tokenConsumers, options);
 
         setParameter("errorBody", ParamType.Json, this, options, "OAUTH_RESSERVER_ACCESS_DENIED_BODY");
+        setParameter("tokenLocations", ParamType.JsonArray, this, options, "OAUTH_TOKEN_LOCATIONS");
+        setParameter("sessionDataName", ParamType.String, this, options, "OAUTH_SESSION_DATA_NAME");
         this.userStorage = options.userStorage;
+        this.sessionAdapter = options.sessionAdapter;
 
         if (options.protectedEndpoints) {
             const regex = /^[!#\$%&'\(\)\*\+,\.\/a-zA-Z\[\]\^_`-]+/;
@@ -217,38 +246,69 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
         error? : string, 
         error_description?: string}|undefined> {
         try {
-            const header = request.headers.authorization;
-            if (header && header.startsWith("Bearer ")) {
-                const parts = header.split(" ");
-                if (parts.length == 2) {
-                    let user : User|undefined = undefined;
-                    const resp = await this.accessTokenAuthorized(parts[1]);
+            let payload : {[key:string]: any}|undefined = undefined;
+            for (let loc of this.tokenLocations) {
+                if (loc == "header") {
+                    const resp = await this.tokenFromHeader(request);
                     if (resp) {
-                        if (resp.sub && this.userStorage) {
-                            const userResp =
-                                await this.userStorage.getUserByUsername(resp.sub);
-                            if (userResp) user = userResp.user;
-                            request.user = user;
-                        } else if (resp.sub) {
-                            request.user = {
-                                id: resp.userid ?? resp.sub,
-                                username: resp.sub,
-                                state: resp.state ?? "active"
-
-                            }
-                        }
-                        return {authorized: true, tokenPayload: resp, user: user};
-                    } else {
-                        return {authorized: false};
+                        payload = resp;
+                        break;
+                    }
+                } else {
+                    const resp = await this.tokenFromSession(request);
+                    if (resp) {
+                        payload = resp;
+                        break;
                     }
                 }
+            }
+            let user : User|undefined = undefined;
+            if (payload) {
+                if (payload.sub && this.userStorage) {
+                    const userResp =
+                        await this.userStorage.getUserByUsername(payload.sub);
+                    if (userResp) user = userResp.user;
+                    request.user = user;
+                } else if (payload.sub) {
+                    request.user = {
+                        id: payload.userid ?? payload.sub,
+                        username: payload.sub,
+                        state: payload.state ?? "active"
 
-            }    
+                    }
+                }
+                return {authorized: true, tokenPayload: payload, user: user};
+            } else {
+                return {authorized: false};
+            }
+            
         } catch (e) {
             const ce = e as CrossauthError;
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.error(j({cerr: ce}));
             return {authorized: false, error: "server_error", error_description: ce.message};
+        }
+        return undefined;
+    }
+
+    private async tokenFromHeader(request : FastifyRequest) : Promise<{[key:string]: any}|undefined> {
+        const header = request.headers.authorization;
+        if (header && header.startsWith("Bearer ")) {
+            const parts = header.split(" ");
+            if (parts.length == 2) {
+                return await this.accessTokenAuthorized(parts[1]);
+            }
+        }    
+        return undefined;
+    }
+
+    private async tokenFromSession(request : FastifyRequest) : Promise<{[key:string]: any}|undefined> {
+        if (!this.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+            "Cannot get session data if sessions not enabled");
+        const oauthData =  await this.sessionAdapter.getSessionData(request, this.sessionDataName);
+        if (oauthData?.session_token) {
+            if (oauthData.expires_at && oauthData.expires_at < Date.now()) return undefined;
+            return await this.accessTokenAuthorized(oauthData.session_token);
         }
         return undefined;
     }

@@ -39,7 +39,7 @@ model UserSecrets {
 model Key {
     id             Int       @id @unique @default(autoincrement())
     value          String    @unique
-    userid        Int?
+    userid         Int?
     created        DateTime
     expires        DateTime
     data           String?
