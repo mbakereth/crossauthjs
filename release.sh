@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# = 0 ]; then
-    echo "bumpversion.txt 1|2|3"
+    echo "release,sh 1|2|3"
     echo "1 = major version"
     echo "2 = minor version"
     echo "3 = bug fix"
