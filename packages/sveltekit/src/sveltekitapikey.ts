@@ -7,7 +7,7 @@ import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
 /**
  * Options for {@link SvelteKitApiKeyServer }.
  * 
- * See {@link SveltekitApiKeyServer } constructor for description of parameters
+ * See {@link SvelteKitApiKeyServer } constructor for description of parameters
  */
 export interface SvelteKitApiKeyServerOptions extends ApiKeyManagerOptions {
     /** Pass the Sveltekit redirect function */
@@ -28,7 +28,7 @@ export interface SvelteKitApiKeyServerOptions extends ApiKeyManagerOptions {
  * They can be used in place of username/password login and session cookies.
  * 
  * This class adds a `preHandler` hook that sets the `user` field in the
- * Fastify request.  It also sets `scopes` in the request object if there
+ * SvelteKit request.  It also sets `scopes` in the request object if there
  * is a `scope` field in the JSON object in the `data` field in in the API
  * record in key storage.
  */
@@ -47,10 +47,9 @@ export class SvelteKitApiKeyServer {
     /**
      * Constructor
      * 
-     * @param app the Fastify app instance
      * @param userStorage the user storage with user accounts
      * @param keyStorage the storage for finding API keys
-     * @param options See {@link FastifyApiKeyServerOptions}
+     * @param options See {@link SvelteKitApiKeyServerOptions}
      */
     constructor(
         userStorage: UserStorage, 

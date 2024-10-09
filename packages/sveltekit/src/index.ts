@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 // Sveltekit
-export { SvelteKitSessionServer } from './sveltekitsession';
+export { SvelteKitSessionServer, type Header } from './sveltekitsession';
 export type { SvelteKitSessionServerOptions } from './sveltekitsession';
 export type {
     LoginReturn,
@@ -20,7 +20,8 @@ export type {
     SearchUsersReturn,
     AdminUpdateUserReturn,
     AdminCreateUserReturn,
-    AdminDeleteUserReturn as ADminDeleteUserReturn,
+    AdminDeleteUserReturn,
+    AdminChangePasswordReturn,
 } from './sveltekitadminendpoints';
 
 export { SvelteKitServer } from './sveltekitserver';
@@ -68,15 +69,22 @@ export { SvelteKitUserClientEndpoints } from './sveltekituserclientendpoints';
 export { SvelteKitAdminClientEndpoints } from './sveltekitadminclientendpoints';
 export { SvelteKitSessionAdapter } from './sveltekitsessionadapter';
 
+export { SvelteKitApiKeyServer, type SvelteKitApiKeyServerOptions } from './sveltekitapikey';
+
+export { SvelteKitAdminEndpoints } from './sveltekitadminendpoints';
+export { SvelteKitUserEndpoints } from './sveltekituserendpoints';
+
 declare global {
     namespace App {
             // interface Error {}
             interface Locals {
                 user?: User,
                 csrfToken?: string,
-                authType? : string,
+                //authType? : string,
+                authType : "cookie" | "oauth" | "oidc" | "apiKey" | undefined,
                 apiKey?: ApiKey,
                 accessTokenPayload?: {[key:string]:any},
+                idTokenPayload?: {[key:string]:any},
                 authError?: string,
                 authErrorDescription?: string,
                 sessionId? : string,

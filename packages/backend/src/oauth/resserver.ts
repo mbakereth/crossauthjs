@@ -16,8 +16,11 @@ export interface OAuthResourceServerOptions {
  */
 export class OAuthResourceServer {
     
-    /** The token consumer that validates the access tokens.  Required */
-    tokenConsumers : {[key:string] : OAuthTokenConsumer} = {};
+    /** The token consumer that validates the access tokens.
+     * Keyed on auth server base URL then audience.  The latter may be ""
+     * for none
+     */
+    tokenConsumers : OAuthTokenConsumer[]
 
     /**
      * Constructor
@@ -27,11 +30,7 @@ export class OAuthResourceServer {
      *        at present
      */
     constructor(tokenConsumers : OAuthTokenConsumer[], _options : OAuthResourceServerOptions = {}) {
-
-        for (let consumer of tokenConsumers) {
-            this.tokenConsumers[consumer.authServerBaseUrl] = consumer;
-
-        }
+        this.tokenConsumers = [...tokenConsumers]
     }
 
     /**
@@ -51,8 +50,13 @@ export class OAuthResourceServer {
         : Promise<{[key:string]: any}|undefined> {
             try {
                 const payload = jose.decodeJwt(accessToken);
-                if (payload.iss && payload.iss in this.tokenConsumers)
-                    return await this.tokenConsumers[payload.iss].tokenAuthorized(accessToken, "access");
+                for (let consumer of this.tokenConsumers) {
+                    if (payload.iss == consumer.authServerBaseUrl && 
+                        ((payload.aud == consumer.audience) ||
+                        (payload.aud == undefined && consumer.audience == ""))) {
+                            return await consumer.tokenAuthorized(accessToken, "access");        
+                    }
+                }
                 throw new CrossauthError(ErrorCode.Unauthorized, "Invalid issuer in access token");
             } catch (e) {
                 CrossauthLogger.logger.warn(j({err: e}));

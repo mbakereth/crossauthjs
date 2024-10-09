@@ -52,7 +52,7 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
     /**
      * Value passed to the constructor.  The `aud` claim must match it
      */
-    protected readonly audience : string;
+    readonly audience : string;
 
     /**
      * Value passed to the constructor. If true, access tokens are saved
@@ -69,16 +69,14 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
      * 
      * @param options see {@link OAuthTokenConsumerOptions}
      */
-    constructor(options : OAuthTokenConsumerOptions = {}) {
+    constructor(audience: string, options : OAuthTokenConsumerOptions = {}) {
 
         const options1 : {
             jwtKeyType? : string,
-            audience : string,
-        } = {audience: ""};
+        } = {};
         setParameter("jwtKeyType", ParamType.String, options1, options, "JWT_KEY_TYPE");
-        setParameter("audience", ParamType.String, options1, options, "OAUTH_AUDIENCE", true);
-        super(options1.audience, {...options, ...options1});
-        this.audience = options1.audience;
+        super(audience, {...options, ...options1});
+        this.audience = audience;
 
         setParameter("authServerBaseUrl", ParamType.String, this, options, "AUTH_SERVER_BASE_URL", true);
         setParameter("jwtSecretKeyFile", ParamType.String, this, options, "JWT_SECRET_KEY_FILE");
@@ -141,7 +139,6 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
      * @param token The token to validate
      * @param tokenType If defined, the `type` claim in the payload must
      *        match this value
-     * @returns 
      */
     async tokenAuthorized(token: string,
         tokenType: "access" | "refresh" | "id") : 

@@ -13,7 +13,7 @@ export abstract class OAuthTokenProvider {
 
     /**
      * Fetches the expiry times for each token.
-     * @param crfToken the CSRF token.  If emtpy
+     * @param csrfToken the CSRF token.  If emtpy
      * , one will be fetched before
      *        making the request
      * @returns for each token, either the expiry, `null` if it does not

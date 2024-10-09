@@ -26,7 +26,7 @@ import { SvelteKitServer } from './sveltekitserver';
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 
-type Header = {
+export type Header = {
     name: string,
     value: string
 };
@@ -329,7 +329,7 @@ function defaultUserValidator(user : UserInputFields) : string[] {
  * Takes any field beginning with `user_` and that is also in
  * `userEditableFields` (without the `user_` prefix).
  * 
- * @param request the fastify request
+ * @param event the SvelteKit request event
  * @param userEditableFields the fields a user may edit
  * @returns the new user
  */
@@ -373,7 +373,7 @@ function defaultCreateUser(event : RequestEvent,
  * `userEditableFields` (without the `user_` prefix).
  * 
  * @param user the user to update
- * @param request the fastify request
+ * @param event the SvelteKit request event
  * @param userEditableFields the fields a user may edit
  * @returns the new user
  */
@@ -408,7 +408,17 @@ function defaultUpdateUser(user: User,
  * The Sveltekit session server.
  * 
  * You shouldn't have to instantiate this directly.  It is created when
- * you create a {@link SveltekitServer} object.
+ * you create a {@link SvelteKitServer} object.
+
+ *  **Middleware**
+ *
+ *  This class registers one middleware function to fill in the following
+ *  fields in the request:
+ *
+ *     - `user` a {@link @crossauth/common!User}` object 
+ *     - `authType`: set to `cookie` or undefined 
+ *     - `csrfToken`: a CSRF token that can be used in POST requests
+ *     - `sessionId` a session ID if one is created
  */
 export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
 
@@ -449,7 +459,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     /**
      * Funtion to validate users upon creation.  Taken from the options during 
      * construction or the default value.
-     * See {@link FastifySessionServerOptions}.
+     * See {@link SvelteKitSessionServerOptions}.
      */
     validateUserFn : (user : UserInputFields) 
         => string[] = defaultUserValidator;
@@ -457,7 +467,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     /**
      * Funtion to create a user record from form fields.  Taken from the options during 
      * construction or the default value.
-     * See {@link FastifySessionServerOptions}.
+     * See {@link SvelteKitSessionServerOptions}.
      */
     createUserFn: (event : RequestEvent,
         data : {[key:string]: string|undefined},
@@ -466,7 +476,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     /**
      * Funtion to update a user record from form fields.  Taken from the options during 
      * construction or the default value.
-     * See {@link FastifySessionServerOptions}.
+     * See {@link SvelteKitSessionServerOptions}.
      */
     updateUserFn: (user: User,
         event: RequestEvent,
@@ -475,7 +485,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
 
     /**
      * The set of authenticators taken from constructor args.
-     * See {@link FastifySessionServer.constructor}.
+     * See {@link SvelteKitSessionServer.constructor}.
      */
     readonly authenticators: {[key:string]: Authenticator};
 
@@ -749,7 +759,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         this.twoFAHook = async ({ event }) => {
             CrossauthLogger.logger.debug(j({msg: "twoFAHook" , username: event.locals.user?.username}) );
 
-            if (!this.userStorage) throw this.error(500, "No user storage defined"); // shouldn't happen as checked in FastifyServer
+            if (!this.userStorage) throw this.error(500, "No user storage defined"); // shouldn't happen as checked in SvelteKitServer
             const sessionCookieValue = this.getSessionCookieValue(event);
             const isFactor2PageProtected = this.isFactor2PageProtected(event);
             const isFactor2ApiProtected = this.isFactor2ApiProtected(event);
@@ -951,7 +961,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     /**
      * Sets headers in the request event.
      * 
-     * Used internally by {@link SveltekitServer}.  Shouldn't be necessary
+     * Used internally by {@link SvelteKitServer}.  Shouldn't be necessary
      * to call this directly.
      * @param headers the headres to set
      * @param resp the response object to set them in
@@ -1108,7 +1118,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     /**
      * Returns a hash of the session ID.  Used for logging (for security,
      * the actual session ID is not logged)
-     * @param request the Fastify request
+     * @param event the Sveltekit request event
      * @returns hash of the session ID
      */
     getHashOfSessionId(event : RequestEvent) : string {
@@ -1289,8 +1299,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      * with a user (`userid` is undefined).  It can be used to persist
      * data between sessions just like a regular user session ID.
      * 
-     * @param request the Fastify request
-     * @param reply the Fastify reply
+     * @param event the SvelteKit reqzest event
      * @param data session data to save
      * @returns the session cookie value
      */

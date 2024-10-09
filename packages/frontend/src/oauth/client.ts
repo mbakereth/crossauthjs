@@ -91,7 +91,7 @@ export class OAuthClient extends OAuthClientBase {
      *   - `deviceAuthorization` URL, relative to the authorization server base, 
      *      for starting the device code flow.  Default `device_authorization`
      *      Default is `/devicecodepoll`
-     *  For other options see {@link @crossauth/common/OAuthClientBase}.
+     *  For other options see {@link OAuthClientBase}.
      */
     constructor(options  : {
             authServerBaseUrl : string,
@@ -266,14 +266,9 @@ export class OAuthClient extends OAuthClientBase {
      * endpoint is called.  Depending on whether that returned an error,
      * either `receiveTokenFn` or `errorFn` will be called.
      * 
-     * @param receiveTokenFn if defined, called if a token is returned.
-     *        
-     * @param errorFn if defined, called if any OAuth endpoint returned `error`, 
-     *        or if the `state` was not correct.
-     * 
-     * @returns the result of `receiveTokenFn`, `errorFn` or `undefined`.  If
-     *          `receiveTokenFn`/`errorFn` is not defined, rather than calling
-     *          it, this function just returns the OAuth response.
+     * @returns the result of `receiveTokenFn` or undefined if there was
+     *          neither a code in the URL search params nor an error `undefined`.  If
+     * @throws CrossauthError if an `error` was passed in the URL search params
      *       
      */
     async handleRedirectUri() : Promise<any|undefined> {
@@ -306,8 +301,8 @@ export class OAuthClient extends OAuthClientBase {
             throw cerr;
         }
 
-            await this.receiveTokens(resp);
-            return resp;
+        await this.receiveTokens(resp);
+        return resp;
     }
 
     /**
@@ -331,8 +326,8 @@ export class OAuthClient extends OAuthClientBase {
 
     /**
      * Turns polling for a device code
-     * @param tokensToFetch which tokens to fetch
-     * @param errorFn what to call in case of error
+     * @param deviceCode the device code to poll for (this was returned when the device code flow was started)
+     * @param pollResultFn called with the result of each poll
      */
     async startDeviceCodePolling(deviceCode : string, 
         pollResultFn : (status: ("complete"|"completeAndRedirect"|"authorization_pending"|"expired_token"|"error"), error? : string, location? : string) => void, interval : number = 5) {
@@ -436,9 +431,8 @@ export class OAuthClient extends OAuthClientBase {
 
     /**
      * Fetches the expiry times for each token.
-     * @param crfToken the CSRF token.  If emtpy
-     * , one will be fetched before
-     *        making the request
+     * @param _tokensToFetch unused
+     * @param _csrfToken unused
      * @returns for each token, either the expiry, `null` if it does not
      *          expire, or `undefined` if the token does not exist
      */
@@ -565,7 +559,7 @@ export class OAuthClient extends OAuthClientBase {
     // Wrap flow functions
 
     /**
-     * See {@link @crossuath/common!OAuthClientBase}.  Calls the base function
+     * See {@link OAuthClientBase}.  Calls the base function
      * then saves the tokens, as per the requested method
      * @param scope 
      */
@@ -577,7 +571,7 @@ export class OAuthClient extends OAuthClientBase {
     }
 
     /**
-     * See {@link @crossuath/common!OAuthClientBase}.  Calls the base function
+     * See {@link OAuthClientBase}.  Calls the base function
      * then saves the tokens, as per the requested method
      * @param scope 
      */
@@ -591,7 +585,7 @@ export class OAuthClient extends OAuthClientBase {
         }
 
     /**
-     * See {@link @crossuath/common!OAuthClientBase}.  Calls the base function
+     * See {@link OAuthClientBase}.  Calls the base function
      * then saves the tokens, as per the requested method
      * @param scope 
      */
@@ -605,9 +599,11 @@ export class OAuthClient extends OAuthClientBase {
         }
 
     /**
-     * See {@link @crossuath/common!OAuthClientBase}.  Calls the base function
+     * See {@link OAuthClientBase}.  Calls the base function
      * then saves the tokens, as per the requested method
-     * @param scope 
+     * @param mfaToken the MFA token returned when the flow was started
+     * @param otp the One time password entered by the user
+     * @return the response from the MFA OTP OAuth call
      */
     async mfaOtpComplete(
         mfaToken: string,
@@ -627,11 +623,12 @@ export class OAuthClient extends OAuthClientBase {
         }
 
     /**
-     * See {@link @crossuath/common!OAuthClientBase}.  Calls the base function
+     * See {@link OAuthClientBase}.  Calls the base function
      * then saves the tokens, as per the requested method
-     * @param scope 
+     * @param mfaToken the MFA token returned when the flow was started
+     * @param oobCode the code entered by the user
+     * @return the response from the MFA OOB OAuth call
      */
-
     async mfaOobComplete(mfaToken: string,
         oobCode: string,
         bindingCode: string) : Promise<OAuthTokenResponse> {
@@ -641,9 +638,10 @@ export class OAuthClient extends OAuthClientBase {
     }
 
     /**
-     * See {@link @crossuath/common!OAuthClientBase}.  Calls the base function
+     * See {@link OAuthClientBase}.  Calls the base function
      * then saves the tokens, as per the requested method
-     * @param scope 
+     * @param refreshToken  the refresh token.  Do not pass this if you have
+     * it stored in this object already
      */
     async refreshTokenFlow(refreshToken? : string) : 
         Promise<OAuthTokenResponse> {

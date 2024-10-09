@@ -2228,6 +2228,7 @@ export class OAuthAuthorizationServer {
             // create id token payload
             const idokenJti = Crypto.uuid();
             let idTokenPayload : {[key:string]: any} = {
+                aud: client.client_id,
                 jti: idokenJti,
                 iat: timeCreated,
                 iss: this.oauthIssuer,

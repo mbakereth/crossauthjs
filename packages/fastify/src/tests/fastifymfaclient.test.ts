@@ -215,8 +215,7 @@ test('FastifyOAuthClient.Mfa.otp', async () => {
      }});
     body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
-    expect(body.template).toBe("mfaotp.njk");
-    expect(body.args.mfa_token).toBe(firstTokenResponse.mfa_token);
+    expect(body.mfa_token).toBe(firstTokenResponse.mfa_token);
 
     // Call passwordotp to completre MFA
     const maxTries = 2;
@@ -321,9 +320,8 @@ test('FastifyOAuthClient.Mfa.oob', async () => {
      }});
     body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
-    expect(body.template).toBe("mfaoob.njk");
-    expect(body.args.mfa_token).toBe(firstTokenResponse.mfa_token);
-    const oobCode = body.args.oob_code;
+    expect(body.mfa_token).toBe(firstTokenResponse.mfa_token);
+    const oobCode = body.oob_code;
 
     // Call passwordoob to completre MFA
     const maxTries = 2;

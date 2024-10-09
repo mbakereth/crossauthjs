@@ -100,7 +100,7 @@ function defaultIsAdminFn(user : User) : boolean {
  *                     and CSRF cookies.  See {@link SvelteKitSessionServer}.
  * - `sessionAdapter`  If you are using only the oAuthClient and don't want
  *                     to use Crossauth's session server, you can implement
- *                     a minimal {@link SveltekitSessionAdapter} instead.
+ *                     a minimal {@link SvelteKitSessionAdapter} instead.
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link SvelteKitAuthorizationServer}
  * - `oAuthClient`     OAuth client.  See {@link SvelteKitOAuthClient}.
@@ -158,7 +158,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * **Use in Pages**
  *
  * For instructions about how to use this class in your endpoints, see
- * {@link SvelkteKitUserEndpoints} and {@link SvelteKitAdminEndpoints}
+ * {@link SvelteKitUserEndpoints} and {@link SvelteKitAdminEndpoints}
  * for cookie-based session management.
  */
 export class SvelteKitServer {
@@ -207,6 +207,8 @@ export class SvelteKitServer {
     /** OAuth resource server instance */
     readonly oAuthResServer? : SvelteKitOAuthResourceServer;
 
+    private audience = "";
+
     /**
      * Constructor.
      * 
@@ -221,7 +223,7 @@ export class SvelteKitServer {
      *     documentation).  The value is an object with a `keyStorage` field
      *     which must be present and should be the {@link KeyStorage} instance
      *     where API keys are stored.  A field called `options` whose
-     *     value is an {@link SveltekitApiKeyServerOptions} may also be
+     *     value is an {@link SvelteKitApiKeyServerOptions} may also be
      *     provided.
      *   - `oAuthAuthServer` if passed, instantiate the session server (see class
      *      documentation).  The value is an object with a `keyStorage` field
@@ -341,9 +343,11 @@ export class SvelteKitServer {
         
 
         if (oAuthResServer) {
+            setParameter("audience", ParamType.String, this, options, "OAUTH_AUDIENCE", true);
             this.oAuthResServer = new SvelteKitOAuthResourceServer( 
-                [new OAuthTokenConsumer(options)],
-                {...oAuthResServer.options, ...options}
+
+                [new OAuthTokenConsumer(this.audience, options)],
+                {sessionAdapter: this.sessionAdapter, ...oAuthResServer.options, ...options}
             )
         }
 
@@ -400,6 +404,11 @@ export class SvelteKitServer {
             // API server hook
             if (this.apiKeyServer) {
                 await this.apiKeyServer.hook({event});
+            }
+
+            // OAuth client hook
+            if (this.oAuthClient) {
+                await this.oAuthClient.hook({event});
             }
 
             // OAuth res server hook

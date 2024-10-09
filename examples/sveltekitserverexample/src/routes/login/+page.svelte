@@ -43,7 +43,7 @@
         <input type="password" id="password" name="password" class="input input-bordered w-full max-w-xs mb-4" placeholder="Password"><br>
 
         <button class="btn btn-primary" type="submit">Log in</button>
-        <p class="mt-3 mb-3 text-muted"><a href="/passwordreset">Forgot Password</a></p> 
+        <p class="mt-3 mb-3 text-muted"><a href="/resetpassword">Forgot Password</a></p> 
     </form>
 {/if}
 

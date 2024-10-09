@@ -467,8 +467,7 @@ export class SessionManager {
      * The `data` field in the session entry is assumed to be a JSON string.
      * The field with the given name is updated or set if not already set.
      * @param sessionId the session Id to update.
-     * @param name of the field.
-     * @param value new value to store
+     * @param dataArray names and values.
      */
         async updateManySessionData(sessionId: string,
             dataArray: {dataName: string, value: any }[]) : Promise<void> {

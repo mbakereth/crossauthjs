@@ -144,9 +144,7 @@ export class DummyFactor2Authenticator extends Authenticator {
 
     /**
      * Creates and emails a new one-time code.
-     * @param user the user to create it for.  Uses the `email` field if 
-     *             present, `username` otherwise (which in this case is 
-     *             expected to contain an email address)
+     * @param _user ignored
      * @returns `otp` and `expiry` as a Unix time (number).
      */
     async createOneTimeSecrets(_user : User) : 

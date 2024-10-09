@@ -103,6 +103,12 @@ export interface FastifyServerOptions extends
 
     isAdminFn?: (user : User) => boolean;
 
+    /**
+     * Config for `@fastify/cors`
+     */
+    cors? : {[key:string]:any}
+
+
 };
 
 /**
@@ -133,7 +139,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * This class provides a complete (but without HTML files) auth backend server 
  * for Fastify applications
  * 
- * If you do not pass an Fastify app to this class, it will create one.  
+ * If you do not pass a Fastify app to this class, it will create one.  
  * By default, pages are rendered
  * with Nunjucks.  If you prefer another renderer that is compatible with 
  * Fastify, create your
@@ -155,7 +161,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * - `sessionServer`   Session cookie management server.  Uses sesion ID
  *                     and CSRF cookies.  See {@link FastifySessionServer}.
  * - `sessionAdapter`  If you want an OAuth client but not want to use
- *                     Fastify's session server, you can provide your own
+ *                     Crossauth's session server, you can provide your own
  *                     with this.  Won't work with auth server.
  * - `oAuthAuthServer` OAuth authorization server.  See 
  *                     {@link FastifyAuthorizationServer}
@@ -177,7 +183,7 @@ function defaultIsAdminFn(user : User) : boolean {
  * **Authenticators**
  * 
  * One and two factor authentication is supported.  Authentication is provided
- * by classes implementing {@link Authenticator}.  They are passed as an 
+ * by classes implementing {@link @crossauth/backend!Authenticator}.  They are passed as an 
  * object to this class, keyed on the name that appears in the user record
  * as `factor1` or `factor2`.  
  * 
@@ -221,6 +227,8 @@ export class FastifyServer {
 
     /** Config for `@fastify/cors` */
     private cors : {[key:string]:any} | undefined;
+
+    private audience : string = "";
 
     /**
      * Integrates fastify session, API key and OAuth servers
@@ -405,9 +413,11 @@ export class FastifyServer {
         }
 
         if (oAuthResServer) {
+            this.audience = ""
+            setParameter("audience", ParamType.String, this, options, "OAUTH_AUDIENCE", true);
             this.oAuthResServer = new FastifyOAuthResourceServer(this.app, 
-                [new OAuthTokenConsumer(options)],
-                {...oAuthResServer.options, ...options}
+                [new OAuthTokenConsumer(this.audience, options)],
+                {sessionAdapter: this.sessionAdapter, ...oAuthResServer.options, ...options}
             )
         }
     }
@@ -458,15 +468,17 @@ export class FastifyServer {
             try {
                 if (errorFn) {
                     const ce = CrossauthError.asCrossauthError(e);
-                    return errorFn(this, request, reply, ce);
+                    return {error: true, reply: await errorFn(this, request, reply, ce)};
                 } else if (this.sessionServer?.errorPage) {
+                    const ce = new CrossauthError(ErrorCode.InvalidCsrf, "CSRF Token not provided")
                     return {error: true, reply: reply.status(401)
                         .view(this.sessionServer?.errorPage??"",
                         {
-                            errorMessage: "CSRF Token not provided",
-                            status: 401,
-                            code: ErrorCode.InvalidCsrf,
-                            codeName: ErrorCode[ErrorCode.InvalidCsrf]
+                            errorMessage: ce.message,
+                            errorMessages: ce.messages,
+                            status: ce.httpStatus,
+                            errorCode: ErrorCode.InvalidCsrf,
+                            errorCodeName: ErrorCode[ErrorCode.InvalidCsrf]
                         })};
                 }
             } catch (e2) {

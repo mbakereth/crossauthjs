@@ -80,13 +80,15 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_authorized', async
     // create resource server
     const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
     const resserver = new SvelteKitOAuthResourceServer(
-        [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver",
+            {authServerBaseUrl: issuer})],
         {userStorage}
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.tokenConsumers[issuer].loadConfig();
+    await resserver.tokenConsumers[0].loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.tokenConsumers[issuer].loadJwks();
+    await resserver.tokenConsumers[0].loadJwks();
 
     // simulate a get request on the res server
     // authorizationCodeFlow get endpoint
@@ -127,7 +129,9 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_hook', async () =>
     // create resource server
     const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
     const resserver = new SvelteKitOAuthResourceServer(
-        [new OAuthTokenConsumer({authServerBaseUrl: issuer})],
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver",
+            {authServerBaseUrl: issuer})],
         {
             userStorage,
             protectedEndpoints: {
@@ -136,9 +140,9 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_hook', async () =>
         }
     );
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
-    await resserver.tokenConsumers[issuer].loadConfig();
+    await resserver.tokenConsumers[0].loadConfig();
     fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
-    await resserver.tokenConsumers[issuer].loadJwks();
+    await resserver.tokenConsumers[0].loadJwks();
 
     // simulate a get request on the res server
     // authorizationCodeFlow get endpoint

@@ -19,7 +19,7 @@ import {
 import type { OAuthClientOptions } from '@crossauth/backend';
 import { SvelteKitServer } from './sveltekitserver';
 import { json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
+import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 
 export type SvelteKitErrorFn = (server: SvelteKitServer,
@@ -71,7 +71,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * logged in here at the client.
      * 
      * In most cases you can ignore this and use 
-     * {@link SvelteKitsessionAdapterOptions.loginProtectedPageEndpoints}
+     * {@link SvelteKitSessionServerOptions.loginProtectedPageEndpoints}
      * to protect the endpoints that begin the flows.
      * 
      * See {@link @crossauth/common!OAuthFlows}.
@@ -165,7 +165,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
 
     /**
      * Endpoints to provide to acces tokens through the BFF mechanism,
-     * See {@link FastifyOAuthClient} class documentation for full description.
+     * See {@link SvelteKitOAuthClient} class documentation for full description.
      */
     tokenEndpoints? : ("access_token"|"refresh_token"|"id_token"|
         "have_access_token"|"have_refresh_token"|"have_id_token")[],
@@ -185,6 +185,11 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * not the other, set this variable.
      */
     validFlows? : string[],
+
+    /**
+     * These token types will be treated as JWT.  Default all of them
+     */
+    jwtTokens?: ("access"|"id"|"refresh")[]
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -252,17 +257,20 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
 }
 
 async function sendJson(oauthResponse: OAuthTokenResponse,
-    _client: SvelteKitOAuthClient,
+    client: SvelteKitOAuthClient,
     _event: RequestEvent,
     _silent?: boolean) : Promise<Response|undefined> {
-        return json({ok: true, ...oauthResponse, 
-            id_payload: decodePayload(oauthResponse.id_token)})
+        let resp : {[key:string]:any} = {ok: true, ...oauthResponse};
+        if (client.jwtTokens.includes("id")) {
+            resp["id_payload"] = decodePayload(oauthResponse.id_token);
+        }
+        return json(resp)
 }
 
-function logTokens(oauthResponse: OAuthTokenResponse) {
+function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
     if (oauthResponse.access_token) {
         try {
-            if (oauthResponse.access_token) {
+            if (oauthResponse.access_token && jwtTokens.includes("access")) {
                 const jti = jwtDecode(oauthResponse.access_token)?.jti;
                 const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got access token", 
@@ -274,7 +282,7 @@ function logTokens(oauthResponse: OAuthTokenResponse) {
     }
     if (oauthResponse.id_token) {
         try {
-            if (oauthResponse.id_token) {
+            if (oauthResponse.id_token && jwtTokens.includes("id")) {
                 const jti = jwtDecode(oauthResponse.id_token)?.jti;
                 const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got id token", 
@@ -284,7 +292,7 @@ function logTokens(oauthResponse: OAuthTokenResponse) {
             CrossauthLogger.logger.debug(j({err: e}));
         }
     }
-    if (oauthResponse.refresh_token) {
+    if (oauthResponse.refresh_token && jwtTokens.includes("refresh")) {
         try {
             if (oauthResponse.refresh_token) {
                 const jti = jwtDecode(oauthResponse.refresh_token)?.jti;
@@ -308,7 +316,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
 
         }
         let expires_in = oauthResponse.expires_in;
-        if (!expires_in && oauthResponse.access_token) {
+        if (!expires_in && oauthResponse.access_token && client.jwtTokens.includes("access")) {
             const payload = jwtDecode(oauthResponse.access_token);
             if (payload.exp) expires_in = payload.exp;
         }
@@ -317,6 +325,11 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
                 "OAuth server did not return an expiry for the access token");
         }
         const expires_at = Date.now() + (expires_in)*1000;
+        let sessionData : {[key:string]:any}= {...oauthResponse, expires_at }
+        if ("id_token" in oauthResponse) {
+            let payload = decodePayload(oauthResponse["id_token"]);
+            if (payload) sessionData["id_token"] = payload;
+        }
         if (client.server.sessionServer) {
             // if we are using Crossauth's session server and there is nop
             // session, we can create an anonymous one.
@@ -327,7 +340,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
             if (!sessionCookieValue) {
                 sessionCookieValue = 
                     await client.server.sessionServer?.createAnonymousSession(event,
-                        { [client.sessionDataName]: {...oauthResponse, expires_at} });
+                        { [client.sessionDataName]: sessionData });
             } else {
                 /*const existingData = 
                     await client.server.sessionAdapter?.getSessionData(event, client.sessionDataName);
@@ -336,7 +349,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
                     { ...existingData??{},  ...oauthResponse, expires_at });*/
                 await client.server.sessionAdapter?.updateSessionData(event,
                     client.sessionDataName,
-                    {...oauthResponse, expires_at });
+                    sessionData);
 
             }
         } else {
@@ -348,7 +361,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
 
             await client.server.sessionAdapter?.updateSessionData(event,
                 client.sessionDataName,
-                { ...oauthResponse, expires_at });
+                sessionData);
 
         }
 
@@ -365,7 +378,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
         return client.errorFn(client.server, event, ce);
     }
 
-    logTokens(oauthResponse);
+    logTokens(oauthResponse, client.jwtTokens);
 
     try {
         if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
@@ -393,7 +406,7 @@ async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
         return client.errorFn(client.server, event, ce);
     }
 
-    logTokens(oauthResponse);
+    logTokens(oauthResponse, client.jwtTokens);
 
     try {
         if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
@@ -424,17 +437,21 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
         }
     }
 
-    logTokens(oauthResponse);
+    logTokens(oauthResponse, client.jwtTokens);
 
     try {
         if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
             await updateSessionData(oauthResponse, client, event);
         }
 
-    return {
+    let resp : TokenReturn = {
         ok: true,
         ...oauthResponse,
-        id_payload: decodePayload(oauthResponse.id_token)}
+    }
+    if (client.jwtTokens.includes("id")) {
+        resp["id_payload"] = decodePayload(oauthResponse.id_token)
+    }
+    return resp;
     } catch (e) {
         if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
         const ce =CrossauthError.asCrossauthError(e);
@@ -449,7 +466,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
 }
 
 async function sendInPage(oauthResponse: OAuthTokenResponse,
-    _client: SvelteKitOAuthClient,
+    client: SvelteKitOAuthClient,
     _event: RequestEvent,
     _silent: boolean,
     ) : Promise<TokenReturn|undefined> {
@@ -461,14 +478,17 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
         }
     }
 
-    logTokens(oauthResponse);
+    logTokens(oauthResponse, client.jwtTokens);
 
     try {
 
-        return {
+        let resp : TokenReturn = {
             ok: true,
-            ...oauthResponse,
-            id_payload: decodePayload(oauthResponse.id_token)}
+            ...oauthResponse};
+        if (client.jwtTokens.includes("id")) {
+            resp["id_payload"] = decodePayload(oauthResponse.id_token);
+        }
+        return resp;
         } catch (e) {
             if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             const ce =CrossauthError.asCrossauthError(e);
@@ -581,6 +601,18 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * of these endpoints, eg `method`, you set `matchSubUrls` to true, then
  * `method/XXX`, `method/YYY` will match as well as `method`.
  * 
+ *  **Middleware**
+ *
+ *  This class provides middleware that works with the BFF method.
+ *
+ *  If an ID token is saved in the session and it is valid, the following
+ *  state attributes are set in the request object:
+ *
+ *     - `idPayload` the payload from the ID token
+ *     - `user` a :class:`crossauth_backend.User` object created from the ID
+ *        token
+ *     - `authType` set to `oidc`
+ *
  * **Endpoints provided by this class**
  * 
  * | Name                                  | Description                                                  | PageData (returned by load) or JSON returned by get/post                     | ActionData (return by actions)                                   | Form fields expected by actions or post/get input data          | 
@@ -616,11 +648,11 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | allBffEndpoint                        | BFF resource server request.  See class documentation        | As per the corresponding resource server endpoint                            | As per the correspoinding resource server endpoint               | As per the corresponding resource server endpoint               |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | accessTokenEndpoint                   | For BFF only, return the access token payload or error       | JSON of the access token payload                                             | *Not provided*                                                   |                                                                 |  
+ * | accessTokenEndpoint                   | For BFF only, return the access token payload or error       | JSON of the access token payload                                             | *Not provided*                                                   | `decode`, default `true`                                        |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | refreshTokenEndpoint                  | For BFF only, return the refresh token payload or error      | JSON of the refresh token payload                                            | *Not provided*                                                   |                                                                 |  
+ * | refreshTokenEndpoint                  | For BFF only, return the refresh token payload or error      | JSON of the refresh token payload                                            | *Not provided*                                                   | `decode`, default `true`                                        |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | idTokenEndpoint                       | For BFF only, return the id token payload or error           | POST: JSON of the id token payload                                           | *Not provided*                                                   |                                                                 |  
+ * | idTokenEndpoint                       | For BFF only, return the id token payload or error           | POST: JSON of the id token payload                                           | *Not provided*                                                   | `decode`, default `true`                                        |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | havAeccessTokenEndpoint               | For BFF only, return whether access token present            | POST: `ok` of false or true                                                  | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
@@ -628,7 +660,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | haveIdTokenEndpoint                   | For BFF only, return whether id token present                | POST: `ok` of false or true                                                  | *Not provided*                                                   |                                                                 |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
- * | tokensEndpoint                        | For BFF only, return a JSON object of all of the above       | POST: All of the above, keyed on `access_token`, `have_access_token`, etc.   | *Not provided*                                                   |                                                                 |  
+ * | tokensEndpoint                        | For BFF only, return a JSON object of all of the above       | POST: All of the above, keyed on `access_token`, `have_access_token`, etc.   | *Not provided*                                                   | `decode`, default `true`                                        |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | deleteTokensEndpoint                  | For BFF only, deletes tokens saved for session               | POST:  `ok` of false or true                                                 | `default`: `ok` of false or true                                 | *None*                                                          |  
  * | ------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
@@ -652,7 +684,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     readonly error : any;
 
     /** 
-     * See {@link FastifyOAuthClientOptions}
+     * See {@link SvelteKitOAuthClientOptions}
      */
     loginProtectedFlows : string[] = [];
     private tokenResponseType :  
@@ -678,12 +710,16 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     private tokenEndpoints : string[] = [];
     private bffMaxTries : number = 1;
     private bffSleepMilliseconds : number = 500;
-    
+    readonly jwtTokens : string[] = ["access", "id", "refresh"]
+    readonly hook : (input: {event: RequestEvent}) => MaybePromise<Response|undefined>;
+    private testMiddleware = false;
+    // @ts-ignore
+    private testEvent : RequestEvent|undefined = undefined;
     /**
      * Constructor
-     * @param server the {@link FastifyServer} instance
+     * @param server the {@link SvelteKitServer} instance
      * @param authServerBaseUrl the `iss` claim in the access token must match this value
-     * @param options See {@link FastifyOAuthClientOptions}
+     * @param options See {@link SvelteKitOAuthClientOptions}
      */
     constructor(server: SvelteKitServer,
         authServerBaseUrl: string,
@@ -701,6 +737,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_validFlows");
         setParameter("bffMaxTries", ParamType.Number, this, options, "OAUTH_BFF_MAX_RETRIES");
         setParameter("bffSleepMilliseconds", ParamType.Number, this, options, "OAUTH_BFF_SLEEP_MILLISECONDS");
+        setParameter("jwtTokens", ParamType.JsonArray, this, options, "OAUTH_JWT_TOKENS");
 
         if (this.bffEndpointName && !this.bffEndpointName.startsWith("/")) this.bffEndpointName = "/" + this.bffEndpointName;
         if (this.bffEndpointName && this.bffEndpointName.endsWith("/")) this.bffEndpointName = this.bffEndpointName.substring(0, this.bffEndpointName.length-1);
@@ -792,6 +829,29 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             throw new CrossauthError(ErrorCode.Configuration, 
                 "loginUrl must be set if protecting oauth endpoints");
         }
+
+        this.hook = async ({ event }) => {
+            if (event.locals.user) return undefined;
+            if (!server.sessionAdapter) return undefined;
+
+            let sessionData = await server.sessionAdapter.getSessionData(event, this.sessionDataName);
+            if (sessionData && sessionData["id_payload"]) {
+                let expiry = sessionData["expires_at"]
+                if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
+                    event.locals.user = {
+                        id : sessionData["id_payload"].userid ?? sessionData["id_payload"].sub,
+                        username : sessionData["id_payload"].sub,
+                        state : sessionData["id_payload"].state ?? "active",
+                    }
+                    event.locals.idTokenPayload = sessionData["id_payload"]
+                    event.locals.authType = "oidc";
+                }
+            }
+
+            if (this.testMiddleware) this.testEvent = event;
+
+            return undefined;
+        };
     }       
 
     private async passwordPost(event : RequestEvent, formData: {[key:string]:string}) : Promise<OAuthTokenResponse> {
@@ -807,9 +867,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const mfa_token = resp.mfa_token;
                 let scope : string|undefined = formData.scope;
                 if (scope == "") scope = undefined;
-                resp = await this.passwordMfa(mfa_token,
+                resp = this.errorIfIdTokenInvalid(await this.passwordMfa(mfa_token,
                     scope,
-                    event);
+                    event));
                 if (resp.error) {
                     const ce = CrossauthError.fromOAuthError(resp.error, 
                         resp.error_description);
@@ -920,8 +980,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
         let scope : string|undefined = formData.scope;
         if (scope == "") scope = undefined;
-        const resp = await this.mfaOtpComplete(formData.mfa_token, 
-            formData.otp, scope);
+        const resp = this.errorIfIdTokenInvalid(await this.mfaOtpComplete(formData.mfa_token, 
+            formData.otp, scope));
         if (resp.error) {
             const ce = CrossauthError.fromOAuthError(resp.error,
                 resp.error_description??"Error completing MFA");
@@ -941,10 +1001,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
         let scope : string|undefined = formData.scope;
         if (scope == "") scope = undefined;
-        const resp = await this.mfaOobComplete(formData.mfa_token, 
+        const resp = this.errorIfIdTokenInvalid(await this.mfaOobComplete(formData.mfa_token, 
             formData.oob_code,
             formData.binding_code,
-            scope);
+            scope));
         if (resp.error) {
             CrossauthLogger.logger.warn(j({
                 msg: "Error completing MFA",
@@ -964,14 +1024,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         onlyIfExpired : boolean,
         refreshToken?: string,
         expiresAt?: number) 
-        : Promise<Response|{
-            refresh_token?: string,
-            access_token?: string,
-            expires_in?: number,
-            expires_at?: number,
-            error?: string,
-            error_description?: string
-            }|undefined> {
+        : Promise<Response|OAuthTokenResponse&{expires_at?:number}|undefined> {
         
         if (!expiresAt || !refreshToken) {
             if (mode != "silent") {
@@ -988,7 +1041,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
             try {
                 if (event.locals.sessionId) this.autoRefreshActive[event.locals.sessionId] = true;
-                const resp = await this.refreshTokenFlow(refreshToken);
+                const resp = this.errorIfIdTokenInvalid(await this.refreshTokenFlow(refreshToken));
                 if (!resp.error && !resp.access_token) {
                     resp.error = "server_error";
                     resp.error_description = "Unexpectedly did not receive error or access token";
@@ -1087,12 +1140,15 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }
             }
     
-            const resp = 
+            let resp = 
                 await this.refresh(mode, event,
                     onlyIfExpired,
                     oauthData.refresh_token,
                     oauthData.expires_at
                 );
+            if (resp && "id_token" in resp) {
+                resp = this.errorIfIdTokenInvalid(resp);
+            }
             if (mode == "silent") {
                 if (resp instanceof Response) {
                     throw new CrossauthError(ErrorCode.Configuration, "Unexpected error: refresh: mode is silent but didn't receive an object")
@@ -1165,7 +1221,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             }
 
             const resp = 
-                await passwordFn(event, formData);
+                this.errorIfIdTokenInvalid(await passwordFn(event, formData));
             if (!resp) throw new CrossauthError(ErrorCode.UnknownError, "Password flow returned no data");
             if (resp.error) return {
                 ok: false,
@@ -1458,21 +1514,21 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
     }
 
-    private tokenPayload(token : string, oauthData : {[key:string]:any}) : {[key:string]:any}|undefined {
-        let isHave = false;
-        if (token.startsWith("have_")) {
-            isHave = true;
-            token = token.substring(5)
-        }
+    private tokenPayload(token : string, oauthData : {[key:string]:any}, isHave : boolean, decodeToken : boolean) : {[key:string]:any}|string|undefined {
         if (!(token in oauthData)) {
             return isHave ? {ok: false} : undefined;
         }
+        if (isHave) return {ok : true};
+        if (!decodeToken) return oauthData[token];
         const payload = decodePayload(oauthData[token]);
-        return isHave ? {ok: true} : payload;
+        return payload;
     }
 
-    async tokens(event : RequestEvent, token: string|string[]) : Promise<{status: number, body?: {[key:string]:any}}> {
+    async tokens(event : RequestEvent, token: string|string[]) : Promise<{status: number, body?: {[key:string]:any}|string}> {
         try {
+            let data = new JsonOrFormData(true);
+            await data.loadData(event);
+            const decode = data.getAsBoolean("decode") ?? true;
             if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
             if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
 
@@ -1488,14 +1544,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 throw new CrossauthError(ErrorCode.Unauthorized, "No access token found");
             }
             let tokensReturning : {
-                access_token?: {[key:string]:any},
+                access_token?: {[key:string]:any}|string,
                 have_access_token?: boolean,
-                refresh_token?: {[key:string]:any},
+                refresh_token?: {[key:string]:any}|string,
                 have_refresh_token?: boolean,
-                id_token?: {[key:string]:any},
+                id_token?: {[key:string]:any}|string,
                 have_id_token?: boolean,
             } = {};
-            let lastTokenPayload : ({[key:string]:any}|undefined) = undefined;
+            let lastTokenPayload : ({[key:string]:any}|string|undefined) = undefined;
             let isHave = false;
             for (let t of tokens) {
                 if (!this.tokenEndpoints.includes(t)) throw new CrossauthError(ErrorCode.Unauthorized, "Token type " + t + " may not be returned");
@@ -1505,22 +1561,25 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     tokenName = t.replace("have_", "");
                     isHave = true;
                 }
-                let payload = this.tokenPayload(tokenName, oauthData);
-                if (payload) {
+                const tokenName1 = tokenName.replace("_token", "")
+                const decodeToken = decode && this.jwtTokens.includes(tokenName1)
+                let payload = this.tokenPayload(tokenName, oauthData, isHave, decodeToken);
+                if (isHave) {
                     // @ts-ignore because t is a string
-                    tokensReturning[t] = isHave ? true : payload;
-                } else if (isHave) {
+                    tokensReturning[t] = payload.ok;
+                } else if (payload) {
                     // @ts-ignore because t is a string
-                    tokensReturning[t] = false;
-                }
-                lastTokenPayload = payload;
+                    tokensReturning[t] = payload;
+                } 
+                // @ts-ignore because t is a string
+                lastTokenPayload = tokensReturning[t];
             }
             if (!Array.isArray(token)) {
                 if (!lastTokenPayload) {
                     if (token.startsWith("have_")) return {status: 200, body: {ok: false}};
                     else return {status: 204};
                 }
-                if (isHave) return  {status: 200, body: {ok: true}};
+                if (isHave) return  {status: 200, body: typeof(lastTokenPayload) == "boolean"? {ok: lastTokenPayload} : lastTokenPayload};
                 return {status: 200, body: lastTokenPayload};
             } else {
                 return {status: 200, body: tokensReturning};
@@ -1640,7 +1699,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             let deviceCode = formData.device_code;
             if (!deviceCode) throw new CrossauthError(ErrorCode.BadRequest, "No device code given when polling for user authorization")
 
-            const resp =  await this.pollDeviceCodeFlow(deviceCode);
+            const resp = this.errorIfIdTokenInvalid(await this.pollDeviceCodeFlow(deviceCode));
             if (resp.access_token && !resp.error) {
                 const resp2 = await this.receiveTokenFn(resp, this, event, false);
                 return resp2;    
@@ -1935,10 +1994,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const state = event.url.searchParams.get("state") ?? undefined;
                 const error = event.url.searchParams.get("error") ?? undefined;
                 const error_description = event.url.searchParams.get("error") ?? undefined;
-                const resp =  await this.redirectEndpoint(code,
+                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint(code,
                     state,
                     error,
-                    error_description);
+                    error_description));
                     if (resp.error) return this.errorFn(this.server, event, CrossauthError.fromOAuthError(resp.error, resp.error_description));
 
                     if (resp.error) {
@@ -1995,10 +2054,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const state = event.url.searchParams.get("state") ?? undefined;
                 const error = event.url.searchParams.get("error") ?? undefined;
                 const error_description = event.url.searchParams.get("error") ?? undefined;
-                const resp =  await this.redirectEndpoint(code,
+                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint(code,
                     state,
                     error,
-                    error_description);
+                    error_description));
                 if (resp.error) return {
                     ok: false,
                     error: resp.error,
@@ -2081,7 +2140,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     return this.error(401, "Must log in to use client credentials");
                 }    */
                 
-                const resp = await this.clientCredentialsFlow(formData?.scope);
+                const resp = this.errorIfIdTokenInvalid(await this.clientCredentialsFlow(formData?.scope));
                 if (resp.error) {
                     const ce = CrossauthError.fromOAuthError(resp.error, 
                         resp.error_description);
@@ -2132,7 +2191,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                             }
                         } */   
                     
-                    const resp = await this.clientCredentialsFlow(formData?.scope);
+                    const resp = this.errorIfIdTokenInvalid(await this.clientCredentialsFlow(formData?.scope));
                     if (resp.error) {
                         const ce = CrossauthError.fromOAuthError(resp.error, 
                             resp.error_description);
@@ -2222,7 +2281,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }
 
                 const resp = 
-                    await this.refreshTokenFlow(refreshToken);
+                    this.errorIfIdTokenInvalid(await this.refreshTokenFlow(refreshToken));
             
                 const resp2 = await this.receiveTokenFn(resp, this, event, false) ;
                 if (resp && resp2 instanceof Response) return resp2;
@@ -2299,7 +2358,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     }
 
                     const resp = 
-                        await this.refreshTokenFlow(refreshToken);
+                        this.errorIfIdTokenInvalid(await this.refreshTokenFlow(refreshToken));
 
                     const resp2 = await this.receiveTokenFn(resp, this, event, false) ?? {};
                     if (resp2 instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Refresh token flow should return an object not Response");
@@ -2624,5 +2683,19 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             default: async ( event : RequestEvent ) => 
                 await this.tokens(event,this.tokenEndpoints),
         },
+    }
+
+    private errorIfIdTokenInvalid(oauthResponse : OAuthTokenResponse) : OAuthTokenResponse {
+        if (oauthResponse["id_token"] && this.jwtTokens.includes("id")) {
+            const payload = this.validateIdToken(oauthResponse["id_token"]);
+            if (payload == undefined) {
+                return {
+                    error: "access_denied",
+                    error_description: "Invalid ID token received"
+                }
+            }
+            return oauthResponse;
+        }
+        return oauthResponse;
     }
 }

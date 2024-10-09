@@ -7,7 +7,10 @@ import { OAuthDeviceCodePoller } from './devicecodepoller.ts';
  * A browser-side OAuth client designed with work with the
  * backend-for-frontend (BFF) mode of the backend OAuth client.
  * 
- * See {@link @crossauth/fastify!FastifyOAuthClient}.
+ * You may use this, or alternatively the backend OAuth clients, eg
+ * 
+ * `@crossauth/fastify/FastifyOAuthClient` or
+ * .`@crossauth/sveltekit/SvelteKitOAuthClient`
  */
 export class OAuthBffClient {
     private bffPrefix : string = "/bff";
@@ -105,7 +108,7 @@ export class OAuthBffClient {
      * This only returns something if the ID token was returned to the BFF
      * client in a previous OAuth call.  Otherwise it returns an empty JSON.
      * 
-     * @param crfToken the CSRF token.  If emtpy, one will be fetched before
+     * @param csrfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
      * @returns the ID token payload or an empty object if there isn't one
      */
@@ -118,7 +121,7 @@ export class OAuthBffClient {
      * Returns whether or not there is an ID token stored in the BFF server
      * for this client.
      * 
-     * @param crfToken the CSRF token.  If emtpy, one will be fetched before
+     * @param csrfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
      * @returns true or false
      */
@@ -135,10 +138,8 @@ export class OAuthBffClient {
      * This only returns something if the access token was returned to the BFF
      * client in a previous OAuth call.  Otherwise it returns an empty JSON.
      * 
-     * @param crfToken the CSRF token.  If emtpy, one will be fetched before
+     * @param csrfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
-     * @param headers any additional headers to add (will be added to
-     *         the ones given with {@link OAuthBffClient.addHeader} )
      * @returns the access token payload or an empty object if there isn't one
      */
     async getAccessToken(csrfToken? : string) : Promise<{[key:string]:any}|null>{
@@ -150,7 +151,7 @@ export class OAuthBffClient {
      * Returns whether or not there is an access token stored in the BFF server
      * for this client.
      * 
-     * @param crfToken the CSRF token.  If emtpy, one will be fetched before
+     * @param csrfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
      * @returns true or false
      */
@@ -167,7 +168,7 @@ export class OAuthBffClient {
      * This only returns something if the refresh token was returned to the BFF
      * client in a previous OAuth call.  Otherwise it returns an empty JSON.
      * 
-     * @param crfToken the CSRF token.  If emtpy, one will be fetched before
+     * @param csrfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
      * @returns the refresh token payload or an empty object if there isn't one
      */
@@ -180,7 +181,7 @@ export class OAuthBffClient {
      * Returns whether or not there is a refresh token stored in the BFF server
      * for this client.
      * 
-     * @param crfToken the CSRF token.  If emtpy, one will be fetched before
+     * @param csrfToken the CSRF token.  If emtpy, one will be fetched before
      *        making the request
      * @returns true or false
      */
@@ -281,8 +282,8 @@ export class OAuthBffClient {
 
     /**
      * Turns polling for a device code
-     * @param tokensToFetch which tokens to fetch
-     * @param errorFn what to call in case of error
+     * @param deviceCode the device code to poll for (returned when the device code flow was started)
+     * @param pollResultFn THis function will be called with the result of each poll
      */
     async startDeviceCodePolling(deviceCode : string, 
         pollResultFn : (status: ("complete"|"completeAndRedirect"|"authorization_pending"|"expired_token"|"error"), error? : string, location? : string) => void, interval : number = 5) {
@@ -303,7 +304,7 @@ export class OAuthBffClient {
 
     /**
      * Fetches the expiry times for each token.
-     * @param crfToken the CSRF token.  If emtpy
+     * @param csrfToken the CSRF token.  If emtpy
      * , one will be fetched before
      *        making the request
      * @returns for each token, either the expiry, `null` if it does not
@@ -348,7 +349,7 @@ export class OAuthBffClient {
      * Makes a fetch, adding in the requested token
      * @param url the URL to fetch
      * @param params parameters to add to the fetch
-     * @param token which token to add
+     * @param _token unused
      * @returns parsed JSON response
      */
     async jsonFetchWithToken(url: string,

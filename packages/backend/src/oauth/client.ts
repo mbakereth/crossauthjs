@@ -75,7 +75,8 @@ export class OAuthClientBackend extends OAuthClientBase {
         }
         setParameter("client_id", ParamType.String, options1, options, "OAUTH_CLIENT_ID", true);
         super({ authServerBaseUrl, 
-            tokenConsumer: new OAuthTokenConsumer({ 
+            tokenConsumer: new OAuthTokenConsumer(
+                options1.client_id, { 
                 audience: options1.client_id, 
                 authServerBaseUrl, 
                 ...options }), ...options });

@@ -33,7 +33,7 @@ export class InMemoryUserStorage extends UserStorage {
 
     /**
      * Creates a InMemoryUserStorage object, optionally overriding defaults.
-     * @param options @see {@link InMemoryUserStorageOptions}
+     * @param options see {@link InMemoryUserStorageOptions}
     */
     constructor(options : InMemoryUserStorageOptions = {}) {
         super(options);

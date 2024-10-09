@@ -82,7 +82,7 @@ export class PostgresOAuthClientStorage extends DbOAuthClientStorage {
     /**
      * Creates a PostgresOAuthClientStorage object, optionally overriding defaults.
      * @param pgPool the instance of the Posrgres client. 
-     * @param options see {@link PostgresOAuthStorageOptions}.
+     * @param options see {@link PostgresOAuthClientStorageOptions}.
      */
     constructor(pgPool : pg.Pool, options : PostgresOAuthClientStorageOptions = {}) {
         super(new PostgresPool(pgPool), options);
@@ -107,7 +107,7 @@ export interface PostgresOAuthAuthorizationStorageOptions extends DbOAuthAuthori
 export class PostgresOAuthAuthorizationStorage extends DbOAuthAuthorizationStorage {
 
     /**
-     * Creates a PostgresOAuthStorage object, optionally overriding defaults.
+     * Creates a PostgresOAuthClientStorage object, optionally overriding defaults.
      * @param pgPool the instance of the Posrgres client. 
      * @param options see {@link PostgresOAuthAuthorizationStorageOptions}.
      */

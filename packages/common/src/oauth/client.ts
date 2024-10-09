@@ -190,7 +190,7 @@ export interface OAuthDeviceResponse {
  * Node.  This base class contains all the non-interpreter specific 
  * functionality.  What is missing is the cryptography which is included
  * in derived Node-only and Browser-only classes.  
- * See {@link @crossauth/backend!OAuthClientBackend}.
+ * See `@crossauth/backend/OAuthClientBackend`.
  * 
  * Flows supported are Authorization Code Flow with and without PKCE,
  * Client Credentials, Refresh Token, Password and Password MFA.  The
@@ -309,7 +309,7 @@ export abstract class OAuthClientBase {
      *        Otherwise, performs a fetch by appending
      *        `/.well-known/openid-configuration` to the 
      *        `authServerBaseUrl`.
-     * @throws {@link @crossauth/common!CrossauthError} with the following {@link @crossauth/common!ErrorCode}s
+     * @throws {@link CrossauthError} with the following {@link ErrorCode}s
      *   - `Connection` if data from the URL could not be fetched or parsed.
      */
     async loadConfig(oidcConfig? : OpenIdConfiguration) : Promise<void> {
@@ -503,7 +503,11 @@ export abstract class OAuthClientBase {
         if (client_secret) params.client_secret = client_secret;
         params.code_verifier = this.#codeVerifier;
         try {
-            return this.post(url, params, this.authServerHeaders);
+            const resp = await this.post(url, params, this.authServerHeaders);
+            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
+                return {error: "access_denied", error_description: "Invalid ID token"}
+            }
+            return resp;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -617,7 +621,11 @@ export abstract class OAuthClientBase {
         }
         if (scope) params.scope = scope;
         try {
-            return await this.post(url, params, this.authServerHeaders);
+            let resp = await this.post(url, params, this.authServerHeaders);
+            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
+                return {error: "access_denied", error_description: "Invalid ID token"}
+            }
+            return resp;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -917,6 +925,9 @@ export abstract class OAuthClientBase {
                 error_description: resp.error_description,
             }
         }
+        if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
+            return {error: "access_denied", error_description: "Invalid ID token"}
+        }
         return {
             id_token: resp.id_token,
             access_token: resp.access_token,
@@ -961,7 +972,11 @@ export abstract class OAuthClientBase {
         }
         if (client_secret) params.client_secret = client_secret;
         try {
-            return await this.post(url, params, this.authServerHeaders);
+            let resp =  await this.post(url, params, this.authServerHeaders);
+            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
+                return {error: "access_denied", error_description: "Invalid ID token"}
+            }    
+            return resp;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -998,7 +1013,11 @@ export abstract class OAuthClientBase {
         }
         if (scope) params.scope = scope;
         try {
-            return await this.post(url, params, this.authServerHeaders);
+            let resp = await this.post(url, params, this.authServerHeaders);
+            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
+                return {error: "access_denied", error_description: "Invalid ID token"}
+            }
+            return resp;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -1041,6 +1060,9 @@ export abstract class OAuthClientBase {
         try {
             const resp = await this.post(this.oidcConfig?.token_endpoint, params, this.authServerHeaders);
             if (resp.error) return resp;
+            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
+                return {error: "access_denied", error_description: "Invalid ID token"}
+            }
             return resp;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
@@ -1161,4 +1183,10 @@ export interface MfaAuthenticatorResponse {
     active: boolean,
     oob_channel? : string,
     name?: string,
+}
+
+export interface MfaAuthenticatorsResponse {
+    authenticators?: MfaAuthenticatorResponse[],
+    error?: string,
+    error_description?: string,
 }

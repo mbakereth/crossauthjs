@@ -26,7 +26,7 @@ export abstract class SvelteKitSessionAdapter {
      * 
      * The `data` field is assumed to be JSON.  Just the field with the given
      * name is updated and the rest is unchanged.
-     * @param request the Fastifdy request
+     * @param event the SvelteKit request event
      * @param dataArray data to update
      */
     abstract updateManySessionData(event : RequestEvent, dataArray: {dataName : string, value : any}[]) : Promise<void> ;

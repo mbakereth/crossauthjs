@@ -777,8 +777,8 @@ test('SvelteKitClient.accessToken', async () => {
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
     const resp = await server.oAuthClient?.accessTokenEndpoint.post(event);
     expect(resp.status).toBe(200);
-    const body = await resp.body;
-    expect(body?.jti).toBeDefined();
+    const body = resp.body;
+    expect(typeof(body) == "object" && body?.jti).toBeDefined();
 });
 
 test('SvelteKitClient.haveAccessToken', async () => {
@@ -998,4 +998,34 @@ test('SvelteKitClient.deviceCodeFlow', async () => {
     resp = await server.oAuthClient?.pollDeviceCodeFlowEndpoint.actions.default(event);
     //expect(resp.error).toBe('authorization_pending');
     
+});
+
+test('SvelteKitClient.middleware', async () => {
+    const {server, sessionId, sessionCookieValue} = await oauthLogin();
+
+    if (server.oAuthClient && server.oAuthClient.hook) {
+        server.oAuthClient["testMiddleware"] = true;
+
+        // insert payload
+        if (!server.sessionServer) throw new Error("No session server");
+        const sessionManager = server.sessionServer["sessionManager"];
+        let sessionData = await sessionManager.dataForSessionId(sessionId??"");
+        sessionData.oauth.id_payload = {"sub": "bob"}
+        await sessionManager.updateSessionData(sessionId??"", "oauth", sessionData["oauth"]);
+
+        let getRequest = new Request(`http://server.com/passwordflow`, {
+            method: "GET",
+            headers: {"cookie": "SESSIONID="+sessionCookieValue,
+                "content-type": "application/json",
+            },
+        });
+        let event = new MockRequestEvent("1", getRequest, {});
+        event.locals.sessionId = sessionId;
+    
+        await server.oAuthClient.hook({event})
+        let locals = server.oAuthClient["testEvent"]?.locals;
+        expect(locals?.user?.username).toBe("bob");
+        expect(locals?.idTokenPayload?.sub).toBe("bob");
+        expect(locals?.authType).toBe("oidc")
+    }
 });

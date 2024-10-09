@@ -79,7 +79,7 @@ export interface SqliteOAuthClientStorageOptions extends DbOAuthClientStorageOpt
 export class SqliteOAuthClientStorage extends DbOAuthClientStorage {
 
     /**
-     * Creates a PostgresOAuthStorage object, optionally overriding defaults.
+     * Creates a SqliteOAuthClientStorage object, optionally overriding defaults.
      * @param filename the Sqlite database file
      * @param options see {@link SqliteOAuthClientStorageOptions}.
      */
@@ -106,7 +106,7 @@ export interface SqliteOAuthAuthorizationStorageOptions extends DbOAuthAuthoriza
 export class SqliteOAuthAuthorizationStorage extends DbOAuthAuthorizationStorage {
 
     /**
-     * Creates a PostgresOAuthStorage object, optionally overriding defaults.
+     * Creates a PostgresOAuthClientStorage object, optionally overriding defaults.
      * @param filename the Sqlite database file
      * @param options see {@link SqliteOAuthAuthorizationStorageOptions}.
      */

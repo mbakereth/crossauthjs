@@ -11,6 +11,14 @@ test('Crypto.signAndUnsign', async () => {
     expect(decoded.foo).toBe(payload.foo);
 });
 
+test('Crypto.secureTokenSignUnsign', async () => {
+    const payload = "ABCDEFGHIJKLMNOP";
+    const secret = "SECRET";
+    const sig = Crypto.signSecureToken(payload, secret);
+    const decoded = Crypto.unsignSecureToken(sig, secret);
+    expect(decoded).toBe(payload);
+});
+
 test('Crypto.passwordHashAndCompare', async () => {
     const password = "PASSWORD"
     const hash = await Crypto.passwordHash(password, {encode: true});
