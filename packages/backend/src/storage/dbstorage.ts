@@ -159,6 +159,21 @@ export class DbUserStorage extends UserStorage {
         return this.getUser("email_normalized", normalizedValue, options);
     }
 
+    /**
+     * Returns user matching the given field, or throws an exception.  
+     * 
+     * @param field the field to match
+     * @param value the value to match (case sensitive)
+     * @param options optionally turn off checks.  Used internally
+     * @throws CrossauthException with ErrorCode either `UserNotExist` or whatever pg throws
+     */
+    async getUserBy(
+        field : string, 
+        value : string, 
+         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
+            return await this.getUser(field, value, options);
+    }
+
     private async getUser(
         field : string,
         value : string|number, 

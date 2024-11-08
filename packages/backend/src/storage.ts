@@ -122,6 +122,23 @@ export abstract class UserStorage {
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}>;
 
     /**
+     * Returns user matching the given field or throws an exception.  
+     * 
+     * @param field field to match
+     * @param value value to match 
+     * @param options optionally turn off checks.  Used internally
+     * @throws CrossauthException with ErrorCode either `UserNotExist` or `Connection`
+     * 
+     * If you are implementing this class, you only need if you are using
+     * the feature in the OAuth client to create a user from an ID token and
+     * you don't use `id`, `username` or `email` as the match field.
+     */
+    abstract getUserBy(
+        field : string, 
+        value : string, 
+         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}>;
+
+    /**
      * Creates a user with the given details and secrets.
      * 
      * @param _user will be put in the User table

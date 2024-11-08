@@ -993,7 +993,18 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         state : sessionData["id_payload"].state ?? "active",
                     }
                     request.idTokenPayload = sessionData["id_payload"]
-                    request.authType = "oidc";
+                    let user : User|undefined = undefined;
+                    try {
+                        user = await this.userCreationFn(sessionData["id_payload"], 
+                            this.userStorage, this.userMatchField, 
+                            this.idTokenMatchField);
+                        request.user = user;
+                        request.authType = user ? "oidc" : undefined;
+                    } catch (e) {
+                        CrossauthLogger.logger.error(j({cerr: e}));
+                        request.user = undefined;
+                        request.authType = undefined;
+                    }
                 }
             }
 

@@ -159,6 +159,20 @@ export class InMemoryUserStorage extends UserStorage {
     }
 
     /**
+     * Returns a {@link User } and {@link UserSecrets } instance matching the given email address, or throws an Exception.
+     * 
+     * @param email the emaila ddress to look up
+     * @returns a {@link User } and {@link UserSecrets } instance, ie including the password hash.
+     * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist`.
+     */
+    async getUserBy(
+        _field : string, 
+        _value : string, 
+        _options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
+        throw new CrossauthError(ErrorCode.NotImplemented);
+    }
+
+    /**
      * If the given session key exist in the database, update it with the passed values.  If it doesn't
      * exist, throw a CreossauthError with InvalidKey.
      * @param user the user to update.  The id to update is taken from this obkect, which must be present.  All other attributes are optional. 

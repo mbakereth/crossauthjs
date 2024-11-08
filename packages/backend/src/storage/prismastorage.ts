@@ -170,6 +170,21 @@ export class PrismaUserStorage extends UserStorage {
     }
 
     /**
+     * Returns user matching the given field, or throws an exception.  
+     * 
+     * @param field the field to match
+     * @param value the value to match (case sensitive)
+     * @param options optionally turn off checks.  Used internally
+     * @throws CrossauthException with ErrorCode either `UserNotExist` or whatever pg throws
+     */
+    async getUserBy(
+        field : string, 
+        value : string, 
+         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
+            return this.getUser(field, value, options);
+        }
+
+    /**
      * Returns a {@link @crossauth/common!User} and {@link @crossauth/common!UserSecrets} instance matching the given email address, or throws an Exception.
      * 
      * If there is no email field in the user, the username is assumed to contain the email

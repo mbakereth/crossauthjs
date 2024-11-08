@@ -10,12 +10,13 @@ import {
 import type {
     OAuthTokenResponse,
     MfaAuthenticatorResponse,
-    OAuthDeviceAuthorizationResponse} from '@crossauth/common';
+    OAuthDeviceAuthorizationResponse,
+    User} from '@crossauth/common';
 import {
     setParameter,
     ParamType,
     Crypto,
-    OAuthClientBackend } from '@crossauth/backend';
+    OAuthClientBackend} from '@crossauth/backend';
 import type { OAuthClientOptions } from '@crossauth/backend';
 import { SvelteKitServer } from './sveltekitserver';
 import { json } from '@sveltejs/kit';
@@ -85,11 +86,15 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
      * @param client the OAuth client
      * @param event the SvelteKit request event
      * @param silent if true, don't return a Response, only JSON or undefined.
+     * @param setUserFn if implementing this function you should call this
+     *        when you receive a valid ID token
      * @returns a Response, JSON or undefined
      */
     receiveTokenFn?: (oauthResponse: OAuthTokenResponse,
         client: SvelteKitOAuthClient,
-        event: RequestEvent, silent: boolean) => Promise<Response|TokenReturn|undefined>;
+        event: RequestEvent, 
+        silent: boolean,
+        setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) => Promise<Response|TokenReturn|undefined>;
 
     /**
      * The function to call when there is an OAuth error and
@@ -259,7 +264,8 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
 async function sendJson(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     _event: RequestEvent,
-    _silent?: boolean) : Promise<Response|undefined> {
+    _silent: boolean,
+    _setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) : Promise<Response|undefined> {
         let resp : {[key:string]:any} = {ok: true, ...oauthResponse};
         if (client.jwtTokens.includes("id")) {
             resp["id_payload"] = decodePayload(oauthResponse.id_token);
@@ -370,8 +376,8 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
 async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     event: RequestEvent,
-    silent: boolean
-    ) : Promise<Response|undefined> {
+    silent: boolean,
+    setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) : Promise<Response|undefined> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
             oauthResponse.error_description);
@@ -383,6 +389,8 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     try {
         if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
             await updateSessionData(oauthResponse, client, event);
+            const payload = decodePayload(oauthResponse.id_token);
+            if (payload) await setUserFn(event, payload);
         }
 
         if (!silent) return client.redirect(302, client.authorizedUrl);
@@ -398,7 +406,8 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
 async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     event: RequestEvent,
-    silent: boolean
+    silent: boolean,
+    setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>
     ) : Promise<Response|undefined> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
@@ -411,6 +420,8 @@ async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
     try {
         if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
             await updateSessionData(oauthResponse, client, event);
+            const payload = decodePayload(oauthResponse.id_token);
+            if (payload) await setUserFn(event, payload);
         }
 
         return json({ok: true, ...oauthResponse});
@@ -427,7 +438,8 @@ async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
 async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     event: RequestEvent,
-    _silent : boolean
+    _silent : boolean,
+    setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>
     ) : Promise<TokenReturn|undefined> {
     if (oauthResponse.error) {
         return {
@@ -451,6 +463,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     if (client.jwtTokens.includes("id")) {
         resp["id_payload"] = decodePayload(oauthResponse.id_token)
     }
+    if (resp["id_payload"]) await setUserFn(event, resp["id_payload"]);
     return resp;
     } catch (e) {
         if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -672,7 +685,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         ( oauthResponse: OAuthTokenResponse,
             client: SvelteKitOAuthClient,
             event : RequestEvent,
-            silet: boolean) 
+            silet: boolean,
+            setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) 
             => Promise<Response|TokenReturn|undefined> = sendJson;
     readonly errorFn : SvelteKitErrorFn = jsonError;
     private loginUrl : string = "/login";
@@ -794,7 +808,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         } else if (this.tokenResponseType == "sendInPage") {
             this.receiveTokenFn = sendInPage;
         } else if (this.tokenResponseType == "saveInSessionAndLoad") {
-            this.receiveTokenFn = sendJson; saveInSessionAndLoad;
+            this.receiveTokenFn = saveInSessionAndLoad;
         } else if (this.tokenResponseType == "saveInSessionAndRedirect") {
             this.receiveTokenFn = saveInSessionAndRedirect;
         } else if (this.tokenResponseType == "saveInSessionAndReturn") {
@@ -838,13 +852,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             if (sessionData && sessionData["id_payload"]) {
                 let expiry = sessionData["expires_at"]
                 if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
-                    event.locals.user = {
-                        id : sessionData["id_payload"].userid ?? sessionData["id_payload"].sub,
-                        username : sessionData["id_payload"].sub,
-                        state : sessionData["id_payload"].state ?? "active",
-                    }
-                    event.locals.idTokenPayload = sessionData["id_payload"]
-                    event.locals.authType = "oidc";
+                    await this.setEventLocalsUser(event, sessionData["id_payload"]);
                 }
             }
 
@@ -853,6 +861,28 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             return undefined;
         };
     }       
+
+    /**
+     * If you implement your own function to receive tokens and you use BFF,
+     * use this function to set `event.locals.user`.
+     * @param event the Sveltekit request event
+     * @param token the ID token
+     */
+    async setEventLocalsUser(event: RequestEvent, token : {[key:string]:any}) {
+        let user : User|undefined = undefined;
+        event.locals.idTokenPayload = token;
+        try {
+            user = await this.userCreationFn(token, 
+                this.userStorage, this.userMatchField, 
+                this.idTokenMatchField);
+            event.locals.user = user;
+            event.locals.authType = user ? "oidc" : undefined;
+        } catch (e) {
+            CrossauthLogger.logger.error(j({cerr: e}));
+            event.locals.user = undefined;
+            event.locals.authType = undefined;
+        }
+    }
 
     private async passwordPost(event : RequestEvent, formData: {[key:string]:string}) : Promise<OAuthTokenResponse> {
 
@@ -1031,7 +1061,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 return await this.receiveTokenFn({},
                     this,
                     event, 
-                    true);
+                    true,
+                    this.setEventLocalsUser);
             } 
             return undefined;
         }
@@ -1050,7 +1081,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const resp1 = await this.receiveTokenFn(resp,
                         this,
                         event,
-                        mode == "silent");
+                        mode == "silent",
+                        this.setEventLocalsUser);
                     if (mode != "silent") return resp1;
                 } 
                 if (mode != "silent") {
@@ -1155,7 +1187,12 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }
                 return {ok: true, expires_at: resp?.expires_at};
             } else if (mode == "post") {
-                if (resp == undefined) return this.receiveTokenFn({}, this, event, false);
+                if (resp == undefined) return this.receiveTokenFn(
+                    {}, 
+                    this, 
+                    event, 
+                    false,
+                    this.setEventLocalsUser);
                 if (resp != undefined) {
                     if (resp instanceof Response) return resp;
                     throw new CrossauthError(ErrorCode.Configuration, "refreshTokenFn for post should return Response not object");
@@ -1227,7 +1264,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 ok: false,
                 ...resp,
             }
-            const resp2 = await this.receiveTokenFn(resp, this, event, false) ;
+            const resp2 = await this.receiveTokenFn(resp, 
+                this, 
+                event, 
+                false,
+                this.setEventLocalsUser);
             if (resp && resp2 instanceof Response) return resp2;
             throw new CrossauthError(ErrorCode.UnknownError, "Receive token function did not return a Response");
 
@@ -1299,7 +1340,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }
                 return resp;
             }
-            const resp2 = await this.receiveTokenFn(resp, this, event, false) ?? {};
+            const resp2 = await this.receiveTokenFn(resp, 
+                this, 
+                event, 
+                false,
+                this.setEventLocalsUser) ?? {};
             if (resp2 instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Refresh token flow should return an object not Response");
             return resp2;
             
@@ -1701,7 +1746,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
             const resp = this.errorIfIdTokenInvalid(await this.pollDeviceCodeFlow(deviceCode));
             if (resp.access_token && !resp.error) {
-                const resp2 = await this.receiveTokenFn(resp, this, event, false);
+                const resp2 = await this.receiveTokenFn(resp, 
+                    this, 
+                    event, 
+                    false,
+                    this.setEventLocalsUser);
                 return resp2;    
             } else {
                 if (resp.error == "authorization_pending") return {ok: true, ...resp};
@@ -2007,7 +2056,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         event,
                         ce);
                 }
-                return await this.receiveTokenFn(resp, this, event, false);
+                return await this.receiveTokenFn(resp, 
+                    this, 
+                    event, 
+                    false,
+                    this.setEventLocalsUser);
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -2074,7 +2127,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         error_description: ce.message,
                     }
                 }
-                const receiveTokenResp = await this.receiveTokenFn(resp, this, event, false);
+                const receiveTokenResp = await this.receiveTokenFn(resp, 
+                    this, 
+                    event, 
+                    false,
+                    this.setEventLocalsUser);
                 if (receiveTokenResp instanceof Response) return {
                     ok: false,
                     error: "server_error",
@@ -2148,7 +2205,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         event,
                         ce);
                 }
-                const resp1 = await this.receiveTokenFn(resp, this, event, false);
+                const resp1 = await this.receiveTokenFn(resp, 
+                    this, 
+                    event, 
+                    false,
+                    this.setEventLocalsUser);
                 if (resp1 instanceof Response) return resp1;
                 return this.pack(resp1);
 
@@ -2197,7 +2258,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                             resp.error_description);
                         throw ce;
                     }
-                    return await this.receiveTokenFn(resp, this, event, false) ?? {};
+                    return await this.receiveTokenFn(resp, 
+                        this, 
+                        event, 
+                        false,
+                        this.setEventLocalsUser) ?? {};
     
                 } catch (e) {
                     if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -2283,7 +2348,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const resp = 
                     this.errorIfIdTokenInvalid(await this.refreshTokenFlow(refreshToken));
             
-                const resp2 = await this.receiveTokenFn(resp, this, event, false) ;
+                const resp2 = await this.receiveTokenFn(resp, 
+                    this, 
+                    event, 
+                    false,
+                    this.setEventLocalsUser) ;
                 if (resp && resp2 instanceof Response) return resp2;
                 throw new CrossauthError(ErrorCode.UnknownError, "Receive token function did not return a Response");
 
@@ -2360,7 +2429,11 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const resp = 
                         this.errorIfIdTokenInvalid(await this.refreshTokenFlow(refreshToken));
 
-                    const resp2 = await this.receiveTokenFn(resp, this, event, false) ?? {};
+                    const resp2 = await this.receiveTokenFn(resp, 
+                        this, 
+                        event, 
+                        false,
+                        this.setEventLocalsUser) ?? {};
                     if (resp2 instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Refresh token flow should return an object not Response");
                     return resp2;
 

@@ -134,7 +134,22 @@ export class LdapUserStorage extends UserStorage {
     async getUserByEmail(
         email : string | number, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
-            return await this.getUserByEmail(email, options);
+            return await this.localStorage.getUserByEmail(email, options);
+    }
+
+    /**
+     * Returns user matching the given field, or throws an exception.  
+     * 
+     * @param field the field to match
+     * @param value the value to match (case sensitive)
+     * @param options optionally turn off checks.  Used internally
+     * @throws CrossauthException with ErrorCode either `UserNotExist` or whatever pg throws
+     */
+    async getUserBy(
+        field : string, 
+        value : string, 
+         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
+            return await this.localStorage.getUserBy(field, value, options);
     }
 
     async getUsers(skip? : number, take? : number) : Promise<User[]> {
