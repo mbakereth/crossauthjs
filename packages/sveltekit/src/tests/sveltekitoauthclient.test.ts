@@ -1093,3 +1093,32 @@ test('SvelteKitClient.middlewareWithUserEmbed', async () => {
         expect(locals?.authType).toBe("oidc")
     }
 });
+
+test('SvelteKitClient.middlewareWithUserMergeNoUser', async () => {
+    const {server, sessionId, sessionCookieValue} = await oauthLogin({userCreationType: "merge"});
+
+    if (server.oAuthClient && server.oAuthClient.hook) {
+        server.oAuthClient["testMiddleware"] = true;
+
+        // insert payload
+        if (!server.sessionServer) throw new Error("No session server");
+        const sessionManager = server.sessionServer["sessionManager"];
+        let sessionData = await sessionManager.dataForSessionId(sessionId??"");
+        sessionData.oauth.id_payload = {"sub": "bob1"}
+        await sessionManager.updateSessionData(sessionId??"", "oauth", sessionData["oauth"]);
+
+        let getRequest = new Request(`http://server.com/passwordflow`, {
+            method: "GET",
+            headers: {"cookie": "SESSIONID="+sessionCookieValue,
+                "content-type": "application/json",
+            },
+        });
+        let event = new MockRequestEvent("1", getRequest, {});
+        event.locals.sessionId = sessionId;
+    
+        await server.oAuthClient.hook({event})
+        let locals = server.oAuthClient["testEvent"]?.locals;
+        expect(locals?.user).toBeUndefined();
+        expect(locals?.authType).toBeUndefined();
+    }
+});
