@@ -299,7 +299,7 @@ export class SessionCookie {
     // cookie settings
     /** Name of the CSRF Cookie, set from input options */
     readonly cookieName : string = "SESSIONID";
-    readonly maxAge : number = 60*60*24*4; // 4 weeks
+    readonly maxAge : number = 60*60*24*30; // 30 days
     readonly domain : string | undefined = undefined;
     readonly httpOnly : boolean = false;
     readonly path : string = "/";
