@@ -353,73 +353,80 @@ export class SvelteKitServer {
 
         this.hooks = async ({event, resolve}) => {
 
-            // reset all locals
-            event.locals.user = undefined;
-            event.locals.sessionId = undefined;
-            event.locals.csrfToken = undefined;
-            event.locals.authType = undefined;
-            event.locals.scope = undefined;
-
-            if (this.sessionServer) {
-
-                // session hook
-                await this.sessionServer.sessionHook({event});
-
-                // two FA hook
-                const ret = this.userStorage ?  await this.sessionServer.twoFAHook({event}) : undefined;
-                if (!(ret && ret.twofa) && !event.locals.user) {
-                    if (this.sessionServer.isLoginPageProtected(event))  {
-                        if (this.loginUrl) {
-                            /*let redirect_uri = event.url.pathname;
-                            if (event.url.searchParams) {
-                                redirect_uri += "%3F";
-                                event.url.searchParams.forEach((value, key) => {
-                                    redirect_uri += encodeURIComponent(key) + "%3D" + encodeURIComponent(value)
-                                });
-                            }*/
-                            let redirect_uri =encodeURIComponent(event.request.url);
-                            return new Response(null, {status: 302, headers: {location: this.loginUrl + "?next=" + redirect_uri}});
-                        }
-                        return this.sessionServer.error(401, "Unauthorized");
-
-                    }
-                    if (this.sessionServer.isLoginApiProtected(event)) 
-                        return this.sessionServer.error(401, "Unauthorized");
-                }
-                if (!(ret && ret.twofa) && this.sessionServer.isAdminPageEndpoint(event) &&
-                    (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))
-                ) {
-                        if (this.sessionServer.unauthorizedUrl) {
-                            return new Response(null, {status: 302, headers: {location: this.sessionServer.unauthorizedUrl}});
-                        }
-                        return this.sessionServer.error(401, "Unauthorized");
-                }
-                if (!(ret && ret.twofa) && this.sessionServer.isAdminApiEndpoint(event) &&
-                    (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))) {
-                        return this.sessionServer.error(401, "Unauthorized");
-                }
-                if (ret?.response) return ret.response;    
-            }
-
-            // API server hook
-            if (this.apiKeyServer) {
-                await this.apiKeyServer.hook({event});
-            }
-
-            // OAuth client hook
-            if (this.oAuthClient) {
-                await this.oAuthClient.hook({event});
-            }
-
-            // OAuth res server hook
-            if (this.oAuthResServer?.hook) {
-                const resp = await this.oAuthResServer.hook({event});
-                if (resp) return resp;
-            }
-            
-            return await resolve(event);
+            const newEvent = await this.unresolvedHooks(event);            
+            return await resolve(newEvent);
 
         }
+    }
+
+    async unresolvedHooks(event : RequestEvent) {
+
+        // reset all locals
+        event.locals.user = undefined;
+        event.locals.sessionId = undefined;
+        event.locals.csrfToken = undefined;
+        event.locals.authType = undefined;
+        event.locals.scope = undefined;
+
+        if (this.sessionServer) {
+
+            // session hook
+            await this.sessionServer.sessionHook({event});
+
+            // two FA hook
+            const ret = this.userStorage ?  await this.sessionServer.twoFAHook({event}) : undefined;
+            if (!(ret && ret.twofa) && !event.locals.user) {
+                if (this.sessionServer.isLoginPageProtected(event))  {
+                    if (this.loginUrl) {
+                        /*let redirect_uri = event.url.pathname;
+                        if (event.url.searchParams) {
+                            redirect_uri += "%3F";
+                            event.url.searchParams.forEach((value, key) => {
+                                redirect_uri += encodeURIComponent(key) + "%3D" + encodeURIComponent(value)
+                            });
+                        }*/
+                        let redirect_uri =encodeURIComponent(event.request.url);
+                        return new Response(null, {status: 302, headers: {location: this.loginUrl + "?next=" + redirect_uri}});
+                    }
+                    return this.sessionServer.error(401, "Unauthorized");
+
+                }
+                if (this.sessionServer.isLoginApiProtected(event)) 
+                    return this.sessionServer.error(401, "Unauthorized");
+            }
+            if (!(ret && ret.twofa) && this.sessionServer.isAdminPageEndpoint(event) &&
+                (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))
+            ) {
+                    if (this.sessionServer.unauthorizedUrl) {
+                        return new Response(null, {status: 302, headers: {location: this.sessionServer.unauthorizedUrl}});
+                    }
+                    return this.sessionServer.error(401, "Unauthorized");
+            }
+            if (!(ret && ret.twofa) && this.sessionServer.isAdminApiEndpoint(event) &&
+                (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user))) {
+                    return this.sessionServer.error(401, "Unauthorized");
+            }
+            if (ret?.response) return ret.response;    
+        }
+
+        // API server hook
+        if (this.apiKeyServer) {
+            await this.apiKeyServer.hook({event});
+        }
+
+        // OAuth client hook
+        if (this.oAuthClient) {
+            await this.oAuthClient.hook({event});
+        }
+
+        // OAuth res server hook
+        if (this.oAuthResServer?.hook) {
+            const resp = await this.oAuthResServer.hook({event});
+            if (resp) return resp;
+        }
+        
+        return event;
+
     }
 
     /**
