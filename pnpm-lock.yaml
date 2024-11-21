@@ -575,7 +575,7 @@ importers:
         specifier: ^3.0.11
         version: 3.0.11
       '@prisma/client':
-        specifier: ^5.12.0
+        specifier: ^5.18.0
         version: 5.18.0(prisma@5.18.0)
       '@types/cookie':
         specifier: ^0.6.0
@@ -640,9 +640,6 @@ importers:
       ldap-async:
         specifier: ^2.1.1
         version: 2.1.1
-      ldapjs:
-        specifier: link:@types/@mbakereth/ldapjs
-        version: link:@types/@mbakereth/ldapjs
       nodemailer:
         specifier: ^6.9.8
         version: 6.9.14
@@ -748,7 +745,7 @@ importers:
         specifier: ^8.2.0
         version: 8.2.0
       '@prisma/client':
-        specifier: ^5.9.1
+        specifier: ^5.18.0
         version: 5.18.0(prisma@5.18.0)
       '@types/cookie':
         specifier: ^0.6.0
