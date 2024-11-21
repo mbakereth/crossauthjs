@@ -13,13 +13,12 @@
   ],
   "exports": {
     ".": {
-        "types": "./dist/index.d.ts",
-        "require": "./dist/index.cjs",
-        "import": "./dist/index.js",
-        "default": "./dist/index.js"
-     }
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   },
-
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -47,6 +46,7 @@
   "dependencies": {
     "@crossauth/common": "workspace:^",
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
+    "@mbakereth/ldapjs": "^3.0.11",
     "@prisma/client": "^5.12.0",
     "@types/cookie": "^0.6.0",
     "@types/cookie-parser": "^1.4.6",
@@ -69,7 +69,6 @@
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
     "ldap-async": "^2.1.1",
-    "ldapjs": "^3.0.7",
     "nodemailer": "^6.9.8",
     "nunjucks": "^3.2.4",
     "otplib": "^12.0.1",

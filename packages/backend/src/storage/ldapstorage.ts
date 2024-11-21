@@ -4,7 +4,9 @@ import { type User, type UserSecrets, type UserInputFields, type UserSecretsInpu
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
-import ldap from 'ldapjs';
+import ldap from '@mbakereth/ldapjs';
+//import LdapClient from 'ldapjs-client';
+//import ldap from 'ldapauth-fork';
 
 /**
  * A user returned by an LDAP server
@@ -204,6 +206,7 @@ export class LdapUserStorage extends UserStorage {
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
             const ce = CrossauthError.asCrossauthError(e);
+            console.log(e)
             if (e instanceof ldap.InvalidCredentialsError) {
                 throw new CrossauthError(ErrorCode.UsernameOrPasswordInvalid);
             } else if (ce.code != ErrorCode.UnknownError) {
