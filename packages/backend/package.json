@@ -28,6 +28,7 @@
     "testonce": "dotenv -e .env.unittest vitest run --exclude **/excl_*",
     "testexclonce": "dotenv -e .env.unittest vitest run excl_",
     "testall": "dotenv -e .env.unittest vitest run ",
+    "testldap": "dotenv -e .env.private vitest run ldapstor ldapauth",
     "doc": "typedoc",
     "prisma": "dotenv -e .env.unittest pnpm exec prisma"
   },
