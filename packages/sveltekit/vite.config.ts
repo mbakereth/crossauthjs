@@ -18,7 +18,7 @@ export default defineConfig({
 		rollupOptions: {
 		  // make sure to externalize deps that shouldn't be bundled
 		  // into your library
-		  external: ['.env', '.env.unittest', 'prisma', '@prisma/client', 'node:crypto', 'crypto', ],
+		  external: ['.env', '.env.unittest', 'prisma', '@prisma/client', 'node:crypto', 'crypto', '@sveltejs/kit'],
 		},
 	  },
 	plugins: [
