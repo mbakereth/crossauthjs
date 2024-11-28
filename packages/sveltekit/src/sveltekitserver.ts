@@ -354,6 +354,7 @@ export class SvelteKitServer {
         this.hooks = async ({event, resolve}) => {
 
             const newEvent = await this.unresolvedHooks(event);            
+            if (newEvent  instanceof Response) return newEvent;
             return await resolve(newEvent);
 
         }

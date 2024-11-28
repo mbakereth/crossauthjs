@@ -1292,6 +1292,12 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             isNotProtected);
         if (isNotProtected) return false;
 
+        isNotProtected = this.loginProtectedExceptionPageEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isNotProtected);
+        if (isNotProtected) return false;
+
         let isAdmin = false;
         return this.adminPageEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
@@ -1315,6 +1321,12 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         // return false for adminProtectedExceptionApiEndpoints
         let isNotProtected = false;
         isNotProtected = this.adminProtectedExceptionApiEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isNotProtected);
+        if (isNotProtected) return false;
+
+        isNotProtected = this.loginProtectedExceptionApiEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
                 accumulator || minimatch(url.pathname, currentValue),
             isNotProtected);
