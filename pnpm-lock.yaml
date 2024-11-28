@@ -934,7 +934,7 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@sveltejs/kit@2.5.22(@sveltejs/vite-plugin-svelte@3.1.1(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))
       '@sveltejs/kit':
-        specifier: ^2.0.0
+        specifier: ^2.5.22
         version: 2.5.22(@sveltejs/vite-plugin-svelte@3.1.1(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^3.0.0

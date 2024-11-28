@@ -205,6 +205,20 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
      */
     loginProtectedExceptionApiEndpoints?: string[],    
     
+    /**
+     * This overrides `adminProtectedPageEndpoints`
+     * 
+     * The default is empty.
+     * 
+     */
+    adminProtectedExceptionPageEndpoints?: string[],
+
+    /**
+     * This overrides `adminProtectedPageEndpoints`
+     * 
+     * The default is empty
+     */
+    adminProtectedExceptionApiEndpoints?: string[],    
     
     /**
      * See `adminPageEndpoints`
@@ -525,6 +539,8 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     private loginProtectedExceptionApiEndpoints : string[] = [];
     private adminPageEndpoints : string[] = [];
     private adminApiEndpoints : string[] = [];
+    private adminProtectedExceptionPageEndpoints : string[] = [];
+    private adminProtectedExceptionApiEndpoints : string[] = [];
     readonly unauthorizedUrl : string|undefined = undefined;
     readonly enableCsrfProtection = true;
 
@@ -620,6 +636,8 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         setParameter("loginProtectedExceptionApiEndpoints", ParamType.JsonArray, this, options, "LOGIN_PROTECTED_EXCEPTION_API_ENDPOINTS");
         setParameter("adminPageEndpoints", ParamType.JsonArray, this, options, "ADMIN_PAGE_ENDPOINTS");
         setParameter("adminApiEndpoints", ParamType.JsonArray, this, options, "ADMIN_API_ENDPOINTS");
+        setParameter("adminProtectedExceptionPageEndpoints", ParamType.JsonArray, this, options, "ADMIN_PROTECTED_EXCEPTION_PAGE_ENDPOINTS");
+        setParameter("adminProtectedExceptionApiEndpoints", ParamType.JsonArray, this, options, "ADMIN_PROTECTED_EXCEPTION_API_ENDPOINTS");
         setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
         setParameter("unauthorizedUrl", ParamType.JsonArray, this, options, "UNAUTHORIZED_PAGE");
         let options1 : {allowedFactor2?: string[]} = {}
@@ -1265,6 +1283,15 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     isAdminPageEndpoint(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         //return (this.adminEndpoints.includes(url.pathname));
+
+        // return false for adminProtectedExceptionPageEndpoints
+        let isNotProtected = false;
+        isNotProtected = this.adminProtectedExceptionPageEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isNotProtected);
+        if (isNotProtected) return false;
+
         let isAdmin = false;
         return this.adminPageEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
@@ -1284,6 +1311,15 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     isAdminApiEndpoint(event : RequestEvent|string) : boolean {
         const url = new URL(typeof event == "string" ? event : event.request.url);
         //return (this.adminEndpoints.includes(url.pathname));
+
+        // return false for adminProtectedExceptionApiEndpoints
+        let isNotProtected = false;
+        isNotProtected = this.adminProtectedExceptionApiEndpoints.reduce(
+            (accumulator : boolean, currentValue : string) => 
+                accumulator || minimatch(url.pathname, currentValue),
+            isNotProtected);
+        if (isNotProtected) return false;
+
         let isAdmin = false;
         return this.adminApiEndpoints.reduce(
             (accumulator : boolean, currentValue : string) => 
