@@ -57,17 +57,17 @@
 
         <!-- factor2-->
         {#if data.allowedFactor2.length > 1}
-        <p class="label-text">Second Factor</p>
-        {#each data.allowedFactor2 as item }
-            <div class="form-control">
-                <span class="align-text-bottom mb-2">
-                    <input type="radio" name="factor2" id={"factor2_"+item.name} value={item.name} class="radio align-middle" bind:group={factor2} /> 
-                    <span class="align-bottom ml-2 text-sm">{ item.friendlyName }
+            <p class="label-text">Second Factor</p>
+            {#each data.allowedFactor2 as item }
+                <div class="form-control">
+                    <span class="align-text-bottom mb-2">
+                        <input type="radio" name="factor2" id={"factor2_"+item.name} value={item.name} class="radio align-middle" bind:group={factor2} /> 
+                        <span class="align-bottom ml-2 text-sm">{ item.friendlyName }
+                        </span>
                     </span>
-                </span>
-            </div>
-        {/each}
-    {/if}
+                </div>
+            {/each}
+        {/if}
 
         <input type="hidden" name="csrfToken" value={data.csrfToken} />
 

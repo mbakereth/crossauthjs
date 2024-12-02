@@ -1,7 +1,7 @@
 {
 	"name": "sveltekitserverexample",
 	"version": "0.0.22",
-        "license": "Apache-2.0",
+	"license": "Apache-2.0",
 	"private": true,
 	"scripts": {
 		"dev": "NODE_PATH=`pwd`/node_modules dotenv -e .env.dev vite dev",
@@ -20,7 +20,7 @@
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.0.0",
-		"@sveltejs/adapter-node": "^5.2.0",
+		"@sveltejs/adapter-node": "^5.2.2",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
 		"@vitejs/plugin-basic-ssl": "^1.1.0",
