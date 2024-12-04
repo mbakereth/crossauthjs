@@ -55,7 +55,13 @@ export class OAuthAutoRefresher {
         if (!this.autoRefreshActive) {
             this.autoRefreshActive = true;
             CrossauthLogger.logger.debug(j({msg: "Starting auto refresh"}));
-            await this.scheduleAutoRefresh(tokensToFetch, errorFn);
+            try {
+                await this.scheduleAutoRefresh(tokensToFetch, errorFn);
+            } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.error(j({cerr: ce}));
+                CrossauthLogger.logger.debug(j({err: ce}));
+            }
         }
     }
 

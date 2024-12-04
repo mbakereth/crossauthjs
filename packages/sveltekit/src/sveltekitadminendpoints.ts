@@ -476,7 +476,7 @@ export class SvelteKitAdminEndpoints {
             // the form should contain old_{secret}, new_{secret} and repeat_{secret}
             // extract them, making sure the secret is a valid one
             const secretNames = authenticator.secretNames();
-            let oldSecrets : AuthenticationParameters = {};
+            let oldSecrets : AuthenticationParameters|undefined = {};
             let newSecrets : AuthenticationParameters = {};
             let repeatSecrets : AuthenticationParameters|undefined = {};
             for (let field in formData) {
@@ -492,6 +492,7 @@ export class SvelteKitAdminEndpoints {
                 }
             }
             if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
+            if (Object.keys(oldSecrets).length === 0) oldSecrets = undefined;
 
             // validate the new secret - this is through an implementor-supplied function
             let errors = authenticator.validateSecrets(newSecrets);
@@ -506,7 +507,7 @@ export class SvelteKitAdminEndpoints {
                     1,
                     newSecrets,
                     repeatSecrets,
-                    oldSecrets
+                    oldSecrets,
                 );
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);

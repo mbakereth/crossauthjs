@@ -261,7 +261,7 @@ export class PrismaUserStorage extends UserStorage {
                     let existingSecrets : {[key:string]:any} = {}
                     try {
                         // @ts-ignore  (because types only exist when do prismaClient.table...)
-                        await tx[this.userSecretsTable].findUniqueOrThrow({
+                        existingSecrets = await tx[this.userSecretsTable].findUniqueOrThrow({
                             where: {
                                 [this.useridForeignKeyColumn]: user.id
                             },

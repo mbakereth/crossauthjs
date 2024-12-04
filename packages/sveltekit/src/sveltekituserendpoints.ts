@@ -1856,14 +1856,14 @@ export class SvelteKitUserEndpoints {
         actions: {
             login: async ( event : RequestEvent ) => {
                 const resp = await this.login(event);
-                    if (resp?.ok == true && !resp?.factor2Required) 
-                      this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
-                        if (resp && (
-                            resp?.errorCode == ErrorCode.UserNotExist ||
-                            resp?.errorCode == ErrorCode.PasswordInvalid)) {
-                                resp.error = "Username or password is invalid";
-                        }
-                        return resp;
+                if (resp?.ok == true && !resp?.factor2Required) 
+                    this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
+                    if (resp && (
+                        resp?.errorCode == ErrorCode.UserNotExist ||
+                        resp?.errorCode == ErrorCode.PasswordInvalid)) {
+                            resp.error = "Username or password is invalid";
+                    }
+                    return resp;
             },
             factor2: async ( event : RequestEvent ) => {
                 const resp = await this.loginFactor2(event);
