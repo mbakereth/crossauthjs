@@ -572,8 +572,32 @@ importers:
         specifier: ^0.2.2
         version: 0.2.2(esbuild@0.23.0)
       '@mbakereth/ldapjs':
-        specifier: ^3.0.12
-        version: 3.0.12
+        specifier: ^3.0.16
+        version: 3.0.16
+      '@mbakereth/ldapjs-asn1':
+        specifier: ^2.0.1
+        version: 2.0.1
+      '@mbakereth/ldapjs-attribute':
+        specifier: ^1.0.1
+        version: 1.0.1
+      '@mbakereth/ldapjs-change':
+        specifier: ^1.0.1
+        version: 1.0.1
+      '@mbakereth/ldapjs-controls':
+        specifier: ^2.1.2
+        version: 2.1.2
+      '@mbakereth/ldapjs-dn':
+        specifier: ^1.1.1
+        version: 1.1.1
+      '@mbakereth/ldapjs-filter':
+        specifier: ^2.1.2
+        version: 2.1.2
+      '@mbakereth/ldapjs-messages':
+        specifier: ^1.3.1
+        version: 1.3.1
+      '@mbakereth/ldapjs-protocol':
+        specifier: ^1.2.2
+        version: 1.2.2
       '@prisma/client':
         specifier: ^5.18.0
         version: 5.18.0(prisma@5.18.0)
@@ -1543,32 +1567,56 @@ packages:
     resolution: {integrity: sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA==}
     engines: {node: '>=8'}
 
-  '@mbakereth/ldapjs-asn1@2.0.0':
-    resolution: {integrity: sha512-AXwsMpbFWRwgrLe2T99IpkjmcZFdYET7p59Ud5jIBhsBpcPNcXtFVCPK+InlOHhsevbuIc7n4saayTW0dSmdTg==}
+  '@mbakereth/ldapjs-asn1@2.0.1':
+    resolution: {integrity: sha512-kUfuyxOcpvM4Ns5WPLhXNt1XtJoD/bB++JJjZ3lGDywSL9dvSa+nwTsj/itr2hPlnyJsAajzrJKEJPQG6pfv0w==}
 
-  '@mbakereth/ldapjs-attribute@1.0.0':
-    resolution: {integrity: sha512-q9qRCroad/S4W7o3MgQhCXN7vrsw+XP3SkBD9mrJEym4Oi6coIkbk6EFzOWoSYTXrWMKiCRwp41NZNN4C9YRWQ==}
+  '@mbakereth/ldapjs-asn1@2.0.2':
+    resolution: {integrity: sha512-i+r5LgX+ixyEapquIW77Mk4Tyn36YM3kdOH4x/ECFKiJNOHvSH8hVJo4NDhzc7+iYNJQWWENHp4ze/fKCSqXOw==}
 
-  '@mbakereth/ldapjs-change@1.0.0':
-    resolution: {integrity: sha512-SUFvsItFVPoLamxipfx6994Ovc4SQ+b7p/UXKfnvO6n9aMEIu9lnQMXPqPSZVUtByPPzvBdmKRhCdM+LRO8CEQ==}
+  '@mbakereth/ldapjs-attribute@1.0.1':
+    resolution: {integrity: sha512-xUPK9eGOzMZ4JtpF+2vUeLsTI72s9/+p3Y6iuv/b/9PJnV/7XPJ3+4Lq+PMKIeGXmpHKzDc5CWvB5fXbsiL3JQ==}
 
-  '@mbakereth/ldapjs-controls@2.1.1':
-    resolution: {integrity: sha512-RuFKu/8SqFIpqo5I4nFKneo71QwXJGi9Mjk51jeMyOlFzFtj5ybWZOMEVG+sQPosXjPF7KDy9iftOs7eK3g32w==}
+  '@mbakereth/ldapjs-attribute@1.0.2':
+    resolution: {integrity: sha512-mGdF4DTuj4H8ydFEBPpMfYaAN81r2/aJCmUUV9zOaBnNyISf/pQd8LIU6aNfVUnNXydc36e6uxlIBCEsutosDw==}
 
-  '@mbakereth/ldapjs-dn@1.1.0':
-    resolution: {integrity: sha512-wjt0RP8SBBWCPOCzbeY3kHakm92pzlvKFFAukgYae4sutsEfRVe3nMhnotdHLiuEUmx9q3l6BYbFmjg8wkWJFQ==}
+  '@mbakereth/ldapjs-change@1.0.1':
+    resolution: {integrity: sha512-Cb8ItUyRnGOwomDiJcJnylfsY61wv5FIs+6T6gp5zZiSAql9Fl1BQYcJt+vxC2CWPhqUtIlwdadbQHW6PhEBTg==}
 
-  '@mbakereth/ldapjs-filter@2.1.1':
-    resolution: {integrity: sha512-yyOPn1wLTGwgQfXtSNC2++Aq24rJFpvxkCWKkgZof6OAUMvIqgbnzNxL9906vB3mMxI/668b75eocG1SV0Pd0g==}
+  '@mbakereth/ldapjs-change@1.0.4':
+    resolution: {integrity: sha512-Ggwfn8iiiVBIXwwFcyrnP6BF5Ts0LM7tZXaMv+UTXzBySfJJ1xpKe5Sr57m4hw2uRCzPJNAgF/udMsto5pijFg==}
 
-  '@mbakereth/ldapjs-messages@1.3.0':
-    resolution: {integrity: sha512-oZtINoqyBkEHOgl+XZ3Qs53pg3xBITbq73Zdy1uHuSHxFwi3qXU8mrg6WDlkaBNsowI5Y6V8OofBwkjmG4BSSg==}
+  '@mbakereth/ldapjs-controls@2.1.2':
+    resolution: {integrity: sha512-6hpNke/lOO2ryvNcXYOUT7bFR90Z0wBHa0nG93DSzVyaW1/J3/xZmVmLZteQUFnb6QzbskYWizDRXXe3sa17VA==}
 
-  '@mbakereth/ldapjs-protocol@1.2.1':
-    resolution: {integrity: sha512-0urmekEZ9913K0W/78yLQSxktn+b69TXgQZfDsCVI0ciWFD7okPcg/aT396qCJE4DhhUy3AqWUudWz2ZqFS5EQ==}
+  '@mbakereth/ldapjs-controls@2.1.3':
+    resolution: {integrity: sha512-KAv5kahE20Zuwp+u5yvJatbFObpWukQtRKqS5wqm/Sbo8telD8noha/axVBalEH8gFGh1awFv6lqB7wYvwLelA==}
 
-  '@mbakereth/ldapjs@3.0.12':
-    resolution: {integrity: sha512-vt50mlHz1dJXRA7nw1hV4Vp/m58zWR8O41MHuwpRhaLd8O80VZWaRRIDQWVk1iEQWF6Sgr+mXrfjrcuNJpGcCQ==}
+  '@mbakereth/ldapjs-dn@1.1.1':
+    resolution: {integrity: sha512-LQ+exBVKKFJSDa6b6mMo+7P7AoaPBHzDytIp/7OP1PT/O363QdXE0S6yX0TlDcKJPEJA+vZgjXwdOUQVhYDRHA==}
+
+  '@mbakereth/ldapjs-dn@1.1.2':
+    resolution: {integrity: sha512-k5Vq4zHWG8uYYGDLl0LUvzPaDv33dK/GqB3I1WU+Ib+0lVKCknbZAKbQ9LPGhn0Q8xpoC04ZvFaHGd9pKLhtPg==}
+
+  '@mbakereth/ldapjs-filter@2.1.2':
+    resolution: {integrity: sha512-0WjjLO0olwtbSMO3ELEo8rq91bRdxWfAZOK4G5GY8bm3QgCcmOlxXPC8a7LjBCIUwg8ItfezqABdfU5GmewOWA==}
+
+  '@mbakereth/ldapjs-filter@2.1.3':
+    resolution: {integrity: sha512-GVOzpmau23xBVtNZ9ji6Uk/03ULPMKRMmTxkWPQL8AYdAeCkl1vC/+sBSfujO34o3NJsJUjqfc5Bp5PVl7Djww==}
+
+  '@mbakereth/ldapjs-messages@1.3.1':
+    resolution: {integrity: sha512-gnYR+3LGCcKy9ih7r5PviVgdfdGCBCLSy3DvB1cfAdL3zlpNYDml5Gj0Giw/Gd6sBfmIU001pZm795sIIxHI8Q==}
+
+  '@mbakereth/ldapjs-messages@1.3.2':
+    resolution: {integrity: sha512-H90aRJYdVe1T81k/gzxECieRBLZQgUr6FYzMZeE3B8UBOQDyxCDE1sL6il5/WFHS4119wnFn55nze3yobUQKDg==}
+
+  '@mbakereth/ldapjs-protocol@1.2.2':
+    resolution: {integrity: sha512-/kpjzVvcWyee9G1HUwCyLnPPXWafu5iN/rWSAjzq724o2vJfhSCLYMAR4GQDNaCODlVJbCLh4DZT2kJvSXuaVg==}
+
+  '@mbakereth/ldapjs-protocol@1.2.3':
+    resolution: {integrity: sha512-xZKv3DiI6b2OAeMmFBHsomGdh3Wd15MO6+z/HYkazHR954zZRgtOkjHZ1pmbW6uEBcy78o8TfOvv2oQQSv9ssg==}
+
+  '@mbakereth/ldapjs@3.0.16':
+    resolution: {integrity: sha512-C5NAg0NOXLHs6nmU79rQXN4X/pJ8nZ/G5rI0rIxyHDG8znGONRQHVpYpXMbUEP2FvIOWBPPmtQGT8F2lVtzWwQ==}
 
   '@microsoft/api-extractor-model@7.28.13':
     resolution: {integrity: sha512-39v/JyldX4MS9uzHcdfmjjfS6cYGAoXV+io8B5a338pkHiSt+gy2eXQ0Q7cGFJ7quSa1VqqlMdlPrB6sLR/cAw==}
@@ -5778,58 +5826,100 @@ snapshots:
 
   '@lukeed/ms@2.0.2': {}
 
-  '@mbakereth/ldapjs-asn1@2.0.0': {}
+  '@mbakereth/ldapjs-asn1@2.0.1': {}
 
-  '@mbakereth/ldapjs-attribute@1.0.0':
+  '@mbakereth/ldapjs-asn1@2.0.2': {}
+
+  '@mbakereth/ldapjs-attribute@1.0.1':
     dependencies:
-      '@mbakereth/ldapjs-asn1': 2.0.0
-      '@mbakereth/ldapjs-protocol': 1.2.1
+      '@mbakereth/ldapjs-asn1': 2.0.1
+      '@mbakereth/ldapjs-protocol': 1.2.2
       process-warning: 2.3.2
 
-  '@mbakereth/ldapjs-change@1.0.0':
+  '@mbakereth/ldapjs-attribute@1.0.2':
     dependencies:
-      '@mbakereth/ldapjs-asn1': 2.0.0
-      '@mbakereth/ldapjs-attribute': 1.0.0
-
-  '@mbakereth/ldapjs-controls@2.1.1':
-    dependencies:
-      '@mbakereth/ldapjs-asn1': 2.0.0
-      '@mbakereth/ldapjs-protocol': 1.2.1
-
-  '@mbakereth/ldapjs-dn@1.1.0':
-    dependencies:
-      '@mbakereth/ldapjs-asn1': 2.0.0
+      '@mbakereth/ldapjs-asn1': 2.0.2
+      '@mbakereth/ldapjs-protocol': 1.2.3
       process-warning: 2.3.2
 
-  '@mbakereth/ldapjs-filter@2.1.1':
+  '@mbakereth/ldapjs-change@1.0.1':
     dependencies:
-      '@mbakereth/ldapjs-asn1': 2.0.0
-      '@mbakereth/ldapjs-protocol': 1.2.1
+      '@mbakereth/ldapjs-asn1': 2.0.1
+      '@mbakereth/ldapjs-attribute': 1.0.1
+
+  '@mbakereth/ldapjs-change@1.0.4':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.2
+      '@mbakereth/ldapjs-attribute': 1.0.2
+
+  '@mbakereth/ldapjs-controls@2.1.2':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.1
+      '@mbakereth/ldapjs-protocol': 1.2.2
+
+  '@mbakereth/ldapjs-controls@2.1.3':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.2
+      '@mbakereth/ldapjs-protocol': 1.2.3
+
+  '@mbakereth/ldapjs-dn@1.1.1':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.1
       process-warning: 2.3.2
 
-  '@mbakereth/ldapjs-messages@1.3.0':
+  '@mbakereth/ldapjs-dn@1.1.2':
     dependencies:
-      '@mbakereth/ldapjs-asn1': 2.0.0
-      '@mbakereth/ldapjs-attribute': 1.0.0
-      '@mbakereth/ldapjs-change': 1.0.0
-      '@mbakereth/ldapjs-controls': 2.1.1
-      '@mbakereth/ldapjs-dn': 1.1.0
-      '@mbakereth/ldapjs-filter': 2.1.1
-      '@mbakereth/ldapjs-protocol': 1.2.1
+      '@mbakereth/ldapjs-asn1': 2.0.2
       process-warning: 2.3.2
 
-  '@mbakereth/ldapjs-protocol@1.2.1': {}
-
-  '@mbakereth/ldapjs@3.0.12':
+  '@mbakereth/ldapjs-filter@2.1.2':
     dependencies:
-      '@mbakereth/ldapjs-asn1': 2.0.0
-      '@mbakereth/ldapjs-attribute': 1.0.0
-      '@mbakereth/ldapjs-change': 1.0.0
-      '@mbakereth/ldapjs-controls': 2.1.1
-      '@mbakereth/ldapjs-dn': 1.1.0
-      '@mbakereth/ldapjs-filter': 2.1.1
-      '@mbakereth/ldapjs-messages': 1.3.0
-      '@mbakereth/ldapjs-protocol': 1.2.1
+      '@mbakereth/ldapjs-asn1': 2.0.1
+      '@mbakereth/ldapjs-protocol': 1.2.2
+      process-warning: 2.3.2
+
+  '@mbakereth/ldapjs-filter@2.1.3':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.2
+      '@mbakereth/ldapjs-protocol': 1.2.3
+      process-warning: 2.3.2
+
+  '@mbakereth/ldapjs-messages@1.3.1':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.1
+      '@mbakereth/ldapjs-attribute': 1.0.1
+      '@mbakereth/ldapjs-change': 1.0.1
+      '@mbakereth/ldapjs-controls': 2.1.2
+      '@mbakereth/ldapjs-dn': 1.1.1
+      '@mbakereth/ldapjs-filter': 2.1.2
+      '@mbakereth/ldapjs-protocol': 1.2.2
+      process-warning: 2.3.2
+
+  '@mbakereth/ldapjs-messages@1.3.2':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.2
+      '@mbakereth/ldapjs-attribute': 1.0.2
+      '@mbakereth/ldapjs-change': 1.0.4
+      '@mbakereth/ldapjs-controls': 2.1.3
+      '@mbakereth/ldapjs-dn': 1.1.2
+      '@mbakereth/ldapjs-filter': 2.1.3
+      '@mbakereth/ldapjs-protocol': 1.2.3
+      process-warning: 2.3.2
+
+  '@mbakereth/ldapjs-protocol@1.2.2': {}
+
+  '@mbakereth/ldapjs-protocol@1.2.3': {}
+
+  '@mbakereth/ldapjs@3.0.16':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.2
+      '@mbakereth/ldapjs-attribute': 1.0.2
+      '@mbakereth/ldapjs-change': 1.0.4
+      '@mbakereth/ldapjs-controls': 2.1.3
+      '@mbakereth/ldapjs-dn': 1.1.2
+      '@mbakereth/ldapjs-filter': 2.1.3
+      '@mbakereth/ldapjs-messages': 1.3.2
+      '@mbakereth/ldapjs-protocol': 1.2.3
       abstract-logging: 2.0.1
       assert-plus: 1.0.0
       backoff: 2.5.0
@@ -6429,7 +6519,7 @@ snapshots:
 
   agent-base@6.0.2:
     dependencies:
-      debug: 4.3.6
+      debug: 4.3.6(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -6548,14 +6638,6 @@ snapshots:
     dependencies:
       '@fastify/error': 3.4.1
       fastq: 1.17.1
-
-  axios@1.7.4:
-    dependencies:
-      follow-redirects: 1.15.6
-      form-data: 4.0.0
-      proxy-from-env: 1.1.0
-    transitivePeerDependencies:
-      - debug
 
   axios@1.7.4(debug@4.3.6):
     dependencies:
@@ -6712,7 +6794,7 @@ snapshots:
 
   centra@2.7.0:
     dependencies:
-      follow-redirects: 1.15.6
+      follow-redirects: 1.15.6(debug@4.3.6)
     transitivePeerDependencies:
       - debug
 
@@ -6921,10 +7003,6 @@ snapshots:
   debug@3.2.7:
     dependencies:
       ms: 2.1.3
-
-  debug@4.3.6:
-    dependencies:
-      ms: 2.1.2
 
   debug@4.3.6(supports-color@5.5.0):
     dependencies:
@@ -7398,8 +7476,6 @@ snapshots:
       locate-path: 5.0.0
       path-exists: 4.0.0
 
-  follow-redirects@1.15.6: {}
-
   follow-redirects@1.15.6(debug@4.3.6):
     optionalDependencies:
       debug: 4.3.6(supports-color@5.5.0)
@@ -7618,7 +7694,7 @@ snapshots:
     dependencies:
       '@tootallnate/once': 1.1.2
       agent-base: 6.0.2
-      debug: 4.3.6
+      debug: 4.3.6(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
     optional: true
@@ -7634,7 +7710,7 @@ snapshots:
   http-proxy@1.18.1:
     dependencies:
       eventemitter3: 4.0.7
-      follow-redirects: 1.15.6
+      follow-redirects: 1.15.6(debug@4.3.6)
       requires-port: 1.0.0
     transitivePeerDependencies:
       - debug
@@ -7645,7 +7721,7 @@ snapshots:
       '@types/follow-redirects': 1.14.4
       chokidar: 3.6.0
       commander: 12.1.0
-      follow-redirects: 1.15.6
+      follow-redirects: 1.15.6(debug@4.3.6)
       http-proxy: 1.18.1
     transitivePeerDependencies:
       - debug
@@ -7653,7 +7729,7 @@ snapshots:
   https-proxy-agent@5.0.1:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.3.6
+      debug: 4.3.6(supports-color@5.5.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -9109,7 +9185,7 @@ snapshots:
   socks-proxy-agent@6.2.1:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.3.6
+      debug: 4.3.6(supports-color@5.5.0)
       socks: 2.8.3
     transitivePeerDependencies:
       - supports-color
@@ -9494,7 +9570,7 @@ snapshots:
 
   twilio@5.2.2:
     dependencies:
-      axios: 1.7.4
+      axios: 1.7.4(debug@4.3.6)
       dayjs: 1.11.12
       https-proxy-agent: 5.0.1
       jsonwebtoken: 9.0.2
@@ -9605,7 +9681,7 @@ snapshots:
   vite-node@1.6.0(@types/node@20.14.15):
     dependencies:
       cac: 6.7.14
-      debug: 4.3.6
+      debug: 4.3.6(supports-color@5.5.0)
       pathe: 1.1.2
       picocolors: 1.0.1
       vite: 5.4.0(@types/node@20.14.15)
@@ -9625,7 +9701,7 @@ snapshots:
       '@microsoft/api-extractor': 7.43.0(@types/node@20.14.15)
       '@rollup/pluginutils': 5.1.0(rollup@4.20.0)
       '@vue/language-core': 1.8.27(typescript@5.3.3)
-      debug: 4.3.6
+      debug: 4.3.6(supports-color@5.5.0)
       kolorist: 1.8.0
       magic-string: 0.30.11
       typescript: 5.3.3
@@ -9686,7 +9762,7 @@ snapshots:
       '@vitest/utils': 1.6.0
       acorn-walk: 8.3.3
       chai: 4.5.0
-      debug: 4.3.6
+      debug: 4.3.6(supports-color@5.5.0)
       execa: 8.0.1
       local-pkg: 0.5.0
       magic-string: 0.30.11
