@@ -2352,9 +2352,6 @@ export class OAuthAuthorizationServer {
                             this.clockTolerance*1000) : 
                         undefined;
             }
-            if (this.audience) {
-                accessTokenPayload.aud = this.oauthIssuer; 
-            }
 
             // create refresh token jwt
             refreshToken = await new Promise((resolve, reject) => {
