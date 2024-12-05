@@ -1,7 +1,7 @@
 {
   "name": "@crossauth/backend",
   "private": false,
-  "version": "0.0.25",
+  "version": "0.0.26",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -67,7 +67,6 @@
     "jose": "^5.2.3",
     "jsonwebtoken": "^9.0.2",
     "jwt-decode": "^4.0.0",
-    "ldap-async": "^2.1.1",
     "nodemailer": "^6.9.8",
     "nunjucks": "^3.2.4",
     "otplib": "^12.0.1",
