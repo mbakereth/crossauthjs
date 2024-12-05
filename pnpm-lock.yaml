@@ -433,7 +433,7 @@ importers:
         specifier: ^5.2.0
         version: 5.2.2(@sveltejs/kit@2.5.22(@sveltejs/vite-plugin-svelte@3.1.1(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))
       '@sveltejs/kit':
-        specifier: ^2.0.0
+        specifier: ^2.5.22
         version: 2.5.22(@sveltejs/vite-plugin-svelte@3.1.1(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^3.0.0
@@ -589,9 +589,6 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.5
         version: 9.0.6
-      '@types/ldapjs':
-        specifier: ^3.0.6
-        version: 3.0.6
       '@types/nodemailer':
         specifier: ^6.4.14
         version: 6.4.15
@@ -759,9 +756,6 @@ importers:
       '@types/jsonwebtoken':
         specifier: ^9.0.5
         version: 9.0.6
-      '@types/ldapjs':
-        specifier: ^3.0.6
-        version: 3.0.6
       '@types/nodemailer':
         specifier: ^6.4.14
         version: 6.4.15
@@ -804,12 +798,6 @@ importers:
       jwt-decode:
         specifier: ^4.0.0
         version: 4.0.0
-      ldap-async:
-        specifier: ^2.1.1
-        version: 2.1.1
-      ldapjs:
-        specifier: ^3.0.7
-        version: 3.0.7
       nodemailer:
         specifier: ^6.9.8
         version: 6.9.14

@@ -2342,7 +2342,7 @@ export class OAuthAuthorizationServer {
                 iat: timeCreated,
                 iss: this.oauthIssuer,
                 sub: authzData.username,
-                type: "access",
+                type: "refresh",
             };
             if (this.refreshTokenExpiry != null) {
                 refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry
@@ -2352,7 +2352,10 @@ export class OAuthAuthorizationServer {
                             this.clockTolerance*1000) : 
                         undefined;
             }
-
+            if (this.oauthIssuer) {
+                refreshTokenPayload.aud = this.oauthIssuer;
+            }
+    
             // create refresh token jwt
             refreshToken = await new Promise((resolve, reject) => {
                 jwt.sign(refreshTokenPayload,

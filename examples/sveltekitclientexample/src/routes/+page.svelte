@@ -6,7 +6,7 @@
     import { onMount } from 'svelte';
 
     let resourceResult = "Resource output will go here";
-    let idTokenResult = "ID token will go here"
+    let tokensResult = "Tokens will go here"
 
     onMount(() => {
         CrossauthLogger.logger.level = CrossauthLogger.Debug;
@@ -105,14 +105,14 @@
     <form method="POST" action="/tokens" use:enhance={() => {
 
         return async ({ result }) => {
-            idTokenResult = "id_token" in result ? JSON.stringify(result.id_token, null, 4) : "None sent";
+            tokensResult = result ? JSON.stringify(result, null, 4) : "None sent";
         };
         }}>
-        <button type="submit" class="btn btn-neutral">Get ID Token</button>
+        <button type="submit" class="btn btn-neutral">Get Tokens</button>
     </form>
     
     <pre class="mt-2 mb-2" id="result">
-{idTokenResult}
+{tokensResult}
     </pre>
     
 </div>
