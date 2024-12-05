@@ -1,7 +1,7 @@
 {
   "name": "@crossauth/backend",
   "private": false,
-  "version": "0.0.24",
+  "version": "0.0.25",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -46,7 +46,7 @@
   "dependencies": {
     "@crossauth/common": "workspace:^",
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
-    "@mbakereth/ldapjs": "^3.0.11",
+    "@mbakereth/ldapjs": "^3.0.12",
     "@prisma/client": "^5.18.0",
     "@types/cookie": "^0.6.0",
     "@types/cookie-parser": "^1.4.6",

@@ -458,7 +458,7 @@ importers:
         version: 4.2.18
       svelte-check:
         specifier: ^3.6.0
-        version: 3.8.5(postcss-load-config@4.0.2(postcss@8.4.41))(postcss@8.4.41)(svelte@4.2.18)
+        version: 3.8.5(postcss-load-config@4.0.2(postcss@8.4.41)(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3)))(postcss@8.4.41)(svelte@4.2.18)
       tailwindcss:
         specifier: ^3.4.1
         version: 3.4.10(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3))
@@ -534,7 +534,7 @@ importers:
         version: 4.2.18
       svelte-check:
         specifier: ^3.6.0
-        version: 3.8.5(postcss-load-config@4.0.2(postcss@8.4.41))(postcss@8.4.41)(svelte@4.2.18)
+        version: 3.8.5(postcss-load-config@4.0.2(postcss@8.4.41)(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3)))(postcss@8.4.41)(svelte@4.2.18)
       tailwindcss:
         specifier: ^3.4.1
         version: 3.4.10(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3))
@@ -572,8 +572,8 @@ importers:
         specifier: ^0.2.2
         version: 0.2.2(esbuild@0.23.0)
       '@mbakereth/ldapjs':
-        specifier: ^3.0.11
-        version: 3.0.11
+        specifier: ^3.0.12
+        version: 3.0.12
       '@prisma/client':
         specifier: ^5.18.0
         version: 5.18.0(prisma@5.18.0)
@@ -947,7 +947,7 @@ importers:
         version: 4.2.18
       svelte-check:
         specifier: ^3.6.0
-        version: 3.8.5(postcss-load-config@4.0.2(postcss@8.4.41))(postcss@8.4.41)(svelte@4.2.18)
+        version: 3.8.5(postcss-load-config@4.0.2(postcss@8.4.41)(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3)))(postcss@8.4.41)(svelte@4.2.18)
       tslib:
         specifier: ^2.4.1
         version: 2.6.3
@@ -1582,8 +1582,32 @@ packages:
     resolution: {integrity: sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA==}
     engines: {node: '>=8'}
 
-  '@mbakereth/ldapjs@3.0.11':
-    resolution: {integrity: sha512-uj7joA1+j78zjbS3X+XrTxs/PUHKc/+2IYfYDUtGZtd2RN0ZMG4OSa5JOckKy7ZROBVw0/eohUcF/7VZ2dYWlA==}
+  '@mbakereth/ldapjs-asn1@2.0.0':
+    resolution: {integrity: sha512-AXwsMpbFWRwgrLe2T99IpkjmcZFdYET7p59Ud5jIBhsBpcPNcXtFVCPK+InlOHhsevbuIc7n4saayTW0dSmdTg==}
+
+  '@mbakereth/ldapjs-attribute@1.0.0':
+    resolution: {integrity: sha512-q9qRCroad/S4W7o3MgQhCXN7vrsw+XP3SkBD9mrJEym4Oi6coIkbk6EFzOWoSYTXrWMKiCRwp41NZNN4C9YRWQ==}
+
+  '@mbakereth/ldapjs-change@1.0.0':
+    resolution: {integrity: sha512-SUFvsItFVPoLamxipfx6994Ovc4SQ+b7p/UXKfnvO6n9aMEIu9lnQMXPqPSZVUtByPPzvBdmKRhCdM+LRO8CEQ==}
+
+  '@mbakereth/ldapjs-controls@2.1.1':
+    resolution: {integrity: sha512-RuFKu/8SqFIpqo5I4nFKneo71QwXJGi9Mjk51jeMyOlFzFtj5ybWZOMEVG+sQPosXjPF7KDy9iftOs7eK3g32w==}
+
+  '@mbakereth/ldapjs-dn@1.1.0':
+    resolution: {integrity: sha512-wjt0RP8SBBWCPOCzbeY3kHakm92pzlvKFFAukgYae4sutsEfRVe3nMhnotdHLiuEUmx9q3l6BYbFmjg8wkWJFQ==}
+
+  '@mbakereth/ldapjs-filter@2.1.1':
+    resolution: {integrity: sha512-yyOPn1wLTGwgQfXtSNC2++Aq24rJFpvxkCWKkgZof6OAUMvIqgbnzNxL9906vB3mMxI/668b75eocG1SV0Pd0g==}
+
+  '@mbakereth/ldapjs-messages@1.3.0':
+    resolution: {integrity: sha512-oZtINoqyBkEHOgl+XZ3Qs53pg3xBITbq73Zdy1uHuSHxFwi3qXU8mrg6WDlkaBNsowI5Y6V8OofBwkjmG4BSSg==}
+
+  '@mbakereth/ldapjs-protocol@1.2.1':
+    resolution: {integrity: sha512-0urmekEZ9913K0W/78yLQSxktn+b69TXgQZfDsCVI0ciWFD7okPcg/aT396qCJE4DhhUy3AqWUudWz2ZqFS5EQ==}
+
+  '@mbakereth/ldapjs@3.0.12':
+    resolution: {integrity: sha512-vt50mlHz1dJXRA7nw1hV4Vp/m58zWR8O41MHuwpRhaLd8O80VZWaRRIDQWVk1iEQWF6Sgr+mXrfjrcuNJpGcCQ==}
 
   '@microsoft/api-extractor-model@7.28.13':
     resolution: {integrity: sha512-39v/JyldX4MS9uzHcdfmjjfS6cYGAoXV+io8B5a338pkHiSt+gy2eXQ0Q7cGFJ7quSa1VqqlMdlPrB6sLR/cAw==}
@@ -5847,16 +5871,58 @@ snapshots:
 
   '@lukeed/ms@2.0.2': {}
 
-  '@mbakereth/ldapjs@3.0.11':
+  '@mbakereth/ldapjs-asn1@2.0.0': {}
+
+  '@mbakereth/ldapjs-attribute@1.0.0':
     dependencies:
-      '@ldapjs/asn1': 2.0.0
-      '@ldapjs/attribute': 1.0.0
-      '@ldapjs/change': 1.0.0
-      '@ldapjs/controls': 2.1.0
-      '@ldapjs/dn': 1.1.0
-      '@ldapjs/filter': 2.1.1
-      '@ldapjs/messages': 1.3.0
-      '@ldapjs/protocol': 1.2.1
+      '@mbakereth/ldapjs-asn1': 2.0.0
+      '@mbakereth/ldapjs-protocol': 1.2.1
+      process-warning: 2.3.2
+
+  '@mbakereth/ldapjs-change@1.0.0':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.0
+      '@mbakereth/ldapjs-attribute': 1.0.0
+
+  '@mbakereth/ldapjs-controls@2.1.1':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.0
+      '@mbakereth/ldapjs-protocol': 1.2.1
+
+  '@mbakereth/ldapjs-dn@1.1.0':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.0
+      process-warning: 2.3.2
+
+  '@mbakereth/ldapjs-filter@2.1.1':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.0
+      '@mbakereth/ldapjs-protocol': 1.2.1
+      process-warning: 2.3.2
+
+  '@mbakereth/ldapjs-messages@1.3.0':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.0
+      '@mbakereth/ldapjs-attribute': 1.0.0
+      '@mbakereth/ldapjs-change': 1.0.0
+      '@mbakereth/ldapjs-controls': 2.1.1
+      '@mbakereth/ldapjs-dn': 1.1.0
+      '@mbakereth/ldapjs-filter': 2.1.1
+      '@mbakereth/ldapjs-protocol': 1.2.1
+      process-warning: 2.3.2
+
+  '@mbakereth/ldapjs-protocol@1.2.1': {}
+
+  '@mbakereth/ldapjs@3.0.12':
+    dependencies:
+      '@mbakereth/ldapjs-asn1': 2.0.0
+      '@mbakereth/ldapjs-attribute': 1.0.0
+      '@mbakereth/ldapjs-change': 1.0.0
+      '@mbakereth/ldapjs-controls': 2.1.1
+      '@mbakereth/ldapjs-dn': 1.1.0
+      '@mbakereth/ldapjs-filter': 2.1.1
+      '@mbakereth/ldapjs-messages': 1.3.0
+      '@mbakereth/ldapjs-protocol': 1.2.1
       abstract-logging: 2.0.1
       assert-plus: 1.0.0
       backoff: 2.5.0
@@ -9327,14 +9393,14 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  svelte-check@3.8.5(postcss-load-config@4.0.2(postcss@8.4.41))(postcss@8.4.41)(svelte@4.2.18):
+  svelte-check@3.8.5(postcss-load-config@4.0.2(postcss@8.4.41)(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3)))(postcss@8.4.41)(svelte@4.2.18):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.25
       chokidar: 3.6.0
       picocolors: 1.0.1
       sade: 1.8.1
       svelte: 4.2.18
-      svelte-preprocess: 5.1.4(postcss-load-config@4.0.2(postcss@8.4.41))(postcss@8.4.41)(svelte@4.2.18)(typescript@5.3.3)
+      svelte-preprocess: 5.1.4(postcss-load-config@4.0.2(postcss@8.4.41)(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3)))(postcss@8.4.41)(svelte@4.2.18)(typescript@5.3.3)
       typescript: 5.3.3
     transitivePeerDependencies:
       - '@babel/core'
@@ -9351,7 +9417,7 @@ snapshots:
     dependencies:
       svelte: 4.2.18
 
-  svelte-preprocess@5.1.4(postcss-load-config@4.0.2(postcss@8.4.41))(postcss@8.4.41)(svelte@4.2.18)(typescript@5.3.3):
+  svelte-preprocess@5.1.4(postcss-load-config@4.0.2(postcss@8.4.41)(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3)))(postcss@8.4.41)(svelte@4.2.18)(typescript@5.3.3):
     dependencies:
       '@types/pug': 2.0.10
       detect-indent: 6.1.0
