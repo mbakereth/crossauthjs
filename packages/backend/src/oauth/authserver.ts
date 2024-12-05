@@ -215,6 +215,12 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
      */
     idTokenClaims? : {[key:string] : string|string[]|{[key:string]:string}};
 
+    /** A JSON string of customs fields per scope to put in access token.
+     * `{"scope": "all"}` or `{"scope": {"idtokenfield" : "userfield"}}`.
+     * If `scope` is `all` then it applies to all scopes
+     */
+    accessTokenClaims? : {[key:string] : string|string[]|{[key:string]:string}};
+
     /**
      * The 2FA factors that are allowed for the Password MFA flow.
      */
@@ -274,6 +280,7 @@ export class OAuthAuthorizationServer {
     private validateScopes : boolean = false;
     private validScopes : string[] = [];
     private idTokenClaims : {[key:string] : any} = {};
+    private accessTokenClaims : {[key:string] : any} = {};
 
     // device code
     private userCodeExpiry = 60*5;
@@ -342,6 +349,7 @@ export class OAuthAuthorizationServer {
         setParameter("validScopes", ParamType.JsonArray, this, options, "OAUTH_VALID_SCOPES");
         setParameter("validFlows", ParamType.JsonArray, this, options, "OAUTH_validFlows");
         setParameter("idTokenClaims", ParamType.Json, this, options, "OAUTH_ID_TOKEN_CLAIMS");
+        setParameter("accessTokenClaims", ParamType.Json, this, options, "OAUTH_ACCESS_TOKEN_CLAIMS");
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
 
         // device code
@@ -2162,15 +2170,35 @@ export class OAuthAuthorizationServer {
         const timeCreated = Math.ceil(now.getTime()/1000);
         let dateAccessTokenExpires : Date|undefined;
 
+
+        if (scopes && scopes.includes("openid") || Object.keys(this.accessTokenClaims).length > 0) {
+
+            if (this.userStorage && authzData.username) {
+                try {
+                    const {user : user1} = 
+                        await this.userStorage.getUserByUsername(authzData.username);
+                    user = user1;
+                } catch (e) {
+                    CrossauthLogger.logger.error(j({err: e}));
+                    return {
+                        error: "server_error",
+                        error_description: "Couldn't load user data"
+                    }
+                }
+            }
+        }
+
         // create access token payload
         const accessTokenJti = Crypto.uuid();
-        const accessTokenPayload : {[key:string]: any} = {
+        let accessTokenPayload : {[key:string]: any} = {
             jti: accessTokenJti,
             iat: timeCreated,
             iss: this.oauthIssuer,
             sub: authzData.username,
             type: "access",
         };
+        // populate claims from custom set
+        accessTokenPayload = this.addClaims(accessTokenPayload, this.accessTokenClaims, scopes, user);
         if (scopes) {
             accessTokenPayload.scope = scopes;
         }
@@ -2212,19 +2240,6 @@ export class OAuthAuthorizationServer {
 
         if (scopes && scopes.includes("openid")) {
 
-            if (this.userStorage && authzData.username) {
-                try {
-                    const {user : user1} = 
-                        await this.userStorage.getUserByUsername(authzData.username);
-                    user = user1;
-                } catch (e) {
-                    CrossauthLogger.logger.error(j({err: e}));
-                    return {
-                        error: "server_error",
-                        error_description: "Couldn't load user data"
-                    }
-                }
-            }
             // create id token payload
             const idokenJti = Crypto.uuid();
             let idTokenPayload : {[key:string]: any} = {
@@ -2264,40 +2279,7 @@ export class OAuthAuthorizationServer {
             }
 
             // populate claims from custom set
-            if (user) {
-                if (scopes) {
-                    for (let scope of scopes) {
-                        if (scope in this.idTokenClaims) {
-                            if (this.idTokenClaims[scope] == "all") {
-                                idTokenPayload = {
-                                    ...idTokenPayload,
-                                    ...user
-                                };
-                            } else {
-                                for (let field in this.idTokenClaims[scope]) {
-                                    idTokenPayload[field] = 
-                                        user[this.idTokenClaims[scope][field]];
-                                }
-                            }
-
-                        }
-                    }
-                } 
-                if ("all" in this.idTokenClaims) {
-                    const claims = this.idTokenClaims["all"]
-                    if (claims == "all") {
-                        idTokenPayload = {
-                            ...idTokenPayload,
-                            ...user
-                        };
-                    } else {
-                        for (let field in claims) {
-                            idTokenPayload[field] = 
-                                user[claims[field]];
-                        }
-                    }
-                }
-            }
+            idTokenPayload = this.addClaims(idTokenPayload, this.idTokenClaims, scopes, user);
             
             idTokenPayload.scope = scopes;
             if (this.accessTokenExpiry != null) {
@@ -2391,6 +2373,52 @@ export class OAuthAuthorizationServer {
             token_type: "Bearer",
             scope: scopes? scopes.join(" ") : undefined,
         }
+    }
+
+    private addClaims(tokenPayload : {[key:string]:any}, 
+        claims : {[key:string] : any},
+        scopes: string[]|undefined,
+        user: User|undefined) : {[key:string]:any} {
+        if (user) {
+            if (scopes) {
+                for (let scope of scopes) {
+                    if (scope in claims) {
+                        if (claims[scope] == "all") {
+                            tokenPayload = {
+                                ...tokenPayload,
+                                ...user
+                            };
+                        } else {
+                            let allClaims = claims[scope];
+                            if (typeof(allClaims) == "string") allClaims = [allClaims];
+                            for (let field of allClaims) {
+                                tokenPayload[field] = 
+                                    user[field];
+                            }
+                        }
+
+                    }
+                }
+            } 
+            if ("all" in claims) {
+                let allClaims = claims["all"]
+                if (typeof(allClaims) == "string") allClaims = [allClaims];
+                if (allClaims == "all") {
+                    tokenPayload = {
+                        ...tokenPayload,
+                        ...user
+                    };
+                } else {
+                    for (let field of allClaims) {
+                        tokenPayload[field] = 
+                            user[field];
+                    }
+                }
+            }
+        }
+
+        return tokenPayload;
+
     }
 
     /**
