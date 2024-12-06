@@ -139,6 +139,161 @@ test('FastifyOAuthResourceServer.validAndInvalidAccessToken_endpoint', async () 
 
 });
 
+test('FastifyOAuthResourceServer.query', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode();
+    const {access_token, error, error_description}
+        = await authServer.tokenEndpoint({
+            grantType: "authorization_code", 
+            client_id: client.client_id, 
+            code: code, 
+            client_secret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(error_description).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    const app = fastify({logger: false});
+    const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
+    const resserver = new FastifyOAuthResourceServer(
+        app,
+        [new OAuthTokenConsumer(process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {authServerBaseUrl: issuer})],
+        {protectedEndpoints: {"/endpoint" : {}}}
+    );
+    app.get('/endpoint',  async (request : FastifyRequest, reply : FastifyReply) =>  {
+        reply.header(...JSONHDR).send({token: request.accessTokenPayload, url: request.url});
+    });
+
+    let res;
+    let body;
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await resserver.tokenConsumers[0].loadConfig();
+    fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
+    await resserver.tokenConsumers[0].loadJwks();
+    // @ts-ignore
+    const reply : FastifyRequest = {
+        headers: {authorization: "Bearer " + access_token}
+    }
+
+    res = await app.inject({
+        method: "GET",
+        url: "/endpoint?param1=val1",
+        headers: {authorization: "Bearer " + access_token}
+    });
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body)
+    expect(body.token).toBeDefined();
+    expect(body.url).toBe("/endpoint?param1=val1");
+});
+
+test('FastifyOAuthResourceServer.suburl', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode();
+    const {access_token, error, error_description}
+        = await authServer.tokenEndpoint({
+            grantType: "authorization_code", 
+            client_id: client.client_id, 
+            code: code, 
+            client_secret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(error_description).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    const app = fastify({logger: false});
+    const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
+    const resserver = new FastifyOAuthResourceServer(
+        app,
+        [new OAuthTokenConsumer(process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {authServerBaseUrl: issuer})],
+        {protectedEndpoints: {"/endpoint" : {suburls: true}}}
+    );
+    app.get('/endpoint/*',  async (request : FastifyRequest, reply : FastifyReply) =>  {
+        reply.header(...JSONHDR).send({token: request.accessTokenPayload});
+    });
+
+    let res;
+    let body;
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await resserver.tokenConsumers[0].loadConfig();
+    fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
+    await resserver.tokenConsumers[0].loadJwks();
+    // @ts-ignore
+    const reply : FastifyRequest = {
+        headers: {authorization: "Bearer " + access_token}
+    }
+
+    res = await app.inject({
+        method: "GET",
+        url: "/endpoint/x",
+        headers: {authorization: "Bearer " + access_token}
+    });
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body)
+    expect(body.token).toBeDefined();
+});
+
+test('FastifyOAuthResourceServer.suburlQuery', async () => {
+
+    const {authServer, client, code} = await getAuthorizationCode();
+    const {access_token, error, error_description}
+        = await authServer.tokenEndpoint({
+            grantType: "authorization_code", 
+            client_id: client.client_id, 
+            code: code, 
+            client_secret: "DEF"});
+    expect(error).toBeUndefined();
+    expect(error_description).toBeUndefined();
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+    expect(decodedAccessToken?.payload.scope.length).toBe(2);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[0]);
+    expect(["read", "write"]).toContain(decodedAccessToken?.payload.scope[1]);
+    const app = fastify({logger: false});
+    const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
+    const resserver = new FastifyOAuthResourceServer(
+        app,
+        [new OAuthTokenConsumer(process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver", {authServerBaseUrl: issuer})],
+        {protectedEndpoints: {"/endpoint" : {suburls: true}}}
+    );
+    app.get('/endpoint/*',  async (request : FastifyRequest, reply : FastifyReply) =>  {
+        reply.header(...JSONHDR).send({token: request.accessTokenPayload, url: request.url});
+    });
+
+    let res;
+    let body;
+
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await resserver.tokenConsumers[0].loadConfig();
+    fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
+    await resserver.tokenConsumers[0].loadJwks();
+    // @ts-ignore
+    const reply : FastifyRequest = {
+        headers: {authorization: "Bearer " + access_token}
+    }
+
+    res = await app.inject({
+        method: "GET",
+        url: "/endpoint/x?param1=val1",
+        headers: {authorization: "Bearer " + access_token}
+    });
+    expect(res.statusCode).toBe(200);
+    body = JSON.parse(res.body)
+    expect(body.token).toBeDefined();
+    expect(body.url).toBe("/endpoint/x?param1=val1");
+});
+
 afterAll(async () => {
     fetchMocker.dontMock();
 });

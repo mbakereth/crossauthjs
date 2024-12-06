@@ -40,7 +40,7 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
      * a status code of 401 Access Denied if the key is invalid or the 
      * given scopes are not present.
      */
-    protectedEndpoints? : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean}},
+    protectedEndpoints? : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean, suburls? : boolean}},
 
     /**
      * Where access tokens may be found (in this order).
@@ -98,7 +98,8 @@ export interface FastifyOAuthResourceServerOptions extends OAuthResourceServerOp
 export class FastifyOAuthResourceServer extends OAuthResourceServer {
 
     private userStorage? : UserStorage;
-    private protectedEndpoints : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean}} = {};
+    private protectedEndpoints : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean, suburls? : boolean}} = {};
+    private protectedEndpointPrefixes : string[] = [];
     private errorBody : {[key:string]:any} = {};
 
     private sessionDataName : string = "oauth";
@@ -135,7 +136,18 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                     });
                 }
             }
-            this.protectedEndpoints = options.protectedEndpoints;
+            this.protectedEndpoints = {...options.protectedEndpoints};
+
+            for (let name in options.protectedEndpoints) {
+                let endpoint = this.protectedEndpoints[name];
+                if (endpoint.suburls == true) {
+                    if (!name.endsWith("/")) {
+                        name += "/";
+                        this.protectedEndpoints[name] = endpoint;
+                    }
+                    this.protectedEndpointPrefixes.push(name);
+                }
+            }
         }
             
         if (options.protectedEndpoints) {
@@ -146,14 +158,26 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                 //if (request.user && request.authType == "cookie") return;
 
                 const urlWithoutQuery = request.url.split("?", 2)[0];
-                if (!(urlWithoutQuery in this.protectedEndpoints)) return;
+                let matches = false;
+                let matchingEndpoint = "";
+                if (urlWithoutQuery in this.protectedEndpoints) {
+                    matches = true;
+                    matchingEndpoint = urlWithoutQuery;
+                } else {
+                    for (let name of this.protectedEndpointPrefixes) {
+                        if (urlWithoutQuery.startsWith(name))
+                            matches = true;
+                            matchingEndpoint = name;
+                    }    
+                }
+                if (!matches) return;
 
                 const authResponse = await this.authorized(request);
 
                 // If we are also we are not allowing authentication by
                 // and the user is valid, session cookie for this endpoint
                 if (!(request.user && request.authType == "cookie" 
-                    && this.protectedEndpoints[urlWithoutQuery].acceptSessionAuthorization!=true )) {
+                    && this.protectedEndpoints[matchingEndpoint].acceptSessionAuthorization!=true )) {
                     if (!authResponse) {
                         request.authError = "access_denied"
                         request.authErrorDescription = "No access token";
@@ -183,10 +207,10 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                             request.scope = authResponse.tokenPayload.scope.split(" ");
                         }
                     }
-                    if (this.protectedEndpoints[urlWithoutQuery].scope) {
-                        for (let scope of this.protectedEndpoints[urlWithoutQuery].scope??[]) {
+                    if (this.protectedEndpoints[matchingEndpoint].scope) {
+                        for (let scope of this.protectedEndpoints[matchingEndpoint].scope??[]) {
                             if (!request.scope || !(request.scope.includes(scope))
-                                && this.protectedEndpoints[urlWithoutQuery].acceptSessionAuthorization!=true) {
+                                && this.protectedEndpoints[matchingEndpoint].acceptSessionAuthorization!=true) {
                                 CrossauthLogger.logger.warn(j({msg: "Access token does not have sufficient scope",
                                     username: request.user?.username, url: request.url}));
                                 request.scope = undefined;
