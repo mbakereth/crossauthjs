@@ -39,7 +39,7 @@ export interface SvelteKitOAuthResourceServerOptions extends OAuthResourceServer
      * a status code of 401 Access Denied if the key is invalid or the 
      * given scopes are not present.
      */
-    protectedEndpoints? : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean}},
+    protectedEndpoints? : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean, suburls?: boolean}},
 
     /**
      * Where access tokens may be found (in this order).
@@ -97,7 +97,8 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
 
     private userStorage? : UserStorage;
     private errorBody : {[key:string]:any} = {};
-    private protectedEndpoints : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean}} = {};
+    private protectedEndpoints : {[key:string]: {scope? : string[], acceptSessionAuthorization?: boolean, suburls? : boolean}} = {};
+    private protectedEndpointPrefixes : string[] = [];
 
     private sessionDataName : string = "oauth";
     private tokenLocations : ("header"|"session")[] = ["header"];
@@ -137,7 +138,18 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                     });
                 }
             }
-            this.protectedEndpoints = options.protectedEndpoints;
+            this.protectedEndpoints = {...options.protectedEndpoints};
+
+            for (let name in options.protectedEndpoints) {
+                let endpoint = this.protectedEndpoints[name];
+                if (endpoint.suburls == true) {
+                    if (!name.endsWith("/")) {
+                        name += "/";
+                        this.protectedEndpoints[name] = endpoint;
+                    }
+                    this.protectedEndpointPrefixes.push(name);
+                }
+            }
         }
             
         if (options.protectedEndpoints) {
@@ -148,14 +160,26 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                 //if (request.user && request.authType == "cookie") return;
 
                 const urlWithoutQuery = event.url.pathname;
-                if (!(urlWithoutQuery in this.protectedEndpoints)) return;
+                let matches = false;
+                let matchingEndpoint = "";
+                if (urlWithoutQuery in this.protectedEndpoints) {
+                    matches = true;
+                    matchingEndpoint = urlWithoutQuery;
+                } else {
+                    for (let name of this.protectedEndpointPrefixes) {
+                        if (urlWithoutQuery.startsWith(name))
+                            matches = true;
+                            matchingEndpoint = name;
+                    }    
+                }
+                if (!matches) return;
 
                 const authResponse = await this.authorized(event);
 
                 // If we are also we are not allowing authentication by
                 // and the user is valid, session cookie for this endpoint
                 if (!(event.locals.user && event.locals.authType == "cookie" 
-                    && this.protectedEndpoints[urlWithoutQuery].acceptSessionAuthorization!=true )) {
+                    && this.protectedEndpoints[matchingEndpoint].acceptSessionAuthorization!=true )) {
                     if (!authResponse) {
                         event.locals.authError = "access_denied"
                         event.locals.authErrorDescription = "No access token";
@@ -191,10 +215,10 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                             event.locals.scope = authResponse.tokenPayload.scope.split(" ");
                         }
                     }
-                    if (this.protectedEndpoints[urlWithoutQuery].scope) {
-                        for (let scope of this.protectedEndpoints[urlWithoutQuery].scope??[]) {
+                    if (this.protectedEndpoints[matchingEndpoint].scope) {
+                        for (let scope of this.protectedEndpoints[matchingEndpoint].scope??[]) {
                             if (!event.locals.scope || !(event.locals.scope.includes(scope))
-                                && this.protectedEndpoints[urlWithoutQuery].acceptSessionAuthorization!=true) {
+                                && this.protectedEndpoints[matchingEndpoint].acceptSessionAuthorization!=true) {
                                 CrossauthLogger.logger.warn(j({msg: "Access token does not have sufficient scope",
                                     username: event.locals.user?.username, url: event.request.url}));
                                     event.locals.scope = undefined;

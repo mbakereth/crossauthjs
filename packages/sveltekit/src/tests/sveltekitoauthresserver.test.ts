@@ -173,3 +173,48 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_hook', async () =>
     expect(event.locals.user).toBeUndefined();
     expect(event.locals.scope).toBeUndefined();
 });
+
+test('SvelteKitOAuthResourceServer.hook_suburl', async () => {
+    // login using password flow
+    const {server, authServer, access_token, userStorage} = await oauthLogin();
+
+    if (server.oAuthClient) await server.oAuthClient.loadConfig(oidcConfiguration);
+
+    const decodedAccessToken
+        = await authServer.validAccessToken(access_token??"");
+    expect(decodedAccessToken).toBeDefined();
+
+    // create resource server
+    const issuer = process.env["CROSSAUTH_AUTH_SERVER_BASE_URL"]??"";
+    const resserver = new SvelteKitOAuthResourceServer(
+        [new OAuthTokenConsumer(
+            process.env["CROSSAUTH_OAUTH_AUDIENCE"]??"resourceserver",
+            {authServerBaseUrl: issuer})],
+        {
+            userStorage,
+            protectedEndpoints: {
+                "/getresource": { scope: ["read", "write"], suburls: true}
+            },
+        }
+    );
+    fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
+    await resserver.tokenConsumers[0].loadConfig();
+    fetchMocker.mockResponseOnce(JSON.stringify(authServer.jwks()));
+    await resserver.tokenConsumers[0].loadJwks();
+
+    // simulate a get request on the res server
+    // authorizationCodeFlow get endpoint
+    let getRequest = new Request(`http://resserver.com/getresource/x`, {
+        method: "GET",
+        headers: {"authorization": "Bearer " + access_token}
+        });
+    let event = new MockRequestEvent("1", getRequest, {});
+    expect(resserver.hook).toBeDefined();
+    if (!resserver.hook) throw new Error("hook undefined");
+    await resserver.hook({event});
+    expect(event.locals.user?.username).toBe("bob");
+    expect(event.locals.scope?.length).toBe(2);
+    let scopes = event.locals.scope ?? [];
+    expect(["read", "write"]).toContain(scopes[0]);
+    expect(["read", "write"]).toContain(scopes[1]);
+});
