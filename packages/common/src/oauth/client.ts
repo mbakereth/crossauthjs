@@ -1123,7 +1123,6 @@ export abstract class OAuthClientBase {
         let options : {[key:string]:any} = {};
         if ( this.authServerCredentials) options.credentials = this.authServerCredentials;
         if ( this.authServerMode) options.mode = this.authServerMode;
-        console.log("GET", url)
         const resp = await fetch(url, {
             method: 'GET',
             ...options,
