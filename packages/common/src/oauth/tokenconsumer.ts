@@ -100,7 +100,7 @@ export abstract class OAuthTokenConsumerBase {
      * still call this function.  This is because key loading is
      * asynchronous, and constructors may not be async.
      */
-    async loadKeys() {
+    async loadKeys(defaultAlg? : string) {
 
         try {
             if (this.jwtSecretKey) {
@@ -126,7 +126,7 @@ export abstract class OAuthTokenConsumerBase {
                     throw new CrossauthError(ErrorCode.Connection, 
                         "Load OIDC config before Jwks")
                 }
-                await this.loadJwks();
+                await this.loadJwks(undefined, defaultAlg);
             }
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -184,7 +184,7 @@ export abstract class OAuthTokenConsumerBase {
      *   - `Connection` if the fetch to the authorization server failed,
      *     the OIDC configuration wasn't set or the keys could not be parsed.
      */
-    async loadJwks(jwks? : {keys: jose.JWK[]}) {
+    async loadJwks(jwks? : {keys: jose.JWK[]}, defaultAlg? : string) {
         if (jwks) {
             this.keys = {};
             for (let i=0; i<jwks.keys.length; ++i) {
@@ -213,8 +213,17 @@ export abstract class OAuthTokenConsumerBase {
                 for (let i=0; i<body.keys.length; ++i) {
                     try {
                         let kid : string = "_default";
-                        if ("kid" in body.keys[i] && typeof (body.keys[i]) == "string") kid = String(body.keys[i]);
-                        const key =  await jose.importJWK(body.keys[i]);
+                        let thisKey = {...body.keys[i]}
+                        if ("kid" in thisKey && typeof (thisKey.kid) == "string") kid = String(thisKey.kid);
+                        if (thisKey && !thisKey.alg && !thisKey.jwk_alg && defaultAlg) {
+                            if (defaultAlg.startsWith("RS") && thisKey.kty == "RSA") {
+                                thisKey.alg = defaultAlg;    
+                            } else {
+                                CrossauthLogger.logger.debug(j({msg: "Skipping key with " + thisKey.kty}))
+                                continue; // cannot load a key if it doesn't have alg and it doesn't match what is in the token
+                            }
+                        }
+                        const key =  await jose.importJWK(thisKey);
                         this.keys[kid] = key;
                     } catch (e) {
                         CrossauthLogger.logger.error(j({err: e}));
@@ -241,24 +250,27 @@ export abstract class OAuthTokenConsumerBase {
      * @returns the JWT payload if the token is valid, `undefined` otherwise.
      */
     async tokenAuthorized(token: string,
-        tokenType: "access" | "refresh" | "id") : Promise<{[key:string]: any}|undefined> {
+        _tokenType: "access" | "refresh" | "id") : Promise<{[key:string]: any}|undefined> {
         if (!this.keys || Object.keys(this.keys).length == 0) {
-            await this.loadKeys();
+            const header = jose.decodeProtectedHeader(token);
+            await this.loadKeys(header.alg);
         }
         const decoded = await this.validateToken(token);
         if (!decoded) return undefined;
-        if (decoded.type != tokenType) {
+        /*if (decoded.type != tokenType) {
             CrossauthLogger.logger.error(j({msg: tokenType + " expected but got " + decoded.type}));
             return undefined;
-        }
+        }*/
         if (decoded.iss != this.authServerBaseUrl) {
-            CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: await this.hash(decoded.jti)}));
+            const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
+            CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: await this.hash(jti)}));
             return undefined;
         }
         if (decoded.aud) {
+            const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
             if ((Array.isArray(decoded.aud) && !decoded.aud.includes(this.audience)) ||
                 (!Array.isArray(decoded.aud) && decoded.aud != this.audience)) {
-                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.aud} in access token`, hashedAccessToken: await this.hash(decoded.jti)}));
+                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.aud} in access token`, hashedAccessToken: await this.hash(jti)}));
                     return undefined;    
                 }
         }
@@ -270,22 +282,24 @@ export abstract class OAuthTokenConsumerBase {
         // get KID from header
         if  (!this.keys || Object.keys(this.keys).length == 0) CrossauthLogger.logger.warn("No keys loaded so cannot validate tokens");
         let kid : string|undefined = undefined;
+        //let defaultAlg = undefined;
         try {
             const header = jose.decodeProtectedHeader(accessToken);
             kid = header.kid;
+            //defaultAlg = header.alg;
         } catch {
             CrossauthLogger.logger.warn(j({msg: "Invalid access token format"}))
             return undefined;
         }
         // find key matching header KID and validate signature (and expiry)
         let key : EncryptionKey|undefined = undefined;
-        if ("_default" in this.keys) key = this.keys["_default"];
         for (let loadedKid in this.keys) {
             if (kid == loadedKid) {
                 key = this.keys[loadedKid];
                 break;
             }
         }
+        if (!key && "_default" in this.keys) key = this.keys["_default"];
         if (!key) {
             CrossauthLogger.logger.warn(j({msg: "No matching keys found for access token"}));
             return undefined;
@@ -299,6 +313,7 @@ export abstract class OAuthTokenConsumerBase {
             }
             return decodedPayload;
         } catch (e) {
+            console.log(e)
             CrossauthLogger.logger.warn(j({msg: "Access token did not validate"}));
             return undefined;
         }

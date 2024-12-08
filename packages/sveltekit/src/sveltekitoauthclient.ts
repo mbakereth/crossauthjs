@@ -254,7 +254,9 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
         try {
             payload = JSON.parse(Crypto.base64Decode(token.split(".")[1]))
         } catch (e) {
-            CrossauthLogger.logger.error(j({msg: "Couldn't decode id token"}));
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({msg: "Couldn't decode token", cerr: ce}));
         }
     }
     return payload;
@@ -277,7 +279,8 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
     if (oauthResponse.access_token) {
         try {
             if (oauthResponse.access_token && jwtTokens.includes("access")) {
-                const jti = jwtDecode(oauthResponse.access_token)?.jti;
+                const decoded= jwtDecode(oauthResponse.access_token);
+                const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
                 const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got access token", 
                     accessTokenHash: hash}));
@@ -289,7 +292,8 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
     if (oauthResponse.id_token) {
         try {
             if (oauthResponse.id_token && jwtTokens.includes("id")) {
-                const jti = jwtDecode(oauthResponse.id_token)?.jti;
+                const decoded= jwtDecode(oauthResponse.id_token);
+                const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
                 const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got id token", 
                     idTokenHash: hash}));
@@ -334,43 +338,9 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
         let sessionData : {[key:string]:any}= {...oauthResponse, expires_at }
         if ("id_token" in oauthResponse) {
             let payload = decodePayload(oauthResponse["id_token"]);
-            if (payload) sessionData["id_token"] = payload;
+            if (payload) sessionData["id_token_payload"] = payload;
         }
-        if (client.server.sessionServer) {
-            // if we are using Crossauth's session server and there is nop
-            // session, we can create an anonymous one.
-            // For other session adapters, we assume the session was already
-            // creeated or that the session adapter can create one automaticall
-            // when updateSessionData is called
-            let sessionCookieValue = client.server.sessionServer?.getSessionCookieValue(event);
-            if (!sessionCookieValue) {
-                sessionCookieValue = 
-                    await client.server.sessionServer?.createAnonymousSession(event,
-                        { [client.sessionDataName]: sessionData });
-            } else {
-                /*const existingData = 
-                    await client.server.sessionAdapter?.getSessionData(event, client.sessionDataName);
-                await client.server.sessionAdapter?.updateSessionData(event,
-                    client.sessionDataName,
-                    { ...existingData??{},  ...oauthResponse, expires_at });*/
-                await client.server.sessionAdapter?.updateSessionData(event,
-                    client.sessionDataName,
-                    sessionData);
-
-            }
-        } else {
-            /*const existingData = 
-            await client.server.sessionAdapter?.getSessionData(event, client.sessionDataName);
-            await client.server.sessionAdapter?.updateSessionData(event,
-                client.sessionDataName,
-                { ...existingData??{},  ...oauthResponse, expires_at });*/
-
-            await client.server.sessionAdapter?.updateSessionData(event,
-                client.sessionDataName,
-                sessionData);
-
-        }
-
+        await client.storeSessionData(event, sessionData);
 }
 
 async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
@@ -1565,6 +1535,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         }
         if (isHave) return {ok : true};
         if (!decodeToken) return oauthData[token];
+        if (token+"_payload" in oauthData) return oauthData[token+"_payload"]
         const payload = decodePayload(oauthData[token]);
         return payload;
     }
@@ -1792,6 +1763,33 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             this.sessionDataName);
     }
 
+    async storeSessionData(event: RequestEvent, sessionData: {[key:string]:any}) {
+
+        // we need a session to save the state
+        if (this.server.sessionServer) {
+            // if we are using Crossauth's session server and there is nop
+            // session, we can create an anonymous one.
+            // For other session adapters, we assume the session was already
+            // creeated or that the session adapter can create one automaticall
+            // when updateSessionData is called
+            let sessionCookieValue = this.server.sessionServer?.getSessionCookieValue(event);
+            if (!sessionCookieValue) {
+                sessionCookieValue = 
+                    await this.server.sessionServer?.createAnonymousSession(event,
+                        { [this.sessionDataName]: sessionData });
+            } else {
+                await this.server.sessionAdapter?.updateSessionData(event,
+                    this.sessionDataName,
+                    sessionData);
+            }
+        } else {
+            await this.server.sessionAdapter?.updateSessionData(event,
+                this.sessionDataName,
+                sessionData);
+
+        }
+
+    }
 
     ////////////////////////////////////////////////////////////////
     // Endpoints
@@ -1812,25 +1810,28 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
                     return this.errorFn(this.server, event, ce);
                 }
+                if (!this.server.sessionAdapter) {
+                    throw new CrossauthError(ErrorCode.Configuration, "Need session server or adapter for authorization code flow")
+                }
 
-                /*if (!event.locals.user && 
-                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
-                    throw this.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }  */        
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
+                const state = this.randomValue(this.stateLength);
+                const sessionData = {scope, state};
+                // we need a session to save the state
+                await this.storeSessionData(event, sessionData);
+        
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(scope);
+                    await this.startAuthorizationCodeFlow(state, scope);
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
                     return await this.errorFn(this.server, event, ce)
                 }
-                    CrossauthLogger.logger.debug(j({
-                        msg: `Authorization code flow: redirecting`,
-                        url: url
-                    }));
+                CrossauthLogger.logger.debug(j({
+                    msg: `Authorization code flow: redirecting`,
+                    url: url
+                }));
                 throw this.redirect(302, url);
 
             } catch (e) {
@@ -1863,16 +1864,19 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         error_description: ce.message,
                     }
                 }
+                if (!this.server.sessionAdapter) {
+                    throw new CrossauthError(ErrorCode.Configuration, "Need session server or adapter for authorization code flow")
+                }
 
-                /*if (!event.locals.user && 
-                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
-                    throw this.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }        */  
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
+                const state = this.randomValue(this.stateLength);
+                const sessionData = {scope, state};
+                // we need a session to save the state
+                await this.storeSessionData(event, sessionData);
+
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(scope);
+                    await this.startAuthorizationCodeFlow(state, scope);
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1919,16 +1923,20 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const ce = new CrossauthError(ErrorCode.Unauthorized, "Authorization flow is not supported");
                     return this.errorFn(this.server, event, ce);
                 }
+                if (!this.server.sessionAdapter) {
+                    throw new CrossauthError(ErrorCode.Configuration, "Need session server or adapter for authorization code flow")
+                }
 
-                /*if (!event.locals.user && 
-                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
-                    throw this.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }    */      
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
+                const state = this.randomValue(this.stateLength);
+                const {codeChallenge, codeVerifier} = await this.codeChallengeAndVerifier();
+                const sessionData = {scope, state, codeChallenge, codeVerifier};
+                // we need a session to save the state
+                await this.storeSessionData(event, sessionData);
+
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(scope, true);
+                    await this.startAuthorizationCodeFlow(state, scope, codeChallenge, true);
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1973,17 +1981,21 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         error: ce.oauthErrorCode,
                         error_description: ce.message,
                     }
-                    }
+                }
+                if (!this.server.sessionAdapter) {
+                    throw new CrossauthError(ErrorCode.Configuration, "Need session server or adapter for authorization code flow")
+                }
 
-                /*if (!event.locals.user && 
-                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
-                    throw this.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }   */       
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
+                const state = this.randomValue(this.stateLength);
+                const {codeChallenge, codeVerifier} = await this.codeChallengeAndVerifier();
+                const sessionData = {scope, state, codeChallenge, codeVerifier};
+                // we need a session to save the state
+                await this.storeSessionData(event, sessionData);
+
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(scope, true);
+                    await this.startAuthorizationCodeFlow(state, scope, codeChallenge, true);
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -2032,19 +2044,17 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     return this.errorFn(this.server, event, ce);
                 }
 
-                /*if (!event.locals.user && 
-                    (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || 
-                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode))) {
-                    throw this.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }    */
+                CrossauthLogger.logger.debug(j({msg: "redirectUriEndpoint, token response type " + this.tokenResponseType}))
 
                 const code = event.url.searchParams.get("code") ?? "";
                 const state = event.url.searchParams.get("state") ?? undefined;
                 const error = event.url.searchParams.get("error") ?? undefined;
                 const error_description = event.url.searchParams.get("error") ?? undefined;
-                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint(code,
-                    state,
+                const oauthData = await this.server.sessionAdapter?.getSessionData(event, this.sessionDataName);
+                if (oauthData?.state != state) {
+                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
+                }
+                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
                     error,
                     error_description));
                     if (resp.error) return this.errorFn(this.server, event, CrossauthError.fromOAuthError(resp.error, resp.error_description));
@@ -2096,19 +2106,16 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     }
                 }
 
-                /*if (!event.locals.user && 
-                    (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || 
-                    this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode))) {
-                    throw this.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(event.request.url));
-                }    */
                 
                 const code = event.url.searchParams.get("code") ?? "";
                 const state = event.url.searchParams.get("state") ?? undefined;
                 const error = event.url.searchParams.get("error") ?? undefined;
                 const error_description = event.url.searchParams.get("error") ?? undefined;
-                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint(code,
-                    state,
+                const oauthData = await this.server.sessionAdapter?.getSessionData(event, this.sessionDataName);
+                if (oauthData?.state != state) {
+                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
+                }
+                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
                     error,
                     error_description));
                 if (resp.error) return {

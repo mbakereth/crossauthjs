@@ -168,6 +168,7 @@ export class OAuthClientBackend extends OAuthClientBase {
         else if (options.userCreationFn && this.userCreationType == "custom") this.userCreationFn = options.userCreationFn;
         else this.userCreationFn = idTokenUserCreationFunction;
         if (options.userStorage) this.userStorage = options.userStorage;
+        setParameter("oauthPostType", ParamType.String, this, options, "OAUTH_POST_TYPE");
     }
 
     /**

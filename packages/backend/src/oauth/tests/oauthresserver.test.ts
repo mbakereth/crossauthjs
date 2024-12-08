@@ -105,7 +105,7 @@ test('ResourceServer.invalidAccessToken', async () => {
             jwtPublicKey: publicKey,
             clockTolerance: 10
     })]);
-    const authorized = await resserver.accessTokenAuthorized("x"+access_token??"");
+    const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeUndefined();
 });
 
@@ -257,7 +257,8 @@ test('ResourceServer.persistAccessToken', async () => {
     const decodedAccessToken
         = await authServer.validAccessToken(access_token??"");
     expect(decodedAccessToken).toBeDefined();
-    const key = KeyPrefix.accessToken+Crypto.hash(decodedAccessToken?.payload.jti);
+    const jti = decodedAccessToken?.payload.jti ? decodedAccessToken?.payload.jti : (decodedAccessToken?.payload.sid ? decodedAccessToken?.payload.sid : "");
+    const key = KeyPrefix.accessToken+Crypto.hash(jti);
     const storedAccessToken = await keyStorage?.getKey(key);
     expect(storedAccessToken?.value).toBe(key);
     const publicKey = fs.readFileSync("keys/rsa-public-key.pem", 'utf8');

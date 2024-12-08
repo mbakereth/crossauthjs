@@ -13,8 +13,6 @@
         if (factor2 == data.allowedFactor2[i].name)  {
             configurable = data.allowedFactor2[i].configurable;
         }
-    console.log(data)
-    console.log(form)
 </script>
 <svelte:head>
     <title>Change Two-Factor Authentication</title>

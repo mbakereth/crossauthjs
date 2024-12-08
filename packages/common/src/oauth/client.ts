@@ -204,12 +204,9 @@ export abstract class OAuthClientBase {
     protected authServerBaseUrl = "";
     #client_id : string|undefined;
     #client_secret : string|undefined;
-    #codeChallenge : string|undefined;
     protected codeChallengeMethod : "plain" | "S256" = "S256";
-    #codeVerifier : string|undefined;
     protected verifierLength = 32;
     protected redirect_uri : string|undefined;
-    #state = "";
     protected stateLength = 32;
     protected authzCode : string = "";
     protected oidcConfig : (OpenIdConfiguration&{[key:string]:any})|undefined;
@@ -217,7 +214,7 @@ export abstract class OAuthClientBase {
     protected authServerHeaders : {[key:string]:string} = {};
     protected authServerMode :  "no-cors" | "cors" | "same-origin" | undefined = undefined;
     protected authServerCredentials : "include" | "omit" | "same-origin" | undefined = undefined;
-
+    protected oauthPostType : "json" | "form" = "json";
     /**
      * Constructor.
      * 
@@ -290,15 +287,6 @@ export abstract class OAuthClientBase {
     }
     set client_secret(value : string) {
         this.#client_secret = value;
-    }
-    set codeVerifier(value : string) {
-        this.#codeVerifier = value;
-    }
-    set codeChallenge(value : string) {
-        this.#codeChallenge = value;
-    }
-    set state(value : string) {
-        this.#state = value;
     }
 
     /**
@@ -386,7 +374,9 @@ export abstract class OAuthClientBase {
      *          - `error_description` friendly error message or undefined
      *            if no error
      */
-    async startAuthorizationCodeFlow(scope?: string,
+    async startAuthorizationCodeFlow(state: string, 
+        scope?: string,
+        codeChallenge? : string, 
         pkce: boolean = false) : 
         Promise<{
             url?: string,
@@ -408,7 +398,6 @@ export abstract class OAuthClientBase {
                 error_description: "Cannot get authorize endpoint"
             };
         }
-        this.#state = this.randomValue(this.stateLength);
         if (!this.#client_id) return {
             error: "invalid_request",
             error_description: "Cannot make authorization code flow without client id"
@@ -422,22 +411,26 @@ export abstract class OAuthClientBase {
         let url = base 
             + "?response_type=code"
             + "&client_id=" + encodeURIComponent(this.#client_id)
-            + "&state=" + encodeURIComponent(this.#state)
-            + "&redirect_uri=" + encodeURIComponent(this.redirect_uri);
+            + "&state=" + encodeURIComponent(state)
+            + "&redirect_uri=" + encodeURIComponent(this.redirect_uri).replace(/%20/g, "+");;
 
         if (scope) {
-            url += "&scope=" + encodeURIComponent(scope);
+            url += "&scope=" + encodeURIComponent(scope).replace(/%20/g, "+");
         }
 
-        if (pkce) {
-            this.#codeVerifier = this.randomValue(this.verifierLength);
-            this.#codeChallenge = 
-                this.codeChallengeMethod == "plain" ? 
-                this.#codeVerifier : await this.sha256(this.#codeVerifier);
-            url += "&code_challenge=" + this.#codeChallenge;
+        if (pkce && codeChallenge) {
+            url += "&code_challenge=" + codeChallenge;
         }
 
         return {url: url};
+    }
+
+    protected async codeChallengeAndVerifier() {
+        const codeVerifier = this.randomValue(this.verifierLength);
+        const codeChallenge = 
+            this.codeChallengeMethod == "plain" ? 
+            codeVerifier : await this.sha256(codeVerifier);
+        return {codeChallenge, codeVerifier}
     }
 
     /**
@@ -460,8 +453,8 @@ export abstract class OAuthClientBase {
      * @returns The {@link OAuthTokenResponse} from the `token` endpoint
      *          request, or `error` and `error_description`.
      */
-    protected async redirectEndpoint(code?: string,
-        state?: string,
+    protected async redirectEndpoint(code?: string, scope?: string,
+        codeVerifier? : string,
         error?: string,
         errorDescription?: string) : Promise<OAuthTokenResponse>{
         if (!this.oidcConfig) await this.loadConfig();      
@@ -469,11 +462,6 @@ export abstract class OAuthClientBase {
             if (!error) error = "server_error";
             if (!errorDescription) errorDescription = "Unknown error";
             return {error, error_description: errorDescription};
-        }
-        if (this.#state) {
-            if (state != this.#state) {
-                return {error: "access_denied", error_description: "State is not valid"};
-            }
         }
         this.authzCode = code;    
 
@@ -499,9 +487,11 @@ export abstract class OAuthClientBase {
             grant_type: grant_type,
             client_id: this.#client_id,
             code: this.authzCode,
+            redirect_uri: this.redirect_uri,
         }
+        if (scope) params.scope = scope;
         if (client_secret) params.client_secret = client_secret;
-        params.code_verifier = this.#codeVerifier;
+        if (codeVerifier) params.code_verifier = codeVerifier;
         try {
             const resp = await this.post(url, params, this.authServerHeaders);
             if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
@@ -1092,17 +1082,31 @@ export abstract class OAuthClientBase {
         let options : {[key:string]:any} = {};
         if ( this.authServerCredentials) options.credentials = this.authServerCredentials;
         if ( this.authServerMode) options.mode = this.authServerMode;
+        let body = "";
+        let contentType = "";
+        if (this.oauthPostType == "json") {
+            body = JSON.stringify(params);
+            contentType = "application/json";
+        } else {
+            body = "";
+            for (let name in params) {
+                if (body != "") body += "&";
+                body += encodeURIComponent(name) + "=" + encodeURI(params[name]);
+            }
+            contentType = "application/x-www-form-urlencoded";
+        }
         const resp = await fetch(url, {
             method: 'POST',
             ...options,
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json',
+                'Content-Type': contentType,
                 ...headers,
             },
-            body: JSON.stringify(params)
+            body: body
         });
-        return await resp.json();
+        const json = await resp.json();
+        return json;
     }
 
     /**
@@ -1119,12 +1123,12 @@ export abstract class OAuthClientBase {
         let options : {[key:string]:any} = {};
         if ( this.authServerCredentials) options.credentials = this.authServerCredentials;
         if ( this.authServerMode) options.mode = this.authServerMode;
+        console.log("GET", url)
         const resp = await fetch(url, {
             method: 'GET',
             ...options,
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json',
                 ...headers,
             },
         });

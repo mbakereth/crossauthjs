@@ -405,7 +405,9 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
         try {
             payload = JSON.parse(Crypto.base64Decode(token.split(".")[1]))
         } catch (e) {
-            CrossauthLogger.logger.error(j({msg: "Couldn't decode id token"}));
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({msg: "Couldn't decode id token", cerr: ce}));
         }
     }
     return payload;
@@ -429,7 +431,8 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
     if (oauthResponse.access_token) {
         try {
             if (oauthResponse.access_token && jwtTokens.includes("access")) {
-                const jti = jwtDecode(oauthResponse.access_token)?.jti;
+                const decoded = jwtDecode(oauthResponse.access_token);
+                const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
                 const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got access token", 
                     accessTokenHash: hash}));
@@ -441,7 +444,8 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
     if (oauthResponse.id_token) {
         try {
             if (oauthResponse.id_token && jwtTokens.includes("id")) {
-                const jti = jwtDecode(oauthResponse.id_token)?.jti;
+                const decoded = jwtDecode(oauthResponse.id_token);
+                const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
                 const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got id token", 
                     idTokenHash: hash}));
@@ -560,6 +564,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     }
 }
 
+
 async function updateSessionData(oauthResponse: OAuthTokenResponse,
     client: FastifyOAuthClient,
     request: FastifyRequest,
@@ -582,34 +587,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
             let payload = decodePayload(oauthResponse["id_token"]);
             if (payload) sessionData["id_token"] = payload;
         }
-        if (client.server.sessionServer) {
-            // if we have a real session server, we can create an anonymous session
-            // if there is no current session.  For session adapters, we assume
-            // that a session was already created, or updateSessionData creates
-            // one automatically.
-            let sessionCookieValue =  client.server.sessionServer.getSessionCookieValue(request);
-            if (!sessionCookieValue && reply) {
-                sessionCookieValue = 
-                    await client.server.createAnonymousSession(request,
-                        reply,
-                        { [client.sessionDataName]: sessionData });
-    
-            } else {
-                // const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
-                //await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
-                await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, sessionData);
-
-            }
-
-        } else /* No session server but might have session adapter */ {
-
-            if (!client.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
-                "Cannot get session data if sessions not enabled");
-            //const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
-            //await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
-            await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, sessionData);
-        }
-
+        await client.storeSessionData(sessionData, request, reply)
     }
 
 async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
@@ -956,13 +934,22 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         ip: request.ip,
                         user: request.user?.username
                     }));
-                if (!request.user && 
+                    if (!this.server.sessionAdapter) {
+                        const ce = new CrossauthError(ErrorCode.Configuration, "Need a session server or adapter for authorization code flow");                 return await this.errorFn(this.server, request, reply, ce)
+                    }
+                    if (!request.user && 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
                     return reply.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }          
+                if (!this.server.sessionAdapter) {
+                    const ce = new CrossauthError(ErrorCode.Configuration, "Need a session server or adapter for authorization code flow");                 return await this.errorFn(this.server, request, reply, ce)
+                }
+                const state = this.randomValue(this.stateLength);
+                const sessionData = {scope: request.query.scope, state};
+                await this.storeSessionData(sessionData, request, reply);
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(request.query.scope);
+                    await this.startAuthorizationCodeFlow(state, request.query.scope);
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1029,8 +1016,12 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     return reply.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }               
+                const state = this.randomValue(this.stateLength);
+                const {codeChallenge, codeVerifier} = await this.codeChallengeAndVerifier();
+                const sessionData = {scope: request.query.scope, state, codeChallenge, codeVerifier};
+                await this.storeSessionData(sessionData, request, reply);
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(request.query.scope, 
+                    await this.startAuthorizationCodeFlow(state, request.query.scope, codeChallenge,
                         true);
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
@@ -1062,9 +1053,12 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     return reply.redirect(302, 
                         this.loginUrl+"?next="+encodeURIComponent(request.url));
                 }               
+                const oauthData =  await this.server.sessionAdapter?.getSessionData(request, this.sessionDataName);
+                if (!oauthData?.state || oauthData?.state != request.query.state) {
+                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match");
+                }
                 const resp = 
-                    await this.redirectEndpoint(request.query.code,
-                        request.query.state,
+                    await this.redirectEndpoint(request.query.code, oauthData?.scope, oauthData?.codeVerifier,
                         request.query.error,
                         request.query.error_description);
                 if (resp.id_token) {
@@ -2259,4 +2253,36 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             "Cannot delete session data if sessions not enabled");
         await this.server.sessionAdapter.deleteSessionData(request, this.sessionDataName);
     }    
+
+    async storeSessionData(sessionData: {[key:string]:any}, request: FastifyRequest, reply?: FastifyReply) {
+
+        if (this.server.sessionServer) {
+            // if we have a real session server, we can create an anonymous session
+            // if there is no current session.  For session adapters, we assume
+            // that a session was already created, or updateSessionData creates
+            // one automatically.
+            let sessionCookieValue =  this.server.sessionServer.getSessionCookieValue(request);
+            if (!sessionCookieValue && reply) {
+                sessionCookieValue = 
+                    await this.server.createAnonymousSession(request,
+                        reply,
+                        { [this.sessionDataName]: sessionData });
+    
+            } else {
+                // const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
+                //await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
+                await this.server.sessionAdapter?.updateSessionData(request, this.sessionDataName, sessionData);
+
+            }
+
+        } else /* No session server but might have session adapter */ {
+
+            if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
+                "Cannot get session data if sessions not enabled");
+            //const existingData =  await client.server.sessionAdapter.getSessionData(request, client.sessionDataName);
+            //await client.server.sessionAdapter.updateSessionData(request, client.sessionDataName, { ...existingData??{},  ...oauthResponse, expires_at });
+            await this.server.sessionAdapter.updateSessionData(request, this.sessionDataName, sessionData);
+        }
+
+    }
 }

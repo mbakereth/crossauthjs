@@ -148,7 +148,7 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
             if (tokenType == "access" && this.persistAccessToken && 
                 this.keyStorage) {
                 try {
-                    const key = KeyPrefix.accessToken + Crypto.hash(payload.jti);
+                    const key = KeyPrefix.accessToken + Crypto.hash(payload.jti ? payload.jti : (payload.sid? payload.sid : ""));
                     const tokenInStorage = await this.keyStorage.getKey(key);
                     const now = new Date();
                     if (tokenInStorage.expires && 
@@ -158,7 +158,7 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
                     }
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({msg: "Couldn't get token from database - is it valid?", 
-                        hashedAccessToken: Crypto.hash(payload.jti)}))
+                        hashedAccessToken: Crypto.hash(payload.jti ? payload.jti : (payload.sid? payload.sid : ""))}))
                     CrossauthLogger.logger.debug(j({err: e}));
                     return undefined;
                 }

@@ -4,12 +4,7 @@ import { test, expect, vi, beforeAll, afterAll } from 'vitest';
 import { getAccessToken } from './common';
 import { OAuthClientBackend } from '../client'
 import { OpenIdConfiguration } from '@crossauth/common';
-
-function get(name : string, url : string){
-    let names : RegExpExecArray|null;
-    if(names=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(url))
-       return decodeURIComponent(names[1]);
- }
+import { Crypto } from '../../crypto';
  
 const fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -50,9 +45,9 @@ test('OAuthClient.startAuthorizationCodeFlow', async () => {
 
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await oauthClient.loadConfig();
-    const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
+    const state = Crypto.randomValue(32);
+    const {url} = await oauthClient["startAuthorizationCodeFlow"](state, "read write", undefined, false);
     expect(url).toBeDefined();
-    const state = get("state",url??"");
     expect(state).toBeDefined();
     expect(state?.length).toBeGreaterThan(0);
 
@@ -65,7 +60,7 @@ test('OAuthClient.startAuthorizationCodeFlow', async () => {
             token_type: "Bearer",
             expires_in: new Date(new Date().getTime()+1000*60*5),
     })});
-    const resp = await oauthClient["redirectEndpoint"](code, state);
+    const resp = await oauthClient["redirectEndpoint"](code, undefined, undefined);
     expect(resp.access_token).toBeDefined();
 
 });
@@ -81,10 +76,9 @@ test('OAuthClient.clientCredentialsFlow', async () => {
 
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await oauthClient.loadConfig();
-    const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
+    const state = Crypto.randomValue(32);
+    const {url} = await oauthClient["startAuthorizationCodeFlow"](state, "read write", undefined, false);
     expect(url).toBeDefined();
-    const state = get("state",url??"");
-    expect(state).toBeDefined();
     expect(state?.length).toBeGreaterThan(0);
 
     fetchMocker.mockResponseOnce((_req) => {
@@ -109,10 +103,9 @@ test('OAuthClient.passwordFlow', async () => {
 
     fetchMocker.mockResponseOnce(JSON.stringify(oidcConfiguration));
     await oauthClient.loadConfig();
-    const {url} = await oauthClient["startAuthorizationCodeFlow"]("read write", false);
+    const state = Crypto.randomValue(32);
+    const {url} = await oauthClient["startAuthorizationCodeFlow"](state, "read write", undefined, false);
     expect(url).toBeDefined();
-    const state = get("state",url??"");
-    expect(state).toBeDefined();
     expect(state?.length).toBeGreaterThan(0);
 
     fetchMocker.mockResponseOnce((req) => {
