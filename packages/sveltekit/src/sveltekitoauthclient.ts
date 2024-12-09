@@ -1828,10 +1828,13 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         error_description);
                     return await this.errorFn(this.server, event, ce)
                 }
-                CrossauthLogger.logger.debug(j({
-                    msg: `Authorization code flow: redirecting`,
-                    url: url
-                }));
+                if (this.oauthLogFetch) {
+                    CrossauthLogger.logger.debug(j({msg: "OAuth redirect", url: url}))
+                } else {
+                    CrossauthLogger.logger.debug(j({
+                        msg: `OAuth redirect`,
+                    }));    
+                }
                 throw this.redirect(302, url);
 
             } catch (e) {
@@ -1886,10 +1889,13 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         error_description: ce.message,
                     }
                 }
-                CrossauthLogger.logger.debug(j({
-                    msg: `Authorization code flow: redirecting`,
-                    url: url
-                }));
+                if (this.oauthLogFetch) {
+                    CrossauthLogger.logger.debug(j({msg: "OAuth redirect", url: url}))
+                } else {
+                    CrossauthLogger.logger.debug(j({
+                        msg: `OAuth redirect`,
+                    }));    
+                }
                 throw this.redirect(302, url);
 
             } catch (e) {
@@ -1942,10 +1948,13 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         error_description);
                     return await this.errorFn(this.server, event, ce)
                 }
+                if (this.oauthLogFetch) {
+                    CrossauthLogger.logger.debug(j({msg: "OAuth redirect", url: url}))
+                } else {
                     CrossauthLogger.logger.debug(j({
-                        msg: `Authorization code flow: redirecting`,
-                        url: url
-                    }));
+                        msg: `OAuth redirect`,
+                    }));    
+                }
                 throw this.redirect(302, url);
 
             } catch (e) {
@@ -2004,11 +2013,14 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                             error: ce.oauthErrorCode,
                             error_description: ce.message,
                         }
-                        }
+                }
+                if (this.oauthLogFetch) {
+                    CrossauthLogger.logger.debug(j({msg: "OAuth redirect", url: url}))
+                } else {
                     CrossauthLogger.logger.debug(j({
-                        msg: `Authorization code flow: redirecting`,
-                        url: url
-                    }));
+                        msg: `OAuth redirect`,
+                    }));    
+                }
                 throw this.redirect(302, url);
 
             } catch (e) {

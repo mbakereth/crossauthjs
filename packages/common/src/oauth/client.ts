@@ -215,6 +215,8 @@ export abstract class OAuthClientBase {
     protected authServerMode :  "no-cors" | "cors" | "same-origin" | undefined = undefined;
     protected authServerCredentials : "include" | "omit" | "same-origin" | undefined = undefined;
     protected oauthPostType : "json" | "form" = "json";
+    protected oauthLogFetch = false;
+
     /**
      * Constructor.
      * 
@@ -412,10 +414,10 @@ export abstract class OAuthClientBase {
             + "?response_type=code"
             + "&client_id=" + encodeURIComponent(this.#client_id)
             + "&state=" + encodeURIComponent(state)
-            + "&redirect_uri=" + encodeURIComponent(this.redirect_uri).replace(/%20/g, "+");;
+            + "&redirect_uri=" + encodeURIComponent(this.redirect_uri);
 
         if (scope) {
-            url += "&scope=" + encodeURIComponent(scope).replace(/%20/g, "+");
+            url += "&scope=" + encodeURIComponent(scope);
         }
 
         if (pkce && codeChallenge) {
@@ -1091,9 +1093,12 @@ export abstract class OAuthClientBase {
             body = "";
             for (let name in params) {
                 if (body != "") body += "&";
-                body += encodeURIComponent(name) + "=" + encodeURI(params[name]);
+                body += encodeURIComponent(name) + "=" + encodeURIComponent(params[name]);
             }
             contentType = "application/x-www-form-urlencoded";
+        }
+        if (this.oauthLogFetch) {
+            CrossauthLogger.logger.debug(j({msg: "OAuth fetch", method: "POST", url: url, body: body}))
         }
         const resp = await fetch(url, {
             method: 'POST',
@@ -1106,6 +1111,9 @@ export abstract class OAuthClientBase {
             body: body
         });
         const json = await resp.json();
+        if (this.oauthLogFetch) {
+            CrossauthLogger.logger.debug(j({msg: "OAuth fetch response", body: JSON.stringify(json)}))
+        }
         return json;
     }
 
@@ -1123,6 +1131,9 @@ export abstract class OAuthClientBase {
         let options : {[key:string]:any} = {};
         if ( this.authServerCredentials) options.credentials = this.authServerCredentials;
         if ( this.authServerMode) options.mode = this.authServerMode;
+        if (this.oauthLogFetch) {
+            CrossauthLogger.logger.debug(j({msg: "OAuth fetch", method: "GET", url: url}))
+        }
         const resp = await fetch(url, {
             method: 'GET',
             ...options,
@@ -1131,7 +1142,11 @@ export abstract class OAuthClientBase {
                 ...headers,
             },
         });
-        return await resp.json();
+        const json = await resp.json();
+        if (this.oauthLogFetch) {
+            CrossauthLogger.logger.debug(j({msg: "OAuth fetch response", body: JSON.stringify(json)}))
+        }
+        return json;
     }
 
     /**

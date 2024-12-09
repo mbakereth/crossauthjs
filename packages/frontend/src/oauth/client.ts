@@ -56,6 +56,7 @@ export class OAuthClient extends OAuthClientBase {
     #codeVerifier : string|undefined = undefined;
     #state : string|undefined = undefined;
     private scope : string|undefined = undefined;
+    protected logFetch = false;
 
     /**
      * Constructor

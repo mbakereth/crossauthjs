@@ -939,8 +939,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     }
                     if (!request.user && 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode)) {
-                    return reply.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(request.url));
+                    return reply.redirect(this.loginUrl+"?next="+encodeURIComponent(request.url), 302);
                 }          
                 if (!this.server.sessionAdapter) {
                     const ce = new CrossauthError(ErrorCode.Configuration, "Need a session server or adapter for authorization code flow");                 return await this.errorFn(this.server, request, reply, ce)
@@ -955,10 +954,13 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         error_description);
                     return await this.errorFn(this.server, request, reply, ce)
                 }
+                if (this.oauthLogFetch) {
+                    CrossauthLogger.logger.debug(j({msg: "OAuth redirect", url: url}))
+                } else {
                     CrossauthLogger.logger.debug(j({
-                        msg: `Authorization code flow: redirecting`,
-                        url: url
-                    }));
+                        msg: `OAuth redirect`,
+                    }));    
+                }
                 return reply.redirect(url);
             });
         }
@@ -1013,8 +1015,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     }));
                 if (!request.user && 
                     this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE)) {
-                    return reply.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(request.url));
+                    return reply.redirect(this.loginUrl+"?next="+encodeURIComponent(request.url), 302);
                 }               
                 const state = this.randomValue(this.stateLength);
                 const {codeChallenge, codeVerifier} = await this.codeChallengeAndVerifier();
@@ -1027,6 +1028,13 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
                     return await this.errorFn(this.server, request, reply, ce);
+                }
+                if (this.oauthLogFetch) {
+                    CrossauthLogger.logger.debug(j({msg: "OAuth redirect", url: url}))
+                } else {
+                    CrossauthLogger.logger.debug(j({
+                        msg: `OAuth redirect`,
+                    }));    
                 }
                 return reply.redirect(url);
             });
@@ -1047,11 +1055,13 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         ip: request.ip,
                         user: request.user?.username
                     }));
-                if (!request.user &&
+                    if (this.oauthLogFetch) {
+                        CrossauthLogger.logger.debug(j({msg: "Received OAuth redirect", url: request.url}))
+                    }
+                    if (!request.user &&
                      (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || 
                         this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCode))) {
-                    return reply.redirect(302, 
-                        this.loginUrl+"?next="+encodeURIComponent(request.url));
+                    return reply.redirect(this.loginUrl+"?next="+encodeURIComponent(request.url), 302);
                 }               
                 const oauthData =  await this.server.sessionAdapter?.getSessionData(request, this.sessionDataName);
                 if (!oauthData?.state || oauthData?.state != request.query.state) {

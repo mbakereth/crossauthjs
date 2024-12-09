@@ -110,6 +110,14 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
      * as x-www-form-urlencoded.
      */
     oauthPostType? : "json" | "form";
+
+    /**
+     * If true and log level is set to debug, also log fetch requests and
+     * results.
+     * 
+     * Off by default for security reasons.
+     */
+    oauthLogFetch? : boolean;
 }
 
 /**
@@ -162,8 +170,8 @@ export class OAuthClientBackend extends OAuthClientBase {
         setParameter("client_secret", ParamType.String, tmp, options, "OAUTH_CLIENT_SECRET");
         setParameter("codeChallengeMethod", ParamType.String, this, options, "OAUTH_CODE_CHALLENGE_METHOD");
         setParameter("deviceAuthorizationUrl", ParamType.String, this, options, "OAUTH_DEVICE_AUTHORIZATION_URL");
+        setParameter("oauthLogFetch", ParamType.Boolean, this, options, "OAUTH_LOG_FETCH");
         if (this.deviceAuthorizationUrl.startsWith("/")) this.deviceAuthorizationUrl = this.deviceAuthorizationUrl.substring(1);
-
         if (tmp.client_secret) this.client_secret = tmp.client_secret;
 
         setParameter("userCreationType", ParamType.String, this, options, "OAUTH_USER_CREATION_TYPE");
