@@ -105,7 +105,7 @@ test('ResourceServer.invalidAccessToken', async () => {
             jwtPublicKey: publicKey,
             clockTolerance: 10
     })]);
-    const authorized = await resserver.accessTokenAuthorized(access_token??"");
+    const authorized = await resserver.accessTokenAuthorized("x"+access_token);
     expect(authorized).toBeUndefined();
 });
 

@@ -2391,9 +2391,9 @@ export class OAuthAuthorizationServer {
                         } else {
                             let allClaims = claims[scope];
                             if (typeof(allClaims) == "string") allClaims = [allClaims];
-                            for (let field of allClaims) {
+                            for (let field in allClaims) {
                                 tokenPayload[field] = 
-                                    user[field];
+                                    user[allClaims[field]];
                             }
                         }
 
@@ -2409,9 +2409,10 @@ export class OAuthAuthorizationServer {
                         ...user
                     };
                 } else {
-                    for (let field of allClaims) {
+                    console.log(allClaims)
+                    for (let field in allClaims) {
                         tokenPayload[field] = 
-                            user[field];
+                            user[allClaims[field]];
                     }
                 }
             }

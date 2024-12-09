@@ -338,7 +338,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
         let sessionData : {[key:string]:any}= {...oauthResponse, expires_at }
         if ("id_token" in oauthResponse) {
             let payload = decodePayload(oauthResponse["id_token"]);
-            if (payload) sessionData["id_token_payload"] = payload;
+            if (payload) sessionData["id_payload"] = payload;
         }
         await client.storeSessionData(event, sessionData);
 }

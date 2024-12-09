@@ -104,6 +104,12 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
      * you must also provide the user storage.
      */
     userStorage? : UserStorage;
+
+    /**
+     * If set to JSON, make calls to the token endpoint as JSON, otherwise
+     * as x-www-form-urlencoded.
+     */
+    oauthPostType? : "json" | "form";
 }
 
 /**
@@ -169,6 +175,9 @@ export class OAuthClientBackend extends OAuthClientBase {
         else this.userCreationFn = idTokenUserCreationFunction;
         if (options.userStorage) this.userStorage = options.userStorage;
         setParameter("oauthPostType", ParamType.String, this, options, "OAUTH_POST_TYPE");
+        if (this.oauthPostType != "json" && this.oauthPostType != "form") {
+            throw new CrossauthError(ErrorCode.Configuration, "oauthPostType must be json or form")
+        }
     }
 
     /**
