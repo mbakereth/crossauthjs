@@ -37,7 +37,7 @@ const oidcConfiguration : OpenIdConfiguration = {
 function get(name : string, url : string){
     let names : RegExpExecArray|null;
     if(names=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(url))
-       return decodeURIComponent(names[1]);
+       return decodeURIComponent(names[1].replace(/\+/g, " "));
 }
 
 function getSession(res: any) : string {

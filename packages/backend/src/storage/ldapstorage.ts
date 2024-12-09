@@ -206,7 +206,6 @@ export class LdapUserStorage extends UserStorage {
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
             const ce = CrossauthError.asCrossauthError(e);
-            console.log(e)
             if (e instanceof ldap.InvalidCredentialsError) {
                 throw new CrossauthError(ErrorCode.UsernameOrPasswordInvalid);
             } else if (ce.code != ErrorCode.UnknownError) {

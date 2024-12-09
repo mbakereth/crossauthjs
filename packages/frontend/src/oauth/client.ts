@@ -52,6 +52,10 @@ export class OAuthClient extends OAuthClientBase {
     private autoRefresher : OAuthAutoRefresher;
     private deviceCodePoller : OAuthDeviceCodePoller;
     private deviceAuthorizationUrl = "device_authorization";
+    #codeChallenge : string|undefined = undefined;
+    #codeVerifier : string|undefined = undefined;
+    #state : string|undefined = undefined;
+    private scope : string|undefined = undefined;
 
     /**
      * Constructor
@@ -293,7 +297,13 @@ export class OAuthClient extends OAuthClientBase {
             CrossauthLogger.logger.error(j({cerr: cerr, msg: "Error from authorize endpoint: " + error}));
             throw cerr;
         }
-        const resp = await this.redirectEndpoint(code, state, error, error_description);
+        if (this.#state && state != this.#state) {
+            return {
+                error: "access_denied",
+                error_description: "Invalid state"
+            }
+        }
+        const resp = await this.redirectEndpoint(code, this.scope, this.#codeVerifier, error, error_description);
         if (resp.error) {
             const cerr = CrossauthError.fromOAuthError(resp.error, error_description);
             CrossauthLogger.logger.debug(j({err: cerr}));
@@ -665,7 +675,15 @@ export class OAuthClient extends OAuthClientBase {
     async authorizationCodeFlow(scope?: string,
         pkce: boolean = false) : 
         Promise<void> {
-        const resp  = await super.startAuthorizationCodeFlow(scope, pkce);
+            const state = this.randomValue(this.stateLength);
+            this.scope = scope;
+            if (pkce) {
+                const ret = await this.codeChallengeAndVerifier();
+                this.#codeChallenge = ret.codeChallenge;
+                this.#codeVerifier = ret.codeVerifier
+                this.#state = state;
+            }
+            const resp  = await super.startAuthorizationCodeFlow(state, scope, this.#codeChallenge, pkce);
         //await this.receiveTokens(resp);
         if (resp.error || !resp.url) {
             const cerr = CrossauthError.fromOAuthError(

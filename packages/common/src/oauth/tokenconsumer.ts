@@ -313,7 +313,6 @@ export abstract class OAuthTokenConsumerBase {
             }
             return decodedPayload;
         } catch (e) {
-            console.log(e)
             CrossauthLogger.logger.warn(j({msg: "Access token did not validate"}));
             return undefined;
         }
