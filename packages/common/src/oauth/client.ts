@@ -532,9 +532,6 @@ export abstract class OAuthClientBase {
         if (codeVerifier) params.code_verifier = codeVerifier;
         try {
             let resp = await this.post(url, params, this.authServerHeaders);
-            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
-                return {error: "access_denied", error_description: "Invalid ID token"}
-            }
             if (resp.id_token) {
                 const userInfo = await this.getIdPayload(resp.id_token, resp.access_token);
                 if (userInfo.error) {
