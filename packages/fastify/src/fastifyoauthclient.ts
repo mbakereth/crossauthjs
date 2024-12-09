@@ -421,7 +421,7 @@ async function sendJson(oauthResponse: OAuthTokenResponse,
     if (reply) {
         let res : {[key:string]:any}= {ok: true, ...oauthResponse}
         if (client.jwtTokens.includes("id")) {
-            res["id_payload"] = decodePayload(oauthResponse.id_token)
+            res["id_payload"] = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token)
         }
         return reply.header(...JSONHDR).status(200).send(res);
     }
@@ -444,11 +444,14 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
     if (oauthResponse.id_token) {
         try {
             if (oauthResponse.id_token && jwtTokens.includes("id")) {
-                const decoded = jwtDecode(oauthResponse.id_token);
-                const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
-                const hash = jti ? Crypto.hash(jti) : undefined;
-                CrossauthLogger.logger.debug(j({msg: "Got id token", 
-                    idTokenHash: hash}));
+                let decoded = oauthResponse.id_payload ?? jwtDecode(oauthResponse.id_token);
+                if (decoded) {
+                    const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
+                    const hash = jti ? Crypto.hash(jti) : undefined;
+                    CrossauthLogger.logger.debug(j({msg: "Got id token", 
+                        idTokenHash: hash}));
+    
+                }
             }
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -491,8 +494,8 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
     if (reply) {
         try {
             let resp : {[key:string]:any} = {...oauthResponse};
-            if (client.jwtTokens.includes("id")) {
-                resp["id_payload"] = decodePayload(oauthResponse.id_token);
+            if (client.jwtTokens.includes("id") && oauthResponse.id_token) {
+                resp["id_payload"] = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
             }
             return reply.status(200).view(client.authorizedPage, resp);
         } catch (e) {
@@ -545,7 +548,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
             }
             let resp : {[key:string]:any} = {...oauthResponse};
             if (client.jwtTokens.includes("id")) {
-                resp["id_payload"] = decodePayload(oauthResponse.id_token);
+                resp["id_payload"] = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
             }
             return reply.status(200).view(client.authorizedPage, resp );
         }
@@ -584,7 +587,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
         const expires_at = Date.now() + (expires_in)*1000;
         let sessionData : {[key:string]:any}= {...oauthResponse, expires_at }
         if ("id_token" in oauthResponse) {
-            let payload = decodePayload(oauthResponse["id_token"]);
+            let payload = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
             if (payload) sessionData["id_token"] = payload;
         }
         await client.storeSessionData(sessionData, request, reply)
@@ -1067,17 +1070,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 if (!oauthData?.state || oauthData?.state != request.query.state) {
                     throw new CrossauthError(ErrorCode.Unauthorized, "State does not match");
                 }
-                const resp = 
+                let resp = 
                     await this.redirectEndpoint(request.query.code, oauthData?.scope, oauthData?.codeVerifier,
                         request.query.error,
                         request.query.error_description);
-                if (resp.id_token) {
-                    let payload = this.validateIdToken(resp.id_token);
-                    if (!payload) {
-                        resp.error = "access_denied";
-                        resp.error_description = "Invalid ID token received";
-                    }
-                }
                 try {
                     if (resp.error) {
                         const ce = CrossauthError.fromOAuthError(resp.error, 
@@ -1128,13 +1124,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         .send({ok: false, msg: "Access denied"});                }               
                 try {
                     const resp = await this.clientCredentialsFlow(request.body?.scope);
-                    if (resp.id_token) {
-                        let payload = this.validateIdToken(resp.id_token);
-                        if (!payload) {
-                            resp.error = "access_denied";
-                            resp.error_description = "Invalid ID token received";
-                        }
-                    }
                     if (resp.error) {
                         const ce = CrossauthError.fromOAuthError(resp.error, 
                             resp.error_description);
@@ -1214,13 +1203,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 try {
                     const resp = 
                         await this.refreshTokenFlow(refreshToken);
-                        if (resp.id_token) {
-                            let payload = this.validateIdToken(resp.id_token);
-                            if (!payload) {
-                                resp.error = "access_denied";
-                                resp.error_description = "Invalid ID token received";
-                            }
-                        }
                         if (resp.error) {
                         const ce = CrossauthError.fromOAuthError(resp.error, 
                             resp.error_description);
@@ -1738,13 +1720,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 await this.passwordFlow(request.body.username,
                     request.body.password,
                     request.body.scope);
-            if (resp.id_token) {
-                let payload = this.validateIdToken(resp.id_token);
-                if (!payload) {
-                    resp.error = "access_denied";
-                    resp.error_description = "Invalid ID token received";
-                }
-            }
             if (resp.error == "mfa_required" && 
                 resp.mfa_token &&
                 this.validFlows.includes(OAuthFlows.PasswordMfa)) {
@@ -1754,13 +1729,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     request.body.scope,
                     request,
                     reply);
-                if (resp.id_token) {
-                    let payload = this.validateIdToken(resp.id_token);
-                    if (!payload) {
-                        resp.error = "access_denied";
-                        resp.error_description = "Invalid ID token received";
-                    }
-                }
                 if (resp.error) {
                     const ce = CrossauthError.fromOAuthError(resp.error, 
                         resp.error_description);
@@ -1940,13 +1908,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         const resp = await this.mfaOobComplete(request.body.mfa_token, 
             request.body.oob_code,
             request.body.binding_code);
-        if (resp.id_token) {
-            let payload = this.validateIdToken(resp.id_token);
-            if (!payload) {
-                resp.error = "access_denied";
-                resp.error_description = "Invalid ID token received";
-            }
-        }
         if (resp.error) {
             const ce = CrossauthError.fromOAuthError(resp.error,
                 resp.error_description??"Error completing MFA");
@@ -2082,13 +2043,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         try {
 
             const resp =  await this.pollDeviceCodeFlow(request.body.device_code);
-            if (resp.id_token) {
-                let payload = this.validateIdToken(resp.id_token);
-                if (!payload) {
-                    resp.error = "access_denied";
-                    resp.error_description = "Invalid ID token received";
-                }
-            }
 
             if (resp.error) {
                 return reply.header(...JSONHDR)
@@ -2144,13 +2098,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         if (!onlyIfExpired || expiresAt <= Date.now()) {
             try {
                 const resp = await this.refreshTokenFlow(refreshToken);
-                if (resp.id_token) {
-                    let payload = this.validateIdToken(resp.id_token);
-                    if (!payload) {
-                        resp.error = "access_denied";
-                        resp.error_description = "Invalid ID token received";
-                    }
-                }
                 if (!resp.error && !resp.access_token) {
                     resp.error = "server_error";
                     resp.error_description = "Unexpectedly did not receive error or access token";
@@ -2237,13 +2184,6 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 //onlyIfExpired ? oauthData.expires_at : undefined
                 oauthData.expires_at
             );
-        if (resp && resp.id_token) {
-            let payload = this.validateIdToken(resp.id_token);
-            if (!payload) {
-                resp.error = "access_denied";
-                resp.error_description = "Invalid ID token received";
-            }
-        }
         if (!silent) {
             if (resp == undefined) return this.receiveTokenFn({}, this, request, reply);
             if (resp != undefined) return resp; 

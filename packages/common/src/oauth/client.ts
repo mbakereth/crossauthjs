@@ -142,6 +142,7 @@ export interface OAuthTokenResponse {
     access_token?: string,
     refresh_token? : string, 
     id_token? : string, 
+    id_payload? : {[key:string]:any},
     token_type?: string, 
     expires_in?: number,
     error? : string,
@@ -216,6 +217,7 @@ export abstract class OAuthClientBase {
     protected authServerCredentials : "include" | "omit" | "same-origin" | undefined = undefined;
     protected oauthPostType : "json" | "form" = "json";
     protected oauthLogFetch = false;
+    protected oauthUseUserInfoEndpoint = false;
 
     /**
      * Constructor.
@@ -435,6 +437,40 @@ export abstract class OAuthClientBase {
         return {codeChallenge, codeVerifier}
     }
 
+    protected async getIdPayload(id_token : string, access_token? : string) : Promise<{payload?: {[key:string]:any}, error? : string, error_description? : string}> {
+        let error : string|undefined = undefined;
+        let error_description : string|undefined = undefined;
+        try {
+            let payload : {[key:string]:any}|undefined = undefined;
+
+            payload = await this.validateIdToken(id_token);
+            if (!payload) {
+                error = "access_denied";
+                error_description = "Invalid ID token received";
+                return {error, error_description}
+            }
+            if (access_token) {
+                if (this.oauthUseUserInfoEndpoint) {
+                    const userInfo = await this.userInfoEndpoint(access_token)
+                    if (userInfo.error) {
+                        error = userInfo.error;
+                        error_description = "Failed getting user info: " + (userInfo.error_description ?? "unknown error");
+                        return {error, error_description}
+                    }
+                    payload = {...payload, ...userInfo}
+                }
+            }
+            return {payload}
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({msg: "Couldn't get user info", cerr: ce}));
+            error = ce.oauthErrorCode;
+            error_description = "Couldn't get user info: " + ce.message;
+            return {error, error_description};
+        }
+    }
+
     /**
      * This implements the functionality behind the redirect URI
      * 
@@ -495,9 +531,16 @@ export abstract class OAuthClientBase {
         if (client_secret) params.client_secret = client_secret;
         if (codeVerifier) params.code_verifier = codeVerifier;
         try {
-            const resp = await this.post(url, params, this.authServerHeaders);
+            let resp = await this.post(url, params, this.authServerHeaders);
             if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
                 return {error: "access_denied", error_description: "Invalid ID token"}
+            }
+            if (resp.id_token) {
+                const userInfo = await this.getIdPayload(resp.id_token, resp.access_token);
+                if (userInfo.error) {
+                    return userInfo;
+                }
+                resp.id_payload = userInfo.payload;
             }
             return resp;
         } catch (e) {
@@ -556,7 +599,15 @@ export abstract class OAuthClientBase {
         }
         if (scope) params.scope = scope;
         try {
-            return await this.post(url, params, this.authServerHeaders);
+            let resp = await this.post(url, params, this.authServerHeaders);
+            if (resp.id_token) {
+                const userInfo = await this.getIdPayload(resp.id_token, resp.access_token);
+                if (userInfo.error) {
+                    return userInfo;
+                }
+                resp.id_payload = userInfo.payload;
+            }
+            return resp;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
             return {
@@ -614,8 +665,12 @@ export abstract class OAuthClientBase {
         if (scope) params.scope = scope;
         try {
             let resp = await this.post(url, params, this.authServerHeaders);
-            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
-                return {error: "access_denied", error_description: "Invalid ID token"}
+            if (resp.id_token) {
+                const userInfo = await this.getIdPayload(resp.id_token, resp.access_token);
+                if (userInfo.error) {
+                    return userInfo;
+                }
+                resp.id_payload = userInfo.payload;
             }
             return resp;
         } catch (e) {
@@ -798,7 +853,14 @@ export abstract class OAuthClientBase {
             otp: otp,
             scope: scope,
         }, this.authServerHeaders);
-        return {
+        if (otpResp.id_token) {
+            const userInfo = await this.getIdPayload(otpResp.id_token, otpResp.access_token);
+            if (userInfo.error) {
+                return userInfo;
+            }
+            otpResp.id_payload = userInfo.payload;
+        }
+    return {
             id_token: otpResp.id_token,
             access_token: otpResp.access_token,
             refresh_token: otpResp.refresh_token,
@@ -917,8 +979,12 @@ export abstract class OAuthClientBase {
                 error_description: resp.error_description,
             }
         }
-        if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
-            return {error: "access_denied", error_description: "Invalid ID token"}
+        if (resp.id_token) {
+            const userInfo = await this.getIdPayload(resp.id_token, resp.access_token);
+            if (userInfo.error) {
+                return userInfo;
+            }
+            resp.id_payload = userInfo.payload;
         }
         return {
             id_token: resp.id_token,
@@ -965,9 +1031,13 @@ export abstract class OAuthClientBase {
         if (client_secret) params.client_secret = client_secret;
         try {
             let resp =  await this.post(url, params, this.authServerHeaders);
-            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
-                return {error: "access_denied", error_description: "Invalid ID token"}
-            }    
+            if (resp.id_token) {
+                const userInfo = await this.getIdPayload(resp.id_token, resp.access_token);
+                if (userInfo.error) {
+                    return userInfo;
+                }
+                resp.id_payload = userInfo.payload;
+            }
             return resp;
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
@@ -1052,8 +1122,12 @@ export abstract class OAuthClientBase {
         try {
             const resp = await this.post(this.oidcConfig?.token_endpoint, params, this.authServerHeaders);
             if (resp.error) return resp;
-            if (resp.id_token && !(await this.validateIdToken(resp.id_token))) {
-                return {error: "access_denied", error_description: "Invalid ID token"}
+            if (resp.id_token) {
+                const userInfo = await this.getIdPayload(resp.id_token, resp.access_token);
+                if (userInfo.error) {
+                    return userInfo;
+                }
+                resp.id_payload = userInfo.payload;
             }
             return resp;
         } catch (e) {
@@ -1066,6 +1140,21 @@ export abstract class OAuthClientBase {
         //return {url: url, params: params};
     }
 
+    //////////////////////////////////////////////////////////////////
+    // UserInfo
+
+    async userInfoEndpoint(access_token : string) : Promise<{[key:string]:any}> {
+        if (!this.oidcConfig?.userinfo_endpoint) {
+            return {
+                error: "server_error",
+                error_description: "Cannot get token endpoint"
+            };
+        }
+        const url = this.oidcConfig.userinfo_endpoint;
+
+        const resp = await this.post(url, {}, {authorization: "Bearer " + access_token});
+        return resp;
+    }
     /**
      * Makes a POST request to the given URL using `fetch()`.
      * 

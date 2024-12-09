@@ -118,6 +118,7 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
      * Off by default for security reasons.
      */
     oauthLogFetch? : boolean;
+
 }
 
 /**
@@ -183,6 +184,7 @@ export class OAuthClientBackend extends OAuthClientBase {
         else this.userCreationFn = idTokenUserCreationFunction;
         if (options.userStorage) this.userStorage = options.userStorage;
         setParameter("oauthPostType", ParamType.String, this, options, "OAUTH_POST_TYPE");
+        setParameter("oauthUseUserInfoEndpoint", ParamType.Boolean, this, options, "OAUTH_USE_USER_INFO_ENDPOINT");
         if (this.oauthPostType != "json" && this.oauthPostType != "form") {
             throw new CrossauthError(ErrorCode.Configuration, "oauthPostType must be json or form")
         }

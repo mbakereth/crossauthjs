@@ -270,7 +270,7 @@ async function sendJson(oauthResponse: OAuthTokenResponse,
     _setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) : Promise<Response|undefined> {
         let resp : {[key:string]:any} = {ok: true, ...oauthResponse};
         if (client.jwtTokens.includes("id")) {
-            resp["id_payload"] = decodePayload(oauthResponse.id_token);
+            resp["id_payload"] = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
         }
         return json(resp)
 }
@@ -292,11 +292,13 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
     if (oauthResponse.id_token) {
         try {
             if (oauthResponse.id_token && jwtTokens.includes("id")) {
-                const decoded= jwtDecode(oauthResponse.id_token);
-                const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
-                const hash = jti ? Crypto.hash(jti) : undefined;
-                CrossauthLogger.logger.debug(j({msg: "Got id token", 
-                    idTokenHash: hash}));
+                const decoded= oauthResponse.id_payload ?? jwtDecode(oauthResponse.id_token);
+                if (decoded) {
+                    const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
+                    const hash = jti ? Crypto.hash(jti) : undefined;
+                    CrossauthLogger.logger.debug(j({msg: "Got id token", 
+                        idTokenHash: hash}));    
+                }
             }
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -337,7 +339,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
         const expires_at = Date.now() + (expires_in)*1000;
         let sessionData : {[key:string]:any}= {...oauthResponse, expires_at }
         if ("id_token" in oauthResponse) {
-            let payload = decodePayload(oauthResponse["id_token"]);
+            let payload = oauthResponse.id_payload ?? decodePayload(oauthResponse["id_token"]);
             if (payload) sessionData["id_payload"] = payload;
         }
         await client.storeSessionData(event, sessionData);
@@ -359,7 +361,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     try {
         if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
             await updateSessionData(oauthResponse, client, event);
-            const payload = decodePayload(oauthResponse.id_token);
+            const payload = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
             if (payload) await setUserFn(event, payload);
         }
 
@@ -390,7 +392,7 @@ async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
     try {
         if (oauthResponse.access_token || oauthResponse.id_token || oauthResponse.refresh_token) {
             await updateSessionData(oauthResponse, client, event);
-            const payload = decodePayload(oauthResponse.id_token);
+            const payload = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
             if (payload) await setUserFn(event, payload);
         }
 
@@ -431,7 +433,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
         ...oauthResponse,
     }
     if (client.jwtTokens.includes("id")) {
-        resp["id_payload"] = decodePayload(oauthResponse.id_token)
+        resp["id_payload"] = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token)
     }
     if (resp["id_payload"]) await setUserFn(event, resp["id_payload"]);
     return resp;
@@ -469,7 +471,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
             ok: true,
             ...oauthResponse};
         if (client.jwtTokens.includes("id")) {
-            resp["id_payload"] = decodePayload(oauthResponse.id_token);
+            resp["id_payload"] = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
         }
         return resp;
         } catch (e) {
@@ -2779,13 +2781,13 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
     private errorIfIdTokenInvalid(oauthResponse : OAuthTokenResponse) : OAuthTokenResponse {
         if (oauthResponse["id_token"] && this.jwtTokens.includes("id")) {
-            const payload = this.validateIdToken(oauthResponse["id_token"]);
+            /*const payload = this.validateIdToken(oauthResponse["id_token"]);
             if (payload == undefined) {
                 return {
                     error: "access_denied",
                     error_description: "Invalid ID token received"
                 }
-            }
+            }*/
             return oauthResponse;
         }
         return oauthResponse;
