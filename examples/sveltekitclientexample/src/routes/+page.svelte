@@ -64,7 +64,7 @@
 <p><a href="flows/passwordflow">Password Flow</a></p>
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-missing-attribute -->
 <p><a class="cursor-pointer" on:click={() => {deviceCodeFlowForm.submit()}}>Device Code Flow</a></p>
-<p><a href="flows/authzcodeflow?scope=openid+profile+email+https%3A%2F%2Flogin.eduid.ch%2Fauthz%2FUser.Read">OIDC Authorization Code Flow</a></p>
+<p><a href="flows/authzcodeflow?scope={data.scope}">OIDC Authorization Code Flow</a></p>
 <p><a href="deletetokens">Delete my tokens</a></p>
 
 <div class="mt-4">

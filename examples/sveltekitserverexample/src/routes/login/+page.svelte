@@ -1,7 +1,4 @@
 <script>
-    import { goto } from '$app/navigation';
-    import { onMount } from 'svelte';
-    import { UserState } from '@crossauth/common';
     import Totp from '$lib/components/Totp.svelte'
 	/** @type {import('./$types').PageData} */
     export let data;
@@ -12,6 +9,9 @@
             goto("/");
         }
     });*/
+    let next = form?.next;
+    let action = "?/factor2";
+    //f (next) action += "?next=" + encodeURI(next);
 </script>
 <svelte:head>
     <title>Server Login</title>
@@ -19,8 +19,9 @@
 <h1>Server Login</h1>
 
 {#if form?.factor2Required}
-    <form method="POST" action="?/factor2">
+    <form method="POST" action={action}>
         <Totp data={data} error={form?.error}/>
+        <input type="hidden" name="next" value={form?.next ?? "/"}/>
     </form>
 {:else if form?.errorCodeName == "PasswordResetNeeded"}
 {#if form?.error} 

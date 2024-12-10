@@ -28,6 +28,7 @@ export type LoginReturn = {
     error?: string,
     formData?: {[key:string]:string},
     factor2Required?: boolean,
+    next? : string,
     ok: boolean
     errorCode? : number,
     errorCodeName?: string,
@@ -447,6 +448,7 @@ export class SvelteKitUserEndpoints {
                 user, 
                 formData, 
                 factor2Required: user.factor2 && user.factor2 != "",
+                next: next,
                 ok: true, 
             };    
         } catch (e) {
@@ -1041,7 +1043,8 @@ export class SvelteKitUserEndpoints {
 
             return {
                 user: user,
-                ok: true,            
+                ok: true,
+                formData: formData,           
             }
 
         } catch (e) {

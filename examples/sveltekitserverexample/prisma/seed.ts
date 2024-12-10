@@ -67,7 +67,7 @@ async function main() {
         client_secret: client_secret,
         client_name: "Client2",
         confidential: true,
-        redirect_uri: ["http://localhost:5174/authcode"],
+        redirect_uri: ["http://localhost:3001/authzcode"],
         valid_flow: OAuthFlows.allFlows(),
         userid: user1.id,
     });
