@@ -218,6 +218,7 @@ export abstract class OAuthClientBase {
     protected oauthPostType : "json" | "form" = "json";
     protected oauthLogFetch = false;
     protected oauthUseUserInfoEndpoint = false;
+    protected oauthAuthorizeRedirect : string|undefined = undefined;
 
     /**
      * Constructor.
@@ -411,7 +412,9 @@ export abstract class OAuthClientBase {
             error_description: "Cannot make authorization code flow without Redirect Uri"
         }; 
 
-        const base = this.oidcConfig.authorization_endpoint;
+        let base = this.oidcConfig.authorization_endpoint;
+        if (this.oauthAuthorizeRedirect) base = this.oauthAuthorizeRedirect;
+
         let url = base 
             + "?response_type=code"
             + "&client_id=" + encodeURIComponent(this.#client_id)

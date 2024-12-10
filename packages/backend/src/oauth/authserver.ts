@@ -290,6 +290,7 @@ export class OAuthAuthorizationServer {
     private deviceCodeLength = 16;
     private userCodeDashEvery : number|null = 4;
     private deviceCodeVerificationUri : string = "";
+    private authServerBaseUrl = "";
 
     /** Set from options.  See {@link OAuthAuthorizationServerOptions.validFlows} */
     validFlows : string[] = ["all"];
@@ -321,7 +322,10 @@ export class OAuthAuthorizationServer {
         }
         this.clientManager = new OAuthClientManager({clientStorage, ...options});
 
-        setParameter("oauthIssuer", ParamType.String, this, options, "AUTH_SERVER_BASE_URL", true);
+        setParameter("authServerBaseUrl", ParamType.String, this, options, "AUTH_SERVER_BASE_URL", true);
+        setParameter("oauthIssuer", ParamType.String, this, options, "OAUTH_ISSUER");
+        if (!this.oauthIssuer) 
+            this.oauthIssuer = this.authServerBaseUrl;
         setParameter("audience", ParamType.String, this, options, "OAUTH_AUDIENCE");
         setParameter("oauthPbkdf2Iterations", ParamType.String, this, options, "OAUTH_PBKDF2_ITERATIONS");
         setParameter("requireClientSecretOrChallenge", ParamType.Boolean, this, options, "OAUTH_REQUIRE_CLIENT_SECRET_OR_CHALLENGE");

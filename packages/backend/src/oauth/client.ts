@@ -185,6 +185,7 @@ export class OAuthClientBackend extends OAuthClientBase {
         if (options.userStorage) this.userStorage = options.userStorage;
         setParameter("oauthPostType", ParamType.String, this, options, "OAUTH_POST_TYPE");
         setParameter("oauthUseUserInfoEndpoint", ParamType.Boolean, this, options, "OAUTH_USE_USER_INFO_ENDPOINT");
+        setParameter("oauthAuthorizeRedirect", ParamType.String, this, options, "OAUTH_AUTHORIZE_REDIRECT");
         if (this.oauthPostType != "json" && this.oauthPostType != "form") {
             throw new CrossauthError(ErrorCode.Configuration, "oauthPostType must be json or form")
         }
