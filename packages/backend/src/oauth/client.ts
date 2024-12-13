@@ -52,6 +52,13 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
     deviceAuthorizationUrl? : string,
 
     /**
+     * If set to true, users must also have a local account to log in
+     * with OIDC.
+     * Default false
+     */
+    requireLocalAccount? : boolean
+
+    /**
      * If using the BFF method, you can also create a user in the sesion
      * when the token is received, just like session management 
      * (`event.locals.user` for Sveltekit, `request.user`) for Fastify.
@@ -65,6 +72,8 @@ export interface OAuthClientOptions extends OAuthTokenConsumerOptions {
      * 
      * Matching is done in the fields given in `userMatchField` and
      * `idTokenMatchField`.
+     * 
+     * Default is `idToken`, which does not require a local account
      */
     userCreationType? : 
         "idToken" |

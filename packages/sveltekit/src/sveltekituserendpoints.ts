@@ -376,7 +376,10 @@ export class SvelteKitUserEndpoints {
             formData = data.toObject();
             const username = data.get('username') ?? "";
             const persist = data.getAsBoolean('persist') ?? false;
-            const next = formData.next ?? this.loginRedirectUrl;
+            let next = formData.next ?? this.loginRedirectUrl;
+            if (next.includes("/__data.json")) {
+                next = next.substring(0, next.indexOf("/__data.json"));
+            }
             if (username == "") throw new CrossauthError(ErrorCode.InvalidUsername, "Username field may not be empty");
             
             // call implementor-provided hook to add additional fields to session key

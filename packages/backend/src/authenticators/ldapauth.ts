@@ -7,7 +7,13 @@ import { LdapUserStorage } from '../storage/ldapstorage.ts';
 
 /** Optional parameters to pass to {@link LdapAuthenticator} constructor. */
 export interface LdapAuthenticatorOptions extends AuthenticationOptions {
+
+    /**
+     * If true, an account will automatically be created (with factor1 taken
+     * from `ldapAutoCreateFactor1` when a user logs in with LDAP)
+     */
     ldapAutoCreateAccount? : boolean,
+    ldapAutoCreateFactor1? : string,
 }
 
 /**
@@ -20,6 +26,7 @@ export class LdapAuthenticator extends PasswordAuthenticator {
 
     private ldapAutoCreateAccount : boolean = false;
     private ldapStorage : LdapUserStorage;
+    private ldapAutoCreateFactor1 = "ldap";
 
     /**
      * Create a new authenticator.
@@ -31,6 +38,7 @@ export class LdapAuthenticator extends PasswordAuthenticator {
                 options : LdapAuthenticatorOptions = {}) {
         super({friendlyName: "LDAP", ...options});
         setParameter("ldapAutoCreateAccount", ParamType.Boolean, this, options, "LDAP_AUTO_CREATE_ACCOUNT");
+        setParameter("ldapAutoCreateFactor1", ParamType.Boolean, this, options, "LDAP_AUTO_CREATE_FACTOR1");
         this.ldapStorage = ldapStorage;
     }
 
@@ -51,8 +59,9 @@ export class LdapAuthenticator extends PasswordAuthenticator {
             try {
                 const resp = await this.ldapStorage.getUserByUsername(user.username);
                 localUser = resp.user;
+                localUser.factor1 = this.ldapAutoCreateFactor1;
             } catch (e) {
-                localUser = await this.ldapStorage.createUser(user, params);
+                localUser = await this.ldapStorage.createUser({factor1: this.ldapAutoCreateFactor1, ...user}, params);
             }
         } else {
             const resp = await this.ldapStorage.getUserByUsername(user.username);

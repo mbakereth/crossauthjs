@@ -8,12 +8,13 @@ import { Authenticator, type AuthenticationParameters , type AuthenticationOptio
  * Optional parameters to pass to {@link OidcPasswordAuthenticator} 
  * constructor. 
  */
-export interface LocalPasswordAuthenticatorOptions extends AuthenticationOptions {
+export interface OidcAuthenticatorOptions extends AuthenticationOptions {
 
 }
 
 /**
- * Does username/password authentication using PBKDF2 hashed passwords.
+ * Does no password checking - used when a user table entry has to be created
+ * but authentication is done with OIDC.
  */
 export class OidcAuthenticator extends Authenticator {
 
@@ -38,7 +39,7 @@ export class OidcAuthenticator extends Authenticator {
      * @param options see {@link LocalPasswordAuthenticatorOptions}
      */
     constructor(_userStorage : UserStorage,
-                options : LocalPasswordAuthenticatorOptions = {}) {
+                options : OidcAuthenticatorOptions = {}) {
         super({friendlyName: "OIDC", ...options});
     }
 
@@ -71,12 +72,8 @@ export class OidcAuthenticator extends Authenticator {
      * @returns the newly created password in the `password` field.
      */
     async createPersistentSecrets(_username : string, 
-        params: AuthenticationParameters, 
-        repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
-        if (!params.password) throw new CrossauthError(ErrorCode.Unauthorized, "No password provided");
-        if (repeatParams && repeatParams.password != params.password) {
-            throw new CrossauthError(ErrorCode.PasswordMatch);
-        }
+        _params: AuthenticationParameters, 
+        _repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         return {};
     }
 
