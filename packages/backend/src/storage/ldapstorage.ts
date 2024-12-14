@@ -97,7 +97,8 @@ export class LdapUserStorage extends UserStorage {
 
         if (!secrets?.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
         const ldapUser = await this.getLdapUser(user.username, secrets.password);
-        return await this.localStorage.createUser(this.createUserFn(user, ldapUser), {});
+        user = this.createUserFn(user, ldapUser);
+        return await this.localStorage.createUser(user, {password: "pbkdf2:sha256:32:600000:0:DISABLED:DISABLED"});
     }
 
     /**

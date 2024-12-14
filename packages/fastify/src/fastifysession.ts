@@ -84,7 +84,7 @@ export interface FastifySessionServerOptions
      * the user storage.
       */
     createUserFn?: (request: FastifyRequest<{ Body: SignupBodyType }>,
-        userEditableFields: string[]) => UserInputFields;
+        userEditableFields: string[], allowableFactor1 : string[]) => UserInputFields;
 
     /** Function that updates a user from form fields.
      * Default one takes fields that begin with `user_`, removing the `user_`
@@ -304,6 +304,18 @@ export interface FastifySessionServerOptions
      * @returns array of matching clients
      */
     clientSearchFn? : (searchTerm : string, clientStorage : OAuthClientStorage, userid? : string|number|null) => Promise<OAuthClient[]>;
+
+    /**
+     * When signing up themselves, users may choose any of these.
+     * Default: ["localpassword"]
+     */
+    userAllowedFactor1? : string[],
+
+    /**
+     * When admins create a user, they may choose any of these.
+     * Default: ["localpassword"]
+     */
+    adminAllowedFactor1? : string[],
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -629,7 +641,8 @@ function defaultUserValidator(user : UserInputFields) : string[] {
  * @returns the new user
  */
 function defaultCreateUser(request: FastifyRequest<{ Body: SignupBodyType }>,
-    userEditableFields: string[]) : UserInputFields {
+    userEditableFields: string[],
+    allowableFactor1 : string[]) : UserInputFields {
     let state = "active";
     let user : UserInputFields = {
         username: request.body.username,
@@ -644,6 +657,9 @@ function defaultCreateUser(request: FastifyRequest<{ Body: SignupBodyType }>,
         }
     }
     user.factor1 = "localpassword";
+    if (allowableFactor1.includes(user.factor1)) {
+        user.factor1 = request.body.factor1;
+    }
     user.factor2 = request.body.factor2;
     return user;
 
@@ -840,7 +856,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
      * See {@link FastifySessionServerOptions}.
      */
     createUserFn: (request: FastifyRequest<{ Body: SignupBodyType }>,
-        userEditableFields: string[]) => UserInputFields = defaultCreateUser;
+        userEditableFields: string[], allowableFactor1: string[]) => UserInputFields = defaultCreateUser;
 
     /**
      * Funtion to update a user record from form fields.  Taken from the options during 
@@ -910,6 +926,8 @@ export class FastifySessionServer implements FastifySessionAdapter {
     ]
     private editUserScope? : string;
     readonly enableCsrfProtection = true;
+    readonly userAllowedFactor1 = ["localpassword"];
+    readonly adminAllowedFactor1 = ["localpassword"];
 
 
     /**
@@ -948,6 +966,8 @@ export class FastifySessionServer implements FastifySessionAdapter {
         setParameter("enableAdminEndpoints", ParamType.Boolean, this, options, "ENABLE_ADMIN_ENDPOINTS");
         setParameter("enableOAuthClientManagement", ParamType.Boolean, this, options, "ENABLE_OAUTH_CLIENT_MANAGEMENT");
         setParameter("editUserScope", ParamType.String, this, options, "EDIT_USER_SCOPE");
+        setParameter("userAllowedFactor1", ParamType.JsonArray, this, options, "USER_ALLOWED_FACTOR1");
+        setParameter("adminAllowedFactor1", ParamType.JsonArray, this, options, "ADMIN_ALLOWED_FACTOR1");
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
         if (options.createUserFn) this.createUserFn = options.createUserFn;
@@ -2354,7 +2374,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
 
         // call implementor-provided function to create the user object (or our default)
         let user = 
-            this.createUserFn(request, this.userStorage.userEditableFields);
+            this.createUserFn(request, this.userStorage.userEditableFields, this.userAllowedFactor1);
 
         // ask the authenticator to validate the user-provided secret
         let passwordErrors = 

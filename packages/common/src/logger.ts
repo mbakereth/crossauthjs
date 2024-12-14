@@ -219,7 +219,7 @@ declare global {
  * Rather than setting this directly, call
  * {@link CrossauthLogger.setLogger()}.
  */
-globalThis.crossauthLogger = new CrossauthLogger(CrossauthLogger.None);
+globalThis.crossauthLogger = new CrossauthLogger();
 
 /**
  * If your logger object accepts JSON input, set this to true.

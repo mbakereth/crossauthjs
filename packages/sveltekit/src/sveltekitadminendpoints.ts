@@ -624,7 +624,8 @@ export class SvelteKitAdminEndpoints {
             user = 
                 this.sessionServer.createUserFn(event, formData, 
                     {...this.sessionServer.userStorage.userEditableFields,
-                    ...this.sessionServer.userStorage.adminEditableFields});
+                    ...this.sessionServer.userStorage.adminEditableFields},
+                this.sessionServer.adminAllowedFactor1);
 
             const secretNames = this.sessionServer.authenticators[user.factor1].secretNames();
             let hasSecrets = true;

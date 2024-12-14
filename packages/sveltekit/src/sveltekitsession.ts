@@ -117,7 +117,8 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
          */
     createUserFn?: (event: RequestEvent,
         data : {[key:string]:string|undefined},
-        userEditableFields: string[]) => UserInputFields;
+        userEditableFields: string[],
+        allowableFactor1 : string[]) => UserInputFields;
 
     /** Function that updates a user from form fields.
      * Default one takes fields that begin with `user_`, removing the `user_`
@@ -316,6 +317,18 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
 
     /** Pass the Sveltekit error function */
     error? : any,
+
+    /**
+     * When signing up themselves, users may choose any of these.
+     * Default: ["localpassword"]
+     */
+    userAllowedFactor1? : string[],
+
+    /**
+     * When admins create a user, they may choose any of these.
+     * Default: ["localpassword"]
+     */
+    adminAllowedFactor1? : string[],
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -349,7 +362,8 @@ function defaultUserValidator(user : UserInputFields) : string[] {
  */
 function defaultCreateUser(event : RequestEvent, 
     data : {[key:string]:string|undefined},
-    userEditableFields: string[]) : UserInputFields {
+    userEditableFields: string[], 
+    allowableFactor1 = ["localpassword"]) : UserInputFields {
     let state = "active";
     let user : UserInputFields = {
         username: data.username ?? "",
@@ -375,6 +389,9 @@ function defaultCreateUser(event : RequestEvent,
         }
     }
     user.factor1 = "localpassword";
+    if (data.factor1 && allowableFactor1.includes(data.factor1)) {
+        user.factor1 = data.factor1;
+    }
     user.factor2 = data.factor2;
     return user;
 
@@ -485,7 +502,8 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      */
     createUserFn: (event : RequestEvent,
         data : {[key:string]: string|undefined},
-        userEditableFields: string[]) => UserInputFields = defaultCreateUser;
+        userEditableFields: string[],
+        allowableFactor1 : string[]) => UserInputFields = defaultCreateUser;
 
     /**
      * Funtion to update a user record from form fields.  Taken from the options during 
@@ -608,6 +626,9 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      */
     readonly editUserScope? : string;
 
+    readonly userAllowedFactor1 = ["localpassword"];
+    readonly adminAllowedFactor1 = ["localpassword"];
+
     /**
      * Constructor
      * @param keyStorage where session IDs, email verification and reset tokens are stored
@@ -640,6 +661,8 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         setParameter("adminProtectedExceptionApiEndpoints", ParamType.JsonArray, this, options, "ADMIN_PROTECTED_EXCEPTION_API_ENDPOINTS");
         setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
         setParameter("unauthorizedUrl", ParamType.JsonArray, this, options, "UNAUTHORIZED_PAGE");
+        setParameter("userAllowedFactor1", ParamType.JsonArray, this, options, "USER_ALLOWED_FACTOR1");
+        setParameter("adminAllowedFactor1", ParamType.JsonArray, this, options, "ADMIN_ALLOWED_FACTOR1");
         let options1 : {allowedFactor2?: string[]} = {}
         setParameter("allowedFactor2", ParamType.JsonArray, options1, options, "ALLOWED_FACTOR2");
         this.allowedFactor2Names = options.allowedFactor2 ?? ["none"];

@@ -130,6 +130,12 @@ export abstract class Authenticator {
             canUpdateSecrets: this.canUpdateSecrets(),
         }
     }
+
+    /**
+     * If your authenticator doesn't need a user to be in the table (because
+     * it can create one), override this and return false. Default is true
+     */
+    requireUserEntry() : boolean {return true}
 }
 
 /**

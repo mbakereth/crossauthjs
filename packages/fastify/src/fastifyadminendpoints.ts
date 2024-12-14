@@ -868,7 +868,8 @@ export class FastifyAdminEndpoints {
         let user = 
             this.sessionServer.createUserFn(request, 
                 {...this.sessionServer.userStorage.userEditableFields,
-                ...this.sessionServer.userStorage.adminEditableFields});
+                ...this.sessionServer.userStorage.adminEditableFields},
+            this.sessionServer.adminAllowedFactor1);
 
         // find out of password was gfiven
         const secretNames = this.sessionServer.authenticators[user.factor1].secretNames();
@@ -918,7 +919,6 @@ export class FastifyAdminEndpoints {
         if (errors.length > 0) {
             throw new CrossauthError(ErrorCode.FormEntry, errors);
         }
-
         const newUser = await this.sessionServer.sessionManager.createUser(user,
             request.body,
             repeatSecrets, true, !hasSecrets);

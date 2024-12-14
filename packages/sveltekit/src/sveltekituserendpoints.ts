@@ -677,7 +677,7 @@ export class SvelteKitUserEndpoints {
     
             // call implementor-provided function to create the user object (or our default)
             user = 
-                this.sessionServer.createUserFn(event, formData, this.sessionServer.userStorage.userEditableFields);
+                this.sessionServer.createUserFn(event, formData, this.sessionServer.userStorage.userEditableFields, this.sessionServer.userAllowedFactor1);
 
             // ask the authenticator to validate the user-provided secret
             let passwordErrors = 

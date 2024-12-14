@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import type { User, UserSecretsInputFields, Key, UserInputFields } from '@crossauth/common';
-import { ErrorCode, CrossauthError } from '@crossauth/common';
+import { ErrorCode, CrossauthError, CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils.ts';
 import { PasswordAuthenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
 import { LdapUserStorage } from '../storage/ldapstorage.ts';
@@ -55,22 +55,29 @@ export class LdapAuthenticator extends PasswordAuthenticator {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");
         await this.ldapStorage.getLdapUser(user.username, params.password);
         let localUser : User;
-        if (this.ldapAutoCreateAccount) {
-            try {
+        try {
+            if (this.ldapAutoCreateAccount) {
+                try {
+                    const resp = await this.ldapStorage.getUserByUsername(user.username);
+                    localUser = resp.user;
+                    localUser.factor1 = this.ldapAutoCreateFactor1;
+                } catch (e) {
+                    localUser = await this.ldapStorage.createUser({factor1: this.ldapAutoCreateFactor1, ...user}, params);
+                }
+            } else {
                 const resp = await this.ldapStorage.getUserByUsername(user.username);
                 localUser = resp.user;
-                localUser.factor1 = this.ldapAutoCreateFactor1;
-            } catch (e) {
-                localUser = await this.ldapStorage.createUser({factor1: this.ldapAutoCreateFactor1, ...user}, params);
             }
-        } else {
-            const resp = await this.ldapStorage.getUserByUsername(user.username);
-            localUser = resp.user;
+            if (localUser.state == "awaitingtwofactorsetup") throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
+            if (localUser.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
+            if (localUser.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
+       
+        } catch (e1) {
+            console.log(e1)
+            CrossauthLogger.logger.debug(j({err: e1}))
+            throw e1;
         }
-        if (localUser.state == "awaitingtwofactorsetup") throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
-        if (localUser.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
-        if (localUser.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
-    }
+    }  
 
     /**
      * Does nothing as LDAP is responsible for password format (this class doesn't create password entries)
@@ -78,6 +85,8 @@ export class LdapAuthenticator extends PasswordAuthenticator {
     validateSecrets(_params : AuthenticationParameters) : string[] {
         return [];
     }
+
+    requireUserEntry() : boolean {return false}
 
     /**
      * Does nothing in this class.
