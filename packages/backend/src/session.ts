@@ -200,22 +200,18 @@ export class SessionManager {
         if (!user) {
             let userInputFields : UserInputFields = {username: "", state: "active"};
             try {
-                console.log("Checking user in table")
                 let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
                 secrets = userAndSecrets.secrets;
                 user = userAndSecrets.user;    
                 userInputFields = userAndSecrets.user;
             } catch (e) {
-                console.log("CHecking authenticators")
                 for (let auth in this.authenticators) {
-                    console.log("Checking authenticator", auth, this.authenticators[auth].requireUserEntry())
                     if (!this.authenticators[auth].requireUserEntry()) {
                         userInputFields = {username: params.username, state: "active"}
                         defaultAuth = auth;
                     }
                 }
             }
-            console.log("Using authenticator", user?.factor1??defaultAuth)
             if (userInputFields.username == "") throw new CrossauthError(ErrorCode.UserNotExist);
             await this.authenticators[user?.factor1??defaultAuth].authenticateUser(userInputFields, secrets, params);
             let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});

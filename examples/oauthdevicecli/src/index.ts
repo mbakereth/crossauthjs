@@ -28,7 +28,7 @@ async function main() {
     let resp = await oauthClient.startDeviceCodeFlow(deviceAuthorizationUrl);
 
     if (resp.error) {
-        console.log("Error: " + resp.error_description ?? resp.error);
+        console.log("Error: " + (resp.error_description ?? resp.error));
         process.exit(1);
     }
     console.log("Please visit the URL " + resp.verification_uri);

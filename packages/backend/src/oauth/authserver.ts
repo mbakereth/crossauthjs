@@ -2413,7 +2413,6 @@ export class OAuthAuthorizationServer {
                         ...user
                     };
                 } else {
-                    console.log(allClaims)
                     for (let field in allClaims) {
                         tokenPayload[field] = 
                             user[allClaims[field]];
