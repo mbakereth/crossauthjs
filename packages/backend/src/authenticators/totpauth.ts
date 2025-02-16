@@ -65,7 +65,10 @@ export class TotpAuthenticator extends Authenticator {
         username : string, 
         sessionKey : Key) : 
         Promise<{qrUrl: string, secret: string, factor2: string}> {
-        const data = KeyStorage.decodeData(sessionKey.data);
+        let data = KeyStorage.decodeData(sessionKey.data);
+        if (data && data["2fa"]) {
+            data = data["2fa"]; 
+        }
         //const data = getJsonData(sessionKey);
         if (!("totpsecret" in data)) {
             throw new CrossauthError(ErrorCode.Unauthorized, 

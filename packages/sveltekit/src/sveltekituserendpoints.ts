@@ -296,9 +296,10 @@ export type UpdateUserReturn = {
  */
 export class SvelteKitUserEndpoints {
     private sessionServer : SvelteKitSessionServer;
-    private changePasswordUrl = "/changepassword";
-    private changeFactor2Url = "/changefactor2";
-    //private requestPasswordResetUrl = "/resetpassword";
+    readonly changePasswordUrl : string|undefined = undefined; //"/changepassword";
+    readonly changeFactor2Url : string|undefined = undefined; //"/changefactor2";
+    readonly configureFactor2Url : string|undefined = undefined; //"/configurefactor2";
+    readonly requestPasswordResetUrl : string|undefined = undefined; //"/resetpassword";
     private loginRedirectUrl = "/";
     private loginUrl = "/login";
     private addToSession? : (request : RequestEvent, formData : {[key:string]:string}) => 
@@ -311,9 +312,26 @@ export class SvelteKitUserEndpoints {
         setParameter("changePasswordUrl", ParamType.String, this, options, "CHANGE_PASSWORD_URL");
         setParameter("requestPasswordResetUrl", ParamType.String, this, options, "REQUEST_PASSWORD_RESET_URL");
         setParameter("changeFactor2Url", ParamType.String, this, options, "CHANGE_FACTOR2_URL");
+        setParameter("configureFactor2Url", ParamType.String, this, options, "CONFIGURE_FACTOR2_URL");
         setParameter("loginRedirectUrl", ParamType.JsonArray, this, options, "LOGIN_REDIRECT_URL");
         setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
         if (options.addToSession) this.addToSession = options.addToSession;
+
+        if (this.changePasswordUrl && !this.changePasswordUrl.startsWith("/")) {
+            throw new CrossauthError(ErrorCode.Configuration, "changePasswordUrl must be an absolute path")
+        }
+        if (this.requestPasswordResetUrl && !this.requestPasswordResetUrl.startsWith("/")) {
+            throw new CrossauthError(ErrorCode.Configuration, "requestPasswordResetUrl must be an absolute path")
+        }
+        if (this.changeFactor2Url && !this.changeFactor2Url.startsWith("/")) {
+            throw new CrossauthError(ErrorCode.Configuration, "changeFactor2Url must be an absolute path")
+        }
+        if (this.configureFactor2Url && !this.configureFactor2Url.startsWith("/")) {
+            throw new CrossauthError(ErrorCode.Configuration, "configureFactor2Url must be an absolute path")
+        }
+        if (!this.loginUrl.startsWith("/")) {
+            throw new CrossauthError(ErrorCode.Configuration, "loginUrl must be an absolute path")
+        }
     }
 
     /** Returns whether there is a user logged in with a cookie-based session
@@ -429,7 +447,10 @@ export class SvelteKitUserEndpoints {
                 }
             }
 
+            // XXX
             if (user.state == UserState.passwordChangeNeeded) {
+                if (!this.changePasswordUrl) 
+                    throw new CrossauthError(ErrorCode.Configuration, "Must set changePasswordUrl in session server")
                 this.sessionServer.redirect(302, this.changePasswordUrl + "?required=true&next="+encodeURIComponent("login?next="+next));
             } else if (user.state == UserState.passwordResetNeeded) {
                 //this.sessionServer.redirect(302, this.requestPasswordResetUrl);
@@ -442,6 +463,8 @@ export class SvelteKitUserEndpoints {
             } else if (this.sessionServer.allowedFactor2.length > 0 && 
                 user.state == UserState.factor2ResetNeeded || 
                 !this.sessionServer.allowedFactor2Names.includes(user.factor2?user.factor2:"none")) {
+                    if (!this.changeFactor2Url)
+                        throw new CrossauthError(ErrorCode.Configuration, "Must set changeFactor2Url in session server")
                     this.sessionServer.redirect(302, this.changeFactor2Url + "?required=true&next="+encodeURIComponent("login?next="+next));
             } else {
                 if (!user.factor2 || user.factor2 == "")
@@ -959,6 +982,14 @@ export class SvelteKitUserEndpoints {
                     username: userData.username ?? "",
                     factor2: factor2,
                 };
+            else {
+                factor2Data = {
+                    userData: {},
+                    csrfToken: event.locals.csrfToken,
+                    username: "",
+                    factor2: factor2,
+                };
+            }
 
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.error(j({cerr: e}));
@@ -1226,6 +1257,9 @@ export class SvelteKitUserEndpoints {
             if (user1.state == UserState.active)
                 return await this.loginWithUser(user1, true, event);
             else {
+                if (!this.changeFactor2Url) {
+                    throw new CrossauthError(ErrorCode.Configuration, "Must set changeFactor2Url in session server")
+                }
                 const sessionCookieValue = this.sessionServer.getSessionCookieValue(event);
                 const sessionId = this.sessionServer.sessionManager.getSessionId(sessionCookieValue??"");
                 await this.sessionServer.sessionManager.updateSessionData(sessionId, "factor2change", {username: user.username});
@@ -1672,7 +1706,7 @@ export class SvelteKitUserEndpoints {
                 if (!event.locals.user) {
                     return await this.loginWithUser(user, true, event);
                 }
-                }
+            }
 
             // get data to show user to finish 2FA setup
             const userData = await this.sessionServer.sessionManager

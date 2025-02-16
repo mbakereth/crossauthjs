@@ -626,6 +626,7 @@ export class SessionManager {
             const factor2Data = await authenticator.prepareConfiguration(user);
             const userData = (factor2Data == undefined) ? {} : factor2Data.userData;
             const sessionData = (factor2Data == undefined) ? {} : factor2Data.sessionData;
+            if (sessionData) sessionData.userData = userData;
 
             await this.keyStorage.updateData(
                 SessionCookie.hashSessionId(sessionId),

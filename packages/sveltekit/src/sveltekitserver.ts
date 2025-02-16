@@ -372,7 +372,14 @@ export class SvelteKitServer {
         if (this.sessionServer) {
 
             // session hook
-            await this.sessionServer.sessionHook({event});
+            let resp = await this.sessionServer.sessionHook({event});
+            if (resp.status == 302) {
+                let loc : string|undefined = undefined;
+                for (let h of resp.headers) {
+                    if (h.name == "location") loc = h.value;
+                }
+                if (loc) await this.sessionServer.redirect(302, loc);
+            }
 
             // two FA hook
             const ret = this.userStorage ?  await this.sessionServer.twoFAHook({event}) : undefined;

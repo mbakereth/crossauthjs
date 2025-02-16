@@ -62,9 +62,16 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
     /**
      * URL to call when login is required.  
      * 
-     * Default "/"
+     * Default "/login"
      */
     loginUrl? : string,
+
+    /**
+     * URL to call to logout.  
+     * 
+     * Default "/logout"
+     */
+    logoutUrl? : string,
 
     /**
      * Default URL to go to after login (can be overridden by `next` POST param)  
@@ -76,23 +83,30 @@ export interface SvelteKitSessionServerOptions extends SessionManagerOptions {
     /**
      * URL to call when change password is required.
      * 
-     * Default "/changepassword"
+     * No default.
      */
     changePasswordUrl? : string,
 
     /**
      * URL to call when change password is required.
      * 
-     * Default "/resetpassword"
+     * No default.
      */
     requestPasswordResetUrl? : string,
 
     /**
      * URL to call when change factor2 is required.
      * 
-     * Default "/changefactor2"
+     * No default.
      */
     changeFactor2Url? : string,
+
+    /**
+     * URL to call when reconfiguring factor2 is required.
+     * 
+     * No default.
+     */
+    configureFactor2Url? : string,
 
     /** OAuth to support.  A comma-separated list from {@link @crossauth/common!OAuthFlows}.  
      * If [`all`], there must be none other in the list.  
@@ -459,7 +473,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      */
     readonly sessionHook : (input: {event: RequestEvent}, 
         //response: Response
-    ) => /*MaybePromise<Response>*/ MaybePromise<{headers: Header[]}>;
+    ) => /*MaybePromise<Response>*/ MaybePromise<{headers: Header[], status? : number}>;
     readonly twoFAHook : (input: {event: RequestEvent}) => MaybePromise<{twofa: boolean, ok: boolean, response?: Response}>;
 
 
@@ -577,6 +591,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
 
     private factor2Url : string = "/factor2";
     private loginUrl = "/login";
+    private logoutUrl = "/logout";
 
     /**
      * Use these to access the `load` and `action` endpoints for functions
@@ -660,6 +675,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         setParameter("adminProtectedExceptionPageEndpoints", ParamType.JsonArray, this, options, "ADMIN_PROTECTED_EXCEPTION_PAGE_ENDPOINTS");
         setParameter("adminProtectedExceptionApiEndpoints", ParamType.JsonArray, this, options, "ADMIN_PROTECTED_EXCEPTION_API_ENDPOINTS");
         setParameter("loginUrl", ParamType.JsonArray, this, options, "LOGIN_URL");
+        setParameter("logoutUrl", ParamType.JsonArray, this, options, "LOGOUT_URL");
         setParameter("unauthorizedUrl", ParamType.JsonArray, this, options, "UNAUTHORIZED_PAGE");
         setParameter("userAllowedFactor1", ParamType.JsonArray, this, options, "USER_ALLOWED_FACTOR1");
         setParameter("adminAllowedFactor1", ParamType.JsonArray, this, options, "ADMIN_ALLOWED_FACTOR1");
@@ -704,6 +720,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             CrossauthLogger.logger.debug("Session hook");
 
             let headers : Header[] = [];
+            let status : number|undefined = undefined;
 
             const csrfCookieName = this.sessionManager.csrfCookieName;
             const sessionCookieName = this.sessionManager.sessionCookieName;
@@ -783,10 +800,35 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                     let {key, user} = await this.sessionManager.userForSessionId(sessionId)
                     if (this.validateSession) this.validateSession(key, user, event);
     
+                    const endpoint = event.url.pathname;
+
+                    if (user) { // XXX
+                        if (this.allowedFactor2.length > 0 && 
+                            (user.state == UserState.factor2ResetNeeded || 
+                            !this.allowedFactor2Names.includes(user.factor2?user.factor2:"none"))) {
+                                if (!this.userEndpoints.configureFactor2Url)
+                                    throw new CrossauthError(ErrorCode.Configuration, "Must set configureFactor2Url in session server")
+                                if (!this.userEndpoints.changeFactor2Url)
+                                    throw new CrossauthError(ErrorCode.Configuration, "Must set changeFactor2Url in session server")
+                                if (!this.logoutUrl)
+                                    throw new CrossauthError(ErrorCode.Configuration, "Must set logoutUrl in session server")
+                                if (!([this.userEndpoints.changeFactor2Url, this.userEndpoints.configureFactor2Url, this.loginUrl, this.logoutUrl].includes(endpoint))) {
+                                    status = 302;
+                                    headers.push({name: "location", value: this.userEndpoints.changeFactor2Url + "?required=true&next="+encodeURIComponent("login?next="+event.url)} )
+                                    //this.redirect(302, this.userEndpoints.changeFactor2Url + "?required=true&next="+encodeURIComponent("login?next="+event.url));
+    
+                                }
+                                
+                        }
+    
+                    }
+
                     event.locals.sessionId = sessionId;
                     event.locals.user = user;
                     event.locals.authType = "cookie";
                     CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
+
+
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                     this.clearCookie(sessionCookieName, this.sessionManager.sessionCookiePath, event);
@@ -794,7 +836,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             }
 
             //return response;
-            return {headers};
+            return {headers, status};
         }
 
         this.twoFAHook = async ({ event }) => {
