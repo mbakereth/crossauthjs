@@ -154,7 +154,9 @@ export abstract class OAuthTokenConsumerBase {
         }
         let resp : Response|undefined = undefined;
         try {
-            resp = await fetch(new URL("/.well-known/openid-configuration", this.authServerBaseUrl));
+            let base = this.authServerBaseUrl;
+            if (!base.endsWith("/")) base += "/";
+            resp = await fetch(new URL(".well-known/openid-configuration", base));
         } catch (e) {
             CrossauthLogger.logger.error(j({err: e}));
         }

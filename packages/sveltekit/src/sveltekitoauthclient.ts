@@ -1,5 +1,5 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
-import { jwtDecode } from "jwt-decode";
+import { jwtDecode, type JwtPayload } from "jwt-decode";
 import QRCode from 'qrcode';
 import {
     CrossauthError,
@@ -279,8 +279,8 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
     if (oauthResponse.access_token) {
         try {
             if (oauthResponse.access_token && jwtTokens.includes("access")) {
-                const decoded= jwtDecode(oauthResponse.access_token);
-                const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
+                const decoded : JwtPayload&{sid?:string}= jwtDecode(oauthResponse.access_token);
+                const jti  = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
                 const hash = jti ? Crypto.hash(jti) : undefined;
                 CrossauthLogger.logger.debug(j({msg: "Got access token", 
                     accessTokenHash: hash}));
