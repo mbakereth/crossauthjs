@@ -1,5 +1,5 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
-import { CrossauthError } from "@crossauth/common";
+import { CrossauthError, CrossauthLogger, j } from "@crossauth/common";
 import { OAuthAutoRefresher } from './autorefresher.ts';
 import { OAuthDeviceCodePoller } from './devicecodepoller.ts';
 
@@ -320,29 +320,38 @@ export class OAuthBffClient {
 
             // Get tokens
             const tokens = await this.getTokens(csrfToken);
-            const idToken = tokensToFetch.includes("id") ? tokens?.id_token ?? null : null;
-            const accessToken = tokensToFetch.includes("access") ? tokens?.access_token ?? null : null;
-            const refreshToken = tokensToFetch.includes("refresh") ? tokens?.refresh_token ?? null : null;
+                try {
+                const idToken = tokensToFetch.includes("id") ? tokens?.id_token ?? null : null;
+                const accessToken = tokensToFetch.includes("access") ? tokens?.access_token ?? null : null;
+                const refreshToken = tokensToFetch.includes("refresh") ? tokens?.refresh_token ?? null : null;
 
-            // get expiries
-            let idTokenExpiry : number | null | undefined = undefined;
-            let accessTokenExpiry : number | null | undefined = undefined;
-            let refreshTokenExpiry : number | null | undefined = undefined;
-            if (idToken) {
-                idTokenExpiry = idToken.exp ? idToken.exp : null;
+                // get expiries
+                let idTokenExpiry : number | null | undefined = undefined;
+                let accessTokenExpiry : number | null | undefined = undefined;
+                let refreshTokenExpiry : number | null | undefined = undefined;
+                if (idToken) {
+                    idTokenExpiry = idToken.exp ? idToken.exp : null;
+                }
+                if (accessToken) {
+                    accessTokenExpiry = accessToken.exp ? accessToken.exp : null;
+                }
+                if (refreshToken) {
+                    refreshTokenExpiry = refreshToken.exp ? refreshToken.exp : null;
+                }
+                
+                return {
+                    id : idTokenExpiry,
+                    access : accessTokenExpiry,
+                    refresh : refreshTokenExpiry
+                };
+            } catch (e) {
+                CrossauthLogger.logger.error(j({msg: "getTokenExpiries received non JSON response " + tokens}))
+                return {
+                    id : 0,
+                    access : 0,
+                    refresh : 0
+                };
             }
-            if (accessToken) {
-                accessTokenExpiry = accessToken.exp ? accessToken.exp : null;
-            }
-            if (refreshToken) {
-                refreshTokenExpiry = refreshToken.exp ? refreshToken.exp : null;
-            }
-            
-            return {
-                id : idTokenExpiry,
-                access : accessTokenExpiry,
-                refresh : refreshTokenExpiry
-            };
         }
 
     /**

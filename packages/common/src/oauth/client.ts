@@ -440,7 +440,7 @@ export abstract class OAuthClientBase {
         return {codeChallenge, codeVerifier}
     }
 
-    protected async getIdPayload(id_token : string, access_token? : string) : Promise<{payload?: {[key:string]:any}, error? : string, error_description? : string}> {
+    async getIdPayload(id_token : string, access_token? : string) : Promise<{payload?: {[key:string]:any}, error? : string, error_description? : string}> {
         let error : string|undefined = undefined;
         let error_description : string|undefined = undefined;
         try {
@@ -474,6 +474,29 @@ export abstract class OAuthClientBase {
         }
     }
 
+    async getAccessPayload(access_token : string, checkAudience? : boolean) : Promise<{payload?: {[key:string]:any}, error? : string, error_description? : string}> {
+        let error : string|undefined = undefined;
+        let error_description : string|undefined = undefined;
+        try {
+            let payload : {[key:string]:any}|undefined = undefined;
+
+            payload = await this.validateAccessToken(access_token, checkAudience); 
+            if (!payload) {
+                error = "access_denied";
+                error_description = "Invalid access token received";
+                return {error, error_description}
+            }
+            return {payload}
+        } catch (e) {
+            const ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.error(j({msg: "Couldn't get user info", cerr: ce}));
+            error = ce.oauthErrorCode;
+            error_description = "Couldn't get user info: " + ce.message;
+            return {error, error_description};
+        }
+    }
+
     /**
      * This implements the functionality behind the redirect URI
      * 
@@ -494,7 +517,7 @@ export abstract class OAuthClientBase {
      * @returns The {@link OAuthTokenResponse} from the `token` endpoint
      *          request, or `error` and `error_description`.
      */
-    protected async redirectEndpoint(code?: string, scope?: string,
+    async redirectEndpoint(code?: string, scope?: string,
         codeVerifier? : string,
         error?: string,
         errorDescription?: string) : Promise<OAuthTokenResponse>{
@@ -1257,16 +1280,34 @@ export abstract class OAuthClientBase {
     }
 
     /**
+     * Validates an access token, returning undefined if it is invalid.
+     * 
+     * Does not raise exceptions.
+     * 
+     * @param token the token to validate.  To be valid, the signature must
+     *        be valid and the `type` claim in the payload must be set to `id`.
+     * @returns the parsed payload or undefined if the token is invalid.
+     */
+    async validateAccessToken(token : string, checkAudience? : boolean) : 
+        Promise<{[key:string]:any}|undefined>{
+        try {
+            return await this.tokenConsumer.tokenAuthorized(token, "access", checkAudience);
+        } catch (e) {
+            return undefined;
+        }
+    }
+
+    /**
      * Validatesd a token using the token consumer.
      * 
      * @param idToken the token to validate
      * @returns the parsed JSON of the payload, or undefinedf if it is not
      * valid.
      */
-    async idTokenAuthorized(idToken: string) 
+    async idTokenAuthorized(idToken: string, checkAudience? : boolean) 
         : Promise<{[key:string]: any}|undefined> {
             try {
-                return await this.tokenConsumer.tokenAuthorized(idToken, "id");
+                return await this.tokenConsumer.tokenAuthorized(idToken, "id", checkAudience);
             } catch (e) {
                 CrossauthLogger.logger.warn(j({err: e}));
                 return undefined;

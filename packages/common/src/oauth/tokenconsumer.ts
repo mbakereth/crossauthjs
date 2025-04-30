@@ -252,8 +252,9 @@ export abstract class OAuthTokenConsumerBase {
      * @returns the JWT payload if the token is valid, `undefined` otherwise.
      */
     async tokenAuthorized(token: string,
-        _tokenType: "access" | "refresh" | "id") : Promise<{[key:string]: any}|undefined> {
-        if (!this.keys || Object.keys(this.keys).length == 0) {
+        tokenType: ("access" | "refresh" | "id"), 
+        checkAudience? : boolean) : Promise<{[key:string]: any}|undefined> {
+            if (!this.keys || Object.keys(this.keys).length == 0) {
             const header = jose.decodeProtectedHeader(token);
             await this.loadKeys(header.alg);
         }
@@ -265,14 +266,14 @@ export abstract class OAuthTokenConsumerBase {
         }*/
         if (decoded.iss != this.authServerBaseUrl) {
             const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
-            CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} in access token`, hashedAccessToken: await this.hash(jti)}));
+            CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} ${tokenType} token`, hashedAccessToken: await this.hash(jti)}));
             return undefined;
         }
-        if (decoded.aud) {
+        if (checkAudience != false && decoded.aud) {
             const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
             if ((Array.isArray(decoded.aud) && !decoded.aud.includes(this.audience)) ||
                 (!Array.isArray(decoded.aud) && decoded.aud != this.audience)) {
-                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.aud} in access token`, hashedAccessToken: await this.hash(jti)}));
+                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.aud} in ${tokenType} token`, hashedAccessToken: await this.hash(jti)}));
                     return undefined;    
                 }
         }

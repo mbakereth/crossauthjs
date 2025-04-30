@@ -73,6 +73,8 @@ export class OAuthAutoRefresher {
 
     private async scheduleAutoRefresh(tokensToFetch : ("access"|"id")[], 
         errorFn? : (msg : string, e? : CrossauthError) => void) {
+            let lastWait : number|undefined = undefined;
+
             // Get CSRF token
             const csrfTokenPromise = this.tokenProvider.getCsrfToken();
             const csrfToken = csrfTokenPromise ?  await csrfTokenPromise : undefined;
@@ -95,11 +97,12 @@ export class OAuthAutoRefresher {
             }
 
             // renew token TOLERANCE_SECONDS before expiry
-            const renewTime = tokenExpiry*1000 - now - TOLERANCE_SECONDS;
-            if (renewTime < 0) {
+            let renewTime = tokenExpiry*1000 - now - TOLERANCE_SECONDS;
+            if (renewTime < 0 && lastWait != undefined && lastWait <= 0) {
                 CrossauthLogger.logger.debug(j({msg: `Expiry time has passed`}))
                 return;
             }
+            if (renewTime < 0) renewTime = 0;
 
             // if refresh token is about to expire, don't try to use it
             if (expiries.refresh && expiries.refresh - TOLERANCE_SECONDS < renewTime) {
@@ -109,7 +112,8 @@ export class OAuthAutoRefresher {
 
             // schedule auto refresh task
             let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
-            CrossauthLogger.logger.debug(j({msg: `Waiting ${renewTime} before refreshing tokens`}))
+            CrossauthLogger.logger.debug(j({msg: `Waiting ${renewTime} before refreshing tokens`}));
+            lastWait = renewTime;
             await wait(renewTime);
             await this.autoRefresh(tokensToFetch, csrfToken, errorFn);
 
@@ -147,7 +151,13 @@ export class OAuthAutoRefresher {
                         CrossauthLogger.logger.error(j({msg: "Failed auto refreshing tokens", status: resp.status}));
         
                     }
-                    reply = await resp.json();
+                    try {
+                        reply = await resp.json();
+                    } catch (e) {
+                        console.log(reply? await reply?.text() : "")
+                        //CrossauthLogger.logger.error(j({msg: "/refresh returned a non-JSON response " + (reply? await reply.text() : undefined )}));
+                        reply = {ok: false, error: "Unknown"}
+                    }
 
                     if (reply?.ok) { 
                         await this.scheduleAutoRefresh(tokensToFetch, errorFn);
@@ -184,7 +194,7 @@ export class OAuthAutoRefresher {
                     if (tries < AUTOREFRESH_RETRIES) {
                         CrossauthLogger.logger.error(j({msg: `Failed auto refreshing tokens.  Retrying in ${AUTOREFRESH_RETRIES} seconds`}));
                         let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
-                        await wait(AUTOREFRESH_RETRY_INTERVAL_SECS);
+                        await wait(AUTOREFRESH_RETRY_INTERVAL_SECS*1000);
                     } else {
                         CrossauthLogger.logger.error(j({msg: `Failed auto refreshing tokens.  Number of retries exceeded`}));
                         if (errorFn) {

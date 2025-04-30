@@ -57,3 +57,4 @@ export { OAuthTokenConsumer } from './oauth/tokenconsumer';
 export type { OAuthTokenConsumerOptions } from './oauth/tokenconsumer';
 export { OAuthClientManager } from './oauth/clientmanager';
 export type { OAuthClientManagerOptions } from './oauth/clientmanager';
+export type { TokenMergeFn, UpstreamClientOptions} from './oauth/authserver'

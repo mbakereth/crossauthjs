@@ -141,9 +141,9 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
      *        match this value
      */
     async tokenAuthorized(token: string,
-        tokenType: "access" | "refresh" | "id") : 
+        tokenType: "access" | "refresh" | "id", checkAudience? : boolean) : 
         Promise<{[key:string]: any}|undefined> {
-        const payload = await super.tokenAuthorized(token, tokenType);
+        const payload = await super.tokenAuthorized(token, tokenType, checkAudience);
         if (payload) {
             if (tokenType == "access" && this.persistAccessToken && 
                 this.keyStorage) {

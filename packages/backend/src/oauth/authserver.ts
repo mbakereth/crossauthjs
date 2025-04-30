@@ -26,11 +26,13 @@ import type {
     OAuthDeviceResponse,
     Key,
     User,
- } from '@crossauth/common';
+} from '@crossauth/common';
+import { OAuthClientBackend, OAuthClientOptions } from './client';
 import { CrossauthLogger, j, KeyPrefix } from '@crossauth/common';
 import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, type JsonWebKey } from 'crypto'
 import fs from 'node:fs';
+//import fs, { access } from 'node:fs';
 
 function algorithm(value : string) : Algorithm {
     switch (value) {
@@ -51,6 +53,32 @@ function algorithm(value : string) : Algorithm {
     }
     throw new CrossauthError(ErrorCode.Configuration, 
         "Invalid JWT signing algorithm " + value)
+}
+
+/**
+ * If using an upstream authz server, this is the signature for the function
+ * you need to merge the upstream token with your own custom fields
+ */
+export type TokenMergeFn = 
+    (accessPayload : string|{[key:string]:any}, 
+        idPayload : {[key:string]:any}|undefined, 
+        userStorage? : UserStorage) => 
+            Promise<{authorized: boolean,
+                error? : string, 
+                error_description? : string, 
+                access_payload?: {[key:string]:any}, 
+                id_payload?: {[key:string]:any}}>;
+
+/**
+ * Options for declaring an upstream authz server
+ */
+export interface UpstreamClientOptions {
+    options : OAuthClientOptions,
+    tokenMergeFn : TokenMergeFn,
+    authServerBaseUrl : string,
+    scopes?: string[],
+    sessionDataName? : string,
+    accessTokenIsJwt : boolean
 }
 
 /**
@@ -225,6 +253,8 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
      * The 2FA factors that are allowed for the Password MFA flow.
      */
     allowedFactor2? : string[],
+
+    upstreamClient?: UpstreamClientOptions;
 }
 
 /**
@@ -243,7 +273,7 @@ export class OAuthAuthorizationServer {
 
     private clientStorage : OAuthClientStorage;
     private keyStorage : KeyStorage;
-    private userStorage? : UserStorage;
+    readonly userStorage? : UserStorage;
     private authenticators : {[key:string] : Authenticator} = {};
     private authStorage? : OAuthAuthorizationStorage;
 
@@ -252,11 +282,11 @@ export class OAuthAuthorizationServer {
 
     private oauthIssuer : string = "";
     private audience : string|null = null;
-    private requireRedirectUriRegistration = true;
+    readonly requireRedirectUriRegistration = true;
     private requireClientSecretOrChallenge = true;
     private jwtAlgorithm = "RS256";
     private jwtAlgorithmChecked : Algorithm = "RS256";
-    private codeLength = 32;
+    readonly codeLength = 32;
     private jwtKeyType = "";
     private jwtSecretKey = "";
     private jwtPublicKey = "";
@@ -281,6 +311,18 @@ export class OAuthAuthorizationServer {
     private validScopes : string[] = [];
     private idTokenClaims : {[key:string] : any} = {};
     private accessTokenClaims : {[key:string] : any} = {};
+
+    ///// Upstream AUth server config
+
+    /**
+     * The OAuth client to the upstream authz server if configured
+     */
+    upstreamClient? : OAuthClientBackend;
+
+    /**
+     * The OAuth client to the upstream authz server if configured
+     */
+    upstreamClientOptions? : UpstreamClientOptions;
 
     // device code
     private userCodeExpiry = 60*5;
@@ -376,6 +418,15 @@ export class OAuthAuthorizationServer {
             }
         }
         setParameter("deviceCodeVerificationUri", ParamType.String, this, options, "DEVICECODE_VERIFICATION_URI");
+
+        ///// upstream client for forwarding authorization code flow to
+        if (options.upstreamClient) {
+            this.upstreamClientOptions = options.upstreamClient;
+            this.upstreamClient = new OAuthClientBackend(options.upstreamClient.authServerBaseUrl, options.upstreamClient.options);
+            if (!options.upstreamClient.options.redirect_uri) {
+                throw new CrossauthError(ErrorCode.Configuration, "Must define redirect_uri in upstreamClient options")
+            }
+        }
 
         if (this.validFlows.length == 1 &&
             this.validFlows[0] == OAuthFlows.All) {
@@ -766,6 +817,8 @@ export class OAuthAuthorizationServer {
         deviceCode? : string}) 
     : Promise<OAuthTokenResponse> {
 
+
+        console.log("backend.tokenEndpoint", grantType);
         const flow = this.inferFlowFromPost(grantType, codeVerifier);
         if (!flow) return {
             error: "server_error",
@@ -861,7 +914,20 @@ export class OAuthAuthorizationServer {
             });
 
         } else if (grantType == "refresh_token") {
-    
+
+            // pass onto upstream authz server if one is defined
+            // handle the case where we have an upstream authz server
+            // either throw redirect or return error
+            if (this.upstreamClient && this.upstreamClientOptions) {
+                if (!refreshToken) {
+                    return {
+                        error: "invalid_request",
+                        error_description: "If executing the refresh token flow, must  provide a refresh token"
+                    }
+                }
+                return await this.upstreamClient.refreshTokenFlow(refreshToken);
+            }
+
             const refreshData = await this.getRefreshTokenData(refreshToken);
             if (!refreshToken || !refreshData || !this.userStorage) {
                 return {
@@ -888,12 +954,15 @@ export class OAuthAuthorizationServer {
             }
             try {
                 const hash = KeyPrefix.refreshToken + Crypto.hash(refreshToken);
+                console.log("delete refresh token", refreshToken, hash)
                 await this.keyStorage.deleteKey(hash);   
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
             }
+
+            console.log("backend.tokemEndpoint returning")
             return await this.makeAccessToken({
                 client,
                 client_secret,
@@ -1981,7 +2050,7 @@ export class OAuthAuthorizationServer {
 
     }
 
-    private async getAuthorizationCode(client: OAuthClient,
+    async getAuthorizationCode(client: OAuthClient,
         redirect_uri: string,
         scopes: string[] | undefined,
         state: string,
@@ -2026,6 +2095,8 @@ export class OAuthAuthorizationServer {
                     this.clockTolerance*1000) : 
                 undefined;
         const authzData : {[key:string]: any} = {
+            client_id: client.client_id,
+            redirect_uri: redirect_uri,
         }
         if (scopes) {
             authzData.scope = scopes;
@@ -2040,6 +2111,7 @@ export class OAuthAuthorizationServer {
             authzData.username = user.username;
             authzData.id = user.id;
         }
+
         const authzDataString = JSON.stringify(authzData);
 
         // save the code in key storage
@@ -2064,6 +2136,38 @@ export class OAuthAuthorizationServer {
         }
 
         return {code: authzCode, state: state};
+    }
+
+    async getAuthorizationCodeData(code: string) : Promise<{[key:string]:any}|undefined> {
+            // recover scope, challenge and user from data persisted with 
+            // authorization code
+            let key : Key|undefined;
+            let authzData : {[key:string]:any} = {}
+            try {
+                key = await this.keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code));
+                authzData = KeyStorage.decodeData(key.data);
+            } catch (e) {
+                CrossauthLogger.logger.debug(j({err: e}));
+                return undefined;
+            }
+            return authzData;
+    }
+
+    async deleteAuthorizationCodeData(code: string) {
+        try {
+            await this.keyStorage.deleteKey(KeyPrefix.authorizationCode+Crypto.hash(code));
+        } catch (e) {
+            CrossauthLogger.logger.warn(j({
+                err: e,
+                msg: "Couldn't delete authorization code from storage",
+            }));
+        }
+}
+
+    async setAuthorizationCodeData(code: string, fields: {[key:string]:any}) {
+        const key = await this.keyStorage.getKey(KeyPrefix.authorizationCode+Crypto.hash(code));
+        key.data = JSON.stringify(fields);
+        this.keyStorage.updateKey(key);
     }
 
     /**
@@ -2379,6 +2483,119 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    /**
+     * Create an access token
+     */
+    async createTokensFromPayload(clientId : string, accessPayload? : {[key:string]:any}, 
+        idPayload? : {[key:string]:any}) 
+        : Promise<{
+            access_token?: string, 
+            id_token? : string, 
+            access_payload?: {[key:string]:any}, 
+            id_payload? : {[key:string]:any}, 
+            expires_in: number|undefined, 
+            token_type : string}> {
+
+        const now = new Date();
+        const timeCreated = Math.ceil(now.getTime()/1000);
+        let dateAccessTokenExpires : Date|undefined;
+
+        let accessToken : string|undefined = undefined;
+        let idToken : string|undefined = undefined;
+        let accessTokenPayload : {[key:string]:any}|undefined = undefined;
+
+        // create access token payload
+        if (accessPayload) {
+            const accessTokenJti = Crypto.uuid();
+            let accessTokenPayload1 : {[key:string]: any} = {
+                ...accessPayload,
+                jti: accessTokenJti,
+                iat: timeCreated,
+                iss: this.oauthIssuer,
+                type: "access",
+            };
+            if (this.accessTokenExpiry != null) {
+                accessTokenPayload1.exp = timeCreated + this.accessTokenExpiry
+                dateAccessTokenExpires = 
+                    new Date(now.getTime()+this.accessTokenExpiry*1000 + 
+                        this.clockTolerance*1000);
+            }
+            if (this.audience) {
+                accessTokenPayload1.aud = this.audience;
+            }
+    
+            // create access token jwt
+            accessToken = await new Promise((resolve, reject) => {
+                jwt.sign(accessTokenPayload1,
+                    this.secretOrPrivateKey,
+                    { algorithm: this.jwtAlgorithmChecked, keyid: "1" }, 
+                    (error: Error | null,
+                    encoded: string | undefined) => {
+                        if (encoded) resolve(encoded);
+                        else if (error) reject(error);
+                        else reject(new CrossauthError(ErrorCode.Unauthorized,
+                            "Couldn't create jwt"));
+                    });
+            });    
+            accessTokenPayload = accessTokenPayload1;
+
+            // persist access token if requested
+            if (this.persistAccessToken && this.keyStorage) {
+                await this.keyStorage?.saveKey(
+                    undefined, // to avoid user storage dependency, we don't set this
+                    KeyPrefix.accessToken+Crypto.hash(accessTokenJti),
+                    now,
+                    dateAccessTokenExpires
+                );
+            }
+        }
+
+
+        if (idPayload != undefined) {
+
+            // create id token payload
+            const idokenJti = Crypto.uuid();
+            idPayload = {
+                ...idPayload,
+                aud: clientId,
+                jti: idokenJti,
+                iat: timeCreated,
+                iss: this.oauthIssuer,
+                type: "id",
+            };
+    
+            // create id token jwt
+            if (idPayload) {
+                const payload1 : {[key:string]:any} = idPayload;
+                idToken = await new Promise((resolve, reject) => {
+                    jwt.sign(payload1, this.secretOrPrivateKey, {
+                        algorithm: this.jwtAlgorithmChecked,
+                        keyid: this.jwtKid,
+                        }, 
+                        (error: Error | null,
+                        encoded: string | undefined) => {
+                            if (encoded) resolve(encoded);
+                            else if (error) reject(error);
+                            else reject(new CrossauthError(ErrorCode.Unauthorized,
+                                "Couldn't create jwt"));
+                        });
+                });
+    
+            }
+    
+        }
+        
+        return {
+            access_token : accessToken,
+            id_token: idToken,
+            access_payload: accessTokenPayload,
+            id_payload: idPayload,
+            expires_in : this.accessTokenExpiry==null ? undefined : 
+                this.accessTokenExpiry,
+            token_type: "Bearer",
+        }
+    }
+
     private addClaims(tokenPayload : {[key:string]:any}, 
         claims : {[key:string] : any},
         scopes: string[]|undefined,
@@ -2472,6 +2689,7 @@ export class OAuthAuthorizationServer {
         if (!token) return undefined;
         try {
             const hash = KeyPrefix.refreshToken + Crypto.hash(token);
+            console.log("getRefreshTokenData", token, hash)
             const key = await this.keyStorage.getKey(hash);
             return JSON.parse(key.data||"{}");
         } catch (e) {

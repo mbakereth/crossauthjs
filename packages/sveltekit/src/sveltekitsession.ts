@@ -717,7 +717,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         this.adminClientEndpoints = new SvelteKitAdminClientEndpoints(this, options);
 
         this.sessionHook = async ({ event}/*, response*/) => {
-            CrossauthLogger.logger.debug("Session hook");
+            CrossauthLogger.logger.debug(j({msg:"Session hook"}));
 
             let headers : Header[] = [];
             let status : number|undefined = undefined;
@@ -802,6 +802,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     
                     const endpoint = event.url.pathname;
 
+                    CrossauthLogger.logger.debug(j({msg: "Session cookie is for user " + user}));
                     if (user) { // XXX
                         if (this.allowedFactor2.length > 0 && 
                             (user.state == UserState.factor2ResetNeeded || 

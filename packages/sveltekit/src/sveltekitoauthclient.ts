@@ -817,13 +817,16 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         }
 
         this.hook = async ({ event }) => {
+            CrossauthLogger.logger.debug(j({msg:"OAuth hook, user " + event.locals.user}));
             if (event.locals.user) return undefined;
             if (!server.sessionAdapter) return undefined;
 
             let sessionData = await server.sessionAdapter.getSessionData(event, this.sessionDataName);
+            //CrossauthLogger.logger.debug(j({msg:"Session data " + (sessionData && sessionData["id_payload"]) ? JSON.stringify(sessionData?.id_payload) : "none)"}));
             if (sessionData && sessionData["id_payload"]) {
                 let expiry = sessionData["expires_at"]
                 if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
+                    CrossauthLogger.logger.debug(j({msg:"ID token is valid"}));
                     await this.setEventLocalsUser(event, sessionData["id_payload"]);
                 }
             }
@@ -849,6 +852,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 this.idTokenMatchField);
             event.locals.user = user;
             event.locals.authType = user ? "oidc" : undefined;
+            CrossauthLogger.logger.debug(j({msg:"Set locals.user to " + (user ? user?.username : "undefined")}));
+
         } catch (e) {
             CrossauthLogger.logger.error(j({cerr: e}));
             event.locals.user = undefined;
@@ -1049,6 +1054,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     resp.error = "server_error";
                     resp.error_description = "Unexpectedly did not receive error or access token";
                 }
+                console.log("refresh got resp", resp)
                 if (!resp.error) {
                     const resp1 = await this.receiveTokenFn(resp,
                         this,

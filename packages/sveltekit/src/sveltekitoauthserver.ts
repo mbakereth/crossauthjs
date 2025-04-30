@@ -26,11 +26,14 @@ import {
     OAuthFlows,
     ErrorCode,
     type User,
-    type MfaAuthenticatorResponse } from '@crossauth/common';
+    type MfaAuthenticatorResponse,
+    type OAuthClient } from '@crossauth/common';
 import { json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { type CookieSerializeOptions } from 'cookie';
+
+const DEFAULT_UPSTREAM_SESSION_DATA_NAME = "upstreamoauth";
 
 //////////////////////////////////////////////////////////////////////////////
 // ENDPOINT INTERFACES
@@ -64,7 +67,7 @@ export interface AuthorizePageData extends ReturnBase {
     authorized?: {
         code : string,
         state : string,    
-    }
+    },
     authorizationNeeded?: {
         user: User,
         response_type: string,
@@ -328,7 +331,7 @@ export class SvelteKitAuthorizationServer {
     private authorizeEndpointUrl = "/oauth/authorize";
     private tokenEndpointUrl = "/oauth/token";
     private jwksEndpointUrl = "/oauth/jwks";
-
+    
     readonly redirect: any;
     readonly error: any;
 
@@ -589,13 +592,13 @@ export class SvelteKitAuthorizationServer {
 
     private async mfaAuthenticators(event : RequestEvent) :
         Promise<MfaAuthenticatorResponse[]|
-            {error? : string, error_desciption? : string}> {
+            {error? : string, error_description? : string}> {
 
         const authHeader = event.request.headers.get('authorization')?.split(" ");
         if (!authHeader || authHeader.length != 2) {
             return {
                 error: "access_denied",
-                error_desciption: "Invalid authorization header"
+                error_description: "Invalid authorization header"
             };
         }
         const mfa_token = authHeader[1];
@@ -607,7 +610,7 @@ export class SvelteKitAuthorizationServer {
         const ce = CrossauthError.fromOAuthError(resp.error??"server_error");
         return {
             error: ce.oauthErrorCode,
-            error_desciption: ce.message,
+            error_description: ce.message,
         };
 
     }
@@ -860,11 +863,47 @@ export class SvelteKitAuthorizationServer {
         },
     }
 
+    async storeSessionData(event: RequestEvent, sessionData: {[key:string]:any}, sessionDataName: string) {
+
+        // we need a session to save the state
+        if (this.svelteKitServer.sessionServer) {
+            // if we are using Crossauth's session server and there is nop
+            // session, we can create an anonymous one.
+            // For other session adapters, we assume the session was already
+            // creeated or that the session adapter can create one automaticall
+            // when updateSessionData is called
+            let sessionCookieValue = this.svelteKitServer.sessionServer?.getSessionCookieValue(event);
+            if (!sessionCookieValue) {
+                sessionCookieValue = 
+                    await this.svelteKitServer.sessionServer?.createAnonymousSession(event,
+                        { [sessionDataName]: sessionData });
+            } else {
+                await this.svelteKitServer.sessionAdapter?.updateSessionData(event,
+                    sessionDataName,
+                    sessionData);
+            }
+        } else {
+            await this.svelteKitServer.sessionAdapter?.updateSessionData(event,
+                sessionDataName,
+                sessionData);
+
+        }
+
+    }
+
+    private async redirectError(redirect_uri: string|undefined, error: string, error_description: string) {
+        if (redirect_uri) {
+            throw this.redirect(redirect_uri + "?error=" + encodeURIComponent(error) + "&error_description=" + encodeURIComponent(error_description));
+        } else {
+            throw this.error(500, error_description);
+        }
+    }
+    
+
     /**
      * `load` and `actions` functions for the authorize endpoint.
      * 
-     * See class description for details.  Not needed if you disable CSRF
-     * protection to rely on Sveltekit's.
+     * See class description for details.  
      */
     readonly authorizeEndpoint = {
 
@@ -874,6 +913,91 @@ export class SvelteKitAuthorizationServer {
             this.authServer.validFlows.includes(OAuthFlows.OidcAuthorizationCode))) {
                 throw this.error(401, "authorize cannot be called because the authorization code flows are not supported");
             }
+
+            // handle the case where we have an upstream authz server
+            // either throw redirect or return error
+            if (this.authServer.upstreamClient && this.authServer.upstreamClientOptions) {
+
+
+                const state = Crypto.randomValue(32);
+                let resp = this.getAuthorizeQuery(event);
+                if (!resp.query) return resp.error
+                let query : AuthorizeQueryType = resp.query;
+                if (query.response_type == "code") {
+
+                    // validate client
+                    let client : OAuthClient;
+                    try {
+                        client = await this.clientStorage.getClientById(query.client_id);
+                    }
+                    catch (e) {
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        return {ok: false, error: "unauthorized_client", 
+                                error_description: "Client is not authorized"};
+                    }
+                    let scopes : string[]|undefined = undefined;
+                    if (query.scope) scopes = decodeURIComponent(query.scope).split(" ");
+                    scopes = scopes?.filter((a) => (a.length > 0));
+
+                    const resp = await this.authServer.upstreamClient.startAuthorizationCodeFlow(state, query.scope, query.code_challenge, query.code_challenge!=undefined);
+                    if (resp.error) {
+                        return {
+                            ok: false,
+                            error: resp.error,
+                            error_description: resp.error_description,
+                        }
+                    } else {
+                        const codeResp = await this.authServer.getAuthorizationCode(client, query.redirect_uri, scopes, state, query.code_challenge, query.code_challenge_method);
+                        if (!codeResp.code) {
+                            return { 
+                                ok: false,
+                                error: "server_error", 
+                                error_description: "Couldn't create authorization code",
+                            };
+        
+                        }
+                        const sessionData = {
+                            scope: query.scope, 
+                            state,
+                            code:codeResp.code,
+                            orig_client_id: query.client_id,
+                            orig_redirect_uri: query.redirect_uri,
+                            orig_state: query.state};
+                        if (!this.authServer.upstreamClientOptions.options.redirect_uri) {
+                            return { 
+                                ok: false,
+                                error: "server_error", 
+                                error_description: "redirect uri not given for upstream client",
+                            };
+        
+                        }
+                        // we need a session to save the state
+                        const sessionDataName = this.authServer.upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
+                        await this.storeSessionData(event, sessionData, sessionDataName);
+                        //await this.authServer.setAuthorizationCodeData(codeResp.code, sessionData);
+                        /*let url = this.authServer.upstreamClientOptions.authServerBaseUrl + 
+                            "?response_type=code" +
+                            "&redirect_uri=" + encodeURIComponent(this.authServer.upstreamClientOptions.options.redirect_uri)
+                            "&client_id=" + encodeURIComponent(this.authServer.upstreamClient.client_id);
+                        if (this.authServer.upstreamClient.client_secret) url += "&client_secret=" + encodeURIComponent(this.authServer.upstreamClient.client_secret);
+                        if (query.state) url += "&state=" + encodeURIComponent(query.state);
+                        if (this.authServer.upstreamClientOptions.scopes) url += encodeURIComponent(this.authServer.upstreamClientOptions.scopes.join(" "));*/
+                        let url = resp.url;
+                        CrossauthLogger.logger.debug(j({msg: "upstream url " + url}))
+                        //CrossauthLogger.logger.debug(j({msg: "upstream base url " + this.authServer.upstreamAuthServerBaseUrl}))
+                        throw this.redirect(302, url);
+                    }
+                } else {
+                    return { 
+                        ok: false,
+                        error: "invalid_request", 
+                        error_description: "authorize can only be called with response_type code",
+                    };
+                }
+            }
+
+            // we don't have an upstream server
+
             if (!event.locals.user) return this.redirect(302, 
                 this.loginUrl+"?next="+encodeURIComponent(event.request.url));
 
@@ -1088,8 +1212,33 @@ export class SvelteKitAuthorizationServer {
                 var data = new JsonOrFormData();
                 await data.loadData(event);
                 formData = data.toObject();
+                console.log("sveltekit.tokenendpoint", formData)
 
                 const {client_id, client_secret} = this.getClientIdAndSecret(formData, event);
+
+                // if the grant type is authorization_code and we have an upstream client
+                // defined, we should already have tokens stored with the authoriazion code
+                if (formData.grant_type == "authorization_code" && 
+                    this.authServer.upstreamClient && this.authServer.upstreamClientOptions) {
+                        const codeData = await this.authServer.getAuthorizationCodeData(formData.code);
+                        if (codeData == undefined) {
+                            return json({
+                                error: "access_denied",
+                                error_description: "Invalid or expired authorization code",
+                            })
+                        }
+                        if (!codeData.access_token) {
+                            return json({error: "access_denied", error_description: "No access token was issued"}, {status: 401});
+                        } 
+                        await this.authServer.deleteAuthorizationCodeData(formData.code);
+                        return json({
+                            access_token: codeData.access_token,
+                            id_token: codeData.id_token,
+                            id_payload: codeData.id_payload,
+                            refresh_token: codeData.refresh_token,
+                            expires_in: codeData.expires_in,
+                        });
+                }
 
                 // if refreshTokenType is not "json", check if there
                 // is a refresh token in the cookie.
@@ -1156,6 +1305,7 @@ export class SvelteKitAuthorizationServer {
                     CrossauthLogger.logger.error(j({cerr: ce}));
                     return json(resp, {status: ce.httpStatus});
                 }
+                console.log("tokenEndpoint return", resp)
                 return json(resp);
             
             } catch (e) {
@@ -1169,6 +1319,99 @@ export class SvelteKitAuthorizationServer {
             }
         },
     }
+
+    readonly upstreamRedirectUriEndpoint = {
+
+        get: async (event : RequestEvent) => {
+            let oauthData : {[key:string]:any} = {};
+            try {
+                if (!this.authServer.upstreamClientOptions) {
+                    CrossauthLogger.logger.error(j({msg: "Cannot call upstreamRedirectUriEndpoint if upstreamClient not defined"}))
+                    return json({
+                        ok: false,
+                        error: "server_error",
+                        error_description: "Cannot call upstreamRedirectUriEndpoint if upstreamClient not defined"
+                    });
+                }
+                CrossauthLogger.logger.debug(j({msg: "upstreamRedirectUriEndpoint"}))
+                if (!this.authServer.upstreamClient || !this.authServer.upstreamClientOptions.tokenMergeFn) {
+                    CrossauthLogger.logger.error(j({msg: "upstreamRedirectUri endpoint called but no upstreamClient or merge function set"}));
+                    return this.redirectError(oauthData.orig_redirect_uri, "server_error",  "upstreamRedirectUri endpoint called but no upstreamClient or merge function set")
+                } 
+
+                const code = event.url.searchParams.get("code") ?? "";
+                const state = event.url.searchParams.get("state") ?? undefined;
+                const error = event.url.searchParams.get("error") ?? undefined;
+                const error_description = event.url.searchParams.get("error") ?? undefined;
+                const sessionDataName = this.authServer.upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
+                oauthData = await this.svelteKitServer.sessionAdapter?.getSessionData(event, sessionDataName) ?? {};
+                if (oauthData?.state != state) {
+                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
+                }
+                const resp =  await this.authServer.upstreamClient.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
+                    error,
+                    error_description);
+                if (resp.error) {
+                    CrossauthLogger.logger.error(j({msg: resp.error_description}));
+                    return this.redirectError(oauthData.orig_redirect_uri, resp.error, resp.error_description ?? "unknown error")
+                }
+
+                let access_token : string|{[key:string]:any}|undefined = resp.access_token;
+                if (resp.access_token && this.authServer.upstreamClientOptions.accessTokenIsJwt) {
+                    const resp1 = await this.authServer.upstreamClient.getAccessPayload(resp.access_token, false);
+                    if (resp1.error) return json(resp1);
+                    else if (resp1.payload) access_token =resp1.payload;
+                    else {
+                        CrossauthLogger.logger.error(j({msg: "No error or access payload received when querying access token"}));
+                        return this.redirectError(oauthData.orig_redirect_uri, "server_error", "No error or access payload received when querying access token")
+                    }   
+                }
+
+                const mergeResponse = await this.authServer.upstreamClientOptions.tokenMergeFn(access_token??"", resp.id_payload, this.authServer.userStorage);
+                if (mergeResponse.authorized) {
+                        const ret = await this.authServer.createTokensFromPayload(oauthData.orig_client_id,
+                            mergeResponse.access_payload, mergeResponse.id_payload
+                        );
+
+                        oauthData = {
+                            ...oauthData,
+                            access_token: ret.access_token,
+                            id_token: ret.id_token,
+                            id_payload: ret.id_payload,
+                            expires_in: ret.expires_in,
+                            refresh_token: resp.refresh_token,
+                        };
+                        let authzData = await this.authServer.getAuthorizationCodeData(oauthData.code);
+                        authzData = {
+                            ...authzData,
+                            access_token: ret.access_token,
+                            id_token: ret.id_token,
+                            id_payload: ret.id_token,
+                            refresh_token: resp.refresh_token,
+                            expires_in: ret.expires_in
+                        }
+                        await this.authServer.setAuthorizationCodeData(oauthData.code, authzData);
+                        throw this.redirect(302, this.authServer.redirect_uri(
+                            oauthData.orig_redirect_uri,
+                            oauthData.code,
+                            oauthData.orig_state
+                        ));                        
+                } else {
+                    CrossauthLogger.logger.error(j({msg: mergeResponse.error_description ?? "Error merging tokens"}));
+                    return this.redirectError(oauthData.orig_redirect_uri, mergeResponse.error ?? "server_error", mergeResponse.error_description ?? "Error merging tokens")
+                }
+
+            } catch (e) {
+                if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
+                if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                const ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug({err: e});
+                CrossauthLogger.logger.error({cerr: e});
+                //throw this.error(ce.httpStatus, ce.message);
+                return this.redirectError(oauthData.orig_redirect_uri, ce.oauthErrorCode, ce.message)
+            }
+        },
+    };
 
     /**
      * `get` and `post` functions for the mfa/authenticators endpoint.
