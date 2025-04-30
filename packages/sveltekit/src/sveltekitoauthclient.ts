@@ -1054,7 +1054,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     resp.error = "server_error";
                     resp.error_description = "Unexpectedly did not receive error or access token";
                 }
-                console.log("refresh got resp", resp)
                 if (!resp.error) {
                     const resp1 = await this.receiveTokenFn(resp,
                         this,
