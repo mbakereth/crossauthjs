@@ -893,7 +893,7 @@ export class SvelteKitAuthorizationServer {
 
     private async redirectError(redirect_uri: string|undefined, error: string, error_description: string) {
         if (redirect_uri) {
-            throw this.redirect(redirect_uri + "?error=" + encodeURIComponent(error) + "&error_description=" + encodeURIComponent(error_description));
+            throw this.redirect(302, redirect_uri + "?error=" + encodeURIComponent(error) + "&error_description=" + encodeURIComponent(error_description));
         } else {
             throw this.error(500, error_description);
         }
@@ -1212,7 +1212,6 @@ export class SvelteKitAuthorizationServer {
                 var data = new JsonOrFormData();
                 await data.loadData(event);
                 formData = data.toObject();
-                console.log("sveltekit.tokenendpoint", formData)
 
                 const {client_id, client_secret} = this.getClientIdAndSecret(formData, event);
 
@@ -1305,7 +1304,6 @@ export class SvelteKitAuthorizationServer {
                     CrossauthLogger.logger.error(j({cerr: ce}));
                     return json(resp, {status: ce.httpStatus});
                 }
-                console.log("tokenEndpoint return", resp)
                 return json(resp);
             
             } catch (e) {
@@ -1346,12 +1344,13 @@ export class SvelteKitAuthorizationServer {
                 const sessionDataName = this.authServer.upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
                 oauthData = await this.svelteKitServer.sessionAdapter?.getSessionData(event, sessionDataName) ?? {};
                 if (oauthData?.state != state) {
-                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
+                    CrossauthLogger.logger.error(j({msg: "State does not match"}))
+                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match");
                 }
                 const resp =  await this.authServer.upstreamClient.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
                     error,
                     error_description);
-                if (resp.error) {
+                    if (resp.error) {
                     CrossauthLogger.logger.error(j({msg: resp.error_description}));
                     return this.redirectError(oauthData.orig_redirect_uri, resp.error, resp.error_description ?? "unknown error")
                 }
