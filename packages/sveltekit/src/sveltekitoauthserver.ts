@@ -893,7 +893,7 @@ export class SvelteKitAuthorizationServer {
 
     private async redirectError(redirect_uri: string|undefined, error: string, error_description: string) {
         if (redirect_uri) {
-            throw this.redirect(redirect_uri + "?error=" + encodeURIComponent(error) + "&error_description=" + encodeURIComponent(error_description));
+            throw this.redirect(302, redirect_uri + "?error=" + encodeURIComponent(error) + "&error_description=" + encodeURIComponent(error_description));
         } else {
             throw this.error(500, error_description);
         }
@@ -1305,45 +1305,6 @@ export class SvelteKitAuthorizationServer {
                     CrossauthLogger.logger.error(j({cerr: ce}));
                     return json(resp, {status: ce.httpStatus});
                 }
-                let mergedTokens = resp;
-                if (this.authServer.upstreamClient && resp.access_token) {
-                    if (!this.authServer.upstreamClientOptions?.tokenMergeFn) {
-                        CrossauthLogger.logger.error(j({msg: "upstreamRedirectUri endpoint called but no upstreamClient or merge function set"}));
-                        return json({error: "server_error", error_description: "Configuration error: Upstreeam client not configured"});
-                    }
-
-                    let access_token : string|{[key:string]:any}|undefined = resp.access_token;
-                    if (resp.access_token && this.authServer.upstreamClientOptions.accessTokenIsJwt) {
-                        const resp1 = await this.authServer.upstreamClient.getAccessPayload(resp.access_token, false);
-                        if (resp1.error) return json(resp1);
-                        else if (resp1.payload) access_token =resp1.payload;
-                        else {
-                            CrossauthLogger.logger.error(j({msg: "No error or access payload received when querying access token"}));
-                            return json({error: "server_error", error_description: "No error or access payload received when querying access token"});
-                        }   
-                    }
-
-                    console.log("Merging tokens")
-                    const mergeResponse = await this.authServer.upstreamClientOptions.tokenMergeFn(access_token, resp.id_payload, this.authServer.userStorage);
-                    if (mergeResponse.authorized) {
-                            const ret = await this.authServer.createTokensFromPayload(client_id,
-                                mergeResponse.access_payload, mergeResponse.id_payload
-                            );
-                            mergedTokens = {
-                                ...mergedTokens,
-                                ...ret
-                            }
-                            console.log("Returning", ret)
-                            const resp = json(ret);
-                            console.log(resp);
-                            return resp;
-    
-                    } else {
-                        console.log("Returning", "error")
-                        CrossauthLogger.logger.error(j({msg: mergeResponse.error_description ?? "Error merging tokens"}));
-                        return json({error: mergeResponse.error ?? "server_error", error_description: mergeResponse.error_description ?? "Error merging tokens"});
-                    }
-                } 
                 return json(resp);
             
             } catch (e) {
@@ -1384,12 +1345,13 @@ export class SvelteKitAuthorizationServer {
                 const sessionDataName = this.authServer.upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
                 oauthData = await this.svelteKitServer.sessionAdapter?.getSessionData(event, sessionDataName) ?? {};
                 if (oauthData?.state != state) {
-                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
+                    CrossauthLogger.logger.error(j({msg: "State does not match"}))
+                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match");
                 }
                 const resp =  await this.authServer.upstreamClient.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
                     error,
                     error_description);
-                if (resp.error) {
+                    if (resp.error) {
                     CrossauthLogger.logger.error(j({msg: resp.error_description}));
                     return this.redirectError(oauthData.orig_redirect_uri, resp.error, resp.error_description ?? "unknown error")
                 }

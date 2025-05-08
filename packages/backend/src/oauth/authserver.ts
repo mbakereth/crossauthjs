@@ -818,7 +818,6 @@ export class OAuthAuthorizationServer {
     : Promise<OAuthTokenResponse> {
 
 
-        CrossauthLogger.logger.debug(j({msg: "backend.tokemEndpoint"}))
         const flow = this.inferFlowFromPost(grantType, codeVerifier);
         if (!flow) return {
             error: "server_error",
@@ -925,8 +924,40 @@ export class OAuthAuthorizationServer {
                         error_description: "If executing the refresh token flow, must  provide a refresh token"
                     }
                 }
-                return await this.upstreamClient.refreshTokenFlow(refreshToken);
-            }
+                let upstream_resp = await this.upstreamClient.refreshTokenFlow(refreshToken);
+                if (!upstream_resp.access_token) {
+                    return {
+                        error: "access_denied",
+                        error_description: "Didn't receive an access token",
+                    }
+                }
+                let accessTokenOrPayload : {[key:string]:any}|string|undefined = upstream_resp.access_token;
+                if (this.upstreamClientOptions.accessTokenIsJwt) {
+                    accessTokenOrPayload = await this.upstreamClient.validateAccessToken(upstream_resp.access_token, false);
+                    if (!accessTokenOrPayload) {
+                        return {
+                            error: "access_denied",
+                            error_description: "Couldn't decode access token"
+                        };
+                    }
+                }
+                const mergeResponse = await this.upstreamClientOptions.tokenMergeFn(accessTokenOrPayload, upstream_resp.id_payload, this.userStorage);    
+                if (mergeResponse.authorized) {
+                    const ret = await this.createTokensFromPayload(client_id,
+                        mergeResponse.access_payload, mergeResponse.id_payload
+                    );
+                    upstream_resp.access_token = ret.access_token;
+                    upstream_resp.id_token = ret.id_token;
+                    upstream_resp.id_payload = ret.id_payload;
+                    return upstream_resp;
+                } else {
+                    CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
+                    return {
+                        error: mergeResponse.error,
+                        error_description: mergeResponse.error_description
+                    };
+                }                            
+    }
 
             const refreshData = await this.getRefreshTokenData(refreshToken);
             if (!refreshToken || !refreshData || !this.userStorage) {
@@ -954,7 +985,6 @@ export class OAuthAuthorizationServer {
             }
             try {
                 const hash = KeyPrefix.refreshToken + Crypto.hash(refreshToken);
-                CrossauthLogger.logger.debug(j({msg: "delete refresh token"}))
                 await this.keyStorage.deleteKey(hash);   
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
@@ -962,7 +992,6 @@ export class OAuthAuthorizationServer {
                 CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
             }
 
-            CrossauthLogger.logger.debug(j({msg: "backend.tokemEndpoint returning"}))
             return await this.makeAccessToken({
                 client,
                 client_secret,

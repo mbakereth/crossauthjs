@@ -155,9 +155,7 @@ export class OAuthAutoRefresher {
                     try {
                         reply = await resp.json();
                     } catch (e) {
-                        if (resp?.status == 204) console.log("No body in response")
-                        else console.log(reply? await reply?.text() : "No response body")
-                        //CrossauthLogger.logger.error(j({msg: "/refresh returned a non-JSON response " + (reply? await reply.text() : undefined )}));
+                        CrossauthLogger.logger.error(j({msg: "/refresh returned a non-JSON response " + (reply? await reply.text() : undefined )}));
                         reply = {ok: false, error: "Unknown"}
                     }
 

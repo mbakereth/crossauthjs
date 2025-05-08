@@ -472,7 +472,7 @@ export class SessionManager {
         value: { [key: string]: any }) : Promise<void> {
         //const sessionId = this.session.unsignCookie(sessionCookieValue);
         const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
-        CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
+        CrossauthLogger.logger.debug(j({msg: `Updating session data value ${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
         await this.keyStorage.updateData(hashedSessionKey, name, value);
     }
 
@@ -506,7 +506,7 @@ export class SessionManager {
        name: string) : Promise<void> {
        //const sessionId = this.session.unsignCookie(sessionCookieValue);
        const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
-       CrossauthLogger.logger.debug(j({msg: `Updating session data value${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
+       CrossauthLogger.logger.debug(j({msg: `Updating session data value ${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
        await this.keyStorage.deleteData(hashedSessionKey, name);
    }
     

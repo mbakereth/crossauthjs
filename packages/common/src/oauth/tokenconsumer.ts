@@ -117,7 +117,6 @@ export abstract class OAuthTokenConsumerBase {
                 }
                 const key = await jose.importSPKI(this.jwtPublicKey, this.jwtKeyType);
                 this.keys["_default"] = key;
-                    
             } else {
                 if (!this.oidcConfig) {
                     await this.loadConfig();
@@ -316,7 +315,9 @@ export abstract class OAuthTokenConsumerBase {
             }
             return decodedPayload;
         } catch (e) {
-            CrossauthLogger.logger.warn(j({msg: "Access token did not validate"}));
+            const ce = CrossauthError.asCrossauthError(e)
+            CrossauthLogger.logger.debug(j({err: ce}));
+            CrossauthLogger.logger.warn(j({msg: "Access token did not validate", cerr: ce}));
             return undefined;
         }
     }
