@@ -840,7 +840,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     const error_description = resp instanceof Response || resp == undefined ? "Unknown error" : (resp.error_description ?? "Unknown error");
                     const ce = CrossauthError.fromOAuthError(error, error_description)
                     CrossauthLogger.logger.debug(j({err: ce}));
-                    CrossauthLogger.logger.warn(j({msg: "Error refrshing token", cerr: ce}));
+                    CrossauthLogger.logger.warn(j({msg: "Error refreshing token", cerr: ce}));
+                } else {
+                    await this.setEventLocalsUser(event, sessionData["id_payload"]);
                 }
             }
 
@@ -1136,7 +1138,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         mode: "silent" | "post" | "page",
         onlyIfExpired : boolean) : Promise<(TokenReturn&{expires_at?: number})|Response|undefined> {
 
-            console.log("refreshTokens")
         try {
             if (!this.server.sessionAdapter) {
                 return {
@@ -1153,7 +1154,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }; 
             }
             const oauthData = await this.server.sessionAdapter.getSessionData(event, this.sessionDataName);
-            console.log(oauthData);
             if (!oauthData?.refresh_token) {
                 if (mode == "silent") {
                     return new Response(null, {status: 204});
@@ -1485,7 +1485,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     pack(ret : {[key:string]:any}|undefined|Response) {
-        console.log("Pack", ret)
         if (ret instanceof Response) return ret;
         let status = 200;
         if (ret?.error == "access_denied") status = 401;

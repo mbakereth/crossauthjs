@@ -146,7 +146,6 @@ export class OAuthAutoRefresher {
                             csrfToken
                         }
                     }, "refresh");
-                    console.log(resp)
 
                     if (!resp.ok) { 
                         CrossauthLogger.logger.error(j({msg: "Failed auto refreshing tokens", status: resp.status}));
@@ -155,7 +154,12 @@ export class OAuthAutoRefresher {
                     try {
                         reply = await resp.json();
                     } catch (e) {
-                        CrossauthLogger.logger.error(j({msg: "/refresh returned a non-JSON response " + (reply? await reply.text() : undefined )}));
+                        try {
+                            CrossauthLogger.logger.error(j({msg: "/refresh returned a non-JSON response " + (reply? await reply.text() : undefined )}));
+                        } catch (e2) {
+                            CrossauthLogger.logger.error(j({msg: "/refresh returned a  with no body "}));
+
+                        }
                         reply = {ok: false, error: "Unknown"}
                     }
 
