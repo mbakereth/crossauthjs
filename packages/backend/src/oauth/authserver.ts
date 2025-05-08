@@ -818,7 +818,7 @@ export class OAuthAuthorizationServer {
     : Promise<OAuthTokenResponse> {
 
 
-        console.log("backend.tokenEndpoint", grantType);
+        CrossauthLogger.logger.debug(j({msg: "backend.tokemEndpoint"}))
         const flow = this.inferFlowFromPost(grantType, codeVerifier);
         if (!flow) return {
             error: "server_error",
@@ -954,7 +954,7 @@ export class OAuthAuthorizationServer {
             }
             try {
                 const hash = KeyPrefix.refreshToken + Crypto.hash(refreshToken);
-                console.log("delete refresh token", refreshToken, hash)
+                CrossauthLogger.logger.debug(j({msg: "delete refresh token"}))
                 await this.keyStorage.deleteKey(hash);   
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
@@ -962,7 +962,7 @@ export class OAuthAuthorizationServer {
                 CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
             }
 
-            console.log("backend.tokemEndpoint returning")
+            CrossauthLogger.logger.debug(j({msg: "backend.tokemEndpoint returning"}))
             return await this.makeAccessToken({
                 client,
                 client_secret,
@@ -2689,7 +2689,6 @@ export class OAuthAuthorizationServer {
         if (!token) return undefined;
         try {
             const hash = KeyPrefix.refreshToken + Crypto.hash(token);
-            console.log("getRefreshTokenData", token, hash)
             const key = await this.keyStorage.getKey(hash);
             return JSON.parse(key.data||"{}");
         } catch (e) {

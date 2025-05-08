@@ -1212,7 +1212,6 @@ export class SvelteKitAuthorizationServer {
                 var data = new JsonOrFormData();
                 await data.loadData(event);
                 formData = data.toObject();
-                console.log("sveltekit.tokenendpoint", formData)
 
                 const {client_id, client_secret} = this.getClientIdAndSecret(formData, event);
 
@@ -1290,6 +1289,7 @@ export class SvelteKitAuthorizationServer {
                     deviceCode: formData.device_code,
                 });
 
+
                 if (resp.refresh_token && this.refreshTokenType != "json") {
                     this.setRefreshTokenCookie(event, resp.refresh_token, resp.expires_in);
                 }
@@ -1305,7 +1305,45 @@ export class SvelteKitAuthorizationServer {
                     CrossauthLogger.logger.error(j({cerr: ce}));
                     return json(resp, {status: ce.httpStatus});
                 }
-                console.log("tokenEndpoint return", resp)
+                let mergedTokens = resp;
+                if (this.authServer.upstreamClient && resp.access_token) {
+                    if (!this.authServer.upstreamClientOptions?.tokenMergeFn) {
+                        CrossauthLogger.logger.error(j({msg: "upstreamRedirectUri endpoint called but no upstreamClient or merge function set"}));
+                        return json({error: "server_error", error_description: "Configuration error: Upstreeam client not configured"});
+                    }
+
+                    let access_token : string|{[key:string]:any}|undefined = resp.access_token;
+                    if (resp.access_token && this.authServer.upstreamClientOptions.accessTokenIsJwt) {
+                        const resp1 = await this.authServer.upstreamClient.getAccessPayload(resp.access_token, false);
+                        if (resp1.error) return json(resp1);
+                        else if (resp1.payload) access_token =resp1.payload;
+                        else {
+                            CrossauthLogger.logger.error(j({msg: "No error or access payload received when querying access token"}));
+                            return json({error: "server_error", error_description: "No error or access payload received when querying access token"});
+                        }   
+                    }
+
+                    console.log("Merging tokens")
+                    const mergeResponse = await this.authServer.upstreamClientOptions.tokenMergeFn(access_token, resp.id_payload, this.authServer.userStorage);
+                    if (mergeResponse.authorized) {
+                            const ret = await this.authServer.createTokensFromPayload(client_id,
+                                mergeResponse.access_payload, mergeResponse.id_payload
+                            );
+                            mergedTokens = {
+                                ...mergedTokens,
+                                ...ret
+                            }
+                            console.log("Returning", ret)
+                            const resp = json(ret);
+                            console.log(resp);
+                            return resp;
+    
+                    } else {
+                        console.log("Returning", "error")
+                        CrossauthLogger.logger.error(j({msg: mergeResponse.error_description ?? "Error merging tokens"}));
+                        return json({error: mergeResponse.error ?? "server_error", error_description: mergeResponse.error_description ?? "Error merging tokens"});
+                    }
+                } 
                 return json(resp);
             
             } catch (e) {

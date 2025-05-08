@@ -822,12 +822,25 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             if (!server.sessionAdapter) return undefined;
 
             let sessionData = await server.sessionAdapter.getSessionData(event, this.sessionDataName);
+            let validIdToken = false;
             //CrossauthLogger.logger.debug(j({msg:"Session data " + (sessionData && sessionData["id_payload"]) ? JSON.stringify(sessionData?.id_payload) : "none)"}));
             if (sessionData && sessionData["id_payload"]) {
                 let expiry = sessionData["expires_at"]
                 if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
                     CrossauthLogger.logger.debug(j({msg:"ID token is valid"}));
                     await this.setEventLocalsUser(event, sessionData["id_payload"]);
+                    if (event.locals.user) validIdToken = true;
+                }
+            } 
+            if (!validIdToken && sessionData && sessionData["refresh_token"]) {
+                CrossauthLogger.logger.debug(j({msg: "No ID token found but refresh token found - attemping refresh flow"}));
+                const resp = await this.refreshTokens(event, "silent", false);
+                if (!resp?.ok) {
+                    const error = resp instanceof Response || resp == undefined ? "server_error" : (resp.error ?? "server_error");
+                    const error_description = resp instanceof Response || resp == undefined ? "Unknown error" : (resp.error_description ?? "Unknown error");
+                    const ce = CrossauthError.fromOAuthError(error, error_description)
+                    CrossauthLogger.logger.debug(j({err: ce}));
+                    CrossauthLogger.logger.warn(j({msg: "Error refrshing token", cerr: ce}));
                 }
             }
 
@@ -1054,7 +1067,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     resp.error = "server_error";
                     resp.error_description = "Unexpectedly did not receive error or access token";
                 }
-                console.log("refresh got resp", resp)
                 if (!resp.error) {
                     const resp1 = await this.receiveTokenFn(resp,
                         this,
@@ -1124,6 +1136,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         mode: "silent" | "post" | "page",
         onlyIfExpired : boolean) : Promise<(TokenReturn&{expires_at?: number})|Response|undefined> {
 
+            console.log("refreshTokens")
         try {
             if (!this.server.sessionAdapter) {
                 return {
@@ -1140,6 +1153,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }; 
             }
             const oauthData = await this.server.sessionAdapter.getSessionData(event, this.sessionDataName);
+            console.log(oauthData);
             if (!oauthData?.refresh_token) {
                 if (mode == "silent") {
                     return new Response(null, {status: 204});
@@ -1471,6 +1485,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     }
 
     pack(ret : {[key:string]:any}|undefined|Response) {
+        console.log("Pack", ret)
         if (ret instanceof Response) return ret;
         let status = 200;
         if (ret?.error == "access_denied") status = 401;
