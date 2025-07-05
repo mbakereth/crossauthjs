@@ -478,6 +478,79 @@ importers:
         specifier: ^1.2.0
         version: 1.6.0(@types/node@20.14.15)
 
+  examples/sveltekitpasswordandldap:
+    dependencies:
+      '@crossauth/backend':
+        specifier: workspace:^
+        version: link:../../packages/backend
+      '@crossauth/common':
+        specifier: workspace:^
+        version: link:../../packages/common
+      '@crossauth/frontend':
+        specifier: workspace:^
+        version: link:../../packages/frontend
+      '@crossauth/sveltekit':
+        specifier: workspace:^
+        version: link:../../packages/sveltekit
+      '@prisma/client':
+        specifier: 5.9.1
+        version: 5.9.1(prisma@5.18.0)
+      prisma:
+        specifier: ^5.9.1
+        version: 5.18.0
+    devDependencies:
+      '@sveltejs/adapter-auto':
+        specifier: ^3.0.0
+        version: 3.2.4(@sveltejs/kit@2.5.22(@sveltejs/vite-plugin-svelte@3.1.1(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))
+      '@sveltejs/adapter-node':
+        specifier: ^5.2.0
+        version: 5.2.2(@sveltejs/kit@2.5.22(@sveltejs/vite-plugin-svelte@3.1.1(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))
+      '@sveltejs/kit':
+        specifier: ^2.5.22
+        version: 2.5.22(@sveltejs/vite-plugin-svelte@3.1.1(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15)))(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^3.0.0
+        version: 3.1.1(svelte@4.2.18)(vite@5.4.0(@types/node@20.14.15))
+      autoprefixer:
+        specifier: ^10.4.18
+        version: 10.4.20(postcss@8.4.41)
+      daisyui:
+        specifier: ^4.7.2
+        version: 4.12.10(postcss@8.4.41)
+      dotenv:
+        specifier: ^16.3.1
+        version: 16.4.5
+      dotenv-cli:
+        specifier: ^7.3.0
+        version: 7.4.2
+      postcss:
+        specifier: ^8.4.35
+        version: 8.4.41
+      svelte:
+        specifier: ^4.2.7
+        version: 4.2.18
+      svelte-check:
+        specifier: ^3.6.0
+        version: 3.8.5(postcss-load-config@4.0.2(postcss@8.4.41)(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3)))(postcss@8.4.41)(svelte@4.2.18)
+      tailwindcss:
+        specifier: ^3.4.1
+        version: 3.4.10(ts-node@10.9.2(@types/node@20.14.15)(typescript@5.3.3))
+      tslib:
+        specifier: ^2.4.1
+        version: 2.6.3
+      tsx:
+        specifier: ^4.7.0
+        version: 4.17.0
+      typescript:
+        specifier: ^5.0.0
+        version: 5.3.3
+      vite:
+        specifier: ^5.0.3
+        version: 5.4.0(@types/node@20.14.15)
+      vitest:
+        specifier: ^1.2.0
+        version: 1.6.0(@types/node@20.14.15)
+
   examples/sveltekitserverexample:
     dependencies:
       '@crossauth/backend':

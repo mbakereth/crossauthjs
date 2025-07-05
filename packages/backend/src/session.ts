@@ -217,7 +217,7 @@ export class SessionManager {
             let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             secrets = userAndSecrets.secrets;
             user = userAndSecrets.user;    
-    } else {
+        } else {
             let userAndSecrets = await this.userStorage.getUserByUsername(user.username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             secrets = userAndSecrets.secrets;
 
@@ -246,7 +246,6 @@ export class SessionManager {
         const csrfToken = this.csrfTokens.createCsrfToken();
         const csrfCookie = this.csrfTokens.makeCsrfCookie(csrfToken);
         const csrfFormOrHeaderValue = this.csrfTokens.makeCsrfFormOrHeaderToken(csrfToken);
-
         // delete any password reset tokens that still exist for this user.
         try {
             this.emailTokenStorage.deleteAllForUser(user.id, 
