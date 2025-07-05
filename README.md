@@ -4,5 +4,3 @@ Crossauth is a package for authentication and authorization using username/passw
 
 There is also a Python package (in a separate repository) that, it is planned wil provide identical functionality as the server-side in this package.
 
-This package is very much in alpha and so far has been used in one project only.
-Being alpha, the API is subject to change without warning.
