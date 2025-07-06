@@ -139,7 +139,7 @@ export abstract class OAuthTokenConsumerBase {
      * to `authServerBaseUrl` )
      * @param oidcConfig the configuration, or undefined to load it from
      *        the authorization server
-     * @throws a {@link CrossauthError} object with {@link ErrorCode} of
+     * @throws a {@link @crossauth/common!CrossauthError} object with {@link @crossauth/common!ErrorCode} of
      *   - `Connection` if the fetch to the authorization server failed.
      */
     async loadConfig(oidcConfig? : OpenIdConfiguration) : Promise<void> {
@@ -181,7 +181,7 @@ export abstract class OAuthTokenConsumerBase {
      * authorization server (using the URL in the OIDC configuration).
      * @param jwks the keys to load, or undefined to fetch them from
      *        the authorization server.
-     * @throws a {@link CrossauthError} object with {@link ErrorCode} of
+     * @throws a {@link @crossauth/common!CrossauthError} object with {@link @crossauth/common!ErrorCode} of
      *   - `Connection` if the fetch to the authorization server failed,
      *     the OIDC configuration wasn't set or the keys could not be parsed.
      */

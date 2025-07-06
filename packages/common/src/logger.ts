@@ -32,7 +32,7 @@ export interface CrossauthLoggerInterface {
  * 
  * - `msg` : main contents of the log
  * - `err` : an error object.  If a subclass of Error, it wil contain at least `message` and
- *           a stack trace in `stack`.  If the error is of type{@link CrossauthError} 
+ *           a stack trace in `stack`.  If the error is of type {@link @crossauth/common!CrossauthError} 
  *           it also will also contain `code` and `httpStatus`.
  * - `hashedSessionCookie` : for security reasons, session cookies are not included in logs.
  *                           However, so that errors can be correlated with each other, a hash
