@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import type { User, UserSecretsInputFields, Key, UserInputFields } from '@crossauth/common';
+import { UserState } from '@crossauth/common';
 import { ErrorCode, CrossauthError, CrossauthLogger, j } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils.ts';
 import { PasswordAuthenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
@@ -62,18 +63,18 @@ export class LdapAuthenticator extends PasswordAuthenticator {
                     localUser = resp.user;
                     localUser.factor1 = this.ldapAutoCreateFactor1;
                 } catch (e) {
+                    CrossauthLogger.logger.debug(j({msg: "Creating user", user: user.username}))
                     localUser = await this.ldapStorage.createUser({factor1: this.ldapAutoCreateFactor1, ...user}, params);
                 }
             } else {
                 const resp = await this.ldapStorage.getUserByUsername(user.username);
                 localUser = resp.user;
             }
-            if (localUser.state == "awaitingtwofactorsetup") throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
-            if (localUser.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
-            if (localUser.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
+            if (localUser.state == UserState.awaitingTwoFactorSetup) throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
+            if (localUser.state == UserState.awaitingEmailVerification) throw new CrossauthError(ErrorCode.EmailNotVerified);
+            if (localUser.state == UserState.disabled) throw new CrossauthError(ErrorCode.UserNotActive);
        
         } catch (e1) {
-            console.log(e1)
             CrossauthLogger.logger.debug(j({err: e1}))
             throw e1;
         }

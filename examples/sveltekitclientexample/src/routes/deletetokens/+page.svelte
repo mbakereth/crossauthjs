@@ -2,7 +2,6 @@
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
     import { UserState } from '@crossauth/common';
-    import Totp from '$lib/components/Totp.svelte'
 	/** @type {import('./$types').PageData} */
     export let data;
 	/** @type {import('./$types').ActionData} */

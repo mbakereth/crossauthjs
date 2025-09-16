@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import type { User, UserSecretsInputFields, Key, UserInputFields } from '@crossauth/common';
+import { UserState } from '@crossauth/common';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { UserStorage } from '../storage.ts'
 import { Crypto } from '../crypto.ts';
@@ -128,9 +129,9 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
             CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
-        if (user.state == "awaitingtwofactorsetup") throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
-        if (user.state == "awaitingemailverification") throw new CrossauthError(ErrorCode.EmailNotVerified);
-        if (user.state == "deactivated") throw new CrossauthError(ErrorCode.UserNotActive);
+        if (user.state == UserState.awaitingTwoFactorSetup) throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
+        if (user.state == UserState.awaitingEmailVerification) throw new CrossauthError(ErrorCode.EmailNotVerified);
+        if (user.state == UserState.disabled) throw new CrossauthError(ErrorCode.UserNotActive);
     }
 
     /**

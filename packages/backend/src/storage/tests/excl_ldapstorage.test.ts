@@ -25,7 +25,7 @@ test('LdapStorage.createUser', async () => {
         await ldapStorage.createUser(
             {username, state: "active", email}, 
             {password});
-        const {user} = await localStorage.getUserByUsername(process.env["LDAPUSER"]);
+        const {user} = await localStorage.getUserByUsername(username);
         expect(user.email).toBe(process.env["LDAPEMAIL"]);    
     } catch (e) {
         console.log(e);

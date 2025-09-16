@@ -197,7 +197,7 @@ export class LdapUserStorage extends UserStorage {
     async getLdapUser(username : string, password : string) : Promise<LdapUser> {
         let ldapClient : ldap.Client;
         try {
-            const sanitizedUsername = LdapUserStorage.sanitizeLdapDnForSerach(username);
+            const sanitizedUsername = LdapUserStorage.sanitizeLdapDnForSearch(username);
             const userDn = [this.ldapUsernameAttribute+"="+sanitizedUsername, this.ldapUserSearchBase].join(",");
             if (!password) throw new CrossauthError(ErrorCode.PasswordInvalid);
             CrossauthLogger.logger.debug(j({msg: "LDAP search "+userDn}));
@@ -322,7 +322,7 @@ export class LdapUserStorage extends UserStorage {
      * @param dn the dn to sanitise
      * @returns a sanitized dn
      */
-    static sanitizeLdapDnForSerach(dn : string) : string {
+    static sanitizeLdapDnForSearch(dn : string) : string {
         return LdapUserStorage.sanitizeLdapDn(dn)
                  .replace("*", "\*")
                  .replace("(", "\(")
