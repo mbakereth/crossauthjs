@@ -32,7 +32,7 @@
     "prisma": "dotenv -e .env.unittest pnpm exec prisma"
   },
   "devDependencies": {
-    "@types/node": "^20.10.8",
+    "@types/node": "^20.19.15",
     "jimp": "^0.22.10",
     "jsqr": "^1.4.0",
     "prisma": "^5.12.0",

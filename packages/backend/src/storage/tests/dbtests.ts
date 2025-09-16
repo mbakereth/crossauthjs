@@ -443,5 +443,4 @@ export function makeDBTests(prefix : string, userStorage : UserStorage, keyStora
         expect(["read", "delete"]).toContain(scopes[0]);
         expect(["read", "delete"]).toContain(scopes[1]);
     });
-
 }

@@ -194,6 +194,7 @@ export class SessionManager {
             secrets: UserSecrets,
         }> {
 
+        console.log("session.login")
         if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call login if no user storage provided");
         let secrets : UserSecrets = {userid: ""};
         let defaultAuth = "";
@@ -205,6 +206,8 @@ export class SessionManager {
                 user = userAndSecrets.user;    
                 userInputFields = userAndSecrets.user;
             } catch (e) {
+                const ce = CrossauthError.asCrossauthError(e);
+                if (ce.code == ErrorCode.Connection) throw e;
                 for (let auth in this.authenticators) {
                     if (!this.authenticators[auth].requireUserEntry()) {
                         userInputFields = {username: params.username, state: "active"}

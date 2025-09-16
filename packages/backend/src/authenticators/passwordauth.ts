@@ -158,11 +158,11 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      * @param salt the salt to use.  If undefined, a random one will be generated.
      * @returns the encoded hash string.
      */
-    async createPasswordHash(password : string, salt? : string) : Promise<string> {
+    async createPasswordHash(password : string, salt? : string, encode : boolean = true) : Promise<string> {
         
         return await Crypto.passwordHash(password, {
             salt: salt, 
-            encode: true, 
+            encode: encode, 
             secret: this.enableSecretForPasswords ? this.secret : undefined,
             iterations: this.pbkdf2Iterations,
             keyLen: this.pbkdf2KeyLength,
@@ -201,7 +201,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      */
     async createPersistentSecrets(_username : string, 
         params: AuthenticationParameters, 
-        repeatParams: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
+        repeatParams?: AuthenticationParameters) : Promise<Partial<UserSecretsInputFields>> {
         if (!params.password) throw new CrossauthError(ErrorCode.Unauthorized, "No password provided");
         if (repeatParams && repeatParams.password != params.password) {
             throw new CrossauthError(ErrorCode.PasswordMatch);
@@ -220,6 +220,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
      * @returns true - this class can create users
      */
     canCreateUser() : boolean { return true; }
+    
     /**
      * @returns true - this class can update users
      */

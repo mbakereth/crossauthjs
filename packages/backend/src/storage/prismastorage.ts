@@ -29,7 +29,7 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
      */
     useridForeignKeyColumn? : string,
 
-    /** The prisma client instanfce.  Leave this out to have Crossauth create a default one */
+    /** The prisma client instance.  Leave this out to have Crossauth create a default one */
     prismaClient? : any; // PrismaClient,
 
     includes? : string[];
@@ -106,6 +106,10 @@ export class PrismaUserStorage extends UserStorage {
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
         let error: CrossauthError|undefined = undefined;
         let prismaUser : any;
+        if (!this.prismaClient) {
+            error = new CrossauthError(ErrorCode.Connection); 
+        }
+        if (error) throw error;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             prismaUser = await this.prismaClient[this.userTable].findUniqueOrThrow({
@@ -116,11 +120,19 @@ export class PrismaUserStorage extends UserStorage {
             });
 
         }  catch (e) {
-            error = new CrossauthError(ErrorCode.UserNotExist); 
-        }
-        if (!this.prismaClient) {
-            error = new CrossauthError(ErrorCode.Connection); 
-
+            //if (e instanceof Prisma.PrismaClientKnownRequestError) {
+            if (typeof(e) == "object" && e?.constructor.name == "PrismaClientInitializationError") {
+                CrossauthLogger.logger.debug(j({err: e}))
+                CrossauthLogger.logger.error(j({cerr: e}))
+                error = new CrossauthError(ErrorCode.Connection, "Couldn't connect to database server"); 
+            }
+            else if (typeof(e) == "object" && e?.constructor.name == "PrismaClientInitializationError") {
+                CrossauthLogger.logger.debug(j({err: e}))
+                CrossauthLogger.logger.error(j({cerr: e}))
+                error = new CrossauthError(ErrorCode.Connection, "Received error from database"); 
+            } else {
+                error = new CrossauthError(ErrorCode.UserNotExist); 
+            }
         }
         if (error) throw error;
         
@@ -294,6 +306,7 @@ export class PrismaUserStorage extends UserStorage {
                 });
             }
         } catch (e) {
+            console.log(e)
             CrossauthLogger.logger.debug(j({err: e}));
             throw new CrossauthError(ErrorCode.Connection, "Error updating user");
         }
@@ -1340,7 +1353,7 @@ export interface PrismaOAuthAuthorizationStorageOptions extends OAuthClientStora
 
     transactionTimeout? : number,
 
-    /** Name of the user id column in the user secrets.  
+    /** Name of the user id column in the table.  
      * Default `userid`.
      */
     useridForeignKeyColumn? : string,
@@ -1363,7 +1376,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
      */
     constructor(options : PrismaOAuthClientStorageOptions = {}) {
         super();
-        setParameter("authorizationTable", ParamType.String, this, options, "OAUTH_CLIENT_TABLE");
+        setParameter("authorizationTable", ParamType.String, this, options, "OAUTH_AUTHORIZATION_TABLE");
         setParameter("transactionTimeout", ParamType.Number, this, options, "TRANSACTION_TIMEOUT");
         setParameter("useridForeignKeyColumn", ParamType.String, this, options, "USER_ID_FOREIGN_KEY_COLUMN");
         if (options.prismaClient == undefined) {
