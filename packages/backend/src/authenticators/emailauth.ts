@@ -86,7 +86,7 @@ export class EmailAuthenticator extends Authenticator {
      * @param options see {@link EmailAuthenticatorOptions}
      */
     constructor(options : EmailAuthenticatorOptions = {}) {
-        super({friendlyName : "Email otp", ...options});
+        super({friendlyName : "Email OTP", ...options});
         setParameter("views", ParamType.String, this, options, "VIEWS");
         setParameter("emailAuthenticatorTextBody", ParamType.String, this, options, "EMAIL_AUTHENTICATOR_TEXT_BODY");
         setParameter("emailAuthenticatorHtmlBody", ParamType.String, this, options, "EMAIL_AUTHENTICATOR_HTML_BODY");
@@ -195,6 +195,7 @@ export class EmailAuthenticator extends Authenticator {
             username: user.username,
             factor2: this.factorName,
             expiry: expiry,
+            email: email,
             otp: otp
         }
         const messageId = this.sendToken(email, otp);
