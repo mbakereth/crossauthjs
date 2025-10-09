@@ -25,7 +25,7 @@ export interface SmsAuthenticatorOptions extends AuthenticationOptions {
     views? : string;
 
     /** Template file containing page for producing the 
-     * SMS message */
+     * SMS message.  Default `smsauthenticationbody.njk` */
     smsAuthenticatorBody? : string,
 
     /** Phone number for sending sms from */
@@ -39,8 +39,7 @@ export interface SmsAuthenticatorOptions extends AuthenticationOptions {
 }
 
 /**
- * This authenticator creates a one-time code and sends it in an sms using 
- * Twilio
+ * Abstract base class for sending OTPs by SMS
  */
 export abstract class SmsAuthenticator extends Authenticator {
 
@@ -121,6 +120,7 @@ export abstract class SmsAuthenticator extends Authenticator {
             username: user.username,
             factor2: this.factorName,
             expiry: expiry,
+            phone: number,
             otp: otp
         }
         let data = {otp: otp};

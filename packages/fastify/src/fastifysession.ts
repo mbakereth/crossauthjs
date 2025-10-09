@@ -957,7 +957,6 @@ export class FastifySessionServer implements FastifySessionAdapter {
         setParameter("factor2Page", ParamType.String, this, options, "FACTOR2_PAGE");
         setParameter("configureFactor2Page", ParamType.String, this, options, "SIGNUP_FACTOR2_PAGE");
         setParameter("errorPage", ParamType.String, this, options, "ERROR_PAGE");
-        setParameter("emailFrom", ParamType.String, this, options, "EMAIL_FROM");
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
@@ -968,6 +967,8 @@ export class FastifySessionServer implements FastifySessionAdapter {
         setParameter("editUserScope", ParamType.String, this, options, "EDIT_USER_SCOPE");
         setParameter("userAllowedFactor1", ParamType.JsonArray, this, options, "USER_ALLOWED_FACTOR1");
         setParameter("adminAllowedFactor1", ParamType.JsonArray, this, options, "ADMIN_ALLOWED_FACTOR1");
+        setParameter("loginRedirect", ParamType.JsonArray, this, options, "LOGIN_REDIRECT");
+        setParameter("logoutRedirect", ParamType.JsonArray, this, options, "LOGOUT_REDIRECT");
 
         if (options.validateUserFn) this.validateUserFn = options.validateUserFn;
         if (options.createUserFn) this.createUserFn = options.createUserFn;
@@ -1216,7 +1217,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                         // 2FA has not started - start it
                         this.validateCsrfToken(request);
                         CrossauthLogger.logger.debug("Starting 2FA");
-                        this.sessionManager.initiateTwoFactorPageVisit(request.user, sessionId, request.body, request.url.replace(/\?.*$/,""));
+                        await this.sessionManager.initiateTwoFactorPageVisit(request.user, sessionId, request.body, request.url.replace(/\?.*$/,""));
                         if (this.factor2ProtectedPageEndpoints.includes(request.url)) {
                             return reply.redirect(this.prefix+"factor2");
                         } else {

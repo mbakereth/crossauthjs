@@ -177,8 +177,13 @@ export class PrismaUserStorage extends UserStorage {
     async getUserByUsername(
         username : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
-        const normalizedValue = PrismaUserStorage.normalize(username);
-        return this.getUser("username_normalized", normalizedValue, options);
+            if (this.normalizeUsername) {
+                const normalizedValue = PrismaUserStorage.normalize(username);
+                return this.getUser("username_normalized", normalizedValue, options);
+            } else {
+                const normalizedValue = username;
+                return this.getUser("username", normalizedValue, options);
+            }
     }
 
     /**
@@ -208,8 +213,13 @@ export class PrismaUserStorage extends UserStorage {
     async getUserByEmail(
         email : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
-        const normalizedValue = PrismaUserStorage.normalize(email);
-        return this.getUser("email_normalized", normalizedValue, options);
+        if (this.normalizeEmail) {
+            const normalizedValue = PrismaUserStorage.normalize(email);
+            return this.getUser("email_normalized", normalizedValue, options);
+        } else {
+            const normalizedValue = email;
+            return this.getUser("email", normalizedValue, options);
+        }
     }
 
     /**
@@ -253,10 +263,10 @@ export class PrismaUserStorage extends UserStorage {
         try {
             let {id: dummyUserId, ...userData} = user;
             let {userid: dummySecretsId, ...secretsData} = secrets??{};
-            if ("email" in userData && userData.email) {
+            if ("email" in userData && userData.email && this.normalizeEmail) {
                 userData = {email_normalized: PrismaUserStorage.normalize(userData.email), ...userData};
             }
-            if ("username" in userData && userData.username) {
+            if ("username" in userData && userData.username && this.normalizeUsername) {
                 userData = {username_normalized: PrismaUserStorage.normalize(userData.username), ...userData};
             }
             if (!secrets) {
@@ -329,36 +339,47 @@ export class PrismaUserStorage extends UserStorage {
         let username_normalized = "";
         let email_normalized = "";
         try {
-            if ("email" in user && user.email) {
+            if ("email" in user && user.email && this.normalizeEmail) {
                 email_normalized = PrismaUserStorage.normalize(user.email);
             }
-            if ("username" in user && user.username) {
+            if ("username" in user && user.username && this.normalizeUsername) {
                 username_normalized = PrismaUserStorage.normalize(user.username);
+            }
+            let data : {[key:string]:any} = {
+                    ...user,
+            }
+            if (this.normalizeUsername) {
+                data = {
+                    ...data,
+                    username_normalized
+                }
+            }
+            if (this.normalizeEmail) {
+                data = {
+                    ...data,
+                    email_normalized
+                }
             }
             if (secrets) {
 
+                data = {
+                    ...data,
+                    secrets: { 
+                        create: 
+                            secrets
+                    }
+                }
+
                 // @ts-ignore  (because types only exist when do prismaClient.table...)
                 newUser = await this.prismaClient[this.userTable].create({
-                    data: {
-                        ...user,
-                        email_normalized,
-                        username_normalized,
-                        secrets: { 
-                            create: 
-                                secrets
-                        }
-                    },
+                    data,
                     include: { secrets: true},
                 });
             } else {
-            // @ts-ignore  (because types only exist when do prismaClient.table...)
-            newUser = await this.prismaClient[this.userTable].create({
-                    data: {
-                        ...user,
-                        email_normalized,
-                        username_normalized,
-                    }
-            });
+                // @ts-ignore  (because types only exist when do prismaClient.table...)
+                newUser = await this.prismaClient[this.userTable].create({
+                        data,
+                });
             }
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
@@ -425,13 +446,14 @@ export class PrismaUserStorage extends UserStorage {
         if (skip) opts.skip = skip;
         if (take) opts.take = take;
 
+        let order_by = this.normalizeUsername ? "username_normalized" : "username";
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             return await this.prismaClient[this.userTable].findMany({
                 ...opts,
                 orderBy: [
                     {
-                        username_normalized: 'asc',
+                        [order_by]: 'asc',
                     },
                 ],
                 include: this.includesObject,

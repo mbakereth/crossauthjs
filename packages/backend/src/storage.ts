@@ -17,21 +17,6 @@ export interface UserStorageGetOptions {
      * If true, a valid user will be returned even if state is not set to `active`
      */
     skipActiveCheck? : boolean,
-
-    /**
-     * If true, usernames will be matched as lowercase and with diacritics removed.
-     * Default true,
-     * 
-     * Note: this doesn't apply to the ID column
-     */
-    normalizeUsername? : boolean,
-
-    /**
-     * If true, email addresses (in the email column not in the username column) 
-     * will be matched as lowercase and with diacritics removed.
-     * Default true.
-     */
-    normalizeEmail? : boolean,
 }
 
 /**
@@ -49,6 +34,21 @@ export interface UserStorageOptions {
      * Fields that admins are allowed to edit (in addition to `userEditableFields`)
      */
 	adminEditableFields? : string[],
+
+    /**
+     * If true, usernames will be matched as lowercase and with diacritics removed.
+     * Default true,
+     * 
+     * Note: this doesn't apply to the ID column
+     */
+    normalizeUsername? : boolean,
+
+    /**
+     * If true, email addresses (in the email column not in the username column) 
+     * will be matched as lowercase and with diacritics removed.
+     * Default true.
+     */
+    normalizeEmail? : boolean,
 }
 
 /**

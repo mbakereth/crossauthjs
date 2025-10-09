@@ -194,7 +194,6 @@ export class SessionManager {
             secrets: UserSecrets,
         }> {
 
-        console.log("session.login")
         if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call login if no user storage provided");
         let secrets : UserSecrets = {userid: ""};
         let defaultAuth = "";
@@ -562,7 +561,7 @@ export class SessionManager {
      */
     async deleteUserByUsername(username : string ) {
         if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call deleteUser if no user storage provided");
-        this.userStorage.deleteUserByUsername(username);
+        await this.userStorage.deleteUserByUsername(username);
     }
 
     /** Creates a user with 2FA enabled.
@@ -860,7 +859,7 @@ export class SessionManager {
      */
     async cancelTwoFactorPageVisit(sessionId : string) : Promise<{[key:string]:any}> {
         let {key} = await this.session.getUserForSessionId(sessionId);
-        if (!key) throw new CrossauthError(ErrorCode.InvalidKey, "Session key not found");
+        if (!key) throw new CrossauthError(ErrorCode.InvalidSession, "Session key not found");
         let data = KeyStorage.decodeData(key.data);
         //let data = getJsonData(key);
         if (!("pre2fa" in data)) throw new CrossauthError(ErrorCode.Unauthorized, "Two factor authentication not initiated");
@@ -1015,7 +1014,7 @@ export class SessionManager {
 
         // delete any password reset tokens
         try {
-            this.emailTokenStorage.deleteAllForUser(user.id, 
+            await this.emailTokenStorage.deleteAllForUser(user.id, 
                 KeyPrefix.passwordResetToken);
         } catch (e) {
             CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
@@ -1042,6 +1041,7 @@ export class SessionManager {
         }
         let { email, username, password, ...rest} = newUser;
         rest.userid = currentUser.userid;
+        rest.id = currentUser.id;
         let hasEmail = false;
         if (email) {
             newEmail = email;

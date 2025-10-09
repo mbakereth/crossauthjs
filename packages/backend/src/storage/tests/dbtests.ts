@@ -85,6 +85,16 @@ export function makeDBTests(prefix : string, userStorage : UserStorage, keyStora
         await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError();
     });
 
+    // test getting a user by username and by id with normalization
+    test(prefix + '.getUserNormalized', async () => {
+        const {user: bob} = await userStorage.getUserByUsername("Bob");
+        expect(bob.username).toBe("bob");
+        const id = bob.id;
+        const {user: bob2} = await userStorage.getUserById(id);
+        expect(bob2.id).toBe(id);
+        await expect(async () => {await userStorage.getUserByUsername("ABC")}).rejects.toThrowError();
+    });
+
     // test updating a field in the user table
     test(prefix + ".updateUser", async() => {
         const {user: bob, secrets: bobsecrets} = await userStorage.getUserByUsername("bob");

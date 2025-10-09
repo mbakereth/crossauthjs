@@ -47,11 +47,17 @@ export class InMemoryUserStorage extends UserStorage {
     async createUser(user: UserInputFields, secrets? : UserSecretsInputFields)
         : Promise<User> {
 
-        user.username_normalized = UserStorage.normalize(user.username);
-        if (user.username_normalized in this.usersByUsername) {
-            throw new CrossauthError(ErrorCode.UserExists);
+        let usernameField = "username";
+        let emailField = "email";
+        if (this.normalizeUsername) {
+            usernameField = "username_normalized"
+            user.username_normalized = UserStorage.normalize(user.username);
+            if (user.username_normalized in this.usersByUsername) {
+                throw new CrossauthError(ErrorCode.UserExists);
+            }
         }
-        if ("email" in user && user.email) {
+        if ("email" in user && user.email && this.normalizeEmail) {
+            emailField = "email_normalized"
             user.email_normalized = UserStorage.normalize(user.email);
             if (user.email_normalized in this.getUserByEmail) {
                 throw new CrossauthError(ErrorCode.UserExists);
@@ -60,10 +66,10 @@ export class InMemoryUserStorage extends UserStorage {
         }
 
         const userToStore = {id: user.username, ...user}
-        this.usersByUsername[user.username_normalized] = userToStore;
-        this.secretsByUsername[user.username_normalized] = secrets??{};
-        if ("email" in user && user.email) this.usersByEmail[user.email_normalized] = userToStore;
-        if ("email" in user && user.email) this.secretsByEmail[user.email_normalized] = secrets??{};
+        this.usersByUsername[user[usernameField]] = userToStore;
+        this.secretsByUsername[user[usernameField]] = secrets??{};
+        if ("email" in user && user.email) this.usersByEmail[user[emailField]] = userToStore;
+        if ("email" in user && user.email) this.secretsByEmail[user[emailField]] = secrets??{};
 
         return {id: user.username, ...user};
     }
@@ -78,7 +84,7 @@ export class InMemoryUserStorage extends UserStorage {
     async getUserByUsername(
         username : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
-        const username_normalized = UserStorage.normalize(username);
+        const username_normalized = this.normalizeUsername ? UserStorage.normalize(username) : username;
         if (username_normalized in this.usersByUsername) {
 
             const user = this.usersByUsername[username_normalized];
@@ -124,7 +130,7 @@ export class InMemoryUserStorage extends UserStorage {
      */
     async getUserByEmail(email : string, 
         options? : UserStorageGetOptions) : Promise<{user: User, secrets: UserSecrets}> {
-        const email_normalized = UserStorage.normalize(email);
+        const email_normalized = this.normalizeEmail ? UserStorage.normalize(email) : email;
         if (email_normalized in this.usersByEmail) {
 
             const user = this.usersByEmail[email_normalized];
@@ -179,22 +185,24 @@ export class InMemoryUserStorage extends UserStorage {
      */
     async updateUser(user : Partial<User>, secrets?: Partial<UserSecrets>) : Promise<void> {
         let newUser : Partial<UserWithNormalization> = {...user};
-        if ("username" in newUser && newUser.username) {
+        let usernameField = "username";
+        if ("username" in newUser && newUser.username && this.normalizeUsername) {
             newUser.username_normalized = UserStorage.normalize(newUser.username);
-        } else if ("id" in newUser && newUser.id) {
+            usernameField = "username_normalized";
+        } else if ("id" in newUser && newUser.id && this.normalizeUsername) {
             newUser.username_normalized = UserStorage.normalize(String(newUser.id));
+            usernameField = "username_normalized";
         }
-        if ("email" in newUser && newUser.email) {
+        if ("email" in newUser && newUser.email && this.normalizeEmail) {
             newUser.email_normalized = UserStorage.normalize(newUser.email);
-
         }
-        if (newUser.username_normalized && newUser.username_normalized in this.usersByUsername) {
+        if (newUser[usernameField] && newUser[usernameField] in this.usersByUsername) {
             for (let field in newUser) {
-                this.usersByUsername[newUser.username_normalized][field] = newUser[field];
+                this.usersByUsername[newUser[usernameField]][field] = newUser[field];
             }
             if (secrets) {
-                this.secretsByUsername[newUser.username_normalized] = {
-                    ...this.secretsByUsername[newUser.username_normalized],
+                this.secretsByUsername[newUser[usernameField]] = {
+                    ...this.secretsByUsername[newUser[usernameField]],
                     ...secrets,
                 }
             }
@@ -206,13 +214,13 @@ export class InMemoryUserStorage extends UserStorage {
      * @param username username of user to delete
      */
     async deleteUserByUsername(username: string): Promise<void> {
-        const normalizedUser = UserStorage.normalize(String(username));
+        const normalizedUser = this.normalizeUsername ? UserStorage.normalize(String(username)) : username;
         if (normalizedUser in this.usersByUsername) {
             const user = this.usersByUsername[normalizedUser];
             delete this.usersByUsername[normalizedUser];
             delete this.secretsByUsername[normalizedUser];
-            const email_normalized = UserStorage.normalize(String(user.email));
-            if (email_normalized in this.usersByEmail) {
+            const email_normalized = this.normalizeEmail ? UserStorage.normalize(String(user.email)) : user.email;
+            if (email_normalized && email_normalized in this.usersByEmail) {
                 delete this.usersByEmail[email_normalized];
                 delete this.secretsByEmail[email_normalized];
             }

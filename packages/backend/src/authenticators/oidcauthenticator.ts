@@ -122,12 +122,7 @@ export class OidcAuthenticator extends Authenticator {
     }
 
     /**
-     * Calls the implementor-provided `validatePasswordFn` 
-     * 
-     * This function is called to apply local password policy (password length,
-     * uppercase/lowercase etc)
-     * @param params the password should be in `password`
-     * @returns an array of errors
+     * Does nothing for this class
      */
     validateSecrets(_params : AuthenticationParameters) : string[] {
         return [];
