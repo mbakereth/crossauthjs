@@ -2294,7 +2294,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
         if (this.isSessionUser(request) && !request.csrfToken) throw new CrossauthError(ErrorCode.InvalidCsrf);
         const sessionCookieValue = this.getSessionCookieValue(request);
         if (sessionCookieValue) {
-            this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
+            await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
         }
         return successFn(reply);
     }
