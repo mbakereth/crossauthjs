@@ -550,7 +550,7 @@ export class SessionManager {
         let secrets = emptyPassword ? undefined : await this.authenticators[user.factor1].createPersistentSecrets(user.username, params, repeatParams);
         const newUser = emptyPassword ? await this.userStorage.createUser(user) : await this.userStorage.createUser(user, secrets);
         if (!skipEmailVerification && this.enableEmailVerification && this.tokenEmailer) {
-            await this.tokenEmailer?.sendEmailVerificationToken(newUser.id, undefined);
+            await this.tokenEmailer?.sendEmailVerificationToken(newUser.id);
         }
         return newUser;
     }

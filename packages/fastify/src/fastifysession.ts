@@ -2427,7 +2427,10 @@ export class FastifySessionServer implements FastifySessionAdapter {
             const ce = CrossauthError.asCrossauthError(e);
             if (ce.code == ErrorCode.TwoFactorIncomplete) {
                 twoFactorInitiated = true;
-            } // all other errors are legitimate ones - we ignore them
+            } // all other errors are legitimate ones - we ignore them XX throw
+            else {
+                throw ce;
+            }
         }
 
         // login (this may be just first stage of 2FA)
@@ -2437,7 +2440,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 request.body,
                 repeatSecrets);
                 if (!this.enableEmailVerification) {
-                return this.login(request, reply, (request, user) => {
+                return await this.login(request, reply, (request, user) => {
                     return successFn(request, {}, user)});
             }
             return successFn(reply, {}, undefined);
@@ -2482,7 +2485,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 // if there is an error, make sure we delete the user before returning
                 CrossauthLogger.logger.error(j({err: e}));
                 try {
-                    this.sessionManager.deleteUserByUsername(username);
+                    await this.sessionManager.deleteUserByUsername(username);
                 } catch (e) {
                     CrossauthLogger.logger.error(j({err: e}));
                 }
