@@ -1467,8 +1467,8 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     url: this.prefix + 'login',
                     ip: request.ip
                 }));
-            if (request.user) return reply
-                .redirect(request.query.next??this.loginRedirect); // already logged in
+                if (request.user) return reply
+                    .redirect(request.query.next??this.loginRedirect); // already logged in
 
                 let data: {
                     urlPrefix: string,
@@ -1889,7 +1889,8 @@ export class FastifySessionServer implements FastifySessionAdapter {
                             });                    
                         });
 
-                    } else if (user.twoFactorRequired) {
+                    //} else if (user.twoFactorRequired) {
+                    } else if ("factor2" in user && user.factor2 != "" && user.factor2 in this.authenticators) {
                         return reply.header(...JSONHDR)
                             .send({ok: true, twoFactorRequired: true});
 
@@ -2016,8 +2017,8 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     ip: request.ip,
                     user: request.user?.username
                 }));
-            if (!this.canEditUser(request)) return this.sendJsonError(reply, 
-                401, "You are not authorized to access this url");
+            //if (!this.canEditUser(request)) return this.sendJsonError(reply, 
+            //    401, "You are not authorized to access this url");
 
             try {
                 return await this.logout(request, reply, 
