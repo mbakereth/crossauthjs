@@ -1945,7 +1945,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 const username = user || "";
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Login failure",
+                    msg: "Cancel 2FA failure",
                     user: username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
