@@ -2099,10 +2099,10 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     user: request.user?.username,
                     hashOfSessionId: this.getHashOfSessionId(request)
                 }));
-                if (!this.canEditUser(request)) return this.sendJsonError(reply,
+/*                 if (!this.canEditUser(request)) return this.sendJsonError(reply,
                     401,
                     "User not logged in");
-                if (this.isSessionUser(request) && !request.csrfToken) return this.sendJsonError(reply,
+ */                if (this.isSessionUser(request) && !request.csrfToken) return this.sendJsonError(reply,
                     403,
                     "No CSRF token present");
                     //await this.validateCsrfToken(request)

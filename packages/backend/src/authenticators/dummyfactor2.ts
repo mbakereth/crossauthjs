@@ -158,18 +158,18 @@ export class DummyFactor2Authenticator extends Authenticator {
     }
 
     /**
-     * @returns true - this class can create users
+     * @returns false - this class cannot create users
      */
     canCreateUser() : boolean {
-        return true;
+        return false;
 
     }
 
     /**
-     * @returns true - this class can update users
+     * @returns false - this class cannot update users
      */
     canUpdateUser() : boolean {
-        return true;
+        return false;
     }
 
     /**
@@ -201,7 +201,7 @@ export class DummyFactor2Authenticator extends Authenticator {
     }
 
     /**
-     * @returns true - as a code is sent to the registers email address, no 
+     * @returns false - as a code is sent to the registers email address, no 
      *          additional email verification is needed
      */
     skipEmailVerificationOnSignup() : boolean {
