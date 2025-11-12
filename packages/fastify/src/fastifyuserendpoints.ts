@@ -1612,10 +1612,11 @@ export class FastifyUserEndpoints {
                     email: request.body.email
                 }))
             } else {
-                CrossauthLogger.logger.debug(j({
+                CrossauthLogger.logger.error(j({
                     err: e,
                     msg: "Couldn't send password reset email"
                 }));
+                throw ce
             }
         }
 
@@ -1658,7 +1659,7 @@ export class FastifyUserEndpoints {
         // validate the new secrets (with the implementor-provided function)
         let errors = authenticator.validateSecrets(newSecrets);
         if (errors.length > 0) {
-            throw new CrossauthError(ErrorCode.PasswordFormat);
+            throw new CrossauthError(ErrorCode.PasswordFormat, errors);
         }
 
         // check new and repeat secrets are valid and update the user
