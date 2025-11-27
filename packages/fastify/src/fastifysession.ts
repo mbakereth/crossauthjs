@@ -1029,7 +1029,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
         // request.user
         app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
 
-            CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
+            CrossauthLogger.logger.debug(j({message: "Getting session cookie"}));
             let sessionCookieValue = this.getSessionCookieValue(request);
             let reportSession : {[key:string]:string} = {}
             if (sessionCookieValue) {
@@ -1046,14 +1046,14 @@ export class FastifySessionServer implements FastifySessionAdapter {
             // remove it if it is not.
             // we are not checking it matches the CSRF token in the header or
             // body at this stage - just removing invalid cookies
-            CrossauthLogger.logger.debug(j({msg: "Getting csrf cookie"}));
+            CrossauthLogger.logger.debug(j({message: "Getting csrf cookie"}));
             let cookieValue : string|undefined;
             try {
                  cookieValue = this.getCsrfCookieValue(request);
                  if (cookieValue) this.sessionManager.validateCsrfCookie(cookieValue);
             }
             catch (e) {
-                CrossauthLogger.logger.warn(j({msg: "Invalid csrf cookie received", cerr: e, hashedCsrfCookie: this.getHashOfCsrfCookie(request)}));
+                CrossauthLogger.logger.warn(j({message: "Invalid csrf cookie received", cerr: e, hashedCsrfCookie: this.getHashOfCsrfCookie(request)}));
                 reply.clearCookie(this.sessionManager.csrfCookieName);
                 cookieValue = undefined;
             }
@@ -1062,19 +1062,19 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 // for get methods, create a CSRF token in the request object and response header
                 try {
                     if (!cookieValue) {
-                        CrossauthLogger.logger.debug(j({msg: "Invalid CSRF cookie - recreating"}));
+                        CrossauthLogger.logger.debug(j({message: "Invalid CSRF cookie - recreating"}));
                         const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createCsrfToken();
                         reply.setCookie(csrfCookie.name, csrfCookie.value, csrfCookie.options );
                         request.csrfToken = csrfFormOrHeaderValue;
                     } else {
-                        CrossauthLogger.logger.debug(j({msg: "Valid CSRF cookie - creating token"}));
+                        CrossauthLogger.logger.debug(j({message: "Valid CSRF cookie - creating token"}));
                         const csrfFormOrHeaderValue = await this.sessionManager.createCsrfFormOrHeaderValue(cookieValue);
                         request.csrfToken = csrfFormOrHeaderValue;
                     }
                     reply.header(this.sessionManager.csrfHeaderName, request.csrfToken);
                 } catch (e) {
                     CrossauthLogger.logger.error(j({
-                        msg: "Couldn't create CSRF token",
+                        message: "Couldn't create CSRF token",
                         cerr: e,
                         user: request.user?.username,
                         ...reportSession,
@@ -1090,7 +1090,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                         this.csrfToken(request, reply);
                     } catch (e) {
                         CrossauthLogger.logger.error(j({
-                            msg: "Couldn't create CSRF token",
+                            message: "Couldn't create CSRF token",
                             cerr: e,
                             user: request.user?.username,
                             ...reportSession,
@@ -1118,12 +1118,12 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     request.user = user;
                     request.authType = "cookie";
                     CrossauthLogger.logger.debug(j({
-                        msg: "Valid session id",
+                        message: "Valid session id",
                         user: user?.username
                     }));
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({
-                        msg: "Invalid session cookie received",
+                        message: "Invalid session cookie received",
                         hashOfSessionId: this.getHashOfSessionId(request)
                     }));
                     reply.clearCookie(this.sessionManager.sessionCookieName);
@@ -1170,7 +1170,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                             CrossauthLogger.logger.debug(j({err: e}));
                             const ce = CrossauthError.asCrossauthError(e);
                             CrossauthLogger.logger.error(j({
-                                msg: error.message,
+                                message: error.message,
                                 cerr: e,
                                 user: request.body.username,
                                 errorCode: ce.code,
@@ -1187,7 +1187,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                                 try {
                                     await this.sessionManager.cancelTwoFactorPageVisit(sessionId);
                                 } catch (e) {
-                                    CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: request.user?.username, hashOfSessionId: this.getHashOfSessionId(request)}));
+                                    CrossauthLogger.logger.error(j({message: "Failed cancelling 2FA", cerr: e, user: request.user?.username, hashOfSessionId: this.getHashOfSessionId(request)}));
                                     CrossauthLogger.logger.debug(j({err:e}))
                                 }
                                 request.body = {
@@ -1241,7 +1241,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                                 await this.sessionManager.cancelTwoFactorPageVisit(sessionId);
                             } catch (e) {
                                 CrossauthLogger.logger.debug(j({err:e}));
-                                CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: request.user?.username, hashOfSessionId: this.getHashOfSessionId(request)}));
+                                CrossauthLogger.logger.error(j({message: "Failed cancelling 2FA", cerr: e, user: request.user?.username, hashOfSessionId: this.getHashOfSessionId(request)}));
                             }      
                         }
                     }
@@ -1462,7 +1462,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Querystring: LoginQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'login',
                     ip: request.ip
@@ -1488,7 +1488,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: LoginBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'login',
                     ip: request.ip
@@ -1501,7 +1501,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 (reply, user) => {
                     if (user.state ==UserState.passwordChangeNeeded) {
                         if (this.endpoints.includes("changepassword")) {
-                            CrossauthLogger.logger.debug(j({msg: "Password change needed - sending redirect"}));
+                            CrossauthLogger.logger.debug(j({message: "Password change needed - sending redirect"}));
                             return reply.redirect("/changepassword?required=true&next="+encodeURIComponent("login?next="+next));
                         } else {
                             const ce = new CrossauthError(ErrorCode.PasswordChangeNeeded)
@@ -1522,7 +1522,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
 
                     } else if (user.state == UserState.passwordResetNeeded || user.state == UserState.passwordAndFactor2ResetNeeded) {
                          
-                        CrossauthLogger.logger.debug(j({msg: "Password reset needed - sending error"}));
+                        CrossauthLogger.logger.debug(j({message: "Password reset needed - sending error"}));
                         const ce = new CrossauthError(ErrorCode.PasswordResetNeeded);
                         return this.handleError(ce, request, reply, (reply, error) => {
                             return reply.view(this.loginPage, {
@@ -1542,10 +1542,10 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     } else if (this.allowedFactor2.length > 0 && 
                         (user.state == UserState.factor2ResetNeeded || 
                         !this.allowedFactor2.includes(user.factor2?user.factor2:"none"))) {
-                        CrossauthLogger.logger.debug(j({msg: `Factor2 reset needed.  Factor2 is ${user.factor2}, state is ${user.state}, allowed factor2 is [${this.allowedFactor2.join(", ")}]`,
+                        CrossauthLogger.logger.debug(j({message: `Factor2 reset needed.  Factor2 is ${user.factor2}, state is ${user.state}, allowed factor2 is [${this.allowedFactor2.join(", ")}]`,
                             username: user.username}))
                         if (this.endpoints.includes("changefactor2")) {
-                            CrossauthLogger.logger.debug(j({msg: "Factor 2 reset needed - sending redirect"}));
+                            CrossauthLogger.logger.debug(j({message: "Factor 2 reset needed - sending redirect"}));
                             return reply.redirect("/changefactor2?required=true&next="+encodeURIComponent("login?next="+next));
                         } else {
                             const ce = new CrossauthError(ErrorCode.Factor2ResetNeeded)
@@ -1566,7 +1566,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     }
 
                     else if (!user.factor2 || user.factor2.length == 0) {
-                        CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect"}));
+                        CrossauthLogger.logger.debug(j({message: "Successful login - sending redirect"}));
                         return reply.redirect(next);
                     } else {
                         let data = {
@@ -1603,16 +1603,16 @@ export class FastifySessionServer implements FastifySessionAdapter {
         this.app.post(this.prefix+'loginfactor2', 
             async (request: FastifyRequest<{ Body: LoginFactor2BodyType }>,
                 reply: FastifyReply) => {
-            CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'loginfactor2', ip: request.ip}));
+            CrossauthLogger.logger.info(j({message: "Page visit", method: 'POST', url: this.prefix+'loginfactor2', ip: request.ip}));
             let next = 
                 request.body.next && request.body.next.length > 0 ? 
                     request.body.next : this.loginRedirect;
             try {
-                CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
+                CrossauthLogger.logger.debug(j({message: "Next page " + next}));
 
                 return await this.loginFactor2(request, reply, 
                 (reply, _user) => {
-                    CrossauthLogger.logger.debug(j({msg: "Successful login - sending redirect to"}));
+                    CrossauthLogger.logger.debug(j({message: "Successful login - sending redirect to"}));
                     return reply.redirect(next);
                 });
             } catch (e) {
@@ -1666,7 +1666,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Querystring: Factor2QueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'factor2',
                     ip: request.ip
@@ -1695,7 +1695,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Querystring: LoginQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'signup',
                     ip: request.ip
@@ -1720,7 +1720,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: SignupBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'signup',
                     ip: request.ip,
@@ -1730,7 +1730,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 request.body.next && request.body.next.length > 0 ? 
                     request.body.next : this.loginRedirect;
             try {
-                CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
+                CrossauthLogger.logger.debug(j({message: "Next page " + next}));
 
                 return await this.signup(request, reply, 
                 (reply, data, _user) => {
@@ -1760,7 +1760,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    msg: "Signup failure",
+                    message: "Signup failure",
                     user: request.body.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -1796,7 +1796,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: LoginBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'logout',
                     ip: request.ip,
@@ -1809,7 +1809,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Logout failure",
+                    message: "Logout failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -1838,7 +1838,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: LoginBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/login',
                     ip: request.ip
@@ -1902,7 +1902,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Login failure",
+                    message: "Login failure",
                     user: request.body.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -1928,7 +1928,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: CsrfBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/cancelfactor2',
                     ip: request.ip
@@ -1945,7 +1945,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 const username = user || "";
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Cancel 2FA failure",
+                    message: "Cancel 2FA failure",
                     user: username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -1970,7 +1970,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: LoginFactor2BodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/loginfactor2',
                     ip: request.ip
@@ -1986,7 +1986,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Login failure",
+                    message: "Login failure",
                     hashOfSessionId: this.getHashOfSessionId(request),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -2011,7 +2011,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: LoginBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/logout',
                     ip: request.ip,
@@ -2026,7 +2026,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Logout failure",
+                    message: "Logout failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -2050,7 +2050,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: SignupBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/signup',
                     ip: request.ip,
@@ -2068,7 +2068,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Signup failure",
+                    message: "Signup failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -2092,7 +2092,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: LoginBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/userforsessionkey',
                     ip: request.ip,
@@ -2128,7 +2128,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                         break;
                 }
                 CrossauthLogger.logger.error(j({
-                    msg: error,
+                    message: error,
                     user: request.user?.username,
                     hashOfSessionId: this.getHashOfSessionId(request),
                     errorCodeName: codeName,
@@ -2150,7 +2150,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             async (request: FastifyRequest<{ Body: LoginBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/getcsrftoken',
                     ip: request.ip,
@@ -2164,7 +2164,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    msg: "getcsrftoken failure",
+                    message: "getcsrftoken failure",
                     user: request.user?.username,
                     hashedCsrfCookie: this.getHashOfCsrfCookie(request),
                     errorCode: ce.code,
@@ -2214,14 +2214,14 @@ export class FastifySessionServer implements FastifySessionAdapter {
 
         // Set the new cookies in the reply
         CrossauthLogger.logger.debug(j({
-            msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            message: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
             user: request.body.username
         }));
         reply.cookie(sessionCookie.name,
             sessionCookie.value,
             sessionCookie.options);
         CrossauthLogger.logger.debug(j({
-            msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            message: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
             user: request.body.username
         }));
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
@@ -2234,7 +2234,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 await this.sessionManager.deleteSession(oldSessionId);
             } catch (e) {
                 CrossauthLogger.logger.warn(j({
-                    msg: "Couldn't delete session ID from database",
+                    message: "Couldn't delete session ID from database",
                     hashOfSessionId: this.getHashOfSessionId(request)
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -2271,14 +2271,14 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 extraFields, 
                 persist);
         CrossauthLogger.logger.debug(j({
-            msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            message: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
             user: user?.username
         }));
         reply.cookie(sessionCookie.name,
             sessionCookie.value,
             sessionCookie.options);
         CrossauthLogger.logger.debug(j({
-            msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            message: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
             user: user?.username
         }));
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
@@ -2321,14 +2321,14 @@ export class FastifySessionServer implements FastifySessionAdapter {
 
         // set the cookies
         CrossauthLogger.logger.debug(j({
-            msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            message: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
             user: user.username
         }));
         reply.cookie(sessionCookie.name,
             sessionCookie.value,
             sessionCookie.options);
         CrossauthLogger.logger.debug(j({
-            msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            message: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
             user: user.username
         }));
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
@@ -2339,7 +2339,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 await this.sessionManager.deleteSession(oldSessionId);
             } catch (e) {
                 CrossauthLogger.logger.warn(j({
-                    msg: "Couldn't delete session ID from database",
+                    message: "Couldn't delete session ID from database",
                     hashOfSessionId: this.getHashOfSessionId(request)
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -2504,7 +2504,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
         }
 
         // clear cookies
-        CrossauthLogger.logger.debug(j({msg: "Logout: clear cookie " 
+        CrossauthLogger.logger.debug(j({message: "Logout: clear cookie " 
             + this.sessionManager.sessionCookieName}));
         reply.clearCookie(this.sessionManager.sessionCookieName);
         reply.clearCookie(this.sessionManager.csrfCookieName);
@@ -2513,7 +2513,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 await this.sessionManager.deleteSession(request.sessionId);
             } catch (e) {
                 CrossauthLogger.logger.warn(j({
-                    msg: "Couldn't delete session ID from database",
+                    message: "Couldn't delete session ID from database",
                     hashOfSessionId: this.getHashOfSessionId(request)
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -2539,7 +2539,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
      */
     async createAnonymousSession(request : FastifyRequest, 
         reply : FastifyReply, data? : {[key:string]:any}) : Promise<string> {
-        CrossauthLogger.logger.debug(j({msg: "Creating session ID"}));
+        CrossauthLogger.logger.debug(j({message: "Creating session ID"}));
 
         // get custom fields from implentor-provided function
         let extraFields = this.addToSession ? this.addToSession(request) : {}
@@ -2714,7 +2714,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             }
             catch (e) {
                 CrossauthLogger.logger.warn(j({
-                    msg: "Invalid CSRF token",
+                    message: "Invalid CSRF token",
                     hashedCsrfCookie: this.getHashOfCsrfCookie(request)
                 }));
                 reply.clearCookie(this.sessionManager.csrfCookieName);
@@ -2743,7 +2743,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
         const ce = e ? CrossauthError.asCrossauthError(e) : undefined;
 
         CrossauthLogger.logger.warn(j({
-            msg: error,
+            message: error,
             errorCode: ce?.code,
             errorCodeName: ce?.codeName,
             httpStatus: status
@@ -2871,7 +2871,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
    async deleteSessionData(request : FastifyRequest, name : string) : Promise<void> {
        if (!request.sessionId) {
         //throw new CrossauthError(ErrorCode.Unauthorized, "User is not logged in");
-            CrossauthLogger.logger.warn(j({msg: "Attempt to delete session data when there is no session"}));
+            CrossauthLogger.logger.warn(j({message: "Attempt to delete session data when there is no session"}));
        } else {
             await this.sessionManager.deleteSessionData(request.sessionId, name);
        }
@@ -2886,7 +2886,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             if (data && name in data) return data[name];
         } catch (e) {
             CrossauthLogger.logger.error(j({
-                msg: "Couldn't get " + name + "from session",
+                message: "Couldn't get " + name + "from session",
                 cerr: e
             }))
             CrossauthLogger.logger.debug(j({err: e}));

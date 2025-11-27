@@ -194,7 +194,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'updateuser',
                     ip: request.ip,
@@ -220,7 +220,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'updateuser',
                     ip: request.ip,
@@ -249,7 +249,7 @@ export class FastifyUserEndpoints {
                     });
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.error(j({msg: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
+                    CrossauthLogger.logger.error(j({message: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
                     CrossauthLogger.logger.debug(j({err: e}));
                     let extraFields : { [key : string] : any }= {};
                     for (let field in request.body) {
@@ -281,7 +281,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: UpdateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/updateuser',
                     ip: request.ip,
@@ -300,7 +300,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Update user failure",
+                    message: "Update user failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -328,7 +328,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Querystring: ChangeFactor2QueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'changefactor2',
                     ip: request.ip,
@@ -363,7 +363,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: ChangeFactor2BodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'changefactor2',
                     ip: request.ip,
@@ -402,7 +402,7 @@ export class FastifyUserEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Change two factor authentication failure",
+                        message: "Change two factor authentication failure",
                         user: request.user?.username,
                         errorCodeName: ce.codeName,
                         errorCode: ce.code
@@ -434,7 +434,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: ChangeFactor2BodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/changefactor2',
                     ip: request.ip,
@@ -451,7 +451,7 @@ export class FastifyUserEndpoints {
                 } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Change factor2 failure",
+                    message: "Change factor2 failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -479,7 +479,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Querystring: ChangePasswordQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'changepassword',
                     ip: request.ip,
@@ -518,7 +518,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: ChangePasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'changepassword',
                     ip: request.ip,
@@ -541,7 +541,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    msg: "Change password failure",
+                    message: "Change password failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -571,7 +571,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: ChangePasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/changepassword',
                     ip: request.ip,
@@ -586,7 +586,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Change password failure",
+                    message: "Change password failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -615,7 +615,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Querystring: ConfigureFactor2QueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'configurefactor2',
                     ip: request.ip
@@ -629,7 +629,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    msg: "Configure factor2 failure",
+                    message: "Configure factor2 failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code              
@@ -654,7 +654,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: ConfigureFactor2BodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'configurefactor2',
                     ip: request.ip
@@ -663,7 +663,7 @@ export class FastifyUserEndpoints {
                 request.body.next && request.body.next.length > 0 ? 
                     request.body.next : this.sessionServer.loginRedirect;
             try {
-                CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
+                CrossauthLogger.logger.debug(j({message: "Next page " + next}));
 
                 return await this.configureFactor2(request, reply, 
                 (reply, user) => {
@@ -709,15 +709,15 @@ export class FastifyUserEndpoints {
                         // this shouldn't happen - user's cannot call this URL without having a session,
                         // user or anonymous.  However, just in case...
                         const ce = CrossauthError.asCrossauthError(e);
-                        CrossauthLogger.logger.error(j({msg: "Signup second factor failure", errorCodeName: ce.codeName, errorCode: ce.code}));
-                        CrossauthLogger.logger.error(j({msg: "Session not defined during two factor process"}));
+                        CrossauthLogger.logger.error(j({message: "Signup second factor failure", errorCodeName: ce.codeName, errorCode: ce.code}));
+                        CrossauthLogger.logger.error(j({message: "Session not defined during two factor process"}));
                         return reply.status(500).view(this.sessionServer.errorPage, {status: 500, errorMessage: "An unknown error occurred", errorCode: ErrorCode.UnknownError, errorCodeName: "UnknownError"});
                     }
 
                     // normal error - wrong code, etc.  show the page again
                     let data = (await this.sessionServer.sessionManager.dataForSessionId(request.sessionId))["2fa"];
                     const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.error(j({msg: "Signup two factor failure", user: data?.username, errorCodeName: ce.codeName, errorCode: ce.code}));
+                    CrossauthLogger.logger.error(j({message: "Signup two factor failure", user: data?.username, errorCodeName: ce.codeName, errorCode: ce.code}));
                     const { userData } = await this.sessionServer.sessionManager.repeatTwoFactorSignup(request.sessionId);
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
                             return reply.view(this.configureFactor2Page, {
@@ -755,7 +755,7 @@ export class FastifyUserEndpoints {
         this.sessionServer.app.get(prefix+'api/configurefactor2', 
             async (request : FastifyRequest, reply : FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'GET',
                     url: prefix + 'api/configurefactor2',
                     ip: request.ip,
@@ -771,7 +771,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Configure 2FA configuration failure",
+                    message: "Configure 2FA configuration failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -793,7 +793,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: ConfigureFactor2BodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: prefix + 'api/configurefactor2',
                     ip: request.ip,
@@ -815,7 +815,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Configure 2FA configuration failure",
+                    message: "Configure 2FA configuration failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -841,7 +841,7 @@ export class FastifyUserEndpoints {
         this.sessionServer.app.get(this.prefix+'requestpasswordreset', 
         async (request : FastifyRequest<{Querystring: RequestPasswordResetQueryType}>, reply : FastifyReply) => {
             CrossauthLogger.logger.info(j({
-                msg: "Page visit",
+                message: "Page visit",
                 method: 'GET',
                 url: this.prefix + 'requestpasswordreset',
                 ip: request.ip
@@ -863,7 +863,7 @@ export class FastifyUserEndpoints {
             const message = "If a user with exists with the email you entered, a message with "
                 + " a link to reset your password has been sent."; 
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'requestpasswordreset',
                     ip: request.ip
@@ -879,7 +879,7 @@ export class FastifyUserEndpoints {
                     });
             } catch (e) {
                     CrossauthLogger.logger.error(j({
-                        msg: "Request password reset faiulure user failure",
+                        message: "Request password reset faiulure user failure",
                         email: request.body.email
                     }));
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -918,7 +918,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: RequestPasswordResetBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/resetpasswordrequest',
                     ip: request.ip
@@ -931,7 +931,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Reset password failure failure",
+                    message: "Reset password failure failure",
                     email: request.body.email,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -959,7 +959,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'resetpassword',
                     ip: request.ip
@@ -984,7 +984,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: ResetPasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'resetpassword',
                     ip: request.ip
@@ -1001,7 +1001,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Reset password failure",
+                    message: "Reset password failure",
                     hashedToken: Crypto.hash(request.body.token),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -1030,7 +1030,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: ResetPasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/resetpassword',
                     ip: request.ip
@@ -1043,7 +1043,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Reset password failure",
+                    message: "Reset password failure",
                     hashedToken: Crypto.hash(request.body.token),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -1071,7 +1071,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'verifyemail',
                     ip: request.ip
@@ -1087,7 +1087,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Verify email failed",
+                    message: "Verify email failed",
                     hashedToken: Crypto.hash(request.params.token),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -1114,7 +1114,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Params: VerifyTokenParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/verifyemail',
                     ip: request.ip
@@ -1128,7 +1128,7 @@ export class FastifyUserEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Verify email failure",
+                    message: "Verify email failure",
                     hashedToken: Crypto.hash(request.params.token),
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -1157,7 +1157,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Querystring: DeleteUserQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'deleteuser',
                     ip: request.ip
@@ -1196,7 +1196,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest<{ Body: DeleteUserQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'deleteuser',
                     ip: request.ip,
@@ -1224,7 +1224,7 @@ export class FastifyUserEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Failed deleting user",
+                        message: "Failed deleting user",
                         user: request.user?.username,
                     
                         errorCodeName: ce.codeName,
@@ -1263,7 +1263,7 @@ export class FastifyUserEndpoints {
             async (request: FastifyRequest,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/deleteuser',
                     ip: request.ip,
@@ -1282,7 +1282,7 @@ export class FastifyUserEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
                     CrossauthLogger.logger.error(j({
-                        msg: "Delete user failure",
+                        message: "Delete user failure",
                         user: request.user?.username,
                         errorCodeName: ce.codeName,
                         errorCode: ce.code
@@ -1488,7 +1488,7 @@ export class FastifyUserEndpoints {
         // validate the new secret - this is through an implementor-supplied function
         let errors = authenticator.validateSecrets(newSecrets);
         if (errors.length > 0) {
-            throw new CrossauthError(ErrorCode.PasswordFormat);
+            throw new CrossauthError(ErrorCode.PasswordFormat, errors);
         }
 
         // validate the old secrets, check the new and repeat ones match and 
@@ -1608,13 +1608,13 @@ export class FastifyUserEndpoints {
             if (ce.code == ErrorCode.UserNotExist) {
                 // fail silently - don't let user know email doesn't exist
                 CrossauthLogger.logger.warn(j({
-                    msg: "Password reset requested for invalid email",
+                    message: "Password reset requested for invalid email",
                     email: request.body.email
                 }))
             } else {
                 CrossauthLogger.logger.error(j({
                     err: e,
-                    msg: "Couldn't send password reset email"
+                    message: "Couldn't send password reset email"
                 }));
                 throw ce
             }
