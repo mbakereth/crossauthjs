@@ -596,6 +596,11 @@ export class SessionManager {
         const sessionData = (factor2Data == undefined) ? {} : factor2Data.sessionData;
 
         const factor1Secrets = await this.authenticators[user.factor1].createPersistentSecrets(user.username, params, repeatParams);
+        if (this.enableEmailVerification && !authenticator.skipEmailVerificationOnSignup()) {
+            user.state = UserState.awaitingTwoFactorSetupAndEmailVerification;
+        } else {
+            user.state = UserState.awaitingTwoFactorSetup;
+        }
         user.state = "awaitingtwofactorsetup";
         await this.keyStorage.updateData(
             SessionCookie.hashSessionId(sessionId), 
@@ -701,7 +706,6 @@ export class SessionManager {
     async completeTwoFactorSetup(params: AuthenticationParameters,
         sessionId: string) : Promise<User> {
             if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call completeTwoFactorSetup if no user storage provided");
-            let newSignup = false;
         let {user, key} = 
             await this.session.getUserForSessionId(sessionId, {
                 skipActiveCheck: true
@@ -724,15 +728,17 @@ export class SessionManager {
         await authenticator.authenticateUser(undefined, data, params);
 
         if (!user) {
-            newSignup = true;
             const resp = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             user = resp.user;
         }
-        const skipEmailVerification = authenticator.skipEmailVerificationOnSignup() == true;
         if (!user) throw new CrossauthError(ErrorCode.UserNotExist, "Couldn't fetch user");
+        let new_state = UserState.active;
+        if (user.state == UserState.awaitingTwoFactorSetupAndEmailVerification) {
+            new_state = UserState.awaitingEmailVerification;
+        }
         const newUser = {
             id: user.id,
-            state: !skipEmailVerification && this.enableEmailVerification ? "awaitingemailverification" : "active",
+            state: new_state,
             factor2: data.factor2,
         }
         if (authenticator.secretNames().length > 0)
@@ -740,7 +746,7 @@ export class SessionManager {
         else
             await this.userStorage.updateUser(newUser);
 
-        if (!skipEmailVerification && newSignup && this.enableEmailVerification && this.tokenEmailer) {
+        if (new_state == UserState.awaitingEmailVerification && this.tokenEmailer) {
             await this.tokenEmailer?.sendEmailVerificationToken(user.id, undefined)
         }
         await this.keyStorage.updateData(SessionCookie.hashSessionId(key.value), "2fa", undefined);

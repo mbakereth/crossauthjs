@@ -231,6 +231,14 @@ export class UserState {
      */
     static readonly awaitingTwoFactorSetup = "awaitingtwofactorsetup";
 
+    /** Two factor authentication has been actived for this user
+     * but has not yet been configured.  Once a user logs in,
+     * they will be directed to a page to configure 2FA and will
+     * not be able to do anything else (that requires login) until
+     * they have done so.  They will then have to verify their email
+     */
+    static readonly awaitingTwoFactorSetupAndEmailVerification = "awaitingtwofactorsetupandemailverification";
+
     /** Email verification has been turned on but user has not
      * verified his or her email address.  Cannot log on until it has
      * been verified.
