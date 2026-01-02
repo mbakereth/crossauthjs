@@ -394,7 +394,7 @@ export class SvelteKitUserEndpoints {
             formData = data.toObject();
             const username = data.get('username') ?? "";
             const persist = data.getAsBoolean('persist') ?? false;
-            if (formData.next.includes("/__data.json")) {
+            if (formData.next && formData.next.includes("/__data.json")) {
                 formData.next = formData.next.substring(0, formData.next.indexOf("/__data.json"));
             }
             let next = formData.next ?? this.loginRedirectUrl;
