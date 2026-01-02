@@ -869,7 +869,7 @@ export class FastifyAdminEndpoints {
             this.sessionServer.createUserFn(request, 
                 {...this.sessionServer.userStorage.userEditableFields,
                 ...this.sessionServer.userStorage.adminEditableFields},
-            this.sessionServer.adminAllowedFactor1,this.sessionServer.adminAllowedFactor2);
+            this.sessionServer.adminAllowedFactor1,this.sessionServer.allowedFactor2);
 
         // find out of password was gfiven
         const secretNames = this.sessionServer.authenticators[user.factor1].secretNames();
