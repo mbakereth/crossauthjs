@@ -601,7 +601,7 @@ export class SessionManager {
         } else {
             user.state = UserState.awaitingTwoFactorSetup;
         }
-        user.state = "awaitingtwofactorsetup";
+        //user.state = "awaitingtwofactorsetup";
         await this.keyStorage.updateData(
             SessionCookie.hashSessionId(sessionId), 
             "2fa",

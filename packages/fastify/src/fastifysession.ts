@@ -84,7 +84,7 @@ export interface FastifySessionServerOptions
      * the user storage.
       */
     createUserFn?: (request: FastifyRequest<{ Body: SignupBodyType }>,
-        userEditableFields: string[], allowableFactor1 : string[]) => UserInputFields;
+        userEditableFields: string[], allowableFactor1 : string[], allowableFactor2: string[]) => UserInputFields;
 
     /** Function that updates a user from form fields.
      * Default one takes fields that begin with `user_`, removing the `user_`
@@ -642,7 +642,8 @@ function defaultUserValidator(user : UserInputFields) : string[] {
  */
 function defaultCreateUser(request: FastifyRequest<{ Body: SignupBodyType }>,
     userEditableFields: string[],
-    allowableFactor1 : string[]) : UserInputFields {
+    allowableFactor1 : string[],
+    allowableFactor2: string[]) : UserInputFields {
     let state = "active";
     let user : UserInputFields = {
         username: request.body.username,
@@ -657,10 +658,13 @@ function defaultCreateUser(request: FastifyRequest<{ Body: SignupBodyType }>,
         }
     }
     user.factor1 = "localpassword";
-    if (allowableFactor1.includes(user.factor1)) {
+    if (request.body.factor1 && allowableFactor1.includes(""+request.body.factor1)) {
         user.factor1 = request.body.factor1;
     }
-    user.factor2 = request.body.factor2;
+    if (request.body.factor2 && allowableFactor2.includes(""+request.body.factor2)) {
+        user.factor2 = request.body.factor2;
+    }
+    //user.factor2 = request.body.factor2;
     return user;
 
 }
@@ -856,7 +860,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
      * See {@link FastifySessionServerOptions}.
      */
     createUserFn: (request: FastifyRequest<{ Body: SignupBodyType }>,
-        userEditableFields: string[], allowableFactor1: string[]) => UserInputFields = defaultCreateUser;
+        userEditableFields: string[], allowableFactor1: string[], allowableFactor2: string[]) => UserInputFields = defaultCreateUser;
 
     /**
      * Funtion to update a user record from form fields.  Taken from the options during 
@@ -2112,8 +2116,11 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     const resp = 
                         await this.sessionManager.userForSessionId(request.sessionId);
                     user = resp.user;
+                    return reply.header(...JSONHDR).send({ok: true, user : user});
                 }
-                return reply.header(...JSONHDR).send({ok: true, user : user});
+                return this.sendJsonError(reply,
+                                    401,
+                                    "User not logged in");                
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 let error = ce.message;
@@ -2376,7 +2383,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
 
         // call implementor-provided function to create the user object (or our default)
         let user = 
-            this.createUserFn(request, this.userStorage.userEditableFields, this.userAllowedFactor1);
+            this.createUserFn(request, this.userStorage.userEditableFields, this.userAllowedFactor1, this.allowedFactor2);
 
         // ask the authenticator to validate the user-provided secret
         let passwordErrors = 
@@ -2400,7 +2407,8 @@ export class FastifySessionServer implements FastifySessionAdapter {
         // depending on settings for next step
         user.state = "active";
         if (request.body.factor2 && request.body.factor2!="none") {
-           user. state = "awaitingtwofactor";
+            if (this.enableEmailVerification) user.state = UserState.awaitingTwoFactorSetupAndEmailVerification;
+            else user.state = UserState.awaitingTwoFactorSetup;
         } else if (this.enableEmailVerification) {
             user.state = "awaitingemailverification";
         }
@@ -2430,7 +2438,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 twoFactorInitiated = true;
             } // all other errors are legitimate ones - we ignore them XX throw
             else {
-                throw ce;
+                //throw ce;
             }
         }
 

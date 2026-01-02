@@ -1,10 +1,11 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma } from '../lib/generated/prisma/client';
 import { UserStorage, KeyStorage, type UserStorageGetOptions, type UserStorageOptions, OAuthClientStorage, type OAuthClientStorageOptions, OAuthAuthorizationStorage } from '../storage';
 import { type User, type UserSecrets, type UserInputFields, type UserSecretsInputFields, type Key, type OAuthClient } from '@crossauth/common';
 import { CrossauthError, ErrorCode, OAuthFlows } from'@crossauth/common';
 import { CrossauthLogger, j, UserState } from '@crossauth/common';
 import { setParameter, ParamType } from '../utils';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 /**
  * Optional parameters for {@link PrismaUserStorage}.
@@ -96,7 +97,9 @@ export class PrismaUserStorage extends UserStorage {
         if (options && options.prismaClient) {
             this.prismaClient = options.prismaClient;
         } else {
-            this.prismaClient = new PrismaClient();
+            const connectionString = `${process.env.DATABASE_URL}`;
+            const adapter = new PrismaBetterSqlite3({ url: connectionString });
+            this.prismaClient = new PrismaClient({adapter});
         }
     }
 
@@ -519,7 +522,9 @@ export class PrismaKeyStorage extends KeyStorage {
             this.keyTable = options.keyTable;
         }
         if (options.prismaClient == undefined) {
-            this.prismaClient = new PrismaClient();
+            const connectionString = `${process.env.DATABASE_URL}`;
+            const adapter = new PrismaBetterSqlite3({ url: connectionString });
+            this.prismaClient = new PrismaClient({adapter});
         } else {
             this.prismaClient = options.prismaClient;
         }
@@ -932,7 +937,9 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         setParameter("updateMode", ParamType.String, this, options, "OAUTHCLIENT_UPDATE_MODE");
         setParameter("useridForeignKeyColumn", ParamType.String, this, options, "USER_ID_FOREIGN_KEY_COLUMN");
         if (options.prismaClient == undefined) {
-            this.prismaClient = new PrismaClient();
+            const connectionString = `${process.env.DATABASE_URL}`;
+            const adapter = new PrismaBetterSqlite3({ url: connectionString });
+            this.prismaClient = new PrismaClient({adapter});
         } else {
             this.prismaClient = options.prismaClient;
         }
@@ -1402,7 +1409,9 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
         setParameter("transactionTimeout", ParamType.Number, this, options, "TRANSACTION_TIMEOUT");
         setParameter("useridForeignKeyColumn", ParamType.String, this, options, "USER_ID_FOREIGN_KEY_COLUMN");
         if (options.prismaClient == undefined) {
-            this.prismaClient = new PrismaClient();
+            const connectionString = `${process.env.DATABASE_URL}`;
+            const adapter = new PrismaBetterSqlite3({ url: connectionString });
+            this.prismaClient = new PrismaClient({adapter});
         } else {
             this.prismaClient = options.prismaClient;
         }

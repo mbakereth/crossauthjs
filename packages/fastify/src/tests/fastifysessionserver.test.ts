@@ -134,8 +134,9 @@ test('FastifyServer.signupWithEmailVerification', async () => {
 
     let {server} = await makeAppWithOptions({enableEmailVerification: true, emailVerificationTextBody: "dummy"});
 
-    // @ts-ignore
-    server["sessionServer"]["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+    let s = server["sessionServer"]
+    if (!s) return;
+    s["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
         confirmEmailData = {token, email, extraData}
         return "1";
     };
@@ -155,6 +156,7 @@ test('FastifyServer.signupWithEmailVerification', async () => {
         password: "maryPass123", 
         repeat_password: "x",
         user_email: "mary@mary.com", 
+        factor1: "localpassword",
         csrfToken: csrfToken
     } })
     body = JSON.parse(res.body)
@@ -167,6 +169,7 @@ test('FastifyServer.signupWithEmailVerification', async () => {
         password: "maryPass123", 
         repeat_password: "maryPass123",
         user_email: "mary@mary.com", 
+        factor1: "localpassword",
         csrfToken: csrfToken
     } })
     body = JSON.parse(res.body)

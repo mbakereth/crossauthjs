@@ -667,6 +667,7 @@ test('FastifyServer.api.turnOffEmail', async () => {
         csrfToken: csrfToken,
         otp: otp
     } })
+    body = JSON.parse(res.body)
     expect(body.ok).toBe(true);
     expect(body.user.username).toBe("mary");
     expect(body.user.factor2).toBe("email");

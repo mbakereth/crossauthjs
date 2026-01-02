@@ -296,8 +296,9 @@ test('FastifyServer.signupTotpWithoutEmailVerification', async () => {
 test('FastifyServer.signupTotpWithEmailVerification', async () => {
 
     let {server} = await makeAppWithOptions({enableEmailVerification: true});
-    // @ts-ignore
-    server["sessionServer"]["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
+    let s = server["sessionServer"]
+    if (!s) return;
+    s["sessionManager"]["tokenEmailer"]["_sendEmailVerificationToken"] = async function (token : string, email: string, extraData : {[key:string]:any}) {
         confirmEmailData = {token, email, extraData}
         return "1";
     };
@@ -674,7 +675,6 @@ test('FastifyServer.loginEmail', async () => {
     expect(res.statusCode).toBe(302);
     //expect(body.user.username).toBe("mary");
 });
-
 test('FastifyServer.turnOnEmail', async () => {
 
     let {server, userStorage} = await makeAppWithOptions({enableEmailVerification: false});

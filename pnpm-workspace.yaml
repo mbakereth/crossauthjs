@@ -1,4 +1,8 @@
 packages:
-  - "./packages/*"
-  - "./examples/*"
-
+  - ./packages/*
+  - ./examples/*
+ignoredBuiltDependencies:
+  - better-sqlite3
+  - prisma
+onlyBuiltDependencies:
+  - better-sqlite3

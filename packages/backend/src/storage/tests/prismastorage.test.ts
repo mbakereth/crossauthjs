@@ -1,12 +1,15 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { beforeEach, afterAll } from 'vitest';
 import { PrismaUserStorage, PrismaKeyStorage, PrismaOAuthClientStorage, PrismaOAuthAuthorizationStorage } from '../prismastorage';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../lib/generated/prisma/client';
 import { LocalPasswordAuthenticator } from '../../authenticators/passwordauth';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 //export var prismaClient : PrismaClient;
 export var userStorage : PrismaUserStorage;
-var prismaClient = new PrismaClient();
+const connectionString = `${process.env.DATABASE_URL}`;
+const adapter = new PrismaBetterSqlite3({ url: connectionString });
+var prismaClient = new PrismaClient({adapter});
 
 import { makeDBTests } from './dbtests';
 

@@ -12,8 +12,6 @@
 		"check:watch": "dotenv -e .env.dev svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest",
 		"testonce": "vitest run",
-		"preinstall": "bash ../../removeprismaclient.sh",
-		"postinstall": "bash ../../copyprismaclient.sh && bash ../../ifdotenv.sh -e .env.dev prisma generate",
 		"prisma": "dotenv -e .env.dev pnpm exec prisma"
 	},
 	"prisma": {
@@ -44,7 +42,7 @@
 		"@crossauth/common": "workspace:^",
 		"@crossauth/frontend": "workspace:^",
 		"@crossauth/sveltekit": "workspace:^",
-		"@prisma/client": "5.9.1",
-		"prisma": "^5.9.1"
+		"@prisma/client": "7.2.0",
+		"prisma": "^7.2.0"
 	}
 }
