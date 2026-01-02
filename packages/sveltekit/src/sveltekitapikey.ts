@@ -2,7 +2,8 @@
 import { ApiKeyManager, UserStorage, KeyStorage } from '@crossauth/backend';
 import type { ApiKeyManagerOptions } from '@crossauth/backend';
 import { CrossauthLogger, j } from '@crossauth/common';
-import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
+import { type MaybePromise } from './tests/sveltemocks';
 
 /**
  * Options for {@link SvelteKitApiKeyServer }.

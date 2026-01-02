@@ -11,7 +11,8 @@ import {
     OAuthClientStorage
  } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, ErrorCode, j, type User } from '@crossauth/common';
-import { type Handle, type RequestEvent, type ResolveOptions, type MaybePromise } from '@sveltejs/kit';
+import { type Handle, type RequestEvent, type ResolveOptions } from '@sveltejs/kit';
+import { type MaybePromise } from './tests/sveltemocks';
 import { SvelteKitOAuthClient } from './sveltekitoauthclient';
 import type { SvelteKitOAuthClientOptions } from './sveltekitoauthclient';
 import {

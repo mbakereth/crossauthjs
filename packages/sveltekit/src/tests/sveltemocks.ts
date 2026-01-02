@@ -1,6 +1,26 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
-import { type Cookies, type RequestEvent, type MaybePromise, type ResolveOptions } from '@sveltejs/kit';
+import { type Cookies, type ResolveOptions } from '@sveltejs/kit';
 import cookie, { type CookieParseOptions, type CookieSerializeOptions } from 'cookie';
+
+export interface AppTypes {
+    // These are all functions so that we can leverage function overloads to get the correct type.
+    // Using the return types directly would error with a "not the same type" error.
+    // https://www.typescriptlang.org/docs/handbook/declaration-merging.html#merging-interfaces
+    RouteId(): string;
+    RouteParams(): Record<string, Record<string, string>>;
+    LayoutParams(): Record<string, Record<string, string>>;
+    Pathname(): string;
+    ResolvedPathname(): string;
+    Asset(): string;
+}
+
+
+declare type RouteId1 = string
+export type LayoutParams<T extends RouteId1> = T extends keyof ReturnType<AppTypes['LayoutParams']>
+    ? ReturnType<AppTypes['LayoutParams']>[T]
+    : Record<string, never>;
+
+export type MaybePromise<T> = T | Promise<T>;
 
 export class MockCookies implements Cookies {
     cookies : {[key : string] : {value : string, opts?: CookieSerializeOptions}};
@@ -57,9 +77,9 @@ export class MockCookies implements Cookies {
 }
 
 export class MockRequestEvent<
-Params extends Partial<Record<string, string>> = {[key:string]:string},
-RouteId extends string | null = string
-> implements RequestEvent<Params, RouteId> {
+	Params extends LayoutParams<'/'> = LayoutParams<'/'>,
+	RouteId extends RouteId1 | null = RouteId1 | null
+> {
 
     constructor(id : RouteId, request : Request, params : Params, {
         isDataRequest = false,
@@ -84,6 +104,8 @@ RouteId extends string | null = string
         this.isDataRequest = isDataRequest;
         this.isSubRequest = isSubRequest;
         this.route = {id: id};
+        this.tracing = {enabled: false, root: "", current: ""}
+        this.isRemoteRequest = false;
     }
 
     cookies: Cookies;
@@ -96,7 +118,7 @@ RouteId extends string | null = string
     platform: Readonly<App.Platform> | undefined;
     request: Request;
     route: { id: RouteId; };
-    headers : {[key:string]:string}|undefined = undefined;
+    headers? : {[key:string]:string}|undefined = undefined;
     setHeaders(headers: Record<string, string>): void {
         
         this.headers = headers;
@@ -105,7 +127,8 @@ RouteId extends string | null = string
     isDataRequest: boolean;
     isSubRequest: boolean;
 
-    
+    tracing: { enabled: boolean; root: any; current: any; }
+    isRemoteRequest: boolean;
 }
 
 export interface MockResolveOptions extends ResolveOptions {
@@ -114,7 +137,7 @@ export interface MockResolveOptions extends ResolveOptions {
     statusText? : string,
 }
 
-type MockResolve = (event : MockRequestEvent, _opts?: ResolveOptions) => MaybePromise<Response>;
+type MockResolve = (event : MockRequestEvent<Record<string, string>, string | null>, _opts?: ResolveOptions|undefined) => MaybePromise<Response>;
 
 export class MockResolver {
     body : string|undefined;

@@ -1,5 +1,5 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
-import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import {
     CrossauthError,
     CrossauthLogger,
@@ -14,6 +14,7 @@ import {
 import type { OAuthResourceServerOptions } from '@crossauth/backend';
 import { OAuthTokenConsumer } from '@crossauth/backend';
 import { SvelteKitSessionAdapter } from './sveltekitsessionadapter';
+import { type MaybePromise } from './tests/sveltemocks';
 
 /**
  * Options for {@link SvelteKitOAuthResourceServer}

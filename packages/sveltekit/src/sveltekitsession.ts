@@ -14,7 +14,7 @@ import type { Cookie, SessionManagerOptions } from '@crossauth/backend';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, httpStatus } from '@crossauth/common';
 import type { Key, User, UserInputFields, OAuthClient } from '@crossauth/common';
 import { UserState } from '@crossauth/common';
-import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { SvelteKitUserEndpoints} from './sveltekituserendpoints';
@@ -23,6 +23,7 @@ import { SvelteKitUserClientEndpoints} from './sveltekituserclientendpoints';
 import { SvelteKitAdminClientEndpoints} from './sveltekitadminclientendpoints';
 import { SvelteKitSessionAdapter } from './sveltekitsessionadapter';
 import { SvelteKitServer } from './sveltekitserver';
+import { type MaybePromise } from './tests/sveltemocks';
 
 export const CSRFHEADER = "X-CROSSAUTH-CSRF";
 

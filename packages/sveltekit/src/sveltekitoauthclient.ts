@@ -20,8 +20,9 @@ import {
 import type { OAuthClientOptions } from '@crossauth/backend';
 import { SvelteKitServer } from './sveltekitserver';
 import { json } from '@sveltejs/kit';
-import type { RequestEvent, MaybePromise } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
+import { type MaybePromise } from './tests/sveltemocks';
 
 export type SvelteKitErrorFn = (server: SvelteKitServer,
     event: RequestEvent,
