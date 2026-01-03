@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/lib/generated/prisma/client.js'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import {
     PrismaKeyStorage,
     PrismaUserStorage,
@@ -49,14 +50,16 @@ app.register(view, {
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
 
-const prisma = new PrismaClient();
+const connectionString = `${process.env.DATABASE_URL}`;
+const adapter = new PrismaBetterSqlite3({ url: connectionString });
+const prisma = new PrismaClient({adapter});
 let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email, phone"});
 let keyStorage = new PrismaKeyStorage(userStorage, {prismaClient : prisma});
 let clientStorage = new PrismaOAuthClientStorage({prismaClient : prisma});
 let lpAuthenticator = new LocalPasswordAuthenticator(userStorage);
 let totpAuthenticator = new TotpAuthenticator("FastifyTest");
 let emailAuthenticator = new EmailAuthenticator();
-let twilioAuthenticator = new TwilioAuthenticator();
+//let twilioAuthenticator = new TwilioAuthenticator({ smsAuthenticatorFrom: "0123 456 7890" });
 
 // create the server, pointing it at the app we created and our nunjucks views directory
 let server = new FastifyServer({
@@ -68,16 +71,17 @@ let server = new FastifyServer({
             localpassword: lpAuthenticator,
             totp: totpAuthenticator,
             email: emailAuthenticator,
-            sms: twilioAuthenticator,
+            //sms: twilioAuthenticator,
         },
             app: app,
         views: path.join(__dirname, '../views'),
-        allowedFactor2: ["none", "totp", "email", "sms"],
+        allowedFactor2: ["none", "totp", "email"/*, "sms"*/],
         enableEmailVerification: false,
         siteUrl: `http://localhost:${port}`,
         clientStorage: clientStorage,
         enableAdminEndpoints: true,
         enableOAuthClientManagement: true,
+        //smsAuthenticatorFrom: "0123 456 7890",
 });
 
 const clientManager = new OAuthClientManager({

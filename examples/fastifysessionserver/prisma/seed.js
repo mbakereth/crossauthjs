@@ -1,3 +1,6 @@
+import { PrismaClient } from '../src/lib/generated/prisma/client.js'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -36,6 +39,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+
 var client_1 = require("@prisma/client");
 var backend_1 = require("@crossauth/backend");
 var backend_2 = require("@crossauth/backend");

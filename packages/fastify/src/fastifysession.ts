@@ -316,18 +316,6 @@ export interface FastifySessionServerOptions
      * Default: ["localpassword"]
      */
     adminAllowedFactor1? : string[],
-
-    /**
-     * When admins create a user, they may choose any of these.
-     * Default: ["localpassword"]
-     */
-    adminAllowedFactor2? : string[],
-
-    /**
-     * When admins create a user, they may choose any of these.
-     * Default: ["localpassword"]
-     */
-    userAllowedFactor2? : string[],
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -943,9 +931,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
     private editUserScope? : string;
     readonly enableCsrfProtection = true;
     readonly userAllowedFactor1 = ["localpassword"];
-    readonly userAllowedFactor2 = [];
     readonly adminAllowedFactor1 = ["localpassword"];
-    readonly adminAllowedFactor2 = [];
 
 
     /**
@@ -985,8 +971,6 @@ export class FastifySessionServer implements FastifySessionAdapter {
         setParameter("editUserScope", ParamType.String, this, options, "EDIT_USER_SCOPE");
         setParameter("userAllowedFactor1", ParamType.JsonArray, this, options, "USER_ALLOWED_FACTOR1");
         setParameter("adminAllowedFactor1", ParamType.JsonArray, this, options, "ADMIN_ALLOWED_FACTOR1");
-        setParameter("userAllowedFactor2", ParamType.JsonArray, this, options, "USER_ALLOWED_FACTOR2");
-        setParameter("adminAllowedFactor2", ParamType.JsonArray, this, options, "ADMIN_ALLOWED_FACTOR2");
         setParameter("loginRedirect", ParamType.JsonArray, this, options, "LOGIN_REDIRECT");
         setParameter("logoutRedirect", ParamType.JsonArray, this, options, "LOGOUT_REDIRECT");
 

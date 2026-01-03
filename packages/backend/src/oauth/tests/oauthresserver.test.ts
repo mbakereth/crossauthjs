@@ -301,6 +301,7 @@ test('ResourceServer.validateWithJwks', async () => {
     const jwks = authServer.jwks();
     expect(jwks.keys.length).toBe(1);
     expect(jwks.keys[0].kty).toBe("RSA");
+    console.log(jwks)
     await resserver.tokenConsumers[0].loadJwks(jwks);
     const authorized = await resserver.accessTokenAuthorized(access_token??"");
     expect(authorized).toBeDefined();

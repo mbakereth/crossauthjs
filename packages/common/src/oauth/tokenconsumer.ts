@@ -4,6 +4,7 @@ import { CrossauthLogger, j } from '../logger';
 import { CrossauthError, ErrorCode } from '../error';
 //import { createPublicKey, type JsonWebKey, KeyObject } from 'crypto'
 import { type OpenIdConfiguration, DEFAULT_OIDCCONFIG } from './wellknown';
+import { Jwks } from './wellknown';
 
 /** Allows passing either a Jose KeyLike object or a key as a binary array */
 export type EncryptionKey = jose.KeyLike | Uint8Array;
@@ -185,12 +186,13 @@ export abstract class OAuthTokenConsumerBase {
      *   - `Connection` if the fetch to the authorization server failed,
      *     the OIDC configuration wasn't set or the keys could not be parsed.
      */
-    async loadJwks(jwks? : {keys: jose.JWK[]}, defaultAlg? : string) {
+    async loadJwks(jwks? : {keys: jose.JWK[]}|Jwks, defaultAlg? : string) {
         if (jwks) {
             this.keys = {};
             for (let i=0; i<jwks.keys.length; ++i) {
                 const key = jwks.keys[i];
-                this.keys[key.kid??"_default"] = await jose.importJWK(jwks.keys[i]);
+                const kid = "kid" in key && key.kid ? (key.kid as string) : "_default";
+                this.keys[kid] = await jose.importJWK(jwks.keys[i] as jose.JWK);
             }
         } else {
             if (!this.oidcConfig) {
