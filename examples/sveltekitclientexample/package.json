@@ -12,21 +12,23 @@
 		"check:watch": "dotenv -e .env.dev svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest",
 		"testonce": "vitest run",
-		"prisma": "dotenv -e .env.dev pnpm exec prisma"
-	},
-	"prisma": {
+		"prisma": "dotenv -e .env.dev pnpm exec prisma",
 		"seed": "dotenv -e .env.dev tsx prisma/seed.ts"
 	},
 	"devDependencies": {
+		"@prisma/client": "7.2.0",
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/adapter-node": "^5.2.0",
 		"@sveltejs/kit": "^2.5.22",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
+		"@types/better-sqlite3": "^7.6.13",
+		"@types/node": "^25.0.3",
 		"autoprefixer": "^10.4.18",
 		"daisyui": "^4.7.2",
 		"dotenv": "^16.3.1",
 		"dotenv-cli": "^7.3.0",
 		"postcss": "^8.4.35",
+		"prisma": "^7.2.0",
 		"svelte": "^4.2.7",
 		"svelte-check": "^3.6.0",
 		"tailwindcss": "^3.4.1",
@@ -42,7 +44,6 @@
 		"@crossauth/common": "workspace:^",
 		"@crossauth/frontend": "workspace:^",
 		"@crossauth/sveltekit": "workspace:^",
-		"@prisma/client": "7.2.0",
-		"prisma": "^7.2.0"
+		"@prisma/adapter-better-sqlite3": "^7.2.0"
 	}
 }

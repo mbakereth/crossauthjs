@@ -8,12 +8,13 @@ import {
     LdapAuthenticator,
  } from '@crossauth/backend';
 import { CrossauthError } from '@crossauth/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '$lib/generated/prisma/client.js'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { redirect, error } from '@sveltejs/kit';
 
-export const prisma = new PrismaClient({
-//    log: ['query', 'info', 'warn', 'error'],
-});
+const connectionString = `${process.env.DATABASE_URL}`;
+const adapter = new PrismaBetterSqlite3({ url: connectionString });
+const prisma = new PrismaClient({adapter});
 const userStorage = new PrismaUserStorage({
     prismaClient : prisma, 
     userEditableFields: ["email"],

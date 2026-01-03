@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '../src/lib/generated/prisma/client.js'
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { PrismaKeyStorage, PrismaUserStorage, LocalPasswordAuthenticator, TotpAuthenticator, EmailAuthenticator } from '@crossauth/backend';
 import { FastifyServer } from '@crossauth/fastify';
 import fastify, { FastifyRequest, FastifyReply } from 'fastify';
@@ -42,7 +43,9 @@ app.register(view, {
       })
       
 // our user table and session key table will be served by Prisma (in a SQLite database)
-const prisma = new PrismaClient();
+const connectionString = `${process.env.DATABASE_URL}`;
+const adapter = new PrismaBetterSqlite3({ url: connectionString });
+const prisma = new PrismaClient({adapter});
 let userStorage = new PrismaUserStorage({prismaClient : prisma, userEditableFields: "email"});
 let keyStorage = new PrismaKeyStorage({prismaClient : prisma, keyTable: "apiKey"});
 
