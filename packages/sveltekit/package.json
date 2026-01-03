@@ -2,23 +2,9 @@
 	"name": "@crossauth/sveltekit",
 	"version": "1.0.2",
 	"license": "Apache-2.0",
+	"description": "Sveltekit adapter for Crossauth authentication package",
 	"private": false,
 	"type": "module",
-	"main": "./dist/index.cjs",
-	"module": "./dist/index.js",
-	"typings": "./dist/index.d.ts",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"require": "./dist/index.cjs",
-			"import": "./dist/index.js",
-			"default": "./dist/index.js"
-		}
-	},
-	"files": [
-		"dist/*"
-	],
 	"scripts": {
 		"preparex": "svelte-kit sync",
 		"dev": "vite dev",
@@ -29,6 +15,25 @@
 		"test": "dotenv -e .env.unittest vitest",
 		"testonce": "dotenv -e .env.unittest vitest run"
 	},
+	"svelte": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist/*",
+		"!dist/**/*.test.*",
+		"!dist/**/*.spec.*"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"svelte": "./dist/index.js"
+		}
+	},
+	"peerDependencies": {
+		"svelte": ">=4.0.0"
+	},
+	"sideEffects": [
+		"**/*.css"
+	],
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/kit": "^2.5.22",
@@ -45,7 +50,8 @@
 		"typescript": "^5.0.0 <=5.3.3",
 		"vite": "^5.0.3",
 		"vitest": "^1.2.0",
-		"vitest-fetch-mock": "^0.2.2"
+		"vitest-fetch-mock": "^0.2.2",
+		"vite-plugin-dts": "^3.6.4"
 	},
 	"dependencies": {
 		"@crossauth/backend": "workspace:^",
@@ -56,7 +62,6 @@
 		"formidable": "^3.5.1",
 		"jwt-decode": "^4.0.0",
 		"minimatch": "^10.0.1",
-		"qrcode": "^1.5.4",
-		"vite-plugin-dts": "^3.6.4"
+		"qrcode": "^1.5.4"
 	}
 }

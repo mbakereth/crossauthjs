@@ -1,20 +1,11 @@
 //import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
+import { sveltekit } from '@sveltejs/kit/vite';
 import dts from 'vite-plugin-dts';
 import { resolve } from 'path';
 
 export default defineConfig({
 	build: {
-		ssr: true,
-                minify: 'esbuild',
-		lib: {
-		  entry: resolve(__dirname, "./src/index.ts"),
-		  fileName: "index",
-		  formats: ['es', 'cjs']
-		  },
-		/*watch: {
-		  // https://rollupjs.org/configuration-options/#watch
-		},*/
 		rollupOptions: {
 		  // make sure to externalize deps that shouldn't be bundled
 		  // into your library
@@ -23,7 +14,7 @@ export default defineConfig({
 	  },
 	plugins: [
 		dts(),
-		//sveltekit(),
+		sveltekit(),
 	],
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}'],
