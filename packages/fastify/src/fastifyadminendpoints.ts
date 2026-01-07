@@ -46,7 +46,7 @@ async function defaultUserSearchFn(searchTerm: string,
             const ce2 = CrossauthError.asCrossauthError(e2);
             if (ce2.code != ErrorCode.UserNotExist) {
                 CrossauthLogger.logger.debug(j({err: ce2}));
-                throw ce1;
+                throw ce2; //was ce1;
             }
         }
     }
@@ -181,7 +181,7 @@ export class FastifyAdminEndpoints {
         setParameter("enableOAuthClientManagement", ParamType.Boolean, this, options, "ENABLE_OAUTH_CLIENT_MANAGEMENT");
         setParameter("deleteUserPage", ParamType.String, this, options, "DELETE_USER_PAGE");
         if (!this.adminPrefix.endsWith("/")) this.adminPrefix += "/";
-        if (!this.adminPrefix.startsWith("/")) "/" + this.adminPrefix;
+        if (!this.adminPrefix.startsWith("/")) this.adminPrefix = "/" + this.adminPrefix;
         if (options.userSearchFn) this.userSearchFn = options.userSearchFn
 
     }
