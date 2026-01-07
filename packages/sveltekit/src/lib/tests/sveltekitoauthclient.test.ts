@@ -3,6 +3,7 @@ import { MockRequestEvent } from './sveltemocks';
 import { CrossauthError, ErrorCode } from '@crossauth/common';
 import {  makeServer, getAccessToken, oidcConfiguration, getCsrfToken } from './testshared';
 import createFetchMock from 'vitest-fetch-mock';
+import { test, expect , vi, beforeAll, afterEach} from 'vitest';
 
 let fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -49,7 +50,7 @@ export async function oauthLogin (options = {}) {
     });
     let event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event as any);
     if (!resp || !(resp instanceof Response)) throw "Resp is not an object";
     expect(resp.status).toBe(200);
     const body = await resp.json();
@@ -83,7 +84,7 @@ test('SvelteKitClient.authzcodeflowLoginNotNeeded_get', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     let location : string|undefined = undefined;
     try {
-        await server.oAuthClient?.authorizationCodeFlowEndpoint.get(event);
+        await server.oAuthClient?.authorizationCodeFlowEndpoint.get(event as any);
     } catch (e : any) {
         expect(e.location).toBeDefined();
         location = e.location;
@@ -124,7 +125,7 @@ test('SvelteKitClient.authzcodeflowLoginNotNeeded_load', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     let location : string|undefined = undefined;
     try {
-        await server.oAuthClient?.authorizationCodeFlowEndpoint.load(event);
+        await server.oAuthClient?.authorizationCodeFlowEndpoint.load(event as any);
     } catch (e : any) {
         expect(e.location).toBeDefined();
         location = e.location;
@@ -159,7 +160,7 @@ test('SvelteKitClient.clientCredentials_post', async () => {
          headers: {"content-type": "application/json"},
     });
     let event = new MockRequestEvent("1", postRequest, {});
-    const resp = await server.oAuthClient?.clientCredentialsFlowEndpoint.post(event);
+    const resp = await server.oAuthClient?.clientCredentialsFlowEndpoint.post(event as any);
     if (!(resp instanceof Response)) throw new CrossauthError(ErrorCode.Configuration, "Expected Response");
     expect(resp.status).toBe(200);
     const body = await resp.json();
@@ -196,7 +197,7 @@ test('SvelteKitClient.clientCredentials_action', async () => {
         headers: {"content-type": "application/json"},
     });
     let event = new MockRequestEvent("1", postRequest, {});
-    const resp = await server.oAuthClient?.clientCredentialsFlowEndpoint.actions.default(event);
+    const resp = await server.oAuthClient?.clientCredentialsFlowEndpoint.actions.default(event as any);
     expect(typeof resp).toBe("object");
     if (typeof resp == "object") {
         const url = ("url" in resp)  ? resp.url : undefined;
@@ -233,7 +234,7 @@ test('SvelteKitClient.refreshTokenFlow_post', async () => {
     let event = new MockRequestEvent("1", postRequest, {});
     event.locals.csrfToken = csrfToken;
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
-    const resp = await server.oAuthClient?.refreshTokenFlowEndpoint.post(event);
+    const resp = await server.oAuthClient?.refreshTokenFlowEndpoint.post(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(true);
@@ -274,7 +275,7 @@ test('SvelteKitClient.refreshTokenFlow_action', async () => {
     let event = new MockRequestEvent("1", postRequest, {});
     event.locals.csrfToken = csrfToken;
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
-    const resp = await server.oAuthClient?.refreshTokenFlowEndpoint.actions.default(event);
+    const resp = await server.oAuthClient?.refreshTokenFlowEndpoint.actions.default(event as any);
     const url = ("url" in resp)  ? resp.url : undefined;
     expect(url).toBe("http://server.com/token");
     const body : {[key:string]:any}= ("body" in resp)  ? (resp.body ?? {}) : {};
@@ -305,7 +306,7 @@ test('SvelteKitClient.passwordFlow_post', async () => {
     });
     let event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event as any);
     if (!resp || !(resp instanceof Response)) throw "Resp is not an object";
     expect(resp.status).toBe(200);
     const body = await resp.json();
@@ -347,7 +348,7 @@ test('SvelteKitClient.passwordFlow_action', async () => {
     });
     let event = new MockRequestEvent("1", postRequest, {});
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
-    const resp = await server.oAuthClient?.passwordFlowEndpoint.actions.password(event);
+    const resp = await server.oAuthClient?.passwordFlowEndpoint.actions.password(event as any);
     const url = ("url" in resp)  ? resp.url : undefined;
     expect(url).toBe("http://server.com/token");
     const body : {[key:string]:any}= ("body" in resp)  ? (resp.body ?? {}) : {};
@@ -380,7 +381,7 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
     });
     let event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event as any);
     if (!resp || !(resp instanceof Response)) throw "Resp is not an object";
     expect(resp.status).toBe(200);
     const body = await resp.json();
@@ -441,7 +442,7 @@ test('SvelteKitClient.passwordMfaFlow_post', async () => {
     });
     event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const password2Resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    const password2Resp = await server.oAuthClient?.passwordFlowEndpoint.post(event as any);
     if (!password2Resp || !(password2Resp instanceof Response)) throw "Resp is not an object";
     expect(password2Resp.status).toBe(200);
     const password2Body = await password2Resp.json();
@@ -501,15 +502,15 @@ test('SvelteKitClient.refreshIfExpired_post', async () => {
     event.locals.sessionId = sessionId;
 
     // expire token
-    const oauthData = await server.sessionServer?.getSessionData(event, "oauth");
+    const oauthData = await server.sessionServer?.getSessionData(event as any, "oauth");
     expect(oauthData).toBeDefined();
     if (!oauthData) throw new Error("oauthData not defined");
     oauthData.expires_in = 0;
     oauthData.expires_at = Date.now() - 10000;
-    await server.sessionServer?.updateSessionData(event, "oauth", oauthData);
+    await server.sessionServer?.updateSessionData(event as any, "oauth", oauthData);
     
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
-    const resp = await server.oAuthClient?.refreshTokensIfExpiredEndpoint.post(event);
+    const resp = await server.oAuthClient?.refreshTokensIfExpiredEndpoint.post(event as any);
     expect(resp).toBeDefined();
     if (!resp || !(resp instanceof Response)) throw Error("Response undefined");
     const body = await resp.json();
@@ -553,7 +554,7 @@ test('SvelteKitClient.refreshIfNotExpired_post', async () => {
     event.locals.sessionId = sessionId;
     
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
-    const resp = await server.oAuthClient?.refreshTokensIfExpiredEndpoint.post(event);
+    const resp = await server.oAuthClient?.refreshTokensIfExpiredEndpoint.post(event as any);
     expect(resp).toBeDefined();
     if (!resp || !(resp instanceof Response)) throw Error("Response unefined");
     const body = await resp.json();
@@ -597,7 +598,7 @@ test('SvelteKitClient.autoRefreshTokens_post', async () => {
     event.locals.sessionId = sessionId;
     
     if (!server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "No auth client");
-    const resp = await server.oAuthClient?.autoRefreshTokensEndpoint.post(event);
+    const resp = await server.oAuthClient?.autoRefreshTokensEndpoint.post(event as any);
     //expect(typeof resp).not.toBe("object");
     //if (!resp || !(resp instanceof Response)) throw Error("Response is not an Response object");
     const body = await resp.json();
@@ -626,7 +627,7 @@ test('SvelteKitClient.bff_post', async () => {
     let event = new MockRequestEvent("1", postRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.bff(event);
+    const resp = await server.oAuthClient?.bff(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.url).toBe("http://server.com/method");
@@ -652,7 +653,7 @@ test('SvelteKitClient.bff_get', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.bff(event);
+    const resp = await server.oAuthClient?.bff(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.url).toContain("http://server.com/method");
@@ -680,7 +681,7 @@ test('SvelteKitClient.bffEndpoint_post', async () => {
     let event = new MockRequestEvent("1", postRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.bffEndpoint.post(event);
+    const resp = await server.oAuthClient?.bffEndpoint.post(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.url).toBe("http://server.com/method");
@@ -706,7 +707,7 @@ test('SvelteKitClient.allBffEndpoint_get', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.allBffEndpoint.get(event);
+    const resp = await server.oAuthClient?.allBffEndpoint.get(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.url).toContain("http://server.com/method1");
@@ -730,7 +731,7 @@ test('SvelteKitClient.allBffEndpoint_subget', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.allBffEndpoint.get(event);
+    const resp = await server.oAuthClient?.allBffEndpoint.get(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.url).toContain("http://server.com/method2");
@@ -754,7 +755,7 @@ test('SvelteKitClient.allBffEndpoint_invalidget', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.allBffEndpoint.get(event);
+    const resp = await server.oAuthClient?.allBffEndpoint.get(event as any);
     expect(resp.status).toBe(401);
 });
 
@@ -775,7 +776,7 @@ test('SvelteKitClient.accessToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.accessTokenEndpoint.post(event);
+    const resp = await server.oAuthClient?.accessTokenEndpoint.post(event as any);
     expect(resp.status).toBe(200);
     const body = resp.body;
     expect(typeof(body) == "object" && body?.jti).toBeDefined();
@@ -798,7 +799,7 @@ test('SvelteKitClient.haveAccessToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.haveAccessTokenEndpoint.post(event);
+    const resp = await server.oAuthClient?.haveAccessTokenEndpoint.post(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(true);
@@ -821,7 +822,7 @@ test('SvelteKitClient.refreshTokenNotAllowed', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.refreshTokenEndpoint.post(event);
+    const resp = await server.oAuthClient?.refreshTokenEndpoint.post(event as any);
     expect(resp.status).toBe(401);
     const body = await resp.json();
     expect(body.jti).toBeUndefined();
@@ -844,7 +845,7 @@ test('SvelteKitClient.dontHaveRefreshToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.haveRefreshTokenEndpoint.post(event);
+    const resp = await server.oAuthClient?.haveRefreshTokenEndpoint.post(event as any);
     expect(resp.status).toBe(401);
     const body = await resp.json();
     expect(body.ok).toBeUndefined();
@@ -867,7 +868,7 @@ test('SvelteKitClient.dontHaveIdToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.haveIdTokenEndpoint.post(event);
+    const resp = await server.oAuthClient?.haveIdTokenEndpoint.post(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.ok).toBe(false);
@@ -890,7 +891,7 @@ test('SvelteKitClient.idToken', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.idTokenEndpoint.post(event);
+    const resp = await server.oAuthClient?.idTokenEndpoint.post(event as any);
     expect(resp.status).toBe(204);
 });
 
@@ -911,7 +912,7 @@ test('SvelteKitClient.tokens', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.tokensEndpoint.post(event);
+    const resp = await server.oAuthClient?.tokensEndpoint.post(event as any);
     expect(resp.status).toBe(200);
     const body = await resp.json();
     expect(body.access_token?.jti).toBeDefined();
@@ -942,7 +943,7 @@ test('SvelteKitClient.deviceCodeFlow', async () => {
     let event = new MockRequestEvent("1", postRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    let resp : {[key:string]:any} = await server.oAuthClient?.startDeviceCodeFlowEndpoint.actions.default(event);
+    let resp : {[key:string]:any} = await server.oAuthClient?.startDeviceCodeFlowEndpoint.actions.default(event as any);
     expect(resp.url).toBe("http://server.com/device_authorization");
     expect(resp.body.grant_type).toBe("urn:ietf:params:oauth:grant-type:device_code");
     expect(resp.body.client_id).toBe("ABC");
@@ -963,7 +964,7 @@ test('SvelteKitClient.deviceCodeFlow', async () => {
     event = new MockRequestEvent("1", postRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    resp = await server.oAuthClient?.pollDeviceCodeFlowEndpoint.actions.default(event);
+    resp = await server.oAuthClient?.pollDeviceCodeFlowEndpoint.actions.default(event as any);
     expect(resp.error).toBe('authorization_pending');
 
     // poll receive access token
@@ -995,7 +996,7 @@ test('SvelteKitClient.deviceCodeFlow', async () => {
     event = new MockRequestEvent("1", postRequest, {});
     event.locals.sessionId = sessionId;
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    resp = await server.oAuthClient?.pollDeviceCodeFlowEndpoint.actions.default(event);
+    resp = await server.oAuthClient?.pollDeviceCodeFlowEndpoint.actions.default(event as any);
     //expect(resp.error).toBe('authorization_pending');
     
 });
@@ -1022,7 +1023,7 @@ test('SvelteKitClient.middleware', async () => {
         let event = new MockRequestEvent("1", getRequest, {});
         event.locals.sessionId = sessionId;
     
-        await server.oAuthClient.hook({event})
+        await server.oAuthClient.hook({event: event as any})
         let locals = server.oAuthClient["testEvent"]?.locals;
         expect(locals?.user?.username).toBe("bob");
         expect(locals?.idTokenPayload?.sub).toBe("bob");
@@ -1052,7 +1053,7 @@ test('SvelteKitClient.middlewareWithUserMerge', async () => {
         let event = new MockRequestEvent("1", getRequest, {});
         event.locals.sessionId = sessionId;
     
-        await server.oAuthClient.hook({event})
+        await server.oAuthClient.hook({event: event as any})
         let locals = server.oAuthClient["testEvent"]?.locals;
         expect(locals?.user?.username).toBe("bob");
         expect(locals?.user?.factor1).toBe("localpassword");
@@ -1084,7 +1085,7 @@ test('SvelteKitClient.middlewareWithUserEmbed', async () => {
         let event = new MockRequestEvent("1", getRequest, {});
         event.locals.sessionId = sessionId;
     
-        await server.oAuthClient.hook({event})
+        await server.oAuthClient.hook({event: event as any})
         let locals = server.oAuthClient["testEvent"]?.locals;
         expect(locals?.user?.username).toBe("bob");
         expect(locals?.user?.factor1).toBe("localpassword");
@@ -1116,7 +1117,7 @@ test('SvelteKitClient.middlewareWithUserMergeNoUser', async () => {
         let event = new MockRequestEvent("1", getRequest, {});
         event.locals.sessionId = sessionId;
     
-        await server.oAuthClient.hook({event})
+        await server.oAuthClient.hook({event: event as any})
         let locals = server.oAuthClient["testEvent"]?.locals;
         expect(locals?.user).toBeUndefined();
         expect(locals?.authType).toBeUndefined();

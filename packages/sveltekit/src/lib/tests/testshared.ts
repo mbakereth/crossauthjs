@@ -5,6 +5,7 @@ import { SvelteKitServer } from '../sveltekitserver';
 import { OAuthAuthorizationServer } from '@crossauth/backend';
 import type { OAuthAuthorizationServerOptions } from '@crossauth/backend';
 import { type OpenIdConfiguration, type OAuthClient } from '@crossauth/common';
+import { test, expect } from 'vitest';
 
 import {
     InMemoryKeyStorage,
@@ -248,7 +249,7 @@ export async function getCsrfToken(server : SvelteKitServer, resolver : MockReso
     const getRequest = new Request("http://ex.com/test", {method: "GET"});
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
 
-    const resp = await handle({event: event, resolve: resolver.mockResolve});
+    const resp = await handle({event: event as any, resolve: resolver.mockResolve});
     /*const cookieNames = resp.headers.getSetCookie().map((el) => el.split("=")[0]);
     expect(cookieNames.length).toBe(2);
     expect(["TESTCOOKIE", "CSRFTOKEN"]).toContain(cookieNames[0]);*/
@@ -281,7 +282,7 @@ export async function login(server : SvelteKitServer, resolver : MockResolver, h
     let event = new MockRequestEvent("1", postRequest, {"param1": "value1"});
     event.locals.csrfToken = csrfToken;
 
-    const ret = await server.sessionServer?.userEndpoints.login(event);
+    const ret = await server.sessionServer?.userEndpoints.login(event as any);
     expect(ret?.user?.username).toBe(user);
     expect(event.cookies.get("SESSIONID")).toBeDefined();
     return {event, ret};
@@ -303,7 +304,7 @@ export async function loginFactor2(server : SvelteKitServer, resolver : MockReso
     event.locals.csrfToken = csrfToken;
     event.locals.sessionId = sessionId;
 
-    const ret = await server.sessionServer?.userEndpoints.loginFactor2(event);
+    const ret = await server.sessionServer?.userEndpoints.loginFactor2(event as any);
     return {event, ret};
 };
 

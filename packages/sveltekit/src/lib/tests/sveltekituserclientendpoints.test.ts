@@ -33,7 +33,7 @@ test('SvelteKitUserClientEndpoints.selectClients', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    let resp1 = await server.sessionServer?.userClientEndpoints.searchClients(event);
+    let resp1 = await server.sessionServer?.userClientEndpoints.searchClients(event as any);
     expect(resp1?.ok).toBe(true);
     expect(resp1?.clients?.length).toBe(1);
 
@@ -65,7 +65,7 @@ test('SvelteKitUserClientEndpoints.updateClient', async () => {
     let status = 200;
     let resp1 : {[key:string]:any}|undefined = {};
     try {
-        resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.load(event);
+        resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.load(event as any);
     } catch (e) {
         if (e && typeof(e) == "object"  && "status" in e && typeof(e.status) == "number") status = e.status;
     }
@@ -78,7 +78,7 @@ test('SvelteKitUserClientEndpoints.updateClient', async () => {
     event.locals.user = loginEvent.locals.user;
     status = 200;
     try {
-        resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.load(event);
+        resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.load(event as any);
     } catch (e) {
         if (e && typeof(e) == "object"  && "status" in e && typeof(e.status) == "number") status = e.status;
     }
@@ -89,7 +89,7 @@ test('SvelteKitUserClientEndpoints.updateClient', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.load(event);
+    resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.load(event as any);
     expect(resp1?.ok).toBe(true);
 
     let postRequest = new Request("http://ex.com/oauth/clients", {
@@ -106,7 +106,7 @@ test('SvelteKitUserClientEndpoints.updateClient', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.actions.default(event);
+    resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.actions.default(event as any);
     expect(resp1?.ok).toBe(true);
     expect(resp1?.client?.client_name).toBe("newName");
     expect(resp1?.plaintextSecret).toBeUndefined();
@@ -126,7 +126,7 @@ test('SvelteKitUserClientEndpoints.updateClient', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.actions.default(event);
+    resp1 = await server.sessionServer?.userClientEndpoints.updateClientEndpoint.actions.default(event as any);
     expect(resp1?.ok).toBe(true);
     expect(resp1?.plaintextSecret).toBeDefined();
     expect(resp1?.client?.client_secret).not.toContain("pbkdf2:sha256");
@@ -158,7 +158,7 @@ test('SvelteKitUserClientEndpoints.deleteClient', async () => {
     let status = 200;
     let resp1 : {[key:string]:any}|undefined = {};
     try {
-        resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.load(event);
+        resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.load(event as any);
     } catch (e) {
         if (e && typeof(e) == "object"  && "status" in e && typeof(e.status) == "number") status = e.status;
     }
@@ -171,7 +171,7 @@ test('SvelteKitUserClientEndpoints.deleteClient', async () => {
     event.locals.user = loginEvent.locals.user;
     status = 200;
     try {
-        resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.load(event);
+        resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.load(event as any);
     } catch (e) {
         if (e && typeof(e) == "object"  && "status" in e && typeof(e.status) == "number") status = e.status;
     }
@@ -182,7 +182,7 @@ test('SvelteKitUserClientEndpoints.deleteClient', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.load(event);
+    resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.load(event as any);
     expect(resp1?.ok).toBe(true);
 
     let postRequest = new Request("http://ex.com/oauth/clients", {
@@ -199,7 +199,7 @@ test('SvelteKitUserClientEndpoints.deleteClient', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.actions.default(event);
+    resp1 = await server.sessionServer?.userClientEndpoints.deleteClientEndpoint.actions.default(event as any);
     expect(resp1?.ok).toBe(true);
 });
 
@@ -229,7 +229,7 @@ test('SvelteKitUserClientEndpoints.createClient', async () => {
     let status = 302;
     let resp1 : {[key:string]:any}|undefined = {};
     try {
-        resp1 = await server.sessionServer?.userClientEndpoints.createClientEndpoint.load(event);
+        resp1 = await server.sessionServer?.userClientEndpoints.createClientEndpoint.load(event as any);
     } catch (e) {
         if (e && typeof(e) == "object"  && "status" in e && typeof(e.status) == "number") status = e.status;
     }
@@ -240,7 +240,7 @@ test('SvelteKitUserClientEndpoints.createClient', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    resp1 = await server.sessionServer?.userClientEndpoints.createClientEndpoint.load(event);
+    resp1 = await server.sessionServer?.userClientEndpoints.createClientEndpoint.load(event as any);
     expect(resp1?.ok).toBe(true);
 
     let postRequest = new Request("http://ex.com/oauth/clients", {
@@ -257,7 +257,7 @@ test('SvelteKitUserClientEndpoints.createClient', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    resp1 = await server.sessionServer?.userClientEndpoints.createClientEndpoint.actions.default(event);
+    resp1 = await server.sessionServer?.userClientEndpoints.createClientEndpoint.actions.default(event as any);
     expect(resp1?.ok).toBe(true);
     expect(resp1?.client?.client_name).toBe("newName");
     expect(resp1?.plaintextSecret).toBeUndefined();

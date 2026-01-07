@@ -4,6 +4,7 @@ import { SvelteKitOAuthResourceServer } from '../sveltekitresserver';
 import {  oidcConfiguration, makeServer, getAccessToken } from './testshared';
 import { OAuthTokenConsumer } from '@crossauth/backend';
 import createFetchMock from 'vitest-fetch-mock';
+import { test, expect, vi, beforeAll,afterEach  } from 'vitest';
 
 let fetchMocker = createFetchMock(vi);
 fetchMocker.enableMocks();
@@ -50,7 +51,7 @@ export async function oauthLogin () {
     });
     let event = new MockRequestEvent("1", postRequest, {});
     if (server.oAuthClient == undefined) throw new Error("server.oAuthClient is undefined");
-    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event);
+    const resp = await server.oAuthClient?.passwordFlowEndpoint.post(event as any);
     if (!resp || !(resp instanceof Response)) throw "response is not an object";
     expect(resp.status).toBe(200);
     const body = await resp.json();
@@ -97,7 +98,7 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_authorized', async
         headers: {"authorization": "Bearer " + access_token}
         });
     let event = new MockRequestEvent("1", getRequest, {});
-    const resp1 = await resserver.authorized(event);
+    const resp1 = await resserver.authorized(event as any);
     expect(resp1?.authorized).toBe(true);
     expect(resp1?.tokenPayload).toBeDefined();
     expect(resp1?.user?.username).toBe("bob");
@@ -109,7 +110,7 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_authorized', async
         headers: {"authorization": "Bearer " + access_token + "x"}
         });
     event = new MockRequestEvent("1", getRequest, {});
-    const resp2 = await resserver.authorized(event);
+    const resp2 = await resserver.authorized(event as any);
     expect(resp2?.authorized).toBe(false);
     expect(resp2?.tokenPayload).toBeUndefined();
     expect(resp2?.user).toBeUndefined();
@@ -153,7 +154,7 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_hook', async () =>
     let event = new MockRequestEvent("1", getRequest, {});
     expect(resserver.hook).toBeDefined();
     if (!resserver.hook) throw new Error("hook undefined");
-    await resserver.hook({event});
+    await resserver.hook({event: event as any});
     expect(event.locals.user?.username).toBe("bob");
     expect(event.locals.scope?.length).toBe(2);
     let scopes = event.locals.scope ?? [];
@@ -169,7 +170,7 @@ test('SvelteKitOAuthResourceServer.validAndInvalidAccessToken_hook', async () =>
     event = new MockRequestEvent("1", getRequest, {});
     expect(resserver.hook).toBeDefined();
     if (!resserver.hook) throw new Error("hook undefined");
-    await resserver.hook({event});
+    await resserver.hook({event: event as any});
     expect(event.locals.user).toBeUndefined();
     expect(event.locals.scope).toBeUndefined();
 });
@@ -211,7 +212,7 @@ test('SvelteKitOAuthResourceServer.hook_suburl', async () => {
     let event = new MockRequestEvent("1", getRequest, {});
     expect(resserver.hook).toBeDefined();
     if (!resserver.hook) throw new Error("hook undefined");
-    await resserver.hook({event});
+    await resserver.hook({event: event as any});
     expect(event.locals.user?.username).toBe("bob");
     expect(event.locals.scope?.length).toBe(2);
     let scopes = event.locals.scope ?? [];

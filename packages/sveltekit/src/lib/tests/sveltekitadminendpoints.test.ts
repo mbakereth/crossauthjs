@@ -34,7 +34,7 @@ test('SvelteKitAdminEndpoints.deleteUser', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    let resp1 = await server.sessionServer?.adminEndpoints.deleteUser(event);
+    let resp1 = await server.sessionServer?.adminEndpoints.deleteUser(event as any);
     expect(resp1?.ok).toBe(true);
     let found = false;
     try {
@@ -78,7 +78,7 @@ test('SvelteKitAdminEndpoints.createUser', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    let resp1 = await server.sessionServer?.adminEndpoints.createUser(event)
+    let resp1 = await server.sessionServer?.adminEndpoints.createUser(event as any)
     expect(resp1?.ok).toBe(true);
     let found = false;
     try {
@@ -125,7 +125,7 @@ test('SvelteKitAdminEndpoints.createUserNoPassword', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    let resp1 = await server.sessionServer?.adminEndpoints.createUser(event);
+    let resp1 = await server.sessionServer?.adminEndpoints.createUser(event as any);
     expect(resp1?.ok).toBe(true);
     let newUser = undefined;
     try {
@@ -171,7 +171,7 @@ test('SvelteKitAdminEndpoints.createUserFactor2', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    let resp1 = await server.sessionServer?.adminEndpoints.createUser(event);
+    let resp1 = await server.sessionServer?.adminEndpoints.createUser(event as any);
     expect(resp1?.ok).toBe(true);
     let newUser = undefined;
     try {
@@ -220,7 +220,7 @@ test('SvelteKitAdminEndpoints.createUserFactor2NoPassword', async () => {
     event.locals.sessionId = sessionId;
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
-    let resp1 = await server.sessionServer?.adminEndpoints.createUser(event);
+    let resp1 = await server.sessionServer?.adminEndpoints.createUser(event as any);
     expect(resp1?.ok).toBe(true);
     let newUser = undefined;
     try {
@@ -262,7 +262,7 @@ test('SvelteKitAdminEndpoints.updateUser', async () => {
     event.locals.authType = "cookie";
     event.locals.user = loginEvent.locals.user;
     const {user} = await userStorage.getUserByUsername("bob");
-    let resp1 = await server.sessionServer?.adminEndpoints.updateUser(user, event)
+    let resp1 = await server.sessionServer?.adminEndpoints.updateUser(user, event as any)
     expect(resp1?.ok).toBe(true);
     let newUser = undefined;
     try {

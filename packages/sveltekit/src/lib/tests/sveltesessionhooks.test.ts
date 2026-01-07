@@ -10,7 +10,7 @@ test('SvelteSessionHooks.hookWithGetNotLoggedIn', async () => {
     const getRequest = new Request("http://ex.com/test", {method: "GET"});
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
 
-    const resp = await handle({event: event, resolve: resolver.mockResolve});
+    const resp = await handle({event: event as any, resolve: resolver.mockResolve});
     const cookies = getCookies(resp);
     expect(cookies["CSRFTOKEN"]).toBeDefined();
     let csrfValid = false;
@@ -37,7 +37,7 @@ test('SvelteSessionHooks.hookWithPostNotLoggedIn', async () => {
     const postRequest = new Request("http://ex.com/test", {method: "POST", body: "This is the body"});
     let event = new MockRequestEvent("1", postRequest, {"param1": "value1"});
 
-    const resp = await handle({event: event, resolve: resolver.mockResolve});
+    const resp = await handle({event: event as any, resolve: resolver.mockResolve});
     const cookies = getCookies(resp);
     expect(cookies["CSRFTOKEN"]).toBeUndefined();
 });
@@ -48,7 +48,7 @@ test('SvelteMocks.hookGetThenPost', async () => {
     const getRequest = new Request("http://ex.com/test", {method: "GET"});
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
 
-    let resp = await handle({event: event, resolve: resolver.mockResolve});
+    let resp = await handle({event: event as any, resolve: resolver.mockResolve});
     const cookies = getCookies(resp);
     expect(cookies["CSRFTOKEN"]).toBeDefined();
     const postRequest = new Request("http://ex.com/test", {
@@ -59,7 +59,7 @@ test('SvelteMocks.hookGetThenPost', async () => {
             "content-type": "application/x-www-form-urlencoded",
         }});
     event = new MockRequestEvent("1", postRequest, {"param1": "value1"});
-    resp = await handle({event: event, resolve: resolver.mockResolve});
+    resp = await handle({event: event as any, resolve: resolver.mockResolve});
     let csrfValid = false;
     try {
         server.sessionServer?.sessionManager.validateCsrfCookie(cookies["CSRFTOKEN"]);
@@ -88,7 +88,7 @@ test('SvelteSessionHooks.formBody', async () => {
         }});
     const event = new MockRequestEvent("1", postRequest, {});
     const data = new JsonOrFormData();
-    await data.loadData(event);
+    await data.loadData(event as any);
     let keys = [...data.keys()];
     expect(keys.length).toBe(2);
     expect(["param1","param&2"]).toContain(keys[0]);
@@ -110,7 +110,7 @@ test('SvelteSessionHooks.jsonBody', async () => {
         }});
     const event = new MockRequestEvent("1", postRequest, {});
     const data = new JsonOrFormData();
-    await data.loadData(event);
+    await data.loadData(event as any);
     let keys = [...data.keys()];
     expect(keys.length).toBe(2);
     expect(["param1","param&2"]).toContain(keys[0]);
@@ -130,7 +130,7 @@ test('SvelteSessionHooks.hookWithGetIsLoggedIn', async () => {
     }});
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
 
-    const resp = await handle({event: event, resolve: resolver.mockResolve});
+    const resp = await handle({event: event as any, resolve: resolver.mockResolve});
     const cookies = getCookies(resp);
     expect(cookies["CSRFTOKEN"]).toBeDefined();
     let csrfValid = false;
@@ -159,7 +159,7 @@ test('SvelteSessionHooks.loginProtectedNotLoggedIn', async () => {
     let getRequest = new Request("http://ex.com/account", {method: "GET"});
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
 
-    let resp = await handle({event: event, resolve: resolver.mockResolve});
+    let resp = await handle({event: event as any, resolve: resolver.mockResolve});
     expect(resp.status).toBe(302);
     expect(resp.headers.get('location')).toContain("/login");
 
@@ -168,7 +168,7 @@ test('SvelteSessionHooks.loginProtectedNotLoggedIn', async () => {
 
     // try again now that we are logged in
     event.request = getRequest;
-    resp = await handle({event: loginEvent, resolve: resolver.mockResolve});
+    resp = await handle({event: loginEvent as any, resolve: resolver.mockResolve});
     expect(resp.status).toBe(200);
 
 });
@@ -224,7 +224,7 @@ test('SvelteSessionHooks.visitPage2FA', async () => {
     //sessionId = loginEvent.locals.sessionId;
     sessionId = server.sessionServer?.sessionManager.getSessionId(sessionCookieValue??"");
     event.locals.sessionId = sessionId;
-    let resp1 = await handle({event: event, resolve: resolver.mockResolve});
+    let resp1 = await handle({event: event as any, resolve: resolver.mockResolve});
     expect(resp1.status).toBe(302);
     expect(resp1.headers.get("location")).toBe("/factor2/");
 
@@ -238,7 +238,7 @@ test('SvelteSessionHooks.visitPage2FA', async () => {
             ["content-type", "application/x-www-form-urlencoded"],
         ]});
     event = new MockRequestEvent("1", postRequest, {});
-    resp1 = await handle({event: event, resolve: resolver.mockResolve});
+    resp1 = await handle({event: event as any, resolve: resolver.mockResolve});
     expect(resp1.status).toBe(200);
 
 });

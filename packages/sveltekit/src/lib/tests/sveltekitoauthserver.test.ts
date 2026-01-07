@@ -18,7 +18,7 @@ test('SvelteKitOAuthServer.authorizeRedirectsToLogin', async () => {
     let authServer = server.oAuthAuthServer;
     let redirectTo : string|undefined = undefined;
     try {
-        await authServer?.authorizeEndpoint.load(event);
+        await authServer?.authorizeEndpoint.load(event as any);
     } catch (e) {
         
         redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
@@ -53,7 +53,7 @@ test('SvelteKitOAuthServer.getAccessTokenWhileLoggedIn', async () => {
     if (!authServer) throw new Error("No auth server");
     let redirectTo : string|undefined = undefined;
     try {
-        const resp = await authServer?.authorizeEndpoint.load(event);
+        const resp = await authServer?.authorizeEndpoint.load(event as any);
         expect(resp?.ok).toBe(true);
         expect(resp?.authorizationNeeded).toBeDefined();
         expect(resp?.authorizationNeeded?.user?.username).toBe("bob");
@@ -85,7 +85,7 @@ test('SvelteKitOAuthServer.getAccessTokenWhileLoggedIn', async () => {
         event.locals.csrfToken = csrfToken;
         event.locals.sessionId = sessionId;
         try {
-            await authServer?.authorizeEndpoint.actions.default(event);
+            await authServer?.authorizeEndpoint.actions.default(event as any);
         } catch (e) {
             redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
         }
@@ -110,7 +110,7 @@ test('SvelteKitOAuthServer.getAccessTokenWhileLoggedIn', async () => {
         event = new MockRequestEvent("1", postRequest, {});
         let access_token : string|undefined = undefined;
         try {
-            const resp = await authServer.tokenEndpoint.post(event);
+            const resp = await authServer.tokenEndpoint.post(event as any);
             access_token = (await resp.json()).access_token;
         } catch (e) {
             redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
@@ -146,7 +146,7 @@ test('SvelteKitOAuthServer.alreadyAuthorized', async () => {
     if (!authServer) throw new Error("No auth server");
     let redirectTo : string|undefined = undefined;
     try {
-        const resp = await authServer?.authorizeEndpoint.load(event);
+        const resp = await authServer?.authorizeEndpoint.load(event  as any);
         expect(resp?.ok).toBe(true);
         expect(resp?.authorizationNeeded).toBeDefined();
         expect(resp?.authorizationNeeded?.user?.username).toBe("bob");
@@ -178,7 +178,7 @@ test('SvelteKitOAuthServer.alreadyAuthorized', async () => {
         event.locals.csrfToken = csrfToken;
         event.locals.sessionId = sessionId;
         try {
-            await authServer?.authorizeEndpoint.actions.default(event);
+            await authServer?.authorizeEndpoint.actions.default(event as any);
         } catch (e) {
             redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
         }
@@ -193,7 +193,7 @@ test('SvelteKitOAuthServer.alreadyAuthorized', async () => {
         event.locals.user = user;
         redirectTo = undefined;
         try {
-            await authServer?.authorizeEndpoint.load(event);
+            await authServer?.authorizeEndpoint.load(event as any);
         } catch (e) {
             redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
         }
@@ -228,7 +228,7 @@ test('SvelteKitOAuthServer.notAuthorized', async () => {
     if (!authServer) throw new Error("No auth server");
     let redirectTo : string|undefined = undefined;
     try {
-        const resp = await authServer?.authorizeEndpoint.load(event);
+        const resp = await authServer?.authorizeEndpoint.load(event as any);
         expect(resp?.ok).toBe(true);
         expect(resp?.authorizationNeeded).toBeDefined();
         expect(resp?.authorizationNeeded?.user?.username).toBe("bob");
@@ -260,7 +260,7 @@ test('SvelteKitOAuthServer.notAuthorized', async () => {
         event.locals.csrfToken = csrfToken;
         event.locals.sessionId = sessionId;
         try {
-            await authServer?.authorizeEndpoint.actions.default(event);
+            await authServer?.authorizeEndpoint.actions.default(event as any);
         } catch (e) {
             redirectTo = "location" in Object(e) ?  Object(e).location : undefined;
         }
@@ -278,7 +278,7 @@ test('SvelteKitOAuthServer.oidcConfiguration', async () => {
         });
     let event = new MockRequestEvent("1", getRequest, {});
     let authServer = server.oAuthAuthServer;
-    const resp =await authServer?.oidcConfigurationEndpoint.get(event);
+    const resp =await authServer?.oidcConfigurationEndpoint.get(event as any);
     expect(resp?.status).toBe(200);
     const body = await resp?.json();
     expect(body?.authorization_endpoint).toBe("http://localhost:3000/oauth/authorize");
@@ -294,7 +294,7 @@ test('SvelteKitOAuthServer.jwks', async () => {
         });
     let event = new MockRequestEvent("1", getRequest, {});
     let authServer = server.oAuthAuthServer;
-    const resp =await authServer?.jwksGetEndpoint.get(event);
+    const resp =await authServer?.jwksGetEndpoint.get(event as any);
     expect(resp?.status).toBe(200);
     const body = await resp?.json();
     expect(body.keys).toBeDefined();
@@ -309,7 +309,7 @@ test('SvelteKitOAuthServer.getCsrfTokenJson', async () => {
         });
     let event = new MockRequestEvent("1", getRequest, {});
     let authServer = server.oAuthAuthServer;
-    const resp =await authServer?.getCsrfTokenEndpoint.get(event);
+    const resp =await authServer?.getCsrfTokenEndpoint.get(event as any);
     expect(resp?.status).toBe(200);
     const body = await resp?.json();
     expect(body.ok).toBe(false);
@@ -323,7 +323,7 @@ test('SvelteKitOAuthServer.getCsrfTokenCookie', async () => {
         });
     let event = new MockRequestEvent("1", getRequest, {});
     let authServer = server.oAuthAuthServer;
-    const resp =await authServer?.getCsrfTokenEndpoint.get(event);
+    const resp =await authServer?.getCsrfTokenEndpoint.get(event as any);
     expect(resp?.status).toBe(200);
     const body = await resp?.json();
     expect(body.ok).toBe(true);
@@ -358,7 +358,7 @@ test('SvelteKitOAuthServer.mfa', async () => {
         ] 
     });
     let event = new MockRequestEvent("1", postRequest, {});
-    const resp2 = await authServer.tokenEndpoint.post(event);
+    const resp2 = await authServer.tokenEndpoint.post(event as any);
     const body2 = await resp2.json();
     expect(body2.error).toBe("mfa_required");
     const mfa_token = body2.mfa_token ?? "";
@@ -371,7 +371,7 @@ test('SvelteKitOAuthServer.mfa', async () => {
         },
         });
     event = new MockRequestEvent("1", getRequest, {});
-    const resp3 = await authServer.mfaAuthenticatorsEndpoint.get(event);
+    const resp3 = await authServer.mfaAuthenticatorsEndpoint.get(event as any);
     const body3 = await resp3.json();
     expect(Array.isArray(body3)).toBe(true);
     expect(body3.length).toBe(1);
@@ -391,7 +391,7 @@ test('SvelteKitOAuthServer.mfa', async () => {
         ] 
     });
     event = new MockRequestEvent("1", postRequest, {});
-    const resp4 = await authServer.mfaChallengeEndpoint.post(event);
+    const resp4 = await authServer.mfaChallengeEndpoint.post(event as any);
     const body4 = await resp4.json();
     expect(body4.challenge_type).toBe("oob");
     expect(body4.oob_code).toBeDefined();
@@ -415,7 +415,7 @@ test('SvelteKitOAuthServer.mfa', async () => {
         ] 
     });
     event = new MockRequestEvent("1", postRequest, {});
-    const resp5 = await authServer.tokenEndpoint.post(event);
+    const resp5 = await authServer.tokenEndpoint.post(event as any);
     const body5 = await resp5.json();
     expect(body5.access_token).toBeDefined();
     
@@ -445,7 +445,7 @@ test('SvelteKitOAuthServer.deviceCodeManual', async () => {
         ] 
     });
     let event = new MockRequestEvent("1", postRequest, {});
-    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event);
+    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event as any);
     let devAuthBody = await devAuthResp.json();
     expect(devAuthBody.device_code).toBeDefined();
     expect(devAuthBody.verification_uri).toBe('http://localhost:5174/device');
@@ -460,7 +460,7 @@ test('SvelteKitOAuthServer.deviceCodeManual', async () => {
     let location = undefined;
     let status = undefined;
     try {
-        await authServer.deviceEndpoint.load(event);
+        await authServer.deviceEndpoint.load(event as any);
     } catch (e : any) {
         location = e.location;
         status = e.status;
@@ -473,7 +473,7 @@ test('SvelteKitOAuthServer.deviceCodeManual', async () => {
     event.locals.user = user;
 
     // call device endpoint again, without user code.  Should return data for showing prompt page
-    let devResp = await authServer.deviceEndpoint.load(event);
+    let devResp = await authServer.deviceEndpoint.load(event as any);
     expect(devResp.ok).toBe(true);
     expect(devResp.completed).toBe(false);
     expect(devResp.retryAllowed).toBe(true);
@@ -495,7 +495,7 @@ test('SvelteKitOAuthServer.deviceCodeManual', async () => {
         ] 
             });
     let tokenEvent = new MockRequestEvent("1", tokenRequest, {});
-    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent as any);
     let tokenBody = await tokenResp.json();
     expect(tokenResp.status).toBe(200);
     expect(tokenBody.error).toBe("authorization_pending");
@@ -512,12 +512,12 @@ test('SvelteKitOAuthServer.deviceCodeManual', async () => {
     });
     event = new MockRequestEvent("1", postRequest, {});
     event.locals.user = user;
-    let devPostResp = await authServer.deviceEndpoint.actions.userCode(event);
+    let devPostResp = await authServer.deviceEndpoint.actions.userCode(event as any);
     expect(devPostResp.ok).toBe(false);
     expect(devPostResp.error).toBe("access_denied");
     
     // token should still return authorization_pending
-    tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    tokenResp = await authServer.tokenEndpoint.post(tokenEvent as any);
     tokenBody = await tokenResp.json();
     expect(tokenResp.status).toBe(200);
     expect(tokenBody.error).toBe("authorization_pending");
@@ -534,7 +534,7 @@ test('SvelteKitOAuthServer.deviceCodeManual', async () => {
     });
     event = new MockRequestEvent("1", postRequest, {});
     event.locals.user = user;
-    devPostResp = await authServer.deviceEndpoint.actions.userCode(event);
+    devPostResp = await authServer.deviceEndpoint.actions.userCode(event as any);
     expect(devPostResp.ok).toBe(true);
     expect(devPostResp.completed).toBe(false);
     expect(devPostResp.authorizationNeeded?.user?.username).toBe("bob");
@@ -546,12 +546,12 @@ test('SvelteKitOAuthServer.deviceCodeManual', async () => {
     authServer.authServer.validateAndPersistScope("ABC", "read write", user);
 
     // submit user code again
-    devPostResp = await authServer.deviceEndpoint.actions.userCode(event);
+    devPostResp = await authServer.deviceEndpoint.actions.userCode(event as any);
     expect(devPostResp.ok).toBe(true);
     expect(devPostResp.completed).toBe(true);
 
     // token should return access_token
-    tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    tokenResp = await authServer.tokenEndpoint.post(tokenEvent as any);
     tokenBody = await tokenResp.json();
     expect(tokenResp.status).toBe(200);
     expect(tokenBody.error).toBeUndefined();
@@ -584,7 +584,7 @@ test('SvelteKitOAuthServer.deviceCodeAuto', async () => {
         ] 
     });
     let event = new MockRequestEvent("1", postRequest, {});
-    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event);
+    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event as any);
     let devAuthBody = await devAuthResp.json();
     expect(devAuthBody.device_code).toBeDefined();
     expect(devAuthBody.verification_uri).toBe('http://localhost:5174/device');
@@ -599,7 +599,7 @@ test('SvelteKitOAuthServer.deviceCodeAuto', async () => {
     let location = undefined;
     let status = undefined;
     try {
-        await authServer.deviceEndpoint.load(event);
+        await authServer.deviceEndpoint.load(event as any);
     } catch (e : any) {
         location = e.location;
         status = e.status;
@@ -612,7 +612,7 @@ test('SvelteKitOAuthServer.deviceCodeAuto', async () => {
     event.locals.user = user;
 
     // call device endpoint again, without user code.  Should return data for showing prompt page
-    let devResp = await authServer.deviceEndpoint.load(event);
+    let devResp = await authServer.deviceEndpoint.load(event as any);
     expect(devResp.ok).toBe(true);
     expect(devResp.completed).toBe(false);
     expect(devResp.retryAllowed).toBe(true);
@@ -638,7 +638,7 @@ test('SvelteKitOAuthServer.deviceCodeAuto', async () => {
         ] 
             });
     let tokenEvent = new MockRequestEvent("1", tokenRequest, {});
-    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent as any);
     let tokenBody = await tokenResp.json();
     expect(tokenResp.status).toBe(200);
     expect(tokenBody.error).toBe("authorization_pending");
@@ -655,13 +655,13 @@ test('SvelteKitOAuthServer.deviceCodeAuto', async () => {
     });
     event = new MockRequestEvent("1", postRequest, {});
     event.locals.user = user;
-    let devPostResp = await authServer.deviceEndpoint.actions.userCode(event);
+    let devPostResp = await authServer.deviceEndpoint.actions.userCode(event as any);
     expect(devPostResp.ok).toBe(true);
     expect(devPostResp.completed).toBe(true);
     expect(devPostResp.authorizationNeeded).toBeUndefined();
 
     // token should return access_token
-    tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    tokenResp = await authServer.tokenEndpoint.post(tokenEvent as any);
     tokenBody = await tokenResp.json();
     expect(tokenResp.status).toBe(200);
     expect(tokenBody.error).toBeUndefined();
@@ -694,7 +694,7 @@ test('SvelteKitOAuthServer.deviceCodeAutoPreAuthorizePreLogin', async () => {
         ] 
     });
     let event = new MockRequestEvent("1", postRequest, {});
-    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event);
+    const devAuthResp = await authServer.deviceAuthorizationEndpoint.post(event as any);
     let devAuthBody = await devAuthResp.json();
     expect(devAuthBody.device_code).toBeDefined();
     expect(devAuthBody.verification_uri).toBe('http://localhost:5174/device');
@@ -712,7 +712,7 @@ test('SvelteKitOAuthServer.deviceCodeAutoPreAuthorizePreLogin', async () => {
     });
     event = new MockRequestEvent("1", getRequest, {});
     event.locals.user = user;
-    let devResp = await authServer.deviceEndpoint.load(event);
+    let devResp = await authServer.deviceEndpoint.load(event as any);
     expect(devResp.ok).toBe(true);
     expect(devResp.completed).toBe(true);
     expect(devResp.user?.username).toBe("bob");
@@ -733,7 +733,7 @@ test('SvelteKitOAuthServer.deviceCodeAutoPreAuthorizePreLogin', async () => {
         ] 
             });
     let tokenEvent = new MockRequestEvent("1", tokenRequest, {});
-    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent);
+    let tokenResp = await authServer.tokenEndpoint.post(tokenEvent as any);
     let tokenBody = await tokenResp.json();
     expect(tokenResp.status).toBe(200);
     expect(tokenBody.error).toBeUndefined();

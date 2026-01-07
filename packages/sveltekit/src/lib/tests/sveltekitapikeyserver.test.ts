@@ -9,7 +9,7 @@ test('SvelteApiKeyServer.hookWithGetNoKey', async () => {
     const getRequest = new Request("http://ex.com/test", {method: "GET"});
     let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
 
-    await handle({event: event, resolve: resolver.mockResolve});
+    await handle({event: event as any, resolve: resolver.mockResolve});
     expect(event.locals.user).toBeUndefined();
     expect(event.locals.apiKey).toBeUndefined();
 });
@@ -25,7 +25,7 @@ test('SvelteApiKeyServer.validKeyAuthenticates', async () => {
             method: "GET",
             headers: {authorization: apiKeyManager.authScheme + " " + token }});
         let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
-        await handle({event: event, resolve: resolver.mockResolve});
+        await handle({event: event as any, resolve: resolver.mockResolve});
         expect(event.locals.user?.username).toBe("bob");
         expect(event.locals.apiKey).toBeDefined();    
     }
@@ -42,7 +42,7 @@ test('SvelteApiKeyServer.invalidKeyDoesntAuthenticate', async () => {
             method: "GET",
             headers: {authorization: apiKeyManager.authScheme + " " + token + "x"}});
         let event = new MockRequestEvent("1", getRequest, {"param1": "value1"});
-        await handle({event: event, resolve: resolver.mockResolve});
+        await handle({event: event as any, resolve: resolver.mockResolve});
         expect(event.locals.user).toBeUndefined();
         expect(event.locals.apiKey).toBeUndefined();    
     }
