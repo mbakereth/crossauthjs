@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
+// Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { CrossauthError, CrossauthLogger, ErrorCode, OAuthClientBase, j } from '@crossauth/common';
 import { Crypto } from '../crypto';
 import { setParameter, ParamType } from '../utils';

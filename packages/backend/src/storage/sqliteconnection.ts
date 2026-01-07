@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
+// Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import sqlite3 from 'sqlite3';
 import { DbPool, DbConnection, DbParameter } from './dbconnection';
 import { CrossauthLogger, j, CrossauthError, ErrorCode } from '@crossauth/common';

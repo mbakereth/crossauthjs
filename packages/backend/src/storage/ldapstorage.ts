@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
+// Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { UserStorage, type UserStorageGetOptions, type UserStorageOptions } from '../storage';
 import { type User, type UserSecrets, type UserInputFields, type UserSecretsInputFields } from '@crossauth/common';
 import { CrossauthError, ErrorCode } from '@crossauth/common';

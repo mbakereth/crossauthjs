@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
+// Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 //import { getJsonData } from '../../interfaces.ts';
 import { ErrorCode, CrossauthError } from '@crossauth/common';
 import { SmsAuthenticator, type SmsAuthenticatorOptions } from './smsauth';

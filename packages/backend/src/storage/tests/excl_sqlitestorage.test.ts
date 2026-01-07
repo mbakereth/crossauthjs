@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
+// Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import sqlite3 from 'sqlite3';
 import { beforeEach, afterEach } from 'vitest';
 import { SqliteUserStorage, SqliteKeyStorage, SqliteOAuthClientStorage, SqliteOAuthAuthorizationStorage } from '../sqlitestorage';
