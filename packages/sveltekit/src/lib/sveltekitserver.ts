@@ -475,6 +475,7 @@ export class SvelteKitServer {
      * @returns an empty object
      */
     dummyLoad : (event : RequestEvent) => Promise<{[key:string]:any}> = async (_event) => {return {}};
+    emptyLoad : (event : RequestEvent) => Promise<{}> = async (_event) => {return {}};
 
     /**
      * See class documentation for {@link SvelteKitUserEndpoints}.

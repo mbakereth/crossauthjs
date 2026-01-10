@@ -953,7 +953,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         return await this.getClientWithTransaction("client_name", name, this.prismaClient, false, userid);
     }
 
-    private async getClientWithTransaction(field : string, value : string, tx : any, unique : boolean, userid : string|number|null|undefined) : Promise<OAuthClient[]> {
+    private async getClientWithTransaction(field : string, value : string, tx : any, unique : boolean, userid : string|number|null|undefined, throwOnFailure=true) : Promise<OAuthClient[]> {
         const userWhere = (userid == undefined && !(userid === null)) ? {} : {[this.useridForeignKeyColumn]: userid};
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
@@ -999,6 +999,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
                 return clients;
                 }
         } catch (e) {
+            if (!throwOnFailure) return [];
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.error(j({msg: "Invalid OAuth client", [field]: value, cerr: e}))
             throw new CrossauthError(ErrorCode.InvalidClientId);
@@ -1015,8 +1016,10 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         try {
             return this.prismaClient.$transaction(async (tx: any) => {
                 try {
-                    await this.getClientWithTransaction("client_id", client.client_id, tx, true, client.userid);
-                    throw new CrossauthError(ErrorCode.ClientExists);
+                    const clients = await this.getClientWithTransaction("client_id", client.client_id, tx, true, client.userid, false);
+                    if (clients.length > 0) {
+                        throw new CrossauthError(ErrorCode.ClientExists);
+                    }
                 } catch (e1) {}
                 return await this.createClientWithTransaction(client, tx);
             }, {timeout: this.transactionTimeout});

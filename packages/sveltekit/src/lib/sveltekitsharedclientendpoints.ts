@@ -153,7 +153,7 @@ export async function defaultClientSearchFn(searchTerm: string,
         clients.push(client);
     } catch (e1) {
         const ce1 = CrossauthError.asCrossauthError(e1);
-        if (ce1.code != ErrorCode.UserNotExist) {
+        if (ce1.code != ErrorCode.InvalidClientId) {
             CrossauthLogger.logger.debug(j({err: ce1}));
             throw ce1;
         }
@@ -492,8 +492,9 @@ export class SvelteKitSharedClientEndpoints {
         // get flows from booleans in body
         let validFlows = [];
         for (let flow of this.validFlows) {
-            if (flow in formData)
-             validFlows.push(flow);
+            if (flow in formData) {
+                validFlows.push(flow);
+            }
         }
         
         const clientUpdate : Partial<OAuthClient> = {}
@@ -666,8 +667,9 @@ export class SvelteKitSharedClientEndpoints {
             // get flows from booleans in body
             let validFlows = [];
             for (let flow of this.validFlows) {
-                if (flow in formData)
-                validFlows.push(flow);
+                if (flow in formData) {
+                    validFlows.push(flow);
+                }
             }
             
             const clientUpdate : Partial<OAuthClient> = {}

@@ -1,6 +1,6 @@
 {
 	"name": "@crossauth/sveltekit",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"license": "Apache-2.0",
 	"description": "Sveltekit adapter for Crossauth authentication package",
 	"private": false,
@@ -8,7 +8,9 @@
 	"scripts": {
 		"preparex": "svelte-kit sync",
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "vite build && npm run prepack",
+		"prepare": "svelte-kit sync || echo ''",
+		"prepack": "svelte-kit sync && svelte-package && publint",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -37,6 +39,7 @@
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/kit": "^2.5.22",
+		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
 		"@types/node": "^25.0.3",
 		"@types/web": "^0.0.154",
@@ -63,6 +66,7 @@
 		"formidable": "^3.5.1",
 		"jwt-decode": "^4.0.0",
 		"minimatch": "^10.0.1",
+		"publint": "0.3.15",
 		"qrcode": "^1.5.4"
 	}
 }
