@@ -8,7 +8,7 @@ import {
     OAuthClientManager,
  } from '@crossauth/backend';
 import type {  OAuthClientStorage } from '@crossauth/backend';
-import type {  OAuthClient } from '@crossauth/common';
+import type { User, OAuthClient } from '@crossauth/common';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, OAuthFlows } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
@@ -18,12 +18,19 @@ import { error, redirect } from '@sveltejs/kit';
 // Return types
 
 /**
+ * Base class for all PageData
+ */
+export interface BasePageData {
+    user?: User,
+    csrfToken?: string,
+}
+/**
  * Return type for {@link SvelteKitUserClientEndpoints.searchClients}
  *  {@link SvelteKitAdminClientEndpoints.searchClients} load.
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
-export type SearchClientsPageData = {
+export interface SearchClientsPageData extends BasePageData {
     ok : boolean,
     clients?: OAuthClient[],
     skip : number,
@@ -43,16 +50,16 @@ export type SearchClientsPageData = {
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
-export type UpdateClientPageData = {
-    ok: boolean,
+export interface UpdateClientPageData extends BasePageData {
+    ok?: boolean,
     client?: OAuthClient,
     client_id?: string;
     clientUsername? : string,
     error? : string,
     errorCode? : number,
     errorCodeName?: string,
-    validFlows: string[],
-    valid_flowNames: {[key:string]:string},
+    validFlows?: string[],
+    valid_flowNames?: {[key:string]:string},
 };
 
 /**
@@ -61,8 +68,8 @@ export type UpdateClientPageData = {
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
-export type UpdateClientFormData = {
-    ok : boolean,
+export interface UpdateClientActionData {
+    ok? : boolean,
     client?: OAuthClient,
     error? : string,
     errorCode? : number,
@@ -77,7 +84,7 @@ export type UpdateClientFormData = {
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
-export type CreateClientPageData = {
+export interface CreateClientPageData extends BasePageData {
     ok: boolean,
     clientUserId? : string|number,
     clientUsername? : string,
@@ -94,7 +101,7 @@ export type CreateClientPageData = {
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
-export type CreateClientFormData = {
+export type CreateClientActionData = {
     ok : boolean,
     client?: OAuthClient,
     error? : string,
@@ -109,8 +116,8 @@ export type CreateClientFormData = {
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
-export type DeleteClientPageData = {
-    ok: boolean,
+export interface DeleteClientPageData extends BasePageData {
+    ok?: boolean,
     client?: OAuthClient,
     client_id?: string;
     clientUsername? : string,
@@ -125,8 +132,8 @@ export type DeleteClientPageData = {
  * 
  * See class documentation for {@link SvelteKitSharedClientEndpoints} for more details.
  */
-export type DeleteClientFormData = {
-    ok : boolean,
+export type DeleteClientActionData = {
+    ok? : boolean,
     error? : string,
     errorCode? : number,
     errorCodeName?: string,
@@ -446,9 +453,9 @@ export class SvelteKitSharedClientEndpoints {
      *   - `confidential` from the body form data: 1, `on`, `yes` or `true` are true
      *   _ `resetSecret` if true (1, `on`, `yes` or `true`), create and return a new secret.  Ignored if not confidential
      *   - Flow names from {@link @crossauth/common!OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
-     * @returns {@link UpdateClientFormData}.  If a new secret was created, it will be placed as plaintext in the client that is returned.
+     * @returns {@link UpdateClientActionData}.  If a new secret was created, it will be placed as plaintext in the client that is returned.
      */
-    protected async updateClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<UpdateClientFormData> {
+    protected async updateClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<UpdateClientActionData> {
         
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -611,9 +618,9 @@ export class SvelteKitSharedClientEndpoints {
      *   - `redirect_uri` from the body form data (space-separated)
      *   - `confidential` from the body form data: 1, `on`, `yes` or `true` are true
      *   - Flow names from {@link @crossauth/common!OAuthFlows} taken from the body form data.  1, `on`, `yes` or `true` are true 
-     * @returns {@link UpdateClientFormData}.  If a secret was created, it will be placed as plaintext in the client that is returned.  A random `client_id` is created.
+     * @returns {@link UpdateClientActionData}.  If a secret was created, it will be placed as plaintext in the client that is returned.  A random `client_id` is created.
      */
-    protected async createClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<CreateClientFormData> {
+    protected async createClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<CreateClientActionData> {
         
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -749,9 +756,9 @@ export class SvelteKitSharedClientEndpoints {
      * 
      * @param event the Sveltekit request event.  The following are taken:
      *   - `client_id` from the URL path parameters
-     * @returns {@link DeleteClientFormData}
+     * @returns {@link DeleteClientActionData}
      */
-    protected async deleteClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<DeleteClientFormData> {
+    protected async deleteClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<DeleteClientActionData> {
         
         try {
             // throw an error if the CSRF token is invalid

@@ -19,11 +19,27 @@ import { JsonOrFormData } from './utils';
 /**
  * Return type for {@link SvelteKitUserEndpoints.login},
  * {@link SvelteKitUserEndpoints.loginFactor2} and the
+ * {@link SvelteKitUserEndpoints.loginEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface LoginPageData {
+    user? : User,
+    csrfToken? : string,
+    error?: string,
+    next? : string,
+    errorCode? : number,
+    errorCodeName?: string,
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.login},
+ * {@link SvelteKitUserEndpoints.loginFactor2} and the
  * {@link SvelteKitUserEndpoints.loginEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type LoginReturn = {
+export interface LoginActionData {
     user? : User,
     error?: string,
     formData?: {[key:string]:string},
@@ -36,12 +52,41 @@ export type LoginReturn = {
 
 /**
  * Return type for {@link SvelteKitUserEndpoints.logout}
+ * {@link SvelteKitUserEndpoints.logoutEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface LogoutPageData {
+    user? : User,
+    csrfToken? : string,
+    error?: string,
+    errorCode? : number,
+    errorCodeName?: string,
+};
+
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.logout}
  * {@link SvelteKitUserEndpoints.logoutEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type LogoutReturn = {
+export interface LogoutActionData {
     ok: boolean,
+    error?: string,
+    errorCode? : number,
+    errorCodeName?: string,
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.signup}
+ * {@link SvelteKitUserEndpoints.signupEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface SignupPageData {
+    user? : User,
+    csrfToken? : string,
     error?: string,
     errorCode? : number,
     errorCodeName?: string,
@@ -53,7 +98,7 @@ export type LogoutReturn = {
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type SignupReturn = {
+export interface SignupActionData {
     user? : UserInputFields,
     factor2Data?:  {
         userData: { [key: string]: any },
@@ -72,11 +117,25 @@ export type SignupReturn = {
 
 /**
  * Return type for {@link SvelteKitUserEndpoints.configureFactor2}
+ * {@link SvelteKitUserEndpoints.configureFactor2Endpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface ConfigureFactor2PageData {
+    user? : User,
+    csrdfToken? : string,
+    error?: string,
+    errorCode? : number,
+    errorCodeName?: string,
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.configureFactor2}
  * {@link SvelteKitUserEndpoints.configureFactor2Endpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type ConfigureFactor2Return = {
+export interface ConfigureFactor2ActionData {
     user? : UserInputFields,
     factor2Data?:  {
         userData: { [key: string]: any },
@@ -94,14 +153,29 @@ export type ConfigureFactor2Return = {
 
 /**
  * Return type for {@link SvelteKitUserEndpoints.verifyEmail}
- * {@link SvelteKitUserEndpoints.verifyEmailTokenEndpoint} action. 
+ * {@link SvelteKitUserEndpoints.verifyEmailTokenEndpoint} load. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type VerifyEmailReturn = {
+export interface VerifyEmailPageData {
     user? : User,
+    csrdfToken? : string,
     error?: string,
-    ok: boolean
+    errorCode? : number,
+    errorCodeName?: string,
+    ok: boolean,
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.requestPasswordReset}
+ * {@link SvelteKitUserEndpoints.resetPasswordEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface RequestPasswordResetPageData {
+    user? : User,
+    csrdfToken? : string,
+    error?: string,
     errorCode? : number,
     errorCodeName?: string,
 };
@@ -112,13 +186,29 @@ export type VerifyEmailReturn = {
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type RequestPasswordResetReturn = {
+export interface RequestPasswordActionData {
     user? : User,
     formData?: {[key:string]:string|undefined},
     error?: string,
-    ok: boolean
+    ok?: boolean
     errorCode? : number,
     errorCodeName?: string,
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.resetPassword}
+ * {@link SvelteKitUserEndpoints.validatePasswordResetToken} and the
+ * {@link SvelteKitUserEndpoints.passwordResetTokenEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface ResetPasswordPageData {
+    user? : User,
+    csrdfToken? : string,
+    error?: string,
+    errorCode? : number,
+    errorCodeName?: string,
+    tokenValidated: boolean,
 };
 
 /**
@@ -128,11 +218,25 @@ export type RequestPasswordResetReturn = {
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type ResetPasswordReturn = {
+export interface ResetPasswordActionData {
     user? : User,
     formData?: {[key:string]:string|undefined},
     error?: string,
-    ok: boolean,
+    errorCode? : number,
+    errorCodeName?: string,
+    ok? : boolean,
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.requestFactor2}
+ * {@link SvelteKitUserEndpoints.factor2Endpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface RequestFactor2PageData {
+    user? : User,
+    csrdfToken? : string,
+    error?: string,
     errorCode? : number,
     errorCodeName?: string,
 };
@@ -143,7 +247,7 @@ export type ResetPasswordReturn = {
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type RequestFactor2Return = {
+export interface RequestFactor2ActionData {
     ok: boolean,
     action?: string,
     factor2?: string,
@@ -155,11 +259,25 @@ export type RequestFactor2Return = {
 
 /**
  * Return type for {@link SvelteKitUserEndpoints.changePassword}
+ * {@link SvelteKitUserEndpoints.changePasswordEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface ChangePasswordPageData {
+    user? : User,
+    formData?: {[key:string]:string|undefined},
+    error?: string,
+    errorCode? : number,
+    errorCodeName?: string,
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.changePassword}
  * {@link SvelteKitUserEndpoints.changePasswordEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type ChangePasswordReturn = {
+export interface ChangePasswordActionData {
     user? : User,
     error?: string,
     formData?: {[key:string]:string},
@@ -174,7 +292,26 @@ export type ChangePasswordReturn = {
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type ChangeFactor2Return = {
+export interface ChangeFactor2PageData {
+    user? : User,
+    error?: string,
+    errorCode? : number,
+    errorCodeName?: string,
+    username?: string,
+    allowedFactor2: {
+        name: string;
+        friendlyName: string;
+        configurable: boolean;
+    }[],
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.changeFactor2}
+ * {@link SvelteKitUserEndpoints.changeFactor2Endpoint} action. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface ChangeFactor2ActionData {
     user? : User,
     error?: string,
     formData?: {[key:string]:string},
@@ -191,14 +328,41 @@ export type ChangeFactor2Return = {
 
 /**
  * Return type for {@link SvelteKitUserEndpoints.deleteUser}
+ * {@link SvelteKitUserEndpoints.deleteUserEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface DeleteUserPageData {
+    user? : User,
+    error?: string,
+    errorCode? : number,
+    errorCodeName?: string,
+};
+
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.deleteUser}
  * {@link SvelteKitUserEndpoints.deleteUserEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type DeleteUserReturn = {
+export interface DeleteUserActionData {
     user? : User,
     error?: string,
     ok: boolean
+    errorCode? : number,
+    errorCodeName?: string,
+};
+
+/**
+ * Return type for {@link SvelteKitUserEndpoints.updateUser}
+ * {@link SvelteKitUserEndpoints.updateUserEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface UpdateUserPageData {
+    user? : User,
+    error?: string,
     errorCode? : number,
     errorCodeName?: string,
 };
@@ -209,7 +373,7 @@ export type DeleteUserReturn = {
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type UpdateUserReturn = {
+export interface UpdateUserActionData {
     user? : User,
     error?: string,
     formData?: {[key:string]:string},
@@ -384,7 +548,7 @@ export class SvelteKitUserEndpoints {
      *   - `factor2Required` if true, second factor authentication is needed
      *     to complete login
      */
-    async login(event : RequestEvent) : Promise<LoginReturn> {
+    async login(event : RequestEvent) : Promise<LoginActionData> {
 
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -569,7 +733,7 @@ export class SvelteKitUserEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-    async logout(event : RequestEvent) : Promise<LogoutReturn> {
+    async logout(event : RequestEvent) : Promise<LogoutActionData> {
 
         try {
             // logout
@@ -667,7 +831,7 @@ export class SvelteKitUserEndpoints {
      *   - `emailVerificationRequired` if true, the user needs to click on
      *     the link emailed to them to complete signup.
      */
-    async signup(event : RequestEvent) : Promise<SignupReturn> {
+    async signup(event : RequestEvent) : Promise<SignupActionData> {
 
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         try {
@@ -862,7 +1026,7 @@ export class SvelteKitUserEndpoints {
      *   - `emailVerificationRequired` if true, the user needs to click on
      *     the link emailed to them to complete signup.
      */
-    async verifyEmail(event : RequestEvent) : Promise<VerifyEmailReturn> {
+    async verifyEmail(event : RequestEvent) : Promise<VerifyEmailPageData> {
         try {
 
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
@@ -917,7 +1081,7 @@ export class SvelteKitUserEndpoints {
      *   - `emailVerificationRequired` if true, the user needs to click on
      *     the link emailed to them to complete configuration.
      */
-    async configureFactor2(event : RequestEvent) : Promise<ConfigureFactor2Return> {
+    async configureFactor2(event : RequestEvent) : Promise<ConfigureFactor2ActionData> {
 
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         let factor2Data : {userData: {[key:string]:any}, username: string, csrfToken? : string, factor2: string}|undefined = undefined;
@@ -1020,7 +1184,7 @@ export class SvelteKitUserEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-    async loginFactor2(event : RequestEvent) : Promise<LoginReturn> {
+    async loginFactor2(event : RequestEvent) : Promise<LoginActionData> {
         if (event.locals.user) {
             return {
                 user: event.locals.user,
@@ -1095,7 +1259,7 @@ export class SvelteKitUserEndpoints {
         }
     }
 
-    async requestPasswordReset(event : RequestEvent) : Promise<RequestPasswordResetReturn> {
+    async requestPasswordReset(event : RequestEvent) : Promise<RequestPasswordActionData> {
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         try {
             // get form data
@@ -1152,7 +1316,7 @@ export class SvelteKitUserEndpoints {
      *     exception was raised
      *   - `formData` the form fields extracted from the request
      */
-    async validatePasswordResetToken(event : RequestEvent) : Promise<ResetPasswordReturn> {
+    async validatePasswordResetToken(event : RequestEvent) : Promise<ResetPasswordActionData> {
         CrossauthLogger.logger.debug(j({msg:"validatePasswordResetToken " + event.request.method}))
         try {
 
@@ -1202,7 +1366,7 @@ export class SvelteKitUserEndpoints {
      *     exception was raised
      *   - `formData` the form fields extracted from the request
      */
-    async resetPassword(event : RequestEvent) : Promise<ResetPasswordReturn> {
+    async resetPassword(event : RequestEvent) : Promise<ResetPasswordActionData> {
         CrossauthLogger.logger.debug(j({msg:"resetPassword"}));
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         try {
@@ -1304,7 +1468,7 @@ export class SvelteKitUserEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-    async requestFactor2(event : RequestEvent) : Promise<RequestFactor2Return> {
+    async requestFactor2(event : RequestEvent) : Promise<RequestFactor2ActionData> {
         try {
 
             if (!event.locals.sessionId) throw new CrossauthError(ErrorCode.Unauthorized, 
@@ -1353,7 +1517,7 @@ export class SvelteKitUserEndpoints {
      *     exception was raised
      *   - `formData` the form fields extracted from the request
      */
-    async changePassword(event : RequestEvent) : Promise<ChangePasswordReturn> {
+    async changePassword(event : RequestEvent) : Promise<ChangePasswordActionData> {
         CrossauthLogger.logger.debug(j({msg:"changePassword"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -1491,7 +1655,7 @@ export class SvelteKitUserEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-    async deleteUser(event : RequestEvent) : Promise<DeleteUserReturn> {
+    async deleteUser(event : RequestEvent) : Promise<DeleteUserActionData> {
         CrossauthLogger.logger.debug(j({msg:"deleteUser"}));
         try {
 
@@ -1553,7 +1717,7 @@ export class SvelteKitUserEndpoints {
      *   - `emailVerificationRequired` if true, the user needs to click on
      *     the link emailed to them to complete signup.
      */
-    async updateUser(event : RequestEvent) : Promise<UpdateUserReturn> {
+    async updateUser(event : RequestEvent) : Promise<UpdateUserActionData> {
         CrossauthLogger.logger.debug(j({msg:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -1640,7 +1804,7 @@ export class SvelteKitUserEndpoints {
      *     exception was raised
      *   - `factor2Data` the data to pass to the factor2 configuration page.
      */
-    async changeFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
+    async changeFactor2(event : RequestEvent) : Promise<ChangeFactor2ActionData> {
         CrossauthLogger.logger.debug(j({msg:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -1761,7 +1925,7 @@ export class SvelteKitUserEndpoints {
      *     exception was raised
      *   - `factor2Data` the data to pass to the factor2 configuration page.
      */
-    async reconfigureFactor2(event : RequestEvent) : Promise<ChangeFactor2Return> {
+    async reconfigureFactor2(event : RequestEvent) : Promise<ChangeFactor2ActionData> {
         CrossauthLogger.logger.debug(j({msg:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -1887,14 +2051,14 @@ export class SvelteKitUserEndpoints {
     };
 
     readonly loginEndpoint = {
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<LoginPageData> => {
             return {
                 next: event.url.searchParams.get("next") ?? this.loginRedirectUrl,
                 ...this.baseEndpoint(event),
             };
         },
         actions: {
-            login: async ( event : RequestEvent ) => {
+            login: async ( event : RequestEvent ) : Promise<LoginActionData> => {
                 const resp = await this.login(event);
                 if (resp?.ok == true && !resp?.factor2Required) 
                     this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
@@ -1905,7 +2069,7 @@ export class SvelteKitUserEndpoints {
                     }
                     return resp;
             },
-            factor2: async ( event : RequestEvent ) => {
+            factor2: async ( event : RequestEvent ) : Promise<LoginActionData> => {
                 const resp = await this.loginFactor2(event);
                 if (resp?.ok == true && !resp?.factor2Required) this.sessionServer.redirect(302, resp.formData?.next ?? this.loginRedirectUrl);
                 return resp;
@@ -1915,7 +2079,7 @@ export class SvelteKitUserEndpoints {
     };
 
     readonly factor2Endpoint  = {
-        load:  async ( event : RequestEvent ) => {
+        load:  async ( event : RequestEvent ) : Promise<RequestFactor2PageData> => {
             const resp = await this.requestFactor2(event);
             if (resp && !resp.error && event.url.searchParams.get("error"))
                 resp.error = event.url.searchParams.get("error") ?? undefined;
@@ -1948,7 +2112,7 @@ export class SvelteKitUserEndpoints {
                 return resp;
             },
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<ChangeFactor2PageData> => {
 
             let username = event.locals.user?.username;
 
@@ -1998,7 +2162,7 @@ export class SvelteKitUserEndpoints {
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<ChangePasswordPageData> => {
             let data : {required?: boolean, next? : string} = {};
             let requiredString = event.url.searchParams.get("required");
             let required : boolean|undefined = undefined;
@@ -2029,7 +2193,7 @@ export class SvelteKitUserEndpoints {
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent )  : Promise<ConfigureFactor2PageData> => {
             return {
                 ...this.baseEndpoint(event),
             };
@@ -2043,7 +2207,7 @@ export class SvelteKitUserEndpoints {
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<DeleteUserPageData> => {
             return {
                 ...this.baseEndpoint(event),
             };
@@ -2057,7 +2221,7 @@ export class SvelteKitUserEndpoints {
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<ResetPasswordActionData> => {
             let data : {required?: boolean, next? : string} = {};
             let requiredString = event.url.searchParams.get("required");
             let required : boolean|undefined = undefined;
@@ -2114,7 +2278,7 @@ export class SvelteKitUserEndpoints {
                     
             }
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<ResetPasswordPageData> => {
             try {
                 if (event.request.method != "POST") {
                     const resp = await this.validatePasswordResetToken(event);

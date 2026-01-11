@@ -12,9 +12,9 @@ import { SvelteKitSharedClientEndpoints } from './sveltekitsharedclientendpoints
 import type {
     SearchClientsPageData,
     UpdateClientPageData,
-    UpdateClientFormData,
+    UpdateClientActionData,
     DeleteClientPageData,
-    DeleteClientFormData,
+    DeleteClientActionData,
 } from './sveltekitsharedclientendpoints';
 
 //////////////////////////////////////////////////////////////////////
@@ -40,13 +40,13 @@ import type {
  * | searchClientsEndpoint      | Returns a paginated set of clients or those matching search | See {@link SearchClientsPageData}                                                | *Not provided*                                                   |                                                                  |           |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | updateClientEndpoint       | Updates a client                                            | See {@link UpdateClientPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link UpdateClientFormData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | client_id  |
+ * |                            |                                                             |                                                                                  | See {@link UpdateClientActionData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | createClientEndpoint       | Creates a new client                                        | See {@link CreateClientPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link CreateClientFormData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | client_id  |
+ * |                            |                                                             |                                                                                  | See {@link CreateClientActionData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | deleteClientEndpoint       | Deletes a client                                            | See {@link DeleteClientPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link DeleteClientFormData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | client_id  |
+ * |                            |                                                             |                                                                                  | See {@link DeleteClientActionData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  */
 export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoints {
@@ -99,7 +99,7 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
      * See {@link SvelteKitSharedClientEndpoints.updateClient_internal}
      */
     async updateClient(event : RequestEvent)
-        : Promise<UpdateClientFormData> {
+        : Promise<UpdateClientActionData> {
 
         if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
             throw this.error(401, "Unauthorized");
@@ -123,7 +123,7 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
      * See {@link SvelteKitSharedClientEndpoints.createClient_internal}
      */
     async createClient(event : RequestEvent)
-        : Promise<UpdateClientFormData> {
+        : Promise<UpdateClientActionData> {
 
         if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
             throw this.error(401, "Unauthorized");
@@ -147,7 +147,7 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
      * See {@link SvelteKitSharedClientEndpoints.deleteClient_internal}
      */
     async deleteClient(event : RequestEvent)
-        : Promise<DeleteClientFormData> {
+        : Promise<DeleteClientActionData> {
 
         if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) 
             throw this.error(401, "Unauthorized");

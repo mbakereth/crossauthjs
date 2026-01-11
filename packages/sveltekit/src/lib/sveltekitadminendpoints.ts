@@ -11,11 +11,31 @@ import { JsonOrFormData } from './utils';
 
 /**
  * Return type for {@link SvelteKitAdminEndpoints.updateUser}
+ * {@link SvelteKitAdminEndpoints.updateUserEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface AdminUpdateUserPageData {
+    user? : User,
+    csrfToken?: string,
+    error?: string,
+    errorCode?: number,
+    errorCodeName?: string,
+    allowedFactor2: {
+        name: string;
+        friendlyName: string;
+        configurable: boolean;
+    }[],
+    editUser?: User,
+};
+
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.updateUser}
  * {@link SvelteKitAdminEndpoints.updateUserEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type AdminUpdateUserReturn = {
+export interface AdminUpdateUserActionData {
     user? : User,
     error?: string,
     errorCode?: number,
@@ -27,11 +47,25 @@ export type AdminUpdateUserReturn = {
 
 /**
  * Return type for {@link SvelteKitAdminEndpoints.changePassword}
+ * {@link SvelteKitAdminEndpoints.changePasswordEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface AdminChangePasswordPageData {
+    user? : User,
+    csrfToken? : string,
+    error?: string,
+    errorCode?: number,
+    errorCodeName?: string,
+};
+
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.changePassword}
  * {@link SvelteKitAdminEndpoints.changePasswordEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type AdminChangePasswordReturn = {
+export interface AdminChangePasswordActionData {
     user? : User,
     error?: string,
     errorCode?: number,
@@ -42,11 +76,30 @@ export type AdminChangePasswordReturn = {
 
 /**
  * Return type for {@link SvelteKitAdminEndpoints.createUser}
+ * {@link SvelteKitAdminEndpoints.createUserEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface AdminCreateUserPageData {
+    user? : User,
+    csrfToken? : string,
+    error?: string,
+    errorCode?: number,
+    errorCodeName?: string,
+    allowedFactor2: {
+        name: string;
+        friendlyName: string;
+        configurable: boolean;
+    }[],
+};
+
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.createUser}
  * {@link SvelteKitAdminEndpoints.createUserEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type AdminCreateUserReturn = {
+export interface AdminCreateUserActionData {
     user? : UserInputFields,
     factor2Data?:  {
         userData: { [key: string]: any },
@@ -63,11 +116,26 @@ export type AdminCreateUserReturn = {
 
 /**
  * Return type for {@link SvelteKitAdminEndpoints.deleteUser}
+ * {@link SvelteKitAdminEndpoints.deleteUserEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface AdminDeleteUserPageData {
+    user? : User,
+    csrfToken? : string,
+    error?: string,
+    errorCode?: number,
+    errorCodeName?: string,
+    username? : string,
+};
+
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.deleteUser}
  * {@link SvelteKitAdminEndpoints.deleteUserEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type AdminDeleteUserReturn = {
+export interface AdminDeleteUserActionData {
     user? : User,
     error?: string,
     errorCode?: number,
@@ -77,11 +145,26 @@ export type AdminDeleteUserReturn = {
 
 /**
  * Return type for {@link SvelteKitAdminEndpoints.searchUsers}
+ * {@link SvelteKitAdminEndpoints.searchUsersEndpoint} load. 
+ * 
+ * See class documentation for {@link SvelteKitUserEndpoints} for more details.
+ */
+export interface SearchUsersPageData {
+    user? : User,
+    editUser? : User,
+    csrfToken? : string,
+    error? : string,
+    errorCode?: number,
+    errorCodeName?: string,
+};
+
+/**
+ * Return type for {@link SvelteKitAdminEndpoints.searchUsers}
  * {@link SvelteKitAdminEndpoints.searchUsersEndpoint} action. 
  * 
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
-export type SearchUsersReturn = {
+export interface SearchUsersActionData {
     ok : boolean,
     users?: User[],
     skip : number,
@@ -238,7 +321,7 @@ export class SvelteKitAdminEndpoints {
      *      were returned.
      */
     async searchUsers(event : RequestEvent, searchTerm? : string, skip? : number, take? : number)
-        : Promise<SearchUsersReturn> {
+        : Promise<SearchUsersActionData> {
 
         try {
 
@@ -358,7 +441,7 @@ export class SvelteKitAdminEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-    async updateUser(user : User, event: RequestEvent) : Promise<AdminUpdateUserReturn> {
+    async updateUser(user : User, event: RequestEvent) : Promise<AdminUpdateUserActionData> {
 
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -450,7 +533,7 @@ export class SvelteKitAdminEndpoints {
      *     exception was raised
      *   - `formData` the form fields extracted from the request
      */
-    async changePassword(user : User, event : RequestEvent) : Promise<AdminChangePasswordReturn> {
+    async changePassword(user : User, event : RequestEvent) : Promise<AdminChangePasswordActionData> {
         CrossauthLogger.logger.debug(j({msg:"changePassword"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -583,7 +666,7 @@ export class SvelteKitAdminEndpoints {
      *   - `emailVerificationRequired` if true, the user needs to click on
      *     the link emailed to them to complete signup.
      */
-    async createUser(event : RequestEvent) : Promise<AdminCreateUserReturn> {
+    async createUser(event : RequestEvent) : Promise<AdminCreateUserActionData> {
 
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         try {
@@ -704,7 +787,7 @@ export class SvelteKitAdminEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-        async deleteUser(event : RequestEvent) : Promise<AdminDeleteUserReturn> {
+        async deleteUser(event : RequestEvent) : Promise<AdminDeleteUserActionData> {
             CrossauthLogger.logger.debug(j({msg:"deleteUser"}));
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             try {
@@ -753,7 +836,7 @@ export class SvelteKitAdminEndpoints {
     }
 
     readonly searchUsersEndpoint = {
-        load: async ( event: RequestEvent ) => {
+        load: async ( event: RequestEvent ) : Promise<SearchUsersPageData> => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             const resp = await this.searchUsers(event);
             return {
@@ -794,7 +877,7 @@ export class SvelteKitAdminEndpoints {
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<AdminUpdateUserPageData> => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             let allowedFactor2 = this.sessionServer.allowedFactor2 ??
                 [{name: "none", friendlyName: "None"}];
@@ -831,7 +914,7 @@ export class SvelteKitAdminEndpoints {
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<SearchUsersPageData> => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             const getUserResp = await this.getUserFromParam(event);
             if (getUserResp.exception || !getUserResp.user) {
@@ -852,7 +935,7 @@ export class SvelteKitAdminEndpoints {
     };
 
     readonly createUserEndpoint = {
-        load: async (event : RequestEvent) => {
+        load: async (event : RequestEvent) : Promise<AdminCreateUserPageData> => {
             if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
             let allowedFactor2 = this.sessionServer?.allowedFactor2 ??
                 [{name: "none", friendlyName: "None"}];
@@ -877,7 +960,7 @@ export class SvelteKitAdminEndpoints {
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) => {
+        load: async ( event : RequestEvent ) : Promise<AdminDeleteUserPageData> => {
             const getUserResp = await this.getUserFromParam(event);
             if (getUserResp.exception || !getUserResp.user) {
                 return {

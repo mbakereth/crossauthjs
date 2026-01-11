@@ -3,25 +3,41 @@
 export { SvelteKitSessionServer, type Header } from './sveltekitsession';
 export type { SvelteKitSessionServerOptions } from './sveltekitsession';
 export type {
-    LoginReturn,
-    LogoutReturn,
-    SignupReturn,
-    ConfigureFactor2Return,
-    VerifyEmailReturn,
-    RequestPasswordResetReturn,
-    ResetPasswordReturn,
-    RequestFactor2Return,
-    ChangePasswordReturn,
-    ChangeFactor2Return,
-    DeleteUserReturn,
-    UpdateUserReturn,
+    LoginPageData,
+    LoginActionData,
+    LogoutPageData,
+    LogoutActionData,
+    SignupPageData,
+    SignupActionData,
+    ConfigureFactor2PageData,
+    ConfigureFactor2ActionData,
+    VerifyEmailPageData,
+    RequestPasswordResetPageData,
+    RequestPasswordActionData,
+    ResetPasswordPageData,
+    ResetPasswordActionData,
+    RequestFactor2PageData,
+    RequestFactor2ActionData,
+    ChangePasswordPageData,
+    ChangePasswordActionData,
+    ChangeFactor2PageData,
+    ChangeFactor2ActionData,
+    DeleteUserPageData,
+    DeleteUserActionData,
+    UpdateUserPageData,
+    UpdateUserActionData,
 } from './sveltekituserendpoints';
 export type {
-    SearchUsersReturn,
-    AdminUpdateUserReturn,
-    AdminCreateUserReturn,
-    AdminDeleteUserReturn,
-    AdminChangePasswordReturn,
+    SearchUsersPageData,
+    SearchUsersActionData,
+    AdminUpdateUserPageData,
+    AdminUpdateUserActionData,
+    AdminCreateUserPageData,
+    AdminCreateUserActionData,
+    AdminDeleteUserPageData,
+    AdminDeleteUserActionData,
+    AdminChangePasswordPageData,
+    AdminChangePasswordActionData,
 } from './sveltekitadminendpoints';
 
 export { SvelteKitServer } from './sveltekitserver';
@@ -35,9 +51,9 @@ export type {
     AuthorizeQueryType,
     ReturnBase,
     AuthorizePageData,
-    AuthorizeFormData,
+    AuthorizeActionData,
     DevicePageData,
-    DeviceFormData,
+    DeviceActionData,
     MfaChallengeBodyType,
     MfaChallengeReturn,
     SvelteKitAuthorizationServerOptions } from './sveltekitoauthserver';
@@ -57,13 +73,14 @@ export type { SvelteKitOAuthResourceServerOptions } from './sveltekitresserver';
 
 export { SvelteKitSharedClientEndpoints, defaultClientSearchFn } from './sveltekitsharedclientendpoints';
 export type { 
+    BasePageData,
     SearchClientsPageData,
     UpdateClientPageData,
-    UpdateClientFormData,
+    UpdateClientActionData,
     CreateClientPageData,
-    CreateClientFormData,
+    CreateClientActionData,
     DeleteClientPageData,
-    DeleteClientFormData,
+    DeleteClientActionData,
 } from './sveltekitsharedclientendpoints';
 export { SvelteKitUserClientEndpoints } from './sveltekituserclientendpoints';
 export { SvelteKitAdminClientEndpoints } from './sveltekitadminclientendpoints';

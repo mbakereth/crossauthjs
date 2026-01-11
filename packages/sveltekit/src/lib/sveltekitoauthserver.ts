@@ -86,7 +86,7 @@ export interface AuthorizePageData extends ReturnBase {
 };
 
 
-export interface AuthorizeFormData extends ReturnBase {
+export interface AuthorizeActionData extends ReturnBase {
     formData? : {[key:string]:string},
 }
 
@@ -100,7 +100,7 @@ export interface DevicePageData extends ReturnBase {
         csrfToken?: string,
     },
     completed: boolean,
-    retryAllowed: boolean,
+    retryAllowed?: boolean,
     user?: User,
     csrfToken? : string,
     ok: boolean,
@@ -110,7 +110,7 @@ export interface DevicePageData extends ReturnBase {
 };
 
 
-export interface DeviceFormData extends ReturnBase {
+export interface DeviceActionData extends ReturnBase {
     authorizationNeeded?: {
         user: User,
         client_id : string,
@@ -304,7 +304,7 @@ export interface SvelteKitAuthorizationServerOptions
  * |                             |                                                            |   - `error_description` if there was an error                                |                                                                  |                                                                 | 
  * | --------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * | deviceEndpoint              | Device flow - authorization endpoint on other device       | `load`:                                                                      | `authorize`: to authorize scopes (call after `userCode`)         | `user_code` query param for GET, form field for POST. Optional  |
- * |                             |                                                            |   See {@link DevicePageData}                                                 |    See {@link DeviceFormData}                                    | If not provided, user will be prompted                          | 
+ * |                             |                                                            |   See {@link DevicePageData}                                                 |    See {@link DeviceActionData}                                    | If not provided, user will be prompted                          | 
  * |                             |                                                            |                                                                              | `userCode` to submit the user code                               | `authorize`: `client_id`, `user_code`, `authorized`             | 
  * | --------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | 
  * 
@@ -1116,7 +1116,7 @@ export class SvelteKitAuthorizationServer {
         }, // load
 
         actions: {
-            default: async ( event : RequestEvent ) : Promise<AuthorizeFormData> => {
+            default: async ( event : RequestEvent ) : Promise<AuthorizeActionData> => {
                 let formData : {[key:string]:string}|undefined = undefined;
                 try {
                     // get form data
@@ -1595,7 +1595,7 @@ export class SvelteKitAuthorizationServer {
         }, // load
 
         actions: {
-            userCode: async ( event : RequestEvent ) : Promise<DeviceFormData> => {
+            userCode: async ( event : RequestEvent ) : Promise<DevicePageData> => {
                 if (!event.locals.user) throw this.error(401, "Access Denied");
 
                 try {
@@ -1627,7 +1627,7 @@ export class SvelteKitAuthorizationServer {
                     }
                 }
             },
-            authorize: async ( event : RequestEvent ) : Promise<DeviceFormData> => {
+            authorize: async ( event : RequestEvent ) : Promise<DevicePageData> => {
                 let formData : {[key:string]:string}|undefined = undefined;
                 try {
                     // get form data

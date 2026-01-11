@@ -10,9 +10,9 @@ import type { RequestEvent } from '@sveltejs/kit';
 import type {
     SearchClientsPageData,
     UpdateClientPageData,
-    UpdateClientFormData,
+    UpdateClientActionData,
     DeleteClientPageData,
-    DeleteClientFormData,
+    DeleteClientActionData,
 } from './sveltekitsharedclientendpoints';
 import { SvelteKitSharedClientEndpoints } from './sveltekitsharedclientendpoints';
 import { CrossauthError, j, CrossauthLogger, ErrorCode } from '@crossauth/common';
@@ -41,13 +41,13 @@ import { CrossauthError, j, CrossauthLogger, ErrorCode } from '@crossauth/common
  * | searchClientsEndpoint      | Returns a paginated set of clients or those matching search | See {@link SearchClientsPageData}                                                | *Not provided*                                                   |                                                                  |           |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | updateClientEndpoint       | Updates a client                                            | See {@link UpdateClientPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link UpdateClientFormData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | client_id  |
+ * |                            |                                                             |                                                                                  | See {@link UpdateClientActionData}                                | See {@link SvelteKitSharedClientEndpoints.updateClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | createClientEndpoint       | Creates a new client                                        | See {@link CreateClientPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link CreateClientFormData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | client_id  |
+ * |                            |                                                             |                                                                                  | See {@link CreateClientActionData}                                | See {@link SvelteKitSharedClientEndpoints.createClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  * | deleteClientEndpoint       | Deletes a client                                            | See {@link DeleteClientPageData}                                                | `default`:                                                       |                                                                  |           |
- * |                            |                                                             |                                                                                  | See {@link DeleteClientFormData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | client_id  |
+ * |                            |                                                             |                                                                                  | See {@link DeleteClientActionData}                                | See {@link SvelteKitSharedClientEndpoints.deleteClient_internal} | client_id  |
  * | -------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | --------- |
  */
 export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints {
@@ -121,7 +121,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
      * See {@link SvelteKitSharedClientEndpoints.updateClient_internal}
      */
     async updateClient(event : RequestEvent)
-        : Promise<UpdateClientFormData> {
+        : Promise<UpdateClientActionData> {
 
         if (!event.locals.user) 
             throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
@@ -185,7 +185,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
      * See {@link SvelteKitSharedClientEndpoints.deleteClient_internal}
      */
     async deleteClient(event : RequestEvent)
-        : Promise<DeleteClientFormData> {
+        : Promise<DeleteClientActionData> {
 
         if (!event.locals.user) 
             throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
@@ -232,7 +232,7 @@ export class SvelteKitUserClientEndpoints extends SvelteKitSharedClientEndpoints
      * See {@link SvelteKitSharedClientEndpoints.createClient_internal}
      */
     async createClient(event : RequestEvent)
-        : Promise<UpdateClientFormData> {
+        : Promise<UpdateClientActionData> {
 
         if (!event.locals.user) 
             throw this.redirect(302, this.loginUrl + "?next="+encodeURIComponent(event.request.url));
