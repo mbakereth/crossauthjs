@@ -396,6 +396,12 @@ export class SvelteKitServer {
                 // OAuth client hook
                 if (this.oAuthClient) {
                     await this.oAuthClient.hook({event});
+                } else if (this.oAuthClients) {
+                    if (this.oAuthClients) {
+                        for (let client of this.oAuthClients ) {
+                            await client.hook({event});
+                        }
+                    }
                 }
 
                 // OAuth res server hook

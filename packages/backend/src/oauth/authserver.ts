@@ -255,6 +255,10 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
     allowedFactor2? : string[],
 
     upstreamClient?: UpstreamClientOptions;
+
+    upstreamClients? : {
+        [key:string]: UpstreamClientOptions
+    }
 }
 
 /**
@@ -323,6 +327,20 @@ export class OAuthAuthorizationServer {
      * The OAuth client to the upstream authz server if configured
      */
     upstreamClientOptions? : UpstreamClientOptions;
+
+    /**
+     * Same as upstreamClient but for case where there is more than one
+     */
+    upstreamClients? : {
+        [key:string]: OAuthClientBackend
+    }
+
+    /**
+     * Same as upstreamClientOptions but for case where there is more than one
+     */
+    upstreamClientOptionss? : {
+        [key:string]: UpstreamClientOptions
+    }
 
     // device code
     private userCodeExpiry = 60*5;
@@ -425,6 +443,22 @@ export class OAuthAuthorizationServer {
             this.upstreamClient = new OAuthClientBackend(options.upstreamClient.authServerBaseUrl, options.upstreamClient.options);
             if (!options.upstreamClient.options.redirect_uri) {
                 throw new CrossauthError(ErrorCode.Configuration, "Must define redirect_uri in upstreamClient options")
+            }
+        } else if (options.upstreamClients) {
+            this.upstreamClientOptionss = options.upstreamClients;
+            this.upstreamClients = {}
+            let sessionDataName : string|undefined = undefined
+            for (let label in this.upstreamClientOptionss) {
+                let coptions = this.upstreamClientOptionss[label]
+                if (!sessionDataName) {
+                    sessionDataName = coptions.sessionDataName
+                } else if (coptions.sessionDataName != sessionDataName) {
+                    throw new CrossauthError(ErrorCode.Configuration, "If defining multiple upstream clients, session data name must be the same for each")
+                }
+                this.upstreamClients[label] = new OAuthClientBackend(coptions.authServerBaseUrl, coptions.options);
+                if (!coptions.options.redirect_uri) {
+                    throw new CrossauthError(ErrorCode.Configuration, "Must define redirect_uri in each upstreamClients options")
+                }
             }
         }
 
@@ -800,6 +834,7 @@ export class OAuthAuthorizationServer {
         bindingCode,
         otp,
         deviceCode,
+        upstreamLabel,
     } : {
         grantType : string, 
         client_id : string, 
@@ -814,7 +849,8 @@ export class OAuthAuthorizationServer {
         oobCode? : string,
         bindingCode?: string,
         otp? : string,
-        deviceCode? : string}) 
+        deviceCode? : string,
+        upstreamLabel? : string}) 
     : Promise<OAuthTokenResponse> {
 
 
@@ -917,14 +953,28 @@ export class OAuthAuthorizationServer {
             // pass onto upstream authz server if one is defined
             // handle the case where we have an upstream authz server
             // either throw redirect or return error
-            if (this.upstreamClient && this.upstreamClientOptions) {
+            let upstreamClient = this.upstreamClient;
+            let upstreamClientOptions = this.upstreamClientOptions;
+            if (this.upstreamClients && this.upstreamClientOptionss) {
+                upstreamClient = this.upstreamClient
+                upstreamClientOptions = this.upstreamClientOptions;
+            } else if (this.upstreamClients && this.upstreamClientOptionss) {
+                if (!upstreamLabel) {
+                    CrossauthLogger.logger.warn(j({"msg": "upstreamClients defined but upstream_label not provided to token endpoint"}))
+                } else {
+                    upstreamClient = this.upstreamClients[upstreamLabel]
+                    upstreamClientOptions = this.upstreamClientOptionss[upstreamLabel];
+
+                }
+            }
+            if (upstreamClient && upstreamClientOptions) {
                 if (!refreshToken) {
                     return {
                         error: "invalid_request",
                         error_description: "If executing the refresh token flow, must  provide a refresh token"
                     }
                 }
-                let upstream_resp = await this.upstreamClient.refreshTokenFlow(refreshToken);
+                let upstream_resp = await upstreamClient.refreshTokenFlow(refreshToken);
                 if (!upstream_resp.access_token) {
                     return {
                         error: "access_denied",
@@ -932,8 +982,8 @@ export class OAuthAuthorizationServer {
                     }
                 }
                 let accessTokenOrPayload : {[key:string]:any}|string|undefined = upstream_resp.access_token;
-                if (this.upstreamClientOptions.accessTokenIsJwt) {
-                    accessTokenOrPayload = await this.upstreamClient.validateAccessToken(upstream_resp.access_token, false);
+                if (upstreamClientOptions.accessTokenIsJwt) {
+                    accessTokenOrPayload = await upstreamClient.validateAccessToken(upstream_resp.access_token, false);
                     if (!accessTokenOrPayload) {
                         return {
                             error: "access_denied",
@@ -941,7 +991,7 @@ export class OAuthAuthorizationServer {
                         };
                     }
                 }
-                const mergeResponse = await this.upstreamClientOptions.tokenMergeFn(accessTokenOrPayload, upstream_resp.id_payload, this.userStorage);    
+                const mergeResponse = await upstreamClientOptions.tokenMergeFn(accessTokenOrPayload, upstream_resp.id_payload, this.userStorage);    
                 if (mergeResponse.authorized) {
                     const ret = await this.createTokensFromPayload(client_id,
                         mergeResponse.access_payload, mergeResponse.id_payload
@@ -957,7 +1007,7 @@ export class OAuthAuthorizationServer {
                         error_description: mergeResponse.error_description
                     };
                 }                            
-    }
+            }
 
             const refreshData = await this.getRefreshTokenData(refreshToken);
             if (!refreshToken || !refreshData || !this.userStorage) {

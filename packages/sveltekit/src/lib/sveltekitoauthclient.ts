@@ -1373,7 +1373,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     async bff(event : RequestEvent, opts: {method?: "GET"|"POST"|"PUT"|"HEAD"|"OPTIONS"|"PATCH"|"DELETE", headers? : Headers, url? : string} = {}) : Promise<Response> {
         try {
             if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
-            if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
+            if (!this.server.oAuthClient && !this.server.oAuthClients) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
             if (!this.bffBaseUrl) throw new CrossauthError(ErrorCode.Configuration, "Must set bffBaseUrl to use bff()");
             if (!this.bffEndpointName) throw new CrossauthError(ErrorCode.Configuration, "Must set bffEndpointName to use bff()");
     
@@ -1506,7 +1506,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         try {
             CrossauthLogger.logger.debug(j({msg: "Called allBff", url: event.url.toString()}));
             if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
-            if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
+            if (!this.server.oAuthClient && !this.server.oAuthClients) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
             if (!this.bffBaseUrl) throw new CrossauthError(ErrorCode.Configuration, "Must set bffBaseUrl to use bff()");
             if (!this.bffEndpointName) throw new CrossauthError(ErrorCode.Configuration, "Must set bffEndpointName to use bff()");
     
@@ -1569,7 +1569,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             await data.loadData(event);
             const decode = data.getAsBoolean("decode") ?? true;
             if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, "Session server must be instantiated to use bff()");
-            if (!this.server.oAuthClient) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
+            if (!this.server.oAuthClient && !this.server.oAuthClients) throw new CrossauthError(ErrorCode.Configuration, "OAuth Client not found"); // pathological but prevents TS errors
 
             if (!this.tokenEndpoints || this.tokenEndpoints.length == 0)
                 throw new CrossauthError(ErrorCode.Unauthorized, "No tokens have been made available");

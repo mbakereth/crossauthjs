@@ -772,7 +772,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                        this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, event);
                        event.locals.csrfToken = undefined;
                    }
-               } else {
+                } else {
                    // for other methods, create a new token only if there is already a valid one
                    if (cookieValue) {
                        try {

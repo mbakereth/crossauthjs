@@ -251,7 +251,7 @@ async function defaultUserSearchFn(searchTerm: string,
  * | baseEndpoint               | This PageData is returned by all endpoints' load function. | - `user` logged in {@link @crossauth/common!User}                                | *Not provided*                                                   |                                                             |           |
  * |                            |                                                            | - `csrfToken` CSRF token if enabled                                              |                                                                  |                                                             |           |                                                                                  | loginPage                | 
  * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
- * | searchUsersEndpoint        | Returns a paginated set of users or those matchign search  | See return of {@link SvelteKitAdminEndpoints.searchUsers}                        | *Not provided*                                                   |                                                             |           |
+ * | searchUsersEndpoint        | Returns a paginated set of users or those matchign search  | See return of searchUsers                                                        | *Not provided*                                                   |                                                             |           |
  * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
  * | updateUserEndpoint         | Update a user's details                                    | - `allowedFactor2` see {@link SvelteKitAdminEndpoints}.`signupEndpoint`          | `default`:                                                       | `default`:                                                  | `id`      |
  * |                            |                                                            | - `editUser` the {@link @crossauth/common!User} being edited                     |  - see {@link SvelteKitAdminEndpoints.updateUser} return          |  - see {@link SvelteKitAdminEndpoints.updateUser} event      |           |
@@ -676,6 +676,7 @@ export class SvelteKitAdminEndpoints {
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
+            console.log(formData)
             const username = data.get('username') ?? "";
             let user : UserInputFields|undefined;
 

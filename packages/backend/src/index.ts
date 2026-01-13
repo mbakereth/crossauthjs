@@ -29,6 +29,9 @@ export type {  DummyFactor2AuthenticatorOptions } from './authenticators/dummyfa
 export {  LdapAuthenticator } from './authenticators/ldapauth';
 export type {  LdapAuthenticatorOptions } from './authenticators/ldapauth';
 export { TotpAuthenticator } from './authenticators/totpauth';
+export {  OidcAuthenticator } from './authenticators/oidcauthenticator';
+export type {  OidcAuthenticatorOptions } from './authenticators/oidcauthenticator';
+
 export { TokenEmailer } from './emailtokens';
 export type { TokenEmailerOptions } from './emailtokens';
 

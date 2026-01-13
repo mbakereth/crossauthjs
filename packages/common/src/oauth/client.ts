@@ -1212,6 +1212,7 @@ export abstract class OAuthClientBase {
         if (this.oauthLogFetch) {
             CrossauthLogger.logger.debug(j({msg: "OAuth fetch", method: "POST", url: url, body: body}))
         }
+
         const resp = await fetch(url, {
             method: 'POST',
             ...options,
@@ -1222,11 +1223,21 @@ export abstract class OAuthClientBase {
             },
             body: body
         });
-        const json = await resp.json();
-        if (this.oauthLogFetch) {
-            CrossauthLogger.logger.debug(j({msg: "OAuth fetch response", body: JSON.stringify(json)}))
+        try {
+            const json = await resp.clone().json();
+
+            if (this.oauthLogFetch) {
+                CrossauthLogger.logger.debug(j({msg: "OAuth fetch response", body: JSON.stringify(json)}))
+            }
+            await resp.json(); // consume
+            return json;
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e)
+            body = await resp.text()
+            CrossauthLogger.logger.debug(j({"msg": "Response is not JSON", "response": body}))
+            throw(ce)
         }
-        return json;
     }
 
     /**

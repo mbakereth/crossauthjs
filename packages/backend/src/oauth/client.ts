@@ -270,6 +270,7 @@ export async function idTokenUserCreationFunction(idToken : {[key:string]:any},
     _idTokenMatchField : string) : Promise<User|undefined> {
 
     return {
+        ...idToken,
         id : idToken.userid ?? idToken.sub,
         username : idToken.sub,
         state : idToken.state ?? "active",

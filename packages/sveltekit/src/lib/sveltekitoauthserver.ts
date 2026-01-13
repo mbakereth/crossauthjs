@@ -16,6 +16,7 @@ import type {
     OAuthAuthorizationServerOptions,
     DoubleSubmitCsrfTokenOptions,
     Cookie,
+    UpstreamClientOptions,
  } from '@crossauth/backend';
 import { SvelteKitServer } from './sveltekitserver';
 import {
@@ -32,6 +33,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { type CookieSerializeOptions } from 'cookie';
+import { OAuthClientBackend } from '@crossauth/backend';
 
 const DEFAULT_UPSTREAM_SESSION_DATA_NAME = "upstreamoauth";
 
@@ -916,7 +918,32 @@ export class SvelteKitAuthorizationServer {
 
             // handle the case where we have an upstream authz server
             // either throw redirect or return error
+            let upstreamClient : OAuthClientBackend|undefined = undefined;
+            let upstreamClientOptions : UpstreamClientOptions|undefined = undefined;
+            let upstreamLabel : string|undefined = undefined;
             if (this.authServer.upstreamClient && this.authServer.upstreamClientOptions) {
+                upstreamClient = this.authServer.upstreamClient;
+                upstreamClientOptions = this.authServer.upstreamClientOptions
+            }
+            else if (this.authServer.upstreamClients && this.authServer.upstreamClientOptionss) {
+                upstreamLabel = event.url.searchParams.get("upstream") ?? undefined;
+                if (upstreamLabel)  {
+                    if (upstreamLabel in this.authServer.upstreamClients) {
+                        upstreamClient = this.authServer.upstreamClients[upstreamLabel]
+                        upstreamClientOptions = this.authServer.upstreamClientOptionss[upstreamLabel]
+                    } else {
+                        CrossauthLogger.logger.warn(j({"msg": "No upstream client defined for " + upstreamLabel}))
+                        return {
+                            ok: false,
+                            error: "server_error",
+                            error_description: "No upstream client defined for " + upstreamLabel
+                        }
+                    }
+                } else {
+                    CrossauthLogger.logger.warn(j({"msg": "upstreamClients defined but no upstream parameter given in authorize request"}))
+                }
+            }
+            if (upstreamClient && upstreamClientOptions) {
 
 
                 const state = Crypto.randomValue(32);
@@ -939,7 +966,7 @@ export class SvelteKitAuthorizationServer {
                     if (query.scope) scopes = decodeURIComponent(query.scope).split(" ");
                     scopes = scopes?.filter((a) => (a.length > 0));
 
-                    const resp = await this.authServer.upstreamClient.startAuthorizationCodeFlow(state, query.scope, query.code_challenge, query.code_challenge!=undefined);
+                    const resp = await upstreamClient.startAuthorizationCodeFlow(state, query.scope, query.code_challenge, query.code_challenge!=undefined);
                     if (resp.error) {
                         return {
                             ok: false,
@@ -962,8 +989,9 @@ export class SvelteKitAuthorizationServer {
                             code:codeResp.code,
                             orig_client_id: query.client_id,
                             orig_redirect_uri: query.redirect_uri,
-                            orig_state: query.state};
-                        if (!this.authServer.upstreamClientOptions.options.redirect_uri) {
+                            orig_state: query.state,
+                            upstream_label: upstreamLabel};
+                        if (!upstreamClientOptions.options.redirect_uri) {
                             return { 
                                 ok: false,
                                 error: "server_error", 
@@ -972,7 +1000,7 @@ export class SvelteKitAuthorizationServer {
         
                         }
                         // we need a session to save the state
-                        const sessionDataName = this.authServer.upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
+                        const sessionDataName = upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
                         await this.storeSessionData(event, sessionData, sessionDataName);
                         //await this.authServer.setAuthorizationCodeData(codeResp.code, sessionData);
                         /*let url = this.authServer.upstreamClientOptions.authServerBaseUrl + 
@@ -1217,8 +1245,40 @@ export class SvelteKitAuthorizationServer {
 
                 // if the grant type is authorization_code and we have an upstream client
                 // defined, we should already have tokens stored with the authoriazion code
+                let upstreamClient : OAuthClientBackend|undefined = undefined;
+                let upstreamClientOptions : UpstreamClientOptions|undefined = undefined;
+                let upstreamLabel : string|undefined = undefined;
+                if (formData.grant_type == "authorization_code") {
+                    if (this.authServer.upstreamClient && this.authServer.upstreamClientOptions) {
+                        upstreamClient = this.authServer.upstreamClient;
+                        upstreamClientOptions = this.authServer.upstreamClientOptions
+                    }
+                    else if (this.authServer.upstreamClients && this.authServer.upstreamClientOptionss) {
+                        upstreamLabel = event.url.searchParams.get("upstream") ?? undefined;
+                        if (!upstreamLabel) {
+                            upstreamLabel = formData.upstream
+                        }
+                        if (upstreamLabel)  {
+                            if (upstreamLabel in this.authServer.upstreamClients) {
+                                upstreamClient = this.authServer.upstreamClients[upstreamLabel]
+                                upstreamClientOptions = this.authServer.upstreamClientOptionss[upstreamLabel]
+                            } else {
+                                CrossauthLogger.logger.warn(j({"msg": "No upstream client defined for " + upstreamLabel}))
+                                return json({
+                                    ok: false,
+                                    error: "server_error",
+                                    error_description: "No upstream client defined for " + upstreamLabel
+                                }, {status: 500})
+                            }
+                        } else {
+                            CrossauthLogger.logger.warn(j({"msg": "upstreamClients defined but no upstream parameter given in authorize request"}))
+                        }
+
+                    }
+                }
+
                 if (formData.grant_type == "authorization_code" && 
-                    this.authServer.upstreamClient && this.authServer.upstreamClientOptions) {
+                    upstreamClient && upstreamClientOptions) {
                         const codeData = await this.authServer.getAuthorizationCodeData(formData.code);
                         if (codeData == undefined) {
                             return json({
@@ -1229,6 +1289,7 @@ export class SvelteKitAuthorizationServer {
                         if (!codeData.access_token) {
                             return json({error: "access_denied", error_description: "No access token was issued"}, {status: 401});
                         } 
+
                         await this.authServer.deleteAuthorizationCodeData(formData.code);
                         return json({
                             access_token: codeData.access_token,
@@ -1287,6 +1348,7 @@ export class SvelteKitAuthorizationServer {
                     otp: formData.otp,
                     refreshToken: refreshToken,
                     deviceCode: formData.device_code,
+                    upstreamLabel,
                 });
 
 
@@ -1333,7 +1395,19 @@ export class SvelteKitAuthorizationServer {
                     });
                 }
                 CrossauthLogger.logger.debug(j({msg: "upstreamRedirectUriEndpoint"}))
-                if (!this.authServer.upstreamClient || !this.authServer.upstreamClientOptions.tokenMergeFn) {
+                let upstreamClient : OAuthClientBackend|undefined = undefined;
+                let upstreamClientOptions : UpstreamClientOptions|undefined = undefined;
+                if (this.authServer.upstreamClient && this.authServer.upstreamClientOptions) {
+                    upstreamClient = this.authServer.upstreamClient
+                    upstreamClientOptions = this.authServer.upstreamClientOptions
+                } else if (this.authServer.upstreamClients && this.authServer.upstreamClientOptionss) {
+                    for (let label in this.authServer.upstreamClients) {
+                        upstreamClient = this.authServer.upstreamClients[label]
+                        upstreamClientOptions = this.authServer.upstreamClientOptionss[label]
+                        break
+                    }
+                }
+                if (!upstreamClient || !upstreamClientOptions?.tokenMergeFn) {
                     CrossauthLogger.logger.error(j({msg: "upstreamRedirectUri endpoint called but no upstreamClient or merge function set"}));
                     return this.redirectError(oauthData.orig_redirect_uri, "server_error",  "upstreamRedirectUri endpoint called but no upstreamClient or merge function set")
                 } 
@@ -1342,13 +1416,19 @@ export class SvelteKitAuthorizationServer {
                 const state = event.url.searchParams.get("state") ?? undefined;
                 const error = event.url.searchParams.get("error") ?? undefined;
                 const error_description = event.url.searchParams.get("error") ?? undefined;
-                const sessionDataName = this.authServer.upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
+                const sessionDataName = upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
                 oauthData = await this.svelteKitServer.sessionAdapter?.getSessionData(event, sessionDataName) ?? {};
+                if (this.authServer.upstreamClients && (!("upstream_label" in oauthData ) || !(oauthData.upstream_label in this.authServer.upstreamClients))) {
+                    return this.redirectError(oauthData.orig_redirect_uri, "server_error", "Invalid upstream client found in saessopm")
+                }
+                if (this.authServer.upstreamClients) {
+                    upstreamClient = this.authServer.upstreamClients[oauthData.upstream_label]
+                }
                 if (oauthData?.state != state) {
                     CrossauthLogger.logger.error(j({msg: "State does not match"}))
                     throw new CrossauthError(ErrorCode.Unauthorized, "State does not match");
                 }
-                const resp =  await this.authServer.upstreamClient.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
+                const resp =  await upstreamClient.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
                     error,
                     error_description);
                     if (resp.error) {
@@ -1357,8 +1437,8 @@ export class SvelteKitAuthorizationServer {
                 }
 
                 let access_token : string|{[key:string]:any}|undefined = resp.access_token;
-                if (resp.access_token && this.authServer.upstreamClientOptions.accessTokenIsJwt) {
-                    const resp1 = await this.authServer.upstreamClient.getAccessPayload(resp.access_token, false);
+                if (resp.access_token && upstreamClientOptions.accessTokenIsJwt) {
+                    const resp1 = await upstreamClient.getAccessPayload(resp.access_token, false);
                     if (resp1.error) return json(resp1);
                     else if (resp1.payload) access_token =resp1.payload;
                     else {
@@ -1367,7 +1447,7 @@ export class SvelteKitAuthorizationServer {
                     }   
                 }
 
-                const mergeResponse = await this.authServer.upstreamClientOptions.tokenMergeFn(access_token??"", resp.id_payload, this.authServer.userStorage);
+                const mergeResponse = await upstreamClientOptions.tokenMergeFn(access_token??"", resp.id_payload, this.authServer.userStorage);
                 if (mergeResponse.authorized) {
                         const ret = await this.authServer.createTokensFromPayload(oauthData.orig_client_id,
                             mergeResponse.access_payload, mergeResponse.id_payload

@@ -120,6 +120,7 @@ export abstract class Authenticator {
      * Implementations should use this to validate secrets against local requirements,
      * eg minimum password length.
      * @param params user-provided secrets to validate
+     * @returns An array of error messages.
      */
     abstract validateSecrets(params : AuthenticationParameters) : string[];
 
