@@ -66,7 +66,7 @@ export type TokenMergeFn =
             Promise<{authorized: boolean,
                 error? : string, 
                 error_description? : string, 
-                access_payload?: {[key:string]:any}, 
+                access_payload?: string|{[key:string]:any}, 
                 id_payload?: {[key:string]:any}}>;
 
 /**
@@ -994,7 +994,7 @@ export class OAuthAuthorizationServer {
                 const mergeResponse = await upstreamClientOptions.tokenMergeFn(accessTokenOrPayload, upstream_resp.id_payload, this.userStorage);    
                 if (mergeResponse.authorized) {
                     const ret = await this.createTokensFromPayload(client_id,
-                        mergeResponse.access_payload, mergeResponse.id_payload
+                        typeof(mergeResponse.access_payload) == "string" ? undefined : mergeResponse.access_payload, mergeResponse.id_payload
                     );
                     upstream_resp.access_token = ret.access_token;
                     upstream_resp.id_token = ret.id_token;

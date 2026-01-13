@@ -23,6 +23,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { type MaybePromise } from './tests/sveltemocks';
+import { type AuthorizeQueryType } from './sveltekitoauthserver'
 
 export type SvelteKitErrorFn = (server: SvelteKitServer,
     event: RequestEvent,
@@ -659,7 +660,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             client: SvelteKitOAuthClient,
             event : RequestEvent,
             silet: boolean,
-            setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) 
+            setUserFn : (event: RequestEvent, 
+            token : {[key:string]:any}) => Promise<void>) 
             => Promise<Response|TokenReturn|undefined> = sendJson;
     readonly errorFn : SvelteKitErrorFn = jsonError;
     private loginUrl : string = "/login";
@@ -1838,14 +1840,22 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 }
 
                 let scope = event.url.searchParams.get("scope") ?? undefined;
+                let upstream = event.url.searchParams.get("upstream") ?? undefined;
+                let next = event.url.searchParams.get("next") ?? undefined;
                 if (scope == "") scope = undefined;
                 const state = this.randomValue(this.stateLength);
-                const sessionData = {scope, state};
+                const sessionData = { scope, state };
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
         
+                if (upstream && next && this.server.oAuthAuthServer) {
+                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                }
+
+                // the following call returns a constructed url for the
+                // auth server's /authorize endpoint
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, scope);
+                    await this.startAuthorizationCodeFlow(state, { scope, upstream });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1858,7 +1868,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         msg: `OAuth redirect`,
                     }));    
                 }
-                throw this.redirect(302, url);
+                throw this.redirect(302, url);  // to auth server's authorize endpoint
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1896,13 +1906,16 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
+                let upstream = event.url.searchParams.get("upstream") ?? undefined;
                 const state = this.randomValue(this.stateLength);
                 const sessionData = {scope, state};
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
 
+                // the following call returns a constructed url for the
+                // auth server's /authorize endpoint
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, scope);
+                    await this.startAuthorizationCodeFlow(state, { scope, upstream });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1919,7 +1932,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         msg: `OAuth redirect`,
                     }));    
                 }
-                throw this.redirect(302, url);
+                throw this.redirect(302, url);   // to auth server's authorize endpoint
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1958,14 +1971,17 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
+                let upstream = event.url.searchParams.get("upstream") ?? undefined;
                 const state = this.randomValue(this.stateLength);
                 const {codeChallenge, codeVerifier} = await this.codeChallengeAndVerifier();
                 const sessionData = {scope, state, codeChallenge, codeVerifier};
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
 
+                // the following call returns a constructed url for the
+                // auth server's /authorize endpoint
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, scope, codeChallenge, true);
+                    await this.startAuthorizationCodeFlow(state, { scope, codeChallenge, pkce: true, upstream });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1978,7 +1994,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         msg: `OAuth redirect`,
                     }));    
                 }
-                throw this.redirect(302, url);
+                throw this.redirect(302, url);  // to auth server's authorize endpoint
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -2020,14 +2036,17 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
 
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
+                let upstream = event.url.searchParams.get("upstream") ?? undefined;
                 const state = this.randomValue(this.stateLength);
                 const {codeChallenge, codeVerifier} = await this.codeChallengeAndVerifier();
                 const sessionData = {scope, state, codeChallenge, codeVerifier};
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
 
+                // the following call returns a constructed url for the
+                // auth server's /authorize endpoint
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, scope, codeChallenge, true);
+                    await this.startAuthorizationCodeFlow(state, { scope, codeChallenge, pkce: true, upstream });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -2044,7 +2063,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         msg: `OAuth redirect`,
                     }));    
                 }
-                throw this.redirect(302, url);
+                throw this.redirect(302, url);  // to auth server's authorize endpoint
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -2089,18 +2108,23 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 if (oauthData?.state != state) {
                     throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
                 }
-                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
-                    error,
-                    error_description));
-                    if (resp.error) return this.errorFn(this.server, event, CrossauthError.fromOAuthError(resp.error, resp.error_description));
 
-                    if (resp.error) {
-                        const ce = CrossauthError.fromOAuthError(resp.error, 
-                        resp.error_description);
-                        return await this.errorFn(this.server,
-                        event,
-                        ce);
+                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint({
+                    code, 
+                    scope: oauthData?.scope, 
+                    codeVerifier: oauthData?.codeVerifier,
+                    error,
+                    errorDescription: error_description}));
+                if (resp.error) return this.errorFn(this.server, event, CrossauthError.fromOAuthError(resp.error, resp.error_description));
+
+                if (resp.error) {
+                    const ce = CrossauthError.fromOAuthError(resp.error, 
+                    resp.error_description);
+                    return await this.errorFn(this.server,
+                    event,
+                    ce);
                 }
+
                 return await this.receiveTokenFn(resp, 
                     this, 
                     event, 
@@ -2150,9 +2174,12 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 if (oauthData?.state != state) {
                     throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
                 }
-                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint(code, oauthData?.scope, oauthData?.codeVerifier,
+                const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint({
+                    code, 
+                    scope: oauthData?.scope, 
+                    codeVerifier: oauthData?.codeVerifier,
                     error,
-                    error_description));
+                    errorDescription: error_description}));
                 if (resp.error) return {
                     ok: false,
                     error: resp.error,

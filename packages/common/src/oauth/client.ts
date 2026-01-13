@@ -380,15 +380,23 @@ export abstract class OAuthClientBase {
      *            if no error
      */
     async startAuthorizationCodeFlow(state: string, 
-        scope?: string,
-        codeChallenge? : string, 
-        pkce: boolean = false) : 
+        {
+            scope,
+            codeChallenge, 
+            pkce = false,
+            upstream,
+        } : {
+            scope?: string,
+            codeChallenge? : string, 
+            pkce?: boolean,
+            upstream? : string
+        }) : 
         Promise<{
             url?: string,
             error?: string,
             error_description?: string
         }> {
-        CrossauthLogger.logger.debug(j({msg: "Starting authorization code flow"}));
+        CrossauthLogger.logger.debug(j({msg: "Starting authorization code flow, scope "+scope}));
         if (!this.oidcConfig) await this.loadConfig();      
         if (!this.oidcConfig?.response_types_supported.includes("code")
             || !this.oidcConfig?.response_modes_supported.includes("query")) {
@@ -427,6 +435,11 @@ export abstract class OAuthClientBase {
 
         if (pkce && codeChallenge) {
             url += "&code_challenge=" + codeChallenge;
+        }
+
+        if (upstream) {
+            url += "&upstream=" + encodeURIComponent(upstream);
+
         }
 
         return {url: url};
@@ -517,10 +530,22 @@ export abstract class OAuthClientBase {
      * @returns The {@link OAuthTokenResponse} from the `token` endpoint
      *          request, or `error` and `error_description`.
      */
-    async redirectEndpoint(code?: string, scope?: string,
-        codeVerifier? : string,
-        error?: string,
-        errorDescription?: string) : Promise<OAuthTokenResponse>{
+    async redirectEndpoint(
+        { 
+            code, 
+            scope,
+            codeVerifier,
+            error,
+            errorDescription,
+            next,
+        }: {
+            code?: string, 
+            scope?: string,
+            codeVerifier? : string,
+            error?: string,
+            errorDescription?: string,
+            next? : string,
+        }) : Promise<OAuthTokenResponse>{
         if (!this.oidcConfig) await this.loadConfig();      
         if (error || !code) {
             if (!error) error = "server_error";

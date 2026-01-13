@@ -304,7 +304,12 @@ export class OAuthClient extends OAuthClientBase {
                 error_description: "Invalid state"
             }
         }
-        const resp = await this.redirectEndpoint(code, this.scope, this.#codeVerifier, error, error_description);
+        const resp = await this.redirectEndpoint({
+            code,
+            scope: this.scope, 
+            codeVerifier: this.#codeVerifier, 
+            error, 
+            errorDescription: error_description});
         if (resp.error) {
             const cerr = CrossauthError.fromOAuthError(resp.error, error_description);
             CrossauthLogger.logger.debug(j({err: cerr}));
@@ -684,7 +689,7 @@ export class OAuthClient extends OAuthClientBase {
                 this.#codeVerifier = ret.codeVerifier
                 this.#state = state;
             }
-            const resp  = await super.startAuthorizationCodeFlow(state, scope, this.#codeChallenge, pkce);
+            const resp  = await super.startAuthorizationCodeFlow(state, { scope, codeChallenge: this.#codeChallenge, pkce });
         //await this.receiveTokens(resp);
         if (resp.error || !resp.url) {
             const cerr = CrossauthError.fromOAuthError(

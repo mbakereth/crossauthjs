@@ -676,7 +676,6 @@ export class SvelteKitAdminEndpoints {
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
-            console.log(formData)
             const username = data.get('username') ?? "";
             let user : UserInputFields|undefined;
 

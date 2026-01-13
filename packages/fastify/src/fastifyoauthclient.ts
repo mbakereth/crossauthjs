@@ -572,6 +572,7 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
     client: FastifyOAuthClient,
     request: FastifyRequest,
     reply?: FastifyReply,
+    prefix? : string,
     ) {
         if (!client.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
             "Cannot update session data if sessions not enabled");
@@ -585,10 +586,16 @@ async function updateSessionData(oauthResponse: OAuthTokenResponse,
                 "OAuth server did not return an expiry for the access token");
         }
         const expires_at = Date.now() + (expires_in)*1000;
-        let sessionData : {[key:string]:any}= {...oauthResponse, expires_at }
+        let sessionData : {[key:string]:any} = {}
+        if (!prefix) {
+            sessionData = {...oauthResponse, expires_at } 
+        } else {
+            sessionData = { expires_at }
+            Object.keys(oauthResponse).forEach((key) => {sessionData[prefix + key] = (oauthResponse as {[key:string]:string})[key]})
+        }
         if ("id_token" in oauthResponse) {
             let payload = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
-            if (payload) sessionData["id_token"] = payload;
+            if (payload) sessionData[(prefix??"")+"id_token"] = payload;
         }
         await client.storeSessionData(sessionData, request, reply)
     }
@@ -951,7 +958,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 const sessionData = {scope: request.query.scope, state};
                 await this.storeSessionData(sessionData, request, reply);
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, request.query.scope);
+                    await this.startAuthorizationCodeFlow(state, { scope: request.query.scope });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1025,8 +1032,8 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 const sessionData = {scope: request.query.scope, state, codeChallenge, codeVerifier};
                 await this.storeSessionData(sessionData, request, reply);
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, request.query.scope, codeChallenge,
-                        true);
+                    await this.startAuthorizationCodeFlow(state, { scope: request.query.scope, codeChallenge,
+                        pkce: true});
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1070,11 +1077,17 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 if (!oauthData?.state || oauthData?.state != request.query.state) {
                     throw new CrossauthError(ErrorCode.Unauthorized, "State does not match");
                 }
+
                 let resp = 
-                    await this.redirectEndpoint(request.query.code, oauthData?.scope, oauthData?.codeVerifier,
-                        request.query.error,
-                        request.query.error_description);
-                try {
+                    await this.redirectEndpoint({ 
+                        code: request.query.code, 
+                        scope: oauthData?.scope, 
+                        codeVerifier: oauthData?.codeVerifier,
+                        error: request.query.error,
+                        errorDescription: request.query.error_description,
+                    } );
+
+                    try {
                     if (resp.error) {
                         const ce = CrossauthError.fromOAuthError(resp.error, 
                             resp.error_description);
@@ -1083,6 +1096,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                             reply,
                             ce);
                     }
+
                     return await this.receiveTokenFn(resp, this, request, reply);
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
