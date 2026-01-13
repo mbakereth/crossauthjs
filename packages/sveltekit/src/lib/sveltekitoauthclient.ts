@@ -1907,10 +1907,15 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
                 let upstream = event.url.searchParams.get("upstream") ?? undefined;
+                let next = event.url.searchParams.get("next") ?? undefined;
                 const state = this.randomValue(this.stateLength);
                 const sessionData = {scope, state};
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
+
+                if (upstream && next && this.server.oAuthAuthServer) {
+                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                }
 
                 // the following call returns a constructed url for the
                 // auth server's /authorize endpoint
@@ -1972,11 +1977,16 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
                 let upstream = event.url.searchParams.get("upstream") ?? undefined;
+                let next = event.url.searchParams.get("next") ?? undefined;
                 const state = this.randomValue(this.stateLength);
                 const {codeChallenge, codeVerifier} = await this.codeChallengeAndVerifier();
                 const sessionData = {scope, state, codeChallenge, codeVerifier};
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
+
+                if (upstream && next && this.server.oAuthAuthServer) {
+                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                }
 
                 // the following call returns a constructed url for the
                 // auth server's /authorize endpoint
@@ -2037,11 +2047,16 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 if (scope == "") scope = undefined;
                 let upstream = event.url.searchParams.get("upstream") ?? undefined;
+                let next = event.url.searchParams.get("next") ?? undefined;
                 const state = this.randomValue(this.stateLength);
                 const {codeChallenge, codeVerifier} = await this.codeChallengeAndVerifier();
                 const sessionData = {scope, state, codeChallenge, codeVerifier};
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
+
+                if (upstream && next && this.server.oAuthAuthServer) {
+                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                }
 
                 // the following call returns a constructed url for the
                 // auth server's /authorize endpoint
