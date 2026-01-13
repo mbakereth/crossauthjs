@@ -956,14 +956,16 @@ export class OAuthAuthorizationServer {
             let upstreamClient = this.upstreamClient;
             let upstreamClientOptions = this.upstreamClientOptions;
             if (this.upstreamClients && this.upstreamClientOptionss) {
-                upstreamClient = this.upstreamClient
-                upstreamClientOptions = this.upstreamClientOptions;
-            } else if (this.upstreamClients && this.upstreamClientOptionss) {
-                if (!upstreamLabel) {
-                    CrossauthLogger.logger.warn(j({"msg": "upstreamClients defined but upstream_label not provided to token endpoint"}))
-                } else {
-                    upstreamClient = this.upstreamClients[upstreamLabel]
-                    upstreamClientOptions = this.upstreamClientOptionss[upstreamLabel];
+                let parts = refreshToken?.split(":", 2)
+                if (parts?.length == 2) {
+                    let label = parts[0]
+                    if (label in this.upstreamClients) {
+                        upstreamClient = this.upstreamClients[label]
+                        upstreamClientOptions = this.upstreamClientOptionss[label];
+                        refreshToken = parts[1]
+                    } else {
+                        CrossauthLogger.logger.warn(j({"msg": "Refresh token with invalid label " + label + " received"}))
+                    }
 
                 }
             }

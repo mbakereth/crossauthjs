@@ -1562,7 +1562,7 @@ export class SvelteKitAuthorizationServer {
                             access_token: ret.access_token,
                             id_token: ret.id_token,
                             id_payload: ret.id_token,
-                            refresh_token: resp.refresh_token,
+                            refresh_token: resp.refresh_token ? upstream + ":" + resp.refresh_token : undefined,
                             expires_in: ret.expires_in,
                             upstream
                         }
