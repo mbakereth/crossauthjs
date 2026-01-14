@@ -1642,7 +1642,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     async tokensResponse(event : RequestEvent, token: string|string[]) : Promise<Response> {
         const resp = await this.tokens(event, token);
         if (resp.body) return json(resp.body, {status: resp.status});
-        return json(null, {status: resp.status});
+        return json({error: "null body"}, {status: resp.status});
     }
 
     private async startDeviceCodeFlow_internal(event : RequestEvent) : Promise<OAuthDeviceAuthorizationResponse&{verification_uri_qrdata? : string}> {
@@ -1848,7 +1848,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
         
-                if (upstream && next && this.server.oAuthAuthServer) {
+                // if we have an upstream client, this call will save the original /authorize call and redirect to
+                // the upstream auth server's /authorize endpoint
+                if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
                     await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
                 }
 
@@ -1913,7 +1915,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
 
-                if (upstream && next && this.server.oAuthAuthServer) {
+                // if we have an upstream client, this call will save the original /authorize call and redirect to
+                // the upstream auth server's /authorize endpoint
+                if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
                     await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
                 }
 
@@ -1984,7 +1988,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
 
-                if (upstream && next && this.server.oAuthAuthServer) {
+                // if we have an upstream client, this call will save the original /authorize call and redirect to
+                // the upstream auth server's /authorize endpoint
+                if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
                     await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
                 }
 
@@ -2054,7 +2060,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
 
-                if (upstream && next && this.server.oAuthAuthServer) {
+                // if we have an upstream client, this call will save the original /authorize call and redirect to
+                // the upstream auth server's /authorize endpoint
+                if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
                     await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
                 }
 
@@ -2124,6 +2132,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
                 }
 
+                // call the auth server's token endpoint to exchange the code for new tokens
                 const resp =  this.errorIfIdTokenInvalid(await this.redirectEndpoint({
                     code, 
                     scope: oauthData?.scope, 

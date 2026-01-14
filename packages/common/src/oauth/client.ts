@@ -537,14 +537,12 @@ export abstract class OAuthClientBase {
             codeVerifier,
             error,
             errorDescription,
-            next,
         }: {
             code?: string, 
             scope?: string,
             codeVerifier? : string,
             error?: string,
             errorDescription?: string,
-            next? : string,
         }) : Promise<OAuthTokenResponse>{
         if (!this.oidcConfig) await this.loadConfig();      
         if (error || !code) {

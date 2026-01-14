@@ -302,11 +302,11 @@ export class OAuthAuthorizationServer {
     private secretOrPrivateKey = "";
     private secretOrPublicKey = "";
     private persistAccessToken = false;
-    private issueRefreshToken = false;
+    readonly issueRefreshToken = false;
     private opaqueAccessToken = false;
     private accessTokenExpiry : number|null = 60*60;
     private refreshTokenExpiry : number|null = 60*60;
-    private rollingRefreshToken : boolean = true;
+    readonly rollingRefreshToken : boolean = true;
     private authorizationCodeExpiry : number|null = 60*5;
     private mfaTokenExpiry : number|null = 60*5;
     private clockTolerance : number = 10;
@@ -834,7 +834,6 @@ export class OAuthAuthorizationServer {
         bindingCode,
         otp,
         deviceCode,
-        upstreamLabel,
     } : {
         grantType : string, 
         client_id : string, 
@@ -850,7 +849,7 @@ export class OAuthAuthorizationServer {
         bindingCode?: string,
         otp? : string,
         deviceCode? : string,
-        upstreamLabel? : string}) 
+    }) 
     : Promise<OAuthTokenResponse> {
 
 
@@ -950,11 +949,25 @@ export class OAuthAuthorizationServer {
 
         } else if (grantType == "refresh_token") {
 
-            // pass onto upstream authz server if one is defined
-            // handle the case where we have an upstream authz server
-            // either throw redirect or return error
+            // Three situations:
+            // 1. we issues a refresh token but not the upstream server
+            //    - this triggers normal behaviour
+            // 2. the upstream server issued a refresh token but not us
+            //    - the token is prefixed with the upstream
+            // 3. we both issued a refresh token
+            //    - perform regular process, fetch upstream token and send
+            //      to upstream server
+
             let upstreamClient = this.upstreamClient;
             let upstreamClientOptions = this.upstreamClientOptions;
+            let upstreamRefreshToken : string|undefined = undefined;
+            let upstreamLabel : string|undefined = undefined;
+            let refreshData : {[key:string]:any}|undefined = undefined;
+            if (this.upstreamClient && this.upstreamClientOptions) {
+                upstreamClient = this.upstreamClient;
+                upstreamClientOptions = this.upstreamClientOptions;
+                upstreamLabel = "";
+            }
             if (this.upstreamClients && this.upstreamClientOptionss) {
                 let parts = refreshToken?.split(":", 2)
                 if (parts?.length == 2) {
@@ -962,96 +975,278 @@ export class OAuthAuthorizationServer {
                     if (label in this.upstreamClients) {
                         upstreamClient = this.upstreamClients[label]
                         upstreamClientOptions = this.upstreamClientOptionss[label];
-                        refreshToken = parts[1]
+                        upstreamLabel = parts[0]
+                        upstreamRefreshToken = parts[1]
+
                     } else {
-                        CrossauthLogger.logger.warn(j({"msg": "Refresh token with invalid label " + label + " received"}))
+                        refreshData = await this.getRefreshTokenData(refreshToken);
+                        if (!refreshToken || !refreshData || !this.userStorage) {
+                            CrossauthLogger.logger.warn(j({"msg": "Received refresh token that is not for upstream client but also has not data"}))
+                            return {
+                                error: "access_denied",
+                                error_description: "Refresh token is invalid",
+                            }
+                        }
+                        upstreamRefreshToken = refreshData.upstreamRefreshToken;
+                        upstreamLabel = refreshData.upstreamLabel;
                     }
 
                 }
             }
-            if (upstreamClient && upstreamClientOptions) {
-                if (!refreshToken) {
-                    return {
-                        error: "invalid_request",
-                        error_description: "If executing the refresh token flow, must  provide a refresh token"
+
+            // we how have:
+            //     refreshToken - the token that was passed by the client
+            //         (which is either a local refresh token or an upstream
+            //          one prefixed with the upstream client label)
+            //      refreshData - locally stored data for the token.  If not
+            //          present, either an invalid token was passed or we
+            //          only have an upstream token
+            //       upstreamLabel - the label for the upstream client,
+            //          "" if there is only one or undefined if there is none
+            //          or the upstream didn't issue a refresh token
+            //       upstreamClient & upstreamClientOptions: the relevant
+            //          upstream client, whether or not it issued a refresh token
+
+            if (refreshToken) {
+                // we have at least one refresh token
+
+                if (refreshData && upstreamRefreshToken && upstreamClient && upstreamClientOptions) { 
+
+                    // we have both.  Refresh upstream and make new tokens, merging
+                    // user data, create a new refresh token and store it
+
+                    let user : User|undefined;
+                    if (refreshData.username) {
+                        try {
+                            const resp = await this.userStorage?.getUserByUsername(refreshData.username);
+                            user = resp?.user;
+                        } catch (e) {
+                            CrossauthLogger.logger.error(j({
+                                err: e,
+                                msg: "Couldn't get user for refresh token.  Doesn't exist?",
+                                username: refreshData.username
+                            }))
+                            return {
+                                error: "access_denied",
+                                error_description: "Refresh token is invalid",
+                            }
+                        }
                     }
-                }
-                let upstream_resp = await upstreamClient.refreshTokenFlow(refreshToken);
-                if (!upstream_resp.access_token) {
-                    return {
-                        error: "access_denied",
-                        error_description: "Didn't receive an access token",
+                    let scope = refreshData.scope
+
+                    // delete old refresh token from storage
+                    try {
+                        const hash = KeyPrefix.refreshToken + Crypto.hash(refreshToken);
+                        await this.keyStorage.deleteKey(hash);   
+                    } catch (e) {
+                        const ce = CrossauthError.asCrossauthError(e);
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
                     }
-                }
-                let accessTokenOrPayload : {[key:string]:any}|string|undefined = upstream_resp.access_token;
-                if (upstreamClientOptions.accessTokenIsJwt) {
-                    accessTokenOrPayload = await upstreamClient.validateAccessToken(upstream_resp.access_token, false);
-                    if (!accessTokenOrPayload) {
+
+                    // refresh upstream token
+                    let upstream_resp = await upstreamClient.refreshTokenFlow(upstreamRefreshToken);
+                    if (!upstream_resp.access_token) {
                         return {
                             error: "access_denied",
-                            error_description: "Couldn't decode access token"
-                        };
+                            error_description: "Didn't receive an access token",
+                        }
                     }
-                }
-                const mergeResponse = await upstreamClientOptions.tokenMergeFn(accessTokenOrPayload, upstream_resp.id_payload, this.userStorage);    
-                if (mergeResponse.authorized) {
-                    const ret = await this.createTokensFromPayload(client_id,
-                        typeof(mergeResponse.access_payload) == "string" ? undefined : mergeResponse.access_payload, mergeResponse.id_payload
-                    );
-                    upstream_resp.access_token = ret.access_token;
-                    upstream_resp.id_token = ret.id_token;
-                    upstream_resp.id_payload = ret.id_payload;
-                    return upstream_resp;
-                } else {
-                    CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
-                    return {
-                        error: mergeResponse.error,
-                        error_description: mergeResponse.error_description
-                    };
-                }                            
-            }
+                    let accessTokenOrPayload : {[key:string]:any}|string|undefined = upstream_resp.access_token;
+                    if (upstreamClientOptions.accessTokenIsJwt) {
+                        accessTokenOrPayload = await upstreamClient.validateAccessToken(upstream_resp.access_token, false);
+                        if (!accessTokenOrPayload) {
+                            return {
+                                error: "access_denied",
+                                error_description: "Couldn't decode access token"
+                            };
+                        }
+                    }
+                    
+                    // merge token with local user data
+                    const mergeResponse = await upstreamClientOptions.tokenMergeFn(accessTokenOrPayload, upstream_resp.id_payload, this.userStorage);    
+                    if (mergeResponse.authorized) {
+                        const ret = await this.createTokensFromPayload(client_id,
+                            typeof(mergeResponse.access_payload) == "string" ? undefined : mergeResponse.access_payload, mergeResponse.id_payload
+                        );
+                        upstream_resp.access_token = ret.access_token;
+                        upstream_resp.id_token = ret.id_token;
+                        upstream_resp.id_payload = ret.id_payload;
 
-            const refreshData = await this.getRefreshTokenData(refreshToken);
-            if (!refreshToken || !refreshData || !this.userStorage) {
+                        upstreamRefreshToken = upstream_resp.refresh_token;
+
+                        // create new refresh token
+                        let newRefreshToken = await this.createRefreshToken(client, {
+                            upstreamRefreshToken, upstreamLabel, scopes: scope, username: user?.username})
+
+                        // return tokens.  Upstream token has been saved in key storage locally
+                        return {...upstream_resp, refresh_token: newRefreshToken};
+                    } else {
+                        CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
+                        return {
+                            error: mergeResponse.error,
+                            error_description: mergeResponse.error_description
+                        };
+                    }                            
+                } else if (upstreamRefreshToken && upstreamClient && upstreamClientOptions) {
+
+                    // we only have upstreamn token.  We refresh upstream but don't
+                    // create one ourselves or store data locally.  Merge received
+                    // token with local User data
+
+                    let upstream_resp = await upstreamClient.refreshTokenFlow(upstreamRefreshToken);
+                    if (!upstream_resp.access_token) {
+                        return {
+                            error: "access_denied",
+                            error_description: "Didn't receive an access token",
+                        }
+                    }
+                    let accessTokenOrPayload : {[key:string]:any}|string|undefined = upstream_resp.access_token;
+                    if (upstreamClientOptions.accessTokenIsJwt) {
+                        accessTokenOrPayload = await upstreamClient.validateAccessToken(upstream_resp.access_token, false);
+                        if (!accessTokenOrPayload) {
+                            return {
+                                error: "access_denied",
+                                error_description: "Couldn't decode access token"
+                            };
+                        }
+                    }
+                    
+                    // merge token with local user data
+                    const mergeResponse = await upstreamClientOptions.tokenMergeFn(accessTokenOrPayload, upstream_resp.id_payload, this.userStorage);    
+                    if (mergeResponse.authorized) {
+                        const ret = await this.createTokensFromPayload(client_id,
+                            typeof(mergeResponse.access_payload) == "string" ? undefined : mergeResponse.access_payload, mergeResponse.id_payload
+                        );
+                        upstream_resp.access_token = ret.access_token;
+                        upstream_resp.id_token = ret.id_token;
+                        upstream_resp.id_payload = ret.id_payload;
+                        return upstream_resp;
+                    } else {
+                        CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
+                        return {
+                            error: mergeResponse.error,
+                            error_description: mergeResponse.error_description
+                        };
+                    }                            
+
+                } else {
+
+                    // we have only our own refresh token.  
+                    // XXX
+                    refreshData = await this.getRefreshTokenData(refreshToken);
+                    if (!refreshToken || !refreshData || !this.userStorage) {
+                        return {
+                            error: "access_denied",
+                            error_description: "Refresh token is invalid",
+                        }
+                    }
+                    let upstreamAccessToken = refreshData.upstreamAccessToken;
+                    let upstreamIdToken = refreshData.upstreamIdToken;
+
+                    let user : User|undefined;
+                    if (refreshData.username) {
+                        try {
+                            const {user: user1} = await this.userStorage?.getUserByUsername(refreshData.username);
+                            user = user1;
+                        } catch (e) {
+                            CrossauthLogger.logger.error(j({
+                                err: e,
+                                msg: "Couldn't get user for refresh token.  Doesn't exist?",
+                                username: refreshData.username
+                            }))
+                            return {
+                                error: "access_denied",
+                                error_description: "Refresh token is invalid",
+                            }
+                        }
+                    }
+                    let scopes: string[]|undefined = refreshData.scopes;
+                    try {
+                        const hash = KeyPrefix.refreshToken + Crypto.hash(refreshToken);
+                        await this.keyStorage.deleteKey(hash);   
+                    } catch (e) {
+                        const ce = CrossauthError.asCrossauthError(e);
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
+                    }
+
+                    if (upstreamAccessToken && upstreamClientOptions && upstreamClient) {
+
+                        // we had an access token from the upstream server.
+                        // it didn't issue a refresh token so we use the
+                        // original access token to merge with local user data
+                        // for our new access token (and potentially 
+                        // ID token)
+
+                        let accessTokenOrPayload : {[key:string]:any}|string = upstreamAccessToken;
+                        if (upstreamClientOptions.accessTokenIsJwt) {
+                            let accessTokenOrPayload1 = await upstreamClient.validateAccessToken(upstreamAccessToken, false);
+                            if (accessTokenOrPayload1) accessTokenOrPayload = accessTokenOrPayload1
+                            else {
+                                return {
+                                    error: "access_denied",
+                                    error_description: "Couldn't decode access token"
+                                };
+                            }
+                        }
+
+                        // create oru own refresh token
+                        let newRefreshToken = await this.createRefreshToken(client, {
+                            upstreamAccessToken,
+                            upstreamIdToken,
+                            upstreamLabel,
+                            scopes,
+                            username: user?.username,
+                        })
+
+                        // merge token with local user data
+                        const mergeResponse = await upstreamClientOptions.tokenMergeFn(accessTokenOrPayload, upstreamIdToken, this.userStorage);    
+                        if (mergeResponse.authorized) {
+                            const ret = await this.createTokensFromPayload(client_id,
+                                typeof(mergeResponse.access_payload) == "string" ? undefined : mergeResponse.access_payload, mergeResponse.id_payload
+                            );
+                            return {
+                                access_token: ret.access_token,
+                                id_token: ret.id_token,
+                                id_payload: ret.id_payload,
+                                refresh_token: newRefreshToken
+                                
+                            }
+                        } else {
+                            CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
+                            return {
+                                error: mergeResponse.error,
+                                error_description: mergeResponse.error_description
+                            };
+                        }                            
+
+                    } else {
+
+                        // there is no upstream.
+                        // make new tokens, saving new refresh token
+                        return await this.makeAccessToken({
+                            client,
+                            client_secret,
+                            codeVerifier,
+                            issueRefreshToken: createRefreshToken,
+                            scopes: refreshData.scope,
+                            user: user
+                        });
+
+                    }
+
+                }
+
+            } else {
+
+                // refresh_token flow was called without providing a refresh token
                 return {
                     error: "access_denied",
                     error_description: "Refresh token is invalid",
                 }
             }
-            let user : User|undefined;
-            if (refreshData.username) {
-                try {
-                    const {user: user1} = await this.userStorage?.getUserByUsername(refreshData.username);
-                    user = user1;
-                } catch (e) {
-                    CrossauthLogger.logger.error(j({
-                        err: e,
-                        msg: "Couldn't get user for refresh token.  Doesn't exist?",
-                        username: refreshData.username
-                    }))
-                    return {
-                        error: "access_denied",
-                        error_description: "Refresh token is invalid",
-                    }
-                }
-            }
-            try {
-                const hash = KeyPrefix.refreshToken + Crypto.hash(refreshToken);
-                await this.keyStorage.deleteKey(hash);   
-            } catch (e) {
-                const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.debug(j({err: e}));
-                CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
-            }
 
-            return await this.makeAccessToken({
-                client,
-                client_secret,
-                codeVerifier,
-                issueRefreshToken: createRefreshToken,
-                scopes: refreshData.scope,
-                user: user
-            });
 
         } else if (grantType == "client_credentials") {
 
@@ -2564,6 +2759,97 @@ export class OAuthAuthorizationServer {
         }
     }
 
+    async createRefreshToken(client: OAuthClient, {
+        upstreamRefreshToken,
+        upstreamLabel,
+        scopes,
+        username,
+        upstreamAccessToken,
+        upstreamIdToken
+    }: {
+        upstreamRefreshToken? : string,
+        upstreamLabel?: string,
+        scopes? : string[],
+        username?: string,
+        upstreamAccessToken? : string,
+        upstreamIdToken? : string,
+    }) 
+        : Promise<string|undefined> {
+
+    const now = new Date();
+    const timeCreated = Math.ceil(now.getTime()/1000);
+    
+
+    let refreshToken : string|undefined = undefined;
+        // create refresh token 
+        //refreshToken = Crypto.randomValue(this.codeLength); 
+
+        const refreshData : {[key:string]: any} = {
+            username: username,
+            client_id: client.client_id,
+
+        }
+        if (scopes) {
+            refreshData.scope = scopes;
+        }
+        if (upstreamRefreshToken) {
+            refreshData.upstreamRefreshToken = upstreamRefreshToken;
+            refreshData.upstreamLabel = upstreamLabel
+        }
+
+        let refreshTokenExpires : Date|undefined = undefined;
+        // create refresh token payload
+        const refreshTokenJti = Crypto.uuid();
+        const refreshTokenPayload : {[key:string]: any} = {
+            jti: refreshTokenJti,
+            iat: timeCreated,
+            iss: this.oauthIssuer,
+            sub: username,
+            type: "refresh",
+        };
+        if (this.refreshTokenExpiry != null) {
+            refreshTokenPayload.exp = timeCreated + this.refreshTokenExpiry
+            refreshTokenExpires = 
+                this.refreshTokenExpiry ? 
+                    new Date(timeCreated + this.refreshTokenExpiry*1000 + 
+                        this.clockTolerance*1000) : 
+                    undefined;
+        }
+        if (this.oauthIssuer) {
+            refreshTokenPayload.aud = this.oauthIssuer;
+        }
+
+        // create refresh token jwt
+        refreshToken = await new Promise((resolve, reject) => {
+            jwt.sign(refreshTokenPayload,
+                this.secretOrPrivateKey,
+                { algorithm: this.jwtAlgorithmChecked, keyid: "1" }, 
+                (error: Error | null,
+                encoded: string | undefined) => {
+                    if (encoded) resolve(encoded);
+                    else if (error) reject(error);
+                    else reject(new CrossauthError(ErrorCode.Unauthorized,
+                        "Couldn't create jwt"));
+                });
+        });
+
+        // save refresh token
+        if (refreshToken) {
+
+            // save refresh token
+            if (refreshToken) {
+                await this.keyStorage?.saveKey(
+                    undefined, // to avoid user storage dependency
+                    KeyPrefix.refreshToken+Crypto.hash(refreshToken),
+                    now,
+                    refreshTokenExpires,
+                    JSON.stringify(refreshData)
+                );
+            }
+            return refreshToken;
+        }
+
+    }
     /**
      * Create an access token
      */
