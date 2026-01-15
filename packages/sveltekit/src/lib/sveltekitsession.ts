@@ -723,6 +723,8 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             let headers : Header[] = [];
             let status : number|undefined = undefined;
 
+            try {
+
             const csrfCookieName = this.sessionManager.csrfCookieName;
             const sessionCookieName = this.sessionManager.sessionCookieName;
 
@@ -836,6 +838,14 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                     this.clearCookie(sessionCookieName, this.sessionManager.sessionCookiePath, event);
                 }
             }
+
+
+            } catch (e) {
+                let ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug(j({err: ce}))
+                CrossauthLogger.logger.error(j({msg: "Error in oauth client hook", cerr: ce}))
+            }
+
 
             //return response;
             return {headers, status};

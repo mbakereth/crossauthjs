@@ -336,8 +336,8 @@ export class SvelteKitServer {
             for (let client of oAuthClients) {
                 this.oAuthClients.push(
                     new SvelteKitOAuthClient(this,
-                    client.authServerBaseUrl,
-                    { ...options, ...client.options })
+                        client.authServerBaseUrl,
+                        { ...options, ...client.options })
                 );
             }
         }
@@ -372,14 +372,7 @@ export class SvelteKitServer {
 
         let otherLoginsTried = false;
 
-        // upstream oauth server
-        // Doesn't work as the login is done from the backend and therefore the cookie is not sent
-        /*if (this.oAuthAuthServer && (
-            (this.oAuthAuthServer.authServer.upstreamClient && this.oAuthAuthServer.authServer.upstreamClientOptions) || 
-            (this.oAuthAuthServer.authServer.upstreamClients && this.oAuthAuthServer.authServer.upstreamClientOptionss)
-        )) {
-            await this.oAuthAuthServer.hook({event});
-        }*/
+        try {
 
         if (this.sessionServer) {
 
@@ -476,6 +469,13 @@ export class SvelteKitServer {
                 const resp = await this.oAuthResServer.hook({event});
                 if (resp) return resp;
             }
+        }
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e);
+            CrossauthLogger.logger.debug(j({err: ce}))
+            CrossauthLogger.logger.error(j({msg: "Error in oauth client hook", cerr: ce}))
+
         }
         
         return event;

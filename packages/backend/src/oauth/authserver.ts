@@ -62,7 +62,8 @@ function algorithm(value : string) : Algorithm {
 export type TokenMergeFn = 
     (accessPayload : string|{[key:string]:any}, 
         idPayload : {[key:string]:any}|undefined, 
-        userStorage? : UserStorage) => 
+        userStorage? : UserStorage,
+        upstream? : string) => 
             Promise<{authorized: boolean,
                 error? : string, 
                 error_description? : string, 

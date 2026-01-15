@@ -823,35 +823,42 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         // as tokens are fetched from a backend POST, thus no cookies
         this.hook = async ({ event }) => {
             CrossauthLogger.logger.debug(j({msg:"OAuth hook, user " + event.locals.user}));
-            if (event.locals.user) return undefined;
-            if (!server.sessionAdapter) return undefined;
+            try {
+                if (event.locals.user) return undefined;
+                if (!server.sessionAdapter) return undefined;
 
-            let sessionData = await server.sessionAdapter.getSessionData(event, this.sessionDataName);
-            let validIdToken = false;
-            //CrossauthLogger.logger.debug(j({msg:"Session data " + (sessionData && sessionData["id_payload"]) ? JSON.stringify(sessionData?.id_payload) : "none)"}));
-            if (sessionData && sessionData["id_payload"]) {
-                let expiry = sessionData["expires_at"]
-                if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
-                    CrossauthLogger.logger.debug(j({msg:"ID token is valid"}));
-                    await this.setEventLocalsUser(event, sessionData["id_payload"]);
-                    if (event.locals.user) validIdToken = true;
+                let sessionData = await server.sessionAdapter.getSessionData(event, this.sessionDataName);
+                let validIdToken = false;
+                //CrossauthLogger.logger.debug(j({msg:"Session data " + (sessionData && sessionData["id_payload"]) ? JSON.stringify(sessionData?.id_payload) : "none)"}));
+                if (sessionData && sessionData["id_payload"]) {
+                    let expiry = sessionData["expires_at"]
+                    if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
+                        CrossauthLogger.logger.debug(j({msg:"ID token is valid"}));
+                        await this.setEventLocalsUser(event, sessionData["id_payload"]);
+                        if (event.locals.user) validIdToken = true;
+                    }
+                } 
+                if (!validIdToken && sessionData && sessionData["refresh_token"]) {
+                    CrossauthLogger.logger.debug(j({msg: "No ID token found but refresh token found - attemping refresh flow"}));
+                    const resp = await this.refreshTokens(event, "silent", false);
+                    if (!resp?.ok) {
+                        const error = resp instanceof Response || resp == undefined ? "server_error" : (resp.error ?? "server_error");
+                        const error_description = resp instanceof Response || resp == undefined ? "Unknown error" : (resp.error_description ?? "Unknown error");
+                        const ce = CrossauthError.fromOAuthError(error, error_description)
+                        CrossauthLogger.logger.debug(j({err: ce}));
+                        CrossauthLogger.logger.warn(j({msg: "Error refreshing token", cerr: ce}));
+                    } else {
+                        await this.setEventLocalsUser(event, sessionData["id_payload"]);
+                    }
                 }
-            } 
-            if (!validIdToken && sessionData && sessionData["refresh_token"]) {
-                CrossauthLogger.logger.debug(j({msg: "No ID token found but refresh token found - attemping refresh flow"}));
-                const resp = await this.refreshTokens(event, "silent", false);
-                if (!resp?.ok) {
-                    const error = resp instanceof Response || resp == undefined ? "server_error" : (resp.error ?? "server_error");
-                    const error_description = resp instanceof Response || resp == undefined ? "Unknown error" : (resp.error_description ?? "Unknown error");
-                    const ce = CrossauthError.fromOAuthError(error, error_description)
-                    CrossauthLogger.logger.debug(j({err: ce}));
-                    CrossauthLogger.logger.warn(j({msg: "Error refreshing token", cerr: ce}));
-                } else {
-                    await this.setEventLocalsUser(event, sessionData["id_payload"]);
-                }
+
+                if (this.testMiddleware) this.testEvent = event;
+
+            } catch (e) {
+                let ce = CrossauthError.asCrossauthError(e);
+                CrossauthLogger.logger.debug(j({err: ce}))
+                CrossauthLogger.logger.error(j({msg: "Error in oauth client hook", cerr: ce}))
             }
-
-            if (this.testMiddleware) this.testEvent = event;
 
             return undefined;
         };
@@ -1829,8 +1836,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         get: async (event : RequestEvent) => {
             if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use load not get");
-                return this.errorFn(this.server, event, ce);
+                CrossauthLogger.logger.debug(j({err: ce}))
+                return await this.errorFn(this.server, event, ce);
             }
+            let redirectUrl : string|undefined = undefined;
             try {
 
                 if (!(this.validFlows.includes(OAuthFlows.AuthorizationCode))) {
@@ -1844,16 +1853,17 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 let upstream = event.url.searchParams.get("upstream") ?? undefined;
                 let next = event.url.searchParams.get("next") ?? undefined;
+                console.log("Start authzcode flow", upstream, next)
                 if (scope == "") scope = undefined;
                 const state = this.randomValue(this.stateLength);
                 const sessionData = { scope, state };
                 // we need a session to save the state
                 await this.storeSessionData(event, sessionData);
-        
+
                 // if we have an upstream client, this call will save the original /authorize call and redirect to
                 // the upstream auth server's /authorize endpoint
                 if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
-                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next, event.url), upstream)
                 }
 
                 // the following call returns a constructed url for the
@@ -1872,7 +1882,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         msg: `OAuth redirect`,
                     }));    
                 }
-                throw this.redirect(302, url);  // to auth server's authorize endpoint
+                redirectUrl = url;
 
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
@@ -1881,9 +1891,12 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 CrossauthLogger.logger.debug({err: e});
                 CrossauthLogger.logger.error({cerr: e});
                 //throw this.error(ce.httpStatus, ce.message);
-                return this.errorFn(this.server, event, ce);
+                return jsonError(this.server, event, ce)
+                //return await this.errorFn(this.server, event, ce);
 
             }
+            if (!redirectUrl) jsonError(this.server, event, new CrossauthError(ErrorCode.UnknownError, "Unexpectedly got redirect URL"))
+            throw this.redirect(302, redirectUrl);  // to auth server's authorize endpoint
         },
 
         load: async (event : RequestEvent) : Promise<AuthorizationCodeFlowReturn> => {
@@ -2114,7 +2127,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use load not get");
                 return this.errorFn(this.server, event, ce);
             }
-            try {
 
                 if (!(this.validFlows.includes(OAuthFlows.AuthorizationCode) || 
                     this.validFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) ||
@@ -2131,7 +2143,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const error_description = event.url.searchParams.get("error") ?? undefined;
                 const oauthData = await this.server.sessionAdapter?.getSessionData(event, this.sessionDataName);
                 if (oauthData?.state != state) {
-                    throw new CrossauthError(ErrorCode.Unauthorized, "State does not match")
+                    return json({
+                        error: "access_denied",
+                        error_description: "state does not match"
+                    }, {status: 403})
                 }
 
                 // call the auth server's token endpoint to exchange the code for new tokens
@@ -2155,18 +2170,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     this, 
                     event, 
                     false,
-                    this.setEventLocalsUser);
+                    this.setEventLocalsUser) as Response;
 
-            } catch (e) {
-                if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
-                if (SvelteKitServer.isSvelteKitError(e)) throw e;
-                const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.debug({err: e});
-                CrossauthLogger.logger.error({cerr: e});
-                //throw this.error(ce.httpStatus, ce.message);
-                return this.errorFn(this.server, event, ce);
-
-            }
         },
 
         load: async (event : RequestEvent) : Promise<RedirectUriReturn> => {

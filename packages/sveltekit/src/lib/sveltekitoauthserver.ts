@@ -343,8 +343,6 @@ export class SvelteKitAuthorizationServer {
     private tokenEndpointUrl = "/oauth/token";
     private jwksEndpointUrl = "/oauth/jwks";
     
-    readonly hook : (input: {event: RequestEvent}) => MaybePromise<Response|undefined>;
-
     readonly redirect: any;
     readonly error: any;
     private sessionDataName = "oauth";
@@ -398,45 +396,6 @@ export class SvelteKitAuthorizationServer {
                 this.csrfTokens = new DoubleSubmitCsrfToken(options.doubleSubmitCookieOptions);
             }
         }
-
-        this.hook = async ({ event }) => {
-            CrossauthLogger.logger.debug(j({msg:"OAuth hook, user " + event.locals.user}));
-
-            if (!server.sessionAdapter) return undefined;
-            if (!(this.authServer.upstreamClient && this.authServer.upstreamClientOptions) && 
-                    !(this.authServer.upstreamClients && this.authServer.upstreamClientOptionss)) {
-                return undefined;
-            }
-
-            let sessionData = await server.sessionAdapter.getSessionData(event,this.sessionDataName);
-            let sessionCookieValue = this.svelteKitServer.sessionServer?.getSessionCookieValue(event);
-            let validIdToken = false;
-            //CrossauthLogger.logger.debug(j({msg:"Session data " + (sessionData && sessionData["id_payload"]) ? JSON.stringify(sessionData?.id_payload) : "none)"}));
-            if (sessionData?.user && sessionData["id_payload"]) {
-                let expiry = sessionData["expires_at"]
-                if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
-
-                    if (this.svelteKitServer.sessionServer && event.locals.user) {
-                        try {
-                            await this.svelteKitServer.sessionServer.userEndpoints.logout(event);
-                        } catch (e) {
-                            let ce = CrossauthError.asCrossauthError(e);
-                            CrossauthLogger.logger.debug(j({err: ce}))
-                            CrossauthLogger.logger.warn(j({msg: "Couldn't logout " + event.locals.user.username, cerr: ce}))
-                        }
-                    }
-
-                    CrossauthLogger.logger.debug(j({msg:"ID token is valid"}));
-                    event.locals.user = sessionData.user;
-                    event.locals.authType = "oidc";
-
-                    if (event.locals.user) validIdToken = true;
-                }
-            } 
-
-            return undefined;
-        };
-
     }
 
     /**
@@ -1182,6 +1141,7 @@ export class SvelteKitAuthorizationServer {
                         let url = resp.url;
                         CrossauthLogger.logger.debug(j({msg: "upstream url " + url}))
                         //CrossauthLogger.logger.debug(j({msg: "upstream base url " + this.authServer.upstreamAuthServerBaseUrl}))
+                        
                         throw this.redirect(302, url);
                     }
                 } else {
@@ -1217,7 +1177,7 @@ export class SvelteKitAuthorizationServer {
                 }));
             }  else {
                 CrossauthLogger.logger.error(j({
-                    msg: "authorize parameter valid",
+                    msg: "authorize parameter invalid",
                     user: event.locals.user?.username
                 }));
 

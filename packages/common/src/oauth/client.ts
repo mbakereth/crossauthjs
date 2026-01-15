@@ -437,10 +437,11 @@ export abstract class OAuthClientBase {
             url += "&code_challenge=" + codeChallenge;
         }
 
-        if (upstream) {
+        // XXX remove this
+        /*if (upstream) {
             url += "&upstream=" + encodeURIComponent(upstream);
 
-        }
+        }*/
 
         return {url: url};
     }
