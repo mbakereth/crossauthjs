@@ -17,6 +17,7 @@ import type {
     DoubleSubmitCsrfTokenOptions,
     Cookie,
     UpstreamClientOptions,
+    OAuthClientOptions,
  } from '@crossauth/backend';
 import { SvelteKitServer } from './sveltekitserver';
 import {
@@ -34,6 +35,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { type CookieSerializeOptions } from 'cookie';
 import { OAuthClientBackend } from '@crossauth/backend';
+import { type MaybePromise } from './tests/sveltemocks';
 
 const DEFAULT_UPSTREAM_SESSION_DATA_NAME = "upstreamoauth";
 
@@ -241,6 +243,12 @@ export interface SvelteKitAuthorizationServerOptions
 
     /** Pass the Sveltekit error function */
     error? : any,
+
+    /**
+     * This is used when there is an upstream client to save the tokens.
+     * Default `oauth`.
+     */
+    sessionDataName? : string,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -335,8 +343,11 @@ export class SvelteKitAuthorizationServer {
     private tokenEndpointUrl = "/oauth/token";
     private jwksEndpointUrl = "/oauth/jwks";
     
+    readonly hook : (input: {event: RequestEvent}) => MaybePromise<Response|undefined>;
+
     readonly redirect: any;
     readonly error: any;
+    private sessionDataName = "oauth";
 
     /**
      * Constructor
@@ -365,6 +376,8 @@ export class SvelteKitAuthorizationServer {
                 authenticators,
                 options);
 
+        let server = svelteKitServer;
+
         setParameter("loginUrl", ParamType.String, this, options, "LOGIN_URL");
         setParameter("refreshTokenType", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_TYPE");
         setParameter("refreshTokenCookieName", ParamType.String, this, options, "OAUTH_REFRESH_TOKEN_COOKIE_NAME");
@@ -376,6 +389,7 @@ export class SvelteKitAuthorizationServer {
         setParameter("authorizeEndpointUrl", ParamType.String, this, options, "OAUTH_AUTHORIZE_ENDPOINT");
         setParameter("tokenEndpointUrl", ParamType.String, this, options, "OAUTH_TOKEN_ENDPOINT");
         setParameter("jwksEndpointUrl", ParamType.String, this, options, "OAUTH_JWKS_ENDPOINT");
+        setParameter("sessionDataName", ParamType.String, this, options, "OAUTH_SESSION_DATA_NAME");
 
         if (this.refreshTokenType != "json") {
             if (this.svelteKitServer.sessionServer?.enableCsrfProtection == true) {
@@ -384,6 +398,46 @@ export class SvelteKitAuthorizationServer {
                 this.csrfTokens = new DoubleSubmitCsrfToken(options.doubleSubmitCookieOptions);
             }
         }
+
+        this.hook = async ({ event }) => {
+            CrossauthLogger.logger.debug(j({msg:"OAuth hook, user " + event.locals.user}));
+
+            if (!server.sessionAdapter) return undefined;
+            if (!(this.authServer.upstreamClient && this.authServer.upstreamClientOptions) && 
+                    !(this.authServer.upstreamClients && this.authServer.upstreamClientOptionss)) {
+                return undefined;
+            }
+
+            let sessionData = await server.sessionAdapter.getSessionData(event,this.sessionDataName);
+            let sessionCookieValue = this.svelteKitServer.sessionServer?.getSessionCookieValue(event);
+            console.log("Got oauth session data", sessionCookieValue, sessionData)
+            let validIdToken = false;
+            //CrossauthLogger.logger.debug(j({msg:"Session data " + (sessionData && sessionData["id_payload"]) ? JSON.stringify(sessionData?.id_payload) : "none)"}));
+            if (sessionData?.user && sessionData["id_payload"]) {
+                let expiry = sessionData["expires_at"]
+                if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
+
+                    if (this.svelteKitServer.sessionServer && event.locals.user) {
+                        try {
+                            await this.svelteKitServer.sessionServer.userEndpoints.logout(event);
+                        } catch (e) {
+                            let ce = CrossauthError.asCrossauthError(e);
+                            CrossauthLogger.logger.debug(j({err: ce}))
+                            CrossauthLogger.logger.warn(j({msg: "Couldn't logout " + event.locals.user.username, cerr: ce}))
+                        }
+                    }
+
+                    CrossauthLogger.logger.debug(j({msg:"ID token is valid"}));
+                    event.locals.user = sessionData.user;
+                    event.locals.authType = "oidc";
+
+                    if (event.locals.user) validIdToken = true;
+                }
+            } 
+
+            return undefined;
+        };
+
     }
 
     /**
@@ -882,16 +936,18 @@ export class SvelteKitAuthorizationServer {
                 sessionCookieValue = 
                     await this.svelteKitServer.sessionServer?.createAnonymousSession(event,
                         { [sessionDataName]: sessionData });
+                console.log("Create session with", sessionCookieValue, sessionData, sessionDataName)
             } else {
                 await this.svelteKitServer.sessionAdapter?.updateSessionData(event,
                     sessionDataName,
                     sessionData);
+                console.log("Store session data", sessionCookieValue, sessionData, sessionDataName)
             }
         } else {
             await this.svelteKitServer.sessionAdapter?.updateSessionData(event,
                 sessionDataName,
                 sessionData);
-
+            console.log("Store session data", sessionData, sessionDataName)
         }
 
     }
@@ -998,7 +1054,7 @@ export class SvelteKitAuthorizationServer {
                             ok: false,
                             error: "server_error", 
                             error_description: "redirect uri not given for upstream client",
-                        };
+                        }
     
                     }
                     const sessionDataName = upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
@@ -1033,7 +1089,6 @@ export class SvelteKitAuthorizationServer {
             this.authServer.validFlows.includes(OAuthFlows.OidcAuthorizationCode))) {
                 throw this.error(401, "authorize cannot be called because the authorization code flows are not supported");
             }
-
 
             // handle the case where we have an upstream authz server
             // either throw redirect or return error
@@ -1375,6 +1430,7 @@ export class SvelteKitAuthorizationServer {
                         if (codeData?.upstream && this.authServer.upstreamClients && this.authServer.upstreamClientOptionss) {
                             upstreamClient = this.authServer.upstreamClients[codeData?.upstream];
                             upstreamClientOptions = this.authServer.upstreamClientOptionss[codeData?.upstream]
+                            upstreamLabel = codeData.upstream
                         }
                     }
 
@@ -1419,12 +1475,25 @@ export class SvelteKitAuthorizationServer {
 
                         let refreshToken = await this.authServer.createRefreshToken(client, {upstreamRefreshToken: codeData.refresh_token, upstreamLabel: upstreamLabel})
 
+                        // save tokens so that this is treated as the logged in user
+                        // doesn't work - no cookie
+                        /*await this.storeSessionData(event, {
+                            access_token: codeData.access_token,
+                            id_token: codeData.id_token,
+                            id_payload: codeData.id_payload,
+                            refresh_token: refreshToken ?? upstreamLabel + ":" + codeData.refresh_token,
+                            expires_in: codeData.expires_in,
+                            upstream: upstreamLabel
+
+                        }, this.sessionDataName)*/
+
                         return json({
                             access_token: codeData.access_token,
                             id_token: codeData.id_token,
                             id_payload: codeData.id_payload,
                             refresh_token: refreshToken ?? upstreamLabel + ":" + codeData.refresh_token,
                             expires_in: codeData.expires_in,
+                            upstream: upstreamLabel,
                         });
                 }
 
@@ -1619,7 +1688,7 @@ export class SvelteKitAuthorizationServer {
                             upstream
                         }
 
-                        // save our new tokens
+                        // save our new tokens, keyed on the authorization code
                         await this.authServer.setAuthorizationCodeData(oauthData.code, authzData);
 
                         // redirect to the originating client's redirect URI 
@@ -1919,3 +1988,4 @@ export class SvelteKitAuthorizationServer {
     }
 
 };
+

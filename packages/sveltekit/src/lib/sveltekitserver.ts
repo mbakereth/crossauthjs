@@ -371,6 +371,16 @@ export class SvelteKitServer {
         event.locals.scope = undefined;
 
         let otherLoginsTried = false;
+
+        // upstream oauth server
+        // Doesn't work as the login is done from the backend and therefore the cookie is not sent
+        /*if (this.oAuthAuthServer && (
+            (this.oAuthAuthServer.authServer.upstreamClient && this.oAuthAuthServer.authServer.upstreamClientOptions) || 
+            (this.oAuthAuthServer.authServer.upstreamClients && this.oAuthAuthServer.authServer.upstreamClientOptionss)
+        )) {
+            await this.oAuthAuthServer.hook({event});
+        }*/
+
         if (this.sessionServer) {
 
             // session hook
@@ -402,7 +412,7 @@ export class SvelteKitServer {
                             await client.hook({event});
                         }
                     }
-                }
+                } 
 
                 // OAuth res server hook
                 if (this.oAuthResServer?.hook) {

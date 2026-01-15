@@ -1209,7 +1209,7 @@ export abstract class OAuthClientBase {
      * @returns the parsed JSON response as an object.
      * @throws any exception raised by `fetch()`
      */
-    protected async post(url : string, params : {[key:string]:any}, headers : {[key:string]:any} = {}) : 
+    protected async post(url : string, params : {[key:string]:any}, headers : {[key:string]:any} = {}, credentials? : string) : 
         Promise<{[key:string]:any}>{
         CrossauthLogger.logger.debug(j({
             msg: "Fetch POST",
@@ -1236,6 +1236,8 @@ export abstract class OAuthClientBase {
             CrossauthLogger.logger.debug(j({msg: "OAuth fetch", method: "POST", url: url, body: body}))
         }
 
+        let credentialsParanm = {};
+        if (credentials) credentialsParanm = credentials;
         const resp = await fetch(url, {
             method: 'POST',
             ...options,
@@ -1244,6 +1246,7 @@ export abstract class OAuthClientBase {
                 'Content-Type': contentType,
                 ...headers,
             },
+            ...credentialsParanm,
             body: body
         });
         try {

@@ -78,7 +78,8 @@ export interface UpstreamClientOptions {
     authServerBaseUrl : string,
     scopes?: string[],
     sessionDataName? : string,
-    accessTokenIsJwt : boolean
+    accessTokenIsJwt : boolean,
+    user? : User,
 }
 
 /**

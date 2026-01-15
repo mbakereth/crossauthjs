@@ -819,6 +819,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 "loginUrl must be set if protecting oauth endpoints");
         }
 
+        // this doesn't work as it relies on data stored in the session, which cannot be done
+        // as tokens are fetched from a backend POST, thus no cookies
         this.hook = async ({ event }) => {
             CrossauthLogger.logger.debug(j({msg:"OAuth hook, user " + event.locals.user}));
             if (event.locals.user) return undefined;
