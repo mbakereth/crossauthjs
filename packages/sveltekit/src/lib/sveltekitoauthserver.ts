@@ -410,7 +410,6 @@ export class SvelteKitAuthorizationServer {
 
             let sessionData = await server.sessionAdapter.getSessionData(event,this.sessionDataName);
             let sessionCookieValue = this.svelteKitServer.sessionServer?.getSessionCookieValue(event);
-            console.log("Got oauth session data", sessionCookieValue, sessionData)
             let validIdToken = false;
             //CrossauthLogger.logger.debug(j({msg:"Session data " + (sessionData && sessionData["id_payload"]) ? JSON.stringify(sessionData?.id_payload) : "none)"}));
             if (sessionData?.user && sessionData["id_payload"]) {
@@ -936,18 +935,15 @@ export class SvelteKitAuthorizationServer {
                 sessionCookieValue = 
                     await this.svelteKitServer.sessionServer?.createAnonymousSession(event,
                         { [sessionDataName]: sessionData });
-                console.log("Create session with", sessionCookieValue, sessionData, sessionDataName)
             } else {
                 await this.svelteKitServer.sessionAdapter?.updateSessionData(event,
                     sessionDataName,
                     sessionData);
-                console.log("Store session data", sessionCookieValue, sessionData, sessionDataName)
             }
         } else {
             await this.svelteKitServer.sessionAdapter?.updateSessionData(event,
                 sessionDataName,
                 sessionData);
-            console.log("Store session data", sessionData, sessionDataName)
         }
 
     }
