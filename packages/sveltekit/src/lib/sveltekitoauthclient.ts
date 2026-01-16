@@ -96,7 +96,7 @@ export interface SvelteKitOAuthClientOptions extends OAuthClientOptions {
         client: SvelteKitOAuthClient,
         event: RequestEvent, 
         silent: boolean,
-        setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) => Promise<Response|TokenReturn|undefined>;
+        setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) => Promise<Response|TokenReturn>;
 
     /**
      * The function to call when there is an OAuth error and
@@ -269,7 +269,7 @@ async function sendJson(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     _event: RequestEvent,
     _silent: boolean,
-    _setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) : Promise<Response|undefined> {
+    _setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) : Promise<Response> {
         let resp : {[key:string]:any} = {ok: true, ...oauthResponse};
         if (client.jwtTokens.includes("id")) {
             resp["id_payload"] = oauthResponse.id_payload ?? decodePayload(oauthResponse.id_token);
@@ -351,7 +351,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     event: RequestEvent,
     silent: boolean,
-    setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) : Promise<Response|undefined> {
+    setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>) : Promise<Response> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
             oauthResponse.error_description);
@@ -367,7 +367,30 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
             if (payload) await setUserFn(event, payload);
         }
 
-        if (!silent) return client.redirect(302, client.authorizedUrl);
+        let url = client.authorizedUrl
+        var data = new JsonOrFormData();
+        await data.loadData(event);
+        let formData = data.toObject();
+        let msg = formData.msg ?? event.url.searchParams.get("msg");
+        let error = formData.error ?? event.url.searchParams.get("error");
+
+        if (msg) {
+            if (url.includes("?")) {
+                url += "&msg=" + encodeURIComponent(msg)
+            } else {
+                url += "?msg=" + encodeURIComponent(msg)
+            }
+        }
+        if (error) {
+            if (url.includes("?")) {
+                url += "&error=" + encodeURIComponent(error)
+            } else {
+                url += "?error=" + encodeURIComponent(error)
+            }
+        }
+
+        if (!silent) return client.redirect(302, url);
+        return json({})
     } catch (e) {
         if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
         const ce = CrossauthError.asCrossauthError(e);
@@ -382,7 +405,7 @@ async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
     event: RequestEvent,
     silent: boolean,
     setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>
-    ) : Promise<Response|undefined> {
+    ) : Promise<Response> {
     if (oauthResponse.error) {
         const ce = CrossauthError.fromOAuthError(oauthResponse.error, 
             oauthResponse.error_description);
@@ -399,7 +422,6 @@ async function saveInSessionAndReturn(oauthResponse: OAuthTokenResponse,
         }
 
         return json({ok: true, ...oauthResponse});
-        if (!silent) return client.redirect(302, client.authorizedUrl);
     } catch (e) {
         if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
         const ce =CrossauthError.asCrossauthError(e);
@@ -414,7 +436,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     event: RequestEvent,
     _silent : boolean,
     setUserFn : (event: RequestEvent, token : {[key:string]:any}) => Promise<void>
-    ) : Promise<TokenReturn|undefined> {
+    ) : Promise<TokenReturn> {
     if (oauthResponse.error) {
         return {
             ok: false,
@@ -456,7 +478,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
     client: SvelteKitOAuthClient,
     _event: RequestEvent,
     _silent: boolean,
-    ) : Promise<TokenReturn|undefined> {
+    ) : Promise<TokenReturn> {
     if (oauthResponse.error) {
         return {
             ok: false, 
@@ -662,7 +684,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             silet: boolean,
             setUserFn : (event: RequestEvent, 
             token : {[key:string]:any}) => Promise<void>) 
-            => Promise<Response|TokenReturn|undefined> = sendJson;
+            => Promise<Response|TokenReturn> = sendJson;
     readonly errorFn : SvelteKitErrorFn = jsonError;
     private loginUrl : string = "/login";
     private validFlows : string[] = [OAuthFlows.All];
@@ -822,7 +844,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         // this doesn't work as it relies on data stored in the session, which cannot be done
         // as tokens are fetched from a backend POST, thus no cookies
         this.hook = async ({ event }) => {
-            CrossauthLogger.logger.debug(j({msg:"OAuth hook, user " + event.locals.user}));
+            CrossauthLogger.logger.debug(j({msg:"OAuth hook, user " + event.locals.user?.username}));
             try {
                 if (event.locals.user) return undefined;
                 if (!server.sessionAdapter) return undefined;
@@ -1853,7 +1875,6 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 let scope = event.url.searchParams.get("scope") ?? undefined;
                 let upstream = event.url.searchParams.get("upstream") ?? undefined;
                 let next = event.url.searchParams.get("next") ?? undefined;
-                console.log("Start authzcode flow", upstream, next)
                 if (scope == "") scope = undefined;
                 const state = this.randomValue(this.stateLength);
                 const sessionData = { scope, state };
@@ -2393,6 +2414,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
                 return this.errorFn(this.server, event, ce);
             }
+            CrossauthLogger.logger.debug(j({msg: "Refresh token flow started"}))
             let formData : {[key:string]:string}|undefined = undefined;
             try {
 
@@ -2475,6 +2497,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                     throw ce;
                 }
 
+                CrossauthLogger.logger.debug(j({msg: "Refresh token flow started"}))
                 let formData : {[key:string]:string}|undefined = undefined;
                 try {
     
@@ -2533,7 +2556,12 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                         this, 
                         event, 
                         false,
-                        this.setEventLocalsUser) ?? {};
+                        this.setEventLocalsUser);
+                    if (!resp2) {
+                        return { 
+                            ok: true,
+                        };
+                    }
                     if (resp2 instanceof Response) throw new CrossauthError(ErrorCode.Configuration, "Refresh token flow should return an object not Response");
                     return resp2;
 

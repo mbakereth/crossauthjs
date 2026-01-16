@@ -973,24 +973,37 @@ export class OAuthAuthorizationServer {
             if (this.upstreamClients && this.upstreamClientOptionss) {
                 let parts = refreshToken?.split(":", 2)
                 if (parts?.length == 2) {
+                    // token is for upstream client only - we have no data stored locally
                     let label = parts[0]
                     if (label in this.upstreamClients) {
+                        // refresh token belongs to an upstream client we know about
                         upstreamClient = this.upstreamClients[label]
                         upstreamClientOptions = this.upstreamClientOptionss[label];
                         upstreamLabel = parts[0]
                         upstreamRefreshToken = parts[1]
-
                     } else {
-                        refreshData = await this.getRefreshTokenData(refreshToken);
-                        if (!refreshToken || !refreshData || !this.userStorage) {
-                            CrossauthLogger.logger.warn(j({"msg": "Received refresh token that is not for upstream client but also has not data"}))
-                            return {
-                                error: "access_denied",
-                                error_description: "Refresh token is invalid",
-                            }
+                        // Unrecognised upstream client
+                        return {
+                            error: "access_denied",
+                            error_description: "Refresh token is invalid",
                         }
-                        upstreamRefreshToken = refreshData.upstreamRefreshToken;
-                        upstreamLabel = refreshData.upstreamLabel;
+                    }
+
+                } else {
+                    // token is not an upstream one - fetch local data
+                    refreshData = await this.getRefreshTokenData(refreshToken);
+                    if (!refreshToken || !refreshData || !this.userStorage) {
+                        CrossauthLogger.logger.warn(j({"msg": "Received refresh token that is not for upstream client but also has not data"}))
+                        return {
+                            error: "access_denied",
+                            error_description: "Refresh token is invalid",
+                        }
+                    }
+                    upstreamRefreshToken = refreshData.upstreamRefreshToken;
+                    upstreamLabel = refreshData.upstreamLabel;
+                    if (upstreamLabel) {
+                        upstreamClient = this.upstreamClients[upstreamLabel]
+                        upstreamClientOptions = this.upstreamClientOptionss[upstreamLabel];
                     }
 
                 }
@@ -1011,6 +1024,7 @@ export class OAuthAuthorizationServer {
 
             if (refreshToken) {
                 // we have at least one refresh token
+                CrossauthLogger.logger.debug(j({msg: "token endpoint: refresh token flow"}))
 
                 if (refreshData && upstreamRefreshToken && upstreamClient && upstreamClientOptions) { 
 
@@ -1047,6 +1061,7 @@ export class OAuthAuthorizationServer {
                     }
 
                     // refresh upstream token
+                    CrossauthLogger.logger.debug(j({msg: "token endpoint: refresh token flow: refreshing from upstream client"}))
                     let upstream_resp = await upstreamClient.refreshTokenFlow(upstreamRefreshToken);
                     if (!upstream_resp.access_token) {
                         return {
@@ -1077,12 +1092,28 @@ export class OAuthAuthorizationServer {
 
                         upstreamRefreshToken = upstream_resp.refresh_token;
 
+                        const ret2 = await this.createTokensFromPayload(client_id,
+                            typeof(mergeResponse.access_payload) == "string" ? undefined : mergeResponse.access_payload, mergeResponse.id_payload
+                        );
                         // create new refresh token
                         let newRefreshToken = await this.createRefreshToken(client, {
                             upstreamRefreshToken, upstreamLabel, scopes: scope, username: user?.username})
 
                         // return tokens.  Upstream token has been saved in key storage locally
-                        return {...upstream_resp, refresh_token: newRefreshToken};
+                        //return {...upstream_resp, refresh_token: newRefreshToken};
+                        //return {...mergeResponse, refresh_token: newRefreshToken}
+
+                    return {
+                        access_token : ret2.access_token,
+                        id_token: ret2.id_token,
+                        refresh_token : newRefreshToken,
+                        expires_in : upstream_resp.expires_in ?? (
+                            this.accessTokenExpiry==null ? undefined : 
+                            this.accessTokenExpiry),
+                        token_type: "Bearer",
+                        scope: scope,
+                    }
+
                     } else {
                         CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
                         return {
@@ -1135,7 +1166,6 @@ export class OAuthAuthorizationServer {
                 } else {
 
                     // we have only our own refresh token.  
-                    // XXX
                     refreshData = await this.getRefreshTokenData(refreshToken);
                     if (!refreshToken || !refreshData || !this.userStorage) {
                         return {
