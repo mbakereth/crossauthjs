@@ -1,6 +1,6 @@
 {
 	"name": "@crossauth/sveltekit",
-	"version": "1.1.3",
+	"version": "1.1.4",
 	"license": "Apache-2.0",
 	"description": "Sveltekit adapter for Crossauth authentication package",
 	"private": false,
