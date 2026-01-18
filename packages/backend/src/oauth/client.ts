@@ -165,7 +165,6 @@ export class OAuthClientBackend extends OAuthClientBase {
         const options1 = {
             client_id: "",
         }
-        console.log("constructor", options)
         setParameter("client_id", ParamType.String, options1, options, "OAUTH_CLIENT_ID", true);
         super({ authServerBaseUrl, 
             tokenConsumer: new OAuthTokenConsumer(
