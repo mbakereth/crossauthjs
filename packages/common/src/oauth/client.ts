@@ -1313,6 +1313,8 @@ export abstract class OAuthClientBase {
         try {
             return await this.tokenConsumer.tokenAuthorized(token, "id");
         } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}))
+            CrossauthLogger.logger.error(j({msg: "Id token invalid", cerr: e}))
             return undefined;
         }
     }
@@ -1331,6 +1333,8 @@ export abstract class OAuthClientBase {
         try {
             return await this.tokenConsumer.tokenAuthorized(token, "access", checkAudience);
         } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}))
+            CrossauthLogger.logger.error(j({msg: "Access token invalid", cerr: e}))
             return undefined;
         }
     }
@@ -1348,6 +1352,7 @@ export abstract class OAuthClientBase {
                 return await this.tokenConsumer.tokenAuthorized(idToken, "id", checkAudience);
             } catch (e) {
                 CrossauthLogger.logger.warn(j({err: e}));
+                CrossauthLogger.logger.debug(j({err: e}))
                 return undefined;
             }
         }

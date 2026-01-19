@@ -2886,7 +2886,13 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
         },
     }
 
-    private errorIfIdTokenInvalid(oauthResponse : OAuthTokenResponse) : OAuthTokenResponse {
+    private errorIfIdTokenInvalid(oauthResponse : OAuthTokenResponse | undefined) : OAuthTokenResponse {
+        if (!oauthResponse) {
+            return {
+                error: "access_denied",
+                error_description: "Invalid OAuth response"
+            }
+        }
         if (oauthResponse["id_token"] && this.jwtTokens.includes("id")) {
             /*const payload = this.validateIdToken(oauthResponse["id_token"]);
             if (payload == undefined) {
