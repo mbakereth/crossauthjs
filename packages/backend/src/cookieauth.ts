@@ -330,7 +330,7 @@ export class SessionCookie {
         setParameter("cookieName", ParamType.String, this, options, "SESSION_COOKIE_NAME");
         setParameter("maxAge", ParamType.String, this, options, "SESSION_COOKIE_MAX_AGE");
         setParameter("domain", ParamType.String, this, options, "SESSION_COOKIE_DOMAIN");
-        setParameter("httpOnly", ParamType.Boolean, this, options, "SESSIONCOOKIE_HTTPONLY");
+        setParameter("httpOnly", ParamType.Boolean, this, options, "SESSION_COOKIE_HTTPONLY"); 
         setParameter("path", ParamType.String, this, options, "SESSION_COOKIE_PATH");
         setParameter("secure", ParamType.Boolean, this, options, "SESSION_COOKIE_SECURE");
         setParameter("sameSite", ParamType.String, this, options, "SESSION_COOKIE_SAMESITE");
@@ -442,10 +442,15 @@ export class SessionCookie {
         options.sameSite = this.sameSite;
         if (this.httpOnly) {
             options.httpOnly = this.httpOnly;
+        } else if (this.httpOnly === false) {
+            options.httpOnly = this.httpOnly;
         }
         if (this.secure) {
             options.secure = this.secure;
+        } else if (this.secure === false) {
+            options.secure = this.secure;
         }
+        CrossauthLogger.logger.debug(j({msg: `Setting session cookie ${this.cookieName} options ${JSON.stringify(options)}`}))
         return {
             name : this.cookieName,
             value : signedValue,

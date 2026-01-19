@@ -529,7 +529,9 @@ export class SvelteKitAuthorizationServer {
         if (this.refreshTokenCookieSameSite) cookieParams.sameSite = this.refreshTokenCookieSameSite;
         if (this.refreshTokenCookieDomain) cookieParams.domain = this.refreshTokenCookieDomain;
         if (this.refreshTokenCookieHttpOnly == true) cookieParams.httpOnly = true;
+        else cookieParams.httpOnly = false;
         if (this.refreshTokenCookieSecure == true) cookieParams.secure = true;
+        else cookieParams.secure = false;
         
         event.cookies.set(
             this.refreshTokenCookieName, 
