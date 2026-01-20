@@ -948,7 +948,7 @@ export class SvelteKitAuthorizationServer {
                 }
             } else {
                 // this may be legitimate, if the request is to log in with a local account
-                CrossauthLogger.logger.warn(j({"msg": "1 upstreamClients defined but no upstream parameter given in authorize request"}))
+                CrossauthLogger.logger.warn(j({"msg": "upstreamClients defined but no upstream parameter given in authorize request"}))
             }
         }
 
@@ -956,10 +956,10 @@ export class SvelteKitAuthorizationServer {
 
             const state = Crypto.randomValue(32);
             let resp = this.getAuthorizeQuery(url);
-            if (!resp.query) return resp.error
+            if (!resp.query) return resp.error ?? { error: "server_error", error_description: "Unknown error"}
             let query : AuthorizeQueryType = resp.query;
 
-            CrossauthLogger.logger.debug(j({"msg": `Have upstream client with redirect_uri ${query.redirect_uri}`}))
+            CrossauthLogger.logger.debug(j({"msg": `Have upstream client.  Downstream redirect_uri ${query.redirect_uri}`}))
             if (query.response_type == "code") {
 
                 // validate client
@@ -978,6 +978,7 @@ export class SvelteKitAuthorizationServer {
                 // construct a url to call the /authorize endpoint on the upstream auth server
                 const resp = await upstreamClient.startAuthorizationCodeFlow(state, { scope: query.scope, codeChallenge: query.code_challenge, pkce: query.code_challenge!=undefined});
                 if (resp.error) {
+                    CrossauthLogger.logger.error(j({msg: "Failed starting upstream authorization code flow: " + (resp.error_description??"")}))
                     return {
                         ok: false,
                         error: resp.error,
@@ -987,6 +988,7 @@ export class SvelteKitAuthorizationServer {
                     // create an authorization code
                     const codeResp = await this.authServer.getAuthorizationCode(client, query.redirect_uri, scopes, state, query.code_challenge, query.code_challenge_method);
                     if (!codeResp.code) {
+                        CrossauthLogger.logger.error(j({msg: "Error creating authorization code: " + (codeResp.error_description??"")}))
                         return { 
                             ok: false,
                             error: "server_error", 
@@ -1007,6 +1009,7 @@ export class SvelteKitAuthorizationServer {
                         next: query.next,
                     };
                     if (!upstreamClientOptions.options.redirect_uri) {
+                        CrossauthLogger.logger.error("No redirect URI given for upstream client")
                         return { 
                             ok: false,
                             error: "server_error", 
@@ -1014,6 +1017,7 @@ export class SvelteKitAuthorizationServer {
                         }
     
                     }
+                    CrossauthLogger.logger.debug(j({msg: "Saving data for call to upstream client"}))
                     const sessionDataName = upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
                     await this.storeSessionData(event, sessionData, sessionDataName);
                     let url = resp.url;
@@ -1024,6 +1028,7 @@ export class SvelteKitAuthorizationServer {
                     throw this.redirect(302, url);
                 }
             } else {
+                CrossauthLogger.logger.error("Invalid call to authorize endpoint.  Not called with response_type of code")
                 return { 
                     ok: false,
                     error: "invalid_request", 
@@ -1081,7 +1086,7 @@ export class SvelteKitAuthorizationServer {
                 if (!resp.query) return resp.error
                 let query : AuthorizeQueryType = resp.query;
 
-                CrossauthLogger.logger.debug(j({"msg": `Have upstream client with redirect_uri ${query.redirect_uri}`}))
+                CrossauthLogger.logger.debug(j({"msg": `Have upstream client.  Downstream redirect_uri ${query.redirect_uri}`}))
                 if (query.response_type == "code") {
 
                     // validate client
@@ -1579,7 +1584,7 @@ export class SvelteKitAuthorizationServer {
                 const sessionDataName = upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
                 oauthData = await this.svelteKitServer.sessionAdapter?.getSessionData(event, sessionDataName) ?? {};
                 if (this.authServer.upstreamClients && (!("upstream_label" in oauthData ) || !(oauthData.upstream_label in this.authServer.upstreamClients))) {
-                    return this.redirectError(oauthData.orig_redirect_uri, "server_error", "Invalid upstream client found in saessom")
+                    return this.redirectError(oauthData.orig_redirect_uri, "server_error", "Invalid upstream client found in session") 
                 }
                 if (this.authServer.upstreamClients) {
                     upstreamClient = this.authServer.upstreamClients[oauthData.upstream_label]

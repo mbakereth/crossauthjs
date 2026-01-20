@@ -1884,7 +1884,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // if we have an upstream client, this call will save the original /authorize call and redirect to
                 // the upstream auth server's /authorize endpoint
                 if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
-                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next, event.url), upstream)
+                    const resp = await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next, event.url), upstream);
+                    if (resp?.error) {
+                        return json(resp ? resp : {error: "server_error", error_description: "Unknown error"}, {status: 500});
+                    }
                 }
 
                 // the following call returns a constructed url for the
@@ -1954,7 +1957,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // if we have an upstream client, this call will save the original /authorize call and redirect to
                 // the upstream auth server's /authorize endpoint
                 if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
-                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                    const resp = await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                    if (resp?.error) {
+                        return json(resp ? resp : {error: "server_error", error_description: "Unknown error"}, {status: 500});
+                    }
                 }
 
                 // the following call returns a constructed url for the
@@ -2027,7 +2033,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // if we have an upstream client, this call will save the original /authorize call and redirect to
                 // the upstream auth server's /authorize endpoint
                 if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
-                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                    const resp = await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream);
+                    if (resp?.error) {
+                        return json(resp ? resp : {error: "server_error", error_description: "Unknown error"}, {status: 500});
+                    }
                 }
 
                 // the following call returns a constructed url for the
@@ -2099,7 +2108,10 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // if we have an upstream client, this call will save the original /authorize call and redirect to
                 // the upstream auth server's /authorize endpoint
                 if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
-                    await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                    const resp = await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next), upstream)
+                    if (resp?.error) {
+                        return json(resp ? resp : {error: "server_error", error_description: "Unknown error"}, {status: 500});
+                    }
                 }
 
                 // the following call returns a constructed url for the

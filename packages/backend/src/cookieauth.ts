@@ -75,7 +75,7 @@ export class DoubleSubmitCsrfToken {
     /** Name of the CSRF Cookie */
     readonly cookieName : string = "CSRFTOKEN";
     readonly domain : string | undefined = undefined;
-    readonly httpOnly : boolean = false;
+    readonly httpOnly : boolean = true;
     readonly path : string = "/";
     readonly secure : boolean = true;
     readonly sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
@@ -301,7 +301,7 @@ export class SessionCookie {
     readonly cookieName : string = "SESSIONID";
     readonly maxAge : number = 60*60*24*30; // 30 days
     readonly domain : string | undefined = undefined;
-    readonly httpOnly : boolean = false;
+    readonly httpOnly : boolean = true;
     readonly path : string = "/";
     readonly secure : boolean = true;
     readonly sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
