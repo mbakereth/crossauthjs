@@ -2592,7 +2592,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
                 return this.errorFn(this.server, event, ce);
             }
-            return this.pack(await this.refreshTokens(event, "post", true));
+            const ret = await this.refreshTokens(event, "post", true)
+            return this.pack(ret);
         },
 
         actions: {
@@ -2615,7 +2616,8 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use actions not post");
                 return this.errorFn(this.server, event, ce);
             }
-            return this.pack(await this.refreshTokens(event, "silent", true));
+            const ret = await this.refreshTokens(event, "silent", true);
+            return this.pack(ret);
         },
     };
 

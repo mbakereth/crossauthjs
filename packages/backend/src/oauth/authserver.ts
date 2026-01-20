@@ -1027,6 +1027,7 @@ export class OAuthAuthorizationServer {
                 CrossauthLogger.logger.debug(j({msg: "token endpoint: refresh token flow"}))
 
                 if (refreshData && upstreamRefreshToken && upstreamClient && upstreamClientOptions) { 
+                    CrossauthLogger.logger.debug(j({msg: "token endpoint: refreshing locally and upstream"}))
 
                     // we have both.  Refresh upstream and make new tokens, merging
                     // user data, create a new refresh token and store it
@@ -1123,6 +1124,7 @@ export class OAuthAuthorizationServer {
                     }                            
                 } else if (upstreamRefreshToken && upstreamClient && upstreamClientOptions) {
 
+                    CrossauthLogger.logger.debug(j({msg: "token endpoint: refreshing upstream"}))
                     // we only have upstreamn token.  We refresh upstream but don't
                     // create one ourselves or store data locally.  Merge received
                     // token with local User data
@@ -1165,6 +1167,7 @@ export class OAuthAuthorizationServer {
 
                 } else {
 
+                    CrossauthLogger.logger.debug(j({msg: "token endpoint: refreshing locally"}))
                     // we have only our own refresh token.  
                     refreshData = await this.getRefreshTokenData(refreshToken);
                     if (!refreshToken || !refreshData || !this.userStorage) {

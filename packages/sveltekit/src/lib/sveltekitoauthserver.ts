@@ -1559,7 +1559,7 @@ export class SvelteKitAuthorizationServer {
                     upstreamClientOptions = this.authServer.upstreamClientOptions
                 } else if (this.authServer.upstreamClients && this.authServer.upstreamClientOptionss) {
                     if (!upstream) {
-                        CrossauthLogger.logger.error(j({msg: "Have multiple upstream clients but upstream redirect uri not passed the upstream identifier"}));
+                        CrossauthLogger.logger.warn(j({msg: "Have multiple upstream clients but upstream redirect uri not passed the upstream identifier"}));
                         return this.redirectError(oauthData.orig_redirect_uri, "server_error",  "Have multiple upstream clients but upstream redirect uri not passed the upstream identifier")
                     }
                     upstreamClient = this.authServer.upstreamClients[upstream]

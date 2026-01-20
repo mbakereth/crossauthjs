@@ -1080,10 +1080,10 @@ export abstract class OAuthClientBase {
             let resp =  await this.post(url, params, this.authServerHeaders);
             if (resp.id_token) {
                 const userInfo = await this.getIdPayload(resp.id_token, resp.access_token);
-                if (userInfo.error) {
+                if (userInfo?.error) {
                     return userInfo;
                 }
-                resp.id_payload = userInfo.payload;
+                resp.id_payload = userInfo?.payload;
             }
             return resp;
         } catch (e) {
