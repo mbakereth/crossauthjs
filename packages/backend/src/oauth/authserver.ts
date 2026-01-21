@@ -1228,8 +1228,6 @@ export class OAuthAuthorizationServer {
 
                         // create oru own refresh token
                         let newRefreshToken = await this.createRefreshToken(client, {
-                            upstreamAccessToken,
-                            upstreamIdToken,
                             upstreamLabel,
                             scopes,
                             username: user?.username,
@@ -2799,15 +2797,11 @@ export class OAuthAuthorizationServer {
         upstreamLabel,
         scopes,
         username,
-        upstreamAccessToken,
-        upstreamIdToken
     }: {
         upstreamRefreshToken? : string,
         upstreamLabel?: string,
         scopes? : string[],
         username?: string,
-        upstreamAccessToken? : string,
-        upstreamIdToken? : string,
     }) 
         : Promise<string|undefined> {
 

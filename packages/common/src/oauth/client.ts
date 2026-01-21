@@ -384,12 +384,10 @@ export abstract class OAuthClientBase {
             scope,
             codeChallenge, 
             pkce = false,
-            upstream,
         } : {
             scope?: string,
             codeChallenge? : string, 
             pkce?: boolean,
-            upstream? : string
         }) : 
         Promise<{
             url?: string,
@@ -436,12 +434,6 @@ export abstract class OAuthClientBase {
         if (pkce && codeChallenge) {
             url += "&code_challenge=" + codeChallenge;
         }
-
-        // XXX remove this
-        /*if (upstream) {
-            url += "&upstream=" + encodeURIComponent(upstream);
-
-        }*/
 
         return {url: url};
     }
