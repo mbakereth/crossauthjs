@@ -1,6 +1,6 @@
 {
 	"name": "sveltekitserverexample",
-	"version": "1.1.7",
+	"version": "1.1.8",
 	"license": "Apache-2.0",
 	"private": true,
 	"scripts": {
@@ -15,7 +15,6 @@
 		"seed": "dotenv -e .env.dev tsx prisma/seed.ts"
 	},
 	"devDependencies": {
-		"@prisma/client": "7.2.0",
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/adapter-node": "^5.2.2",
 		"@sveltejs/kit": "^2.0.0",
@@ -45,6 +44,7 @@
 		"@crossauth/backend": "workspace:^",
 		"@crossauth/common": "workspace:^",
 		"@crossauth/sveltekit": "workspace:^",
+		"@prisma/client": "7.2.0",
 		"@prisma/adapter-better-sqlite3": "^7.2.0"
 	}
 }

@@ -200,11 +200,13 @@ export class SessionManager {
         if (!user) {
             let userInputFields : UserInputFields = {username: "", state: "active"};
             try {
+                CrossauthLogger.logger.debug(j({msg: "Fetching user " + username + " locally"}))
                 let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
                 secrets = userAndSecrets.secrets;
                 user = userAndSecrets.user;    
                 userInputFields = userAndSecrets.user;
             } catch (e) {
+                CrossauthLogger.logger.debug(j({msg: "Failed.  Checking for authenticators that don't require user entry", err: e}))
                 const ce = CrossauthError.asCrossauthError(e);
                 if (ce.code == ErrorCode.Connection) throw e;
                 for (let auth in this.authenticators) {
@@ -213,8 +215,10 @@ export class SessionManager {
                         defaultAuth = auth;
                     }
                 }
+                CrossauthLogger.logger.debug(j({msg: "User " + user?.username + " factor1 " + user?.factor1 + " Default auth", defaultAuth}))
             }
             if (userInputFields.username == "") throw new CrossauthError(ErrorCode.UserNotExist);
+            CrossauthLogger.logger.debug(j({msg: "Authenticating with " + (user?.factor1??defaultAuth)}))
             await this.authenticators[user?.factor1??defaultAuth].authenticateUser(userInputFields, secrets, params);
             let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             secrets = userAndSecrets.secrets;

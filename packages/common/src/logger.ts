@@ -44,7 +44,7 @@ export interface CrossauthLoggerInterface {
  * - `emailMessageId` : internal id of any email that is sent
  * - `email` : email address
  * - `userid` : sometimes provided in addition to username, or when username not available
- * - `hahedApiKey` : a hash of an API key.  The unhashed version is not logged for security,
+ * - `hashedApiKey` : a hash of an API key.  The unhashed version is not logged for security,
  *                   but a hash of it is logged for correlation purposes.
  * - `header`      : an HTTP header that relates to an error (eg `Authorization`), only if
  *                   it is non-secret or invalid

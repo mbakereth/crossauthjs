@@ -113,6 +113,10 @@ export class PrismaUserStorage extends UserStorage {
             error = new CrossauthError(ErrorCode.Connection); 
         }
         if (error) throw error;
+        /* // @ts-ignore  (because types only exist when do prismaClient.table...)
+        const res1 = await this.prismaClient[this.userTable].findMany({})
+        console.log(res1)*/
+
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             prismaUser = await this.prismaClient[this.userTable].findUniqueOrThrow({
@@ -125,7 +129,7 @@ export class PrismaUserStorage extends UserStorage {
         }  catch (e) {
             //if (e instanceof Prisma.PrismaClientKnownRequestError) {
             if (typeof(e) == "object" && e?.constructor.name == "PrismaClientInitializationError") {
-                CrossauthLogger.logger.debug(j({err: e}))
+                CrossauthLogger.logger.debug(j({err: e, constructor: e?.constructor.name}))
                 CrossauthLogger.logger.error(j({cerr: e}))
                 error = new CrossauthError(ErrorCode.Connection, "Couldn't connect to database server"); 
             }
