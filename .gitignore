@@ -1,4 +1,5 @@
 # Env
+**/.npmrc
 **/.env.twilio
 **/.env.private
 
