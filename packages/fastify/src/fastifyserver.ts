@@ -42,7 +42,6 @@ import {
     FastifyOAuthResourceServer,
     type FastifyOAuthResourceServerOptions } from './fastifyresserver';
 import { type User } from '@crossauth/common';
-import { hostname } from 'os';
 
 export const ERROR_400 = `<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
@@ -664,7 +663,7 @@ export class FastifyServer {
      * Starts the Fastify app on the given port.  
      * @param port the port to listen on
      */
-    start(port : number = 3000, hostname="0.0.0.0") {
+    start(port : number = 3000, hostname : string = "0.0.0.0") {
         this.app.listen({ port: port}, () =>
             CrossauthLogger.logger.info(j({
                 msg: "Starting fastify server",

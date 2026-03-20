@@ -1893,7 +1893,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // the following call returns a constructed url for the
                 // auth server's /authorize endpoint
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, { scope, upstream });
+                    await this.startAuthorizationCodeFlow(state, { scope });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -1966,7 +1966,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // the following call returns a constructed url for the
                 // auth server's /authorize endpoint
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, { scope, upstream });
+                    await this.startAuthorizationCodeFlow(state, { scope });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -2042,7 +2042,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // the following call returns a constructed url for the
                 // auth server's /authorize endpoint
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, { scope, codeChallenge, pkce: true, upstream });
+                    await this.startAuthorizationCodeFlow(state, { scope, codeChallenge, pkce: true });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
@@ -2117,7 +2117,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // the following call returns a constructed url for the
                 // auth server's /authorize endpoint
                 const {url, error, error_description} = 
-                    await this.startAuthorizationCodeFlow(state, { scope, codeChallenge, pkce: true, upstream });
+                    await this.startAuthorizationCodeFlow(state, { scope, codeChallenge, pkce: true });
                 if (error || !url) {
                     const ce = CrossauthError.fromOAuthError(error??"server_error", 
                         error_description);
