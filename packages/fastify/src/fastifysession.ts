@@ -1029,7 +1029,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
         ////////////////
         // hooks
 
-        // session management: validate session and CSRF cookies and populate 
+        // session management: validate session, CSRF nad known device cookies and populate 
         // request.user
         app.addHook('preHandler', async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
 
@@ -1132,6 +1132,37 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     }));
                     reply.clearCookie(this.sessionManager.sessionCookieName);
                 }
+
+                // check if there is a known device cookie
+                let haveKnownDevice = false;
+                let knownDeviceUsers : {[key:string|number]:Date} = {}
+                let knownDeviceCookieValue : string|undefined = undefined;
+                if (!this.sessionManager.enableKnownDevices) {
+                    request.knownDevice = false;
+                } else {
+                    CrossauthLogger.logger.debug(j({message: "Getting known device cookie"}));
+                    knownDeviceCookieValue = undefined;
+                    try {
+                        knownDeviceCookieValue = this.getKnownDeviceCookieValue(request); 
+                        haveKnownDevice = true;
+                        if (knownDeviceCookieValue) knownDeviceUsers = await this.sessionManager.getUsersForKnownDeviceKey(knownDeviceCookieValue) ?? {};
+                    }
+                    catch (e) {
+                        CrossauthLogger.logger.warn(j({message: "Invalid or expired known devive cookie received", cerr: e, knownDeviceCookieValue: knownDeviceCookieValue}));
+                        reply.clearCookie(this.sessionManager.knownDeviceCookieName);
+                        cookieValue = undefined;
+                    }
+                }
+                if (haveKnownDevice && request.user && request.user.userid in knownDeviceUsers && knownDeviceCookieValue) {
+                    const now = Date.now();
+                    if (now > knownDeviceUsers[request.user.userid].getTime()) {
+                        CrossauthLogger.logger.info(j({msg: "Known device has expired for user", username: request.user.username}));
+                        await this.sessionManager.removeUserFromKnownDevice(knownDeviceCookieValue, request.user.userid)
+                    } else {
+                        request.knownDevice = true;
+                    }
+                }
+
             }
         });
 
@@ -1143,7 +1174,9 @@ export class FastifySessionServer implements FastifySessionAdapter {
             if (sessionCookieValue && 
                 request.user?.factor2 && 
                 (this.factor2ProtectedPageEndpoints.includes(request.url) || 
-                this.factor2ProtectedApiEndpoints.includes(request.url))) {
+                this.factor2ProtectedApiEndpoints.includes(request.url)) && (
+                    !this.sessionManager.enableKnownDevices || !request.knownDevice
+                )) {
                 const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                 if (!(["GET", "OPTIONS", "HEAD"].includes(request.method))) {
                     const sessionData = 
@@ -2636,6 +2669,19 @@ export class FastifySessionServer implements FastifySessionAdapter {
         if (request.cookies && 
             this.sessionManager.csrfCookieName in request.cookies) {       
             return request.cookies[this.sessionManager.csrfCookieName]
+        }
+        return undefined;
+    }
+
+    /**
+     * Returns the known device cookie value from the request
+     * @param request the Fastify request
+     * @returns the CSRF token cookie value
+     */
+    getKnownDeviceCookieValue(request : FastifyRequest) : string|undefined{
+        if (request.cookies && 
+            this.sessionManager.knownDeviceCookieName in request.cookies) {       
+            return request.cookies[this.sessionManager.knownDeviceCookieName]
         }
         return undefined;
     }

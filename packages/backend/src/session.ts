@@ -17,7 +17,7 @@ import type { LocalPasswordAuthenticatorOptions }  from "./authenticators/passwo
 import { TokenEmailer, type TokenEmailerOptions } from './emailtokens.ts';
 import { CrossauthLogger, j } from '@crossauth/common';
 import { type Cookie, DoubleSubmitCsrfToken, SessionCookie } from './cookieauth.ts';
-import type { DoubleSubmitCsrfTokenOptions, SessionCookieOptions } from './cookieauth.ts';
+import { DoubleSubmitCsrfTokenOptions, KnownDeviceCookie, SessionCookieOptions } from './cookieauth.ts';
 import { setParameter, ParamType } from './utils.ts';
 import { Crypto } from './crypto.ts';
 
@@ -37,6 +37,9 @@ export interface SessionManagerOptions extends TokenEmailerOptions {
 
     /** options for session cookie manager */
     sessionCookieOptions? : SessionCookieOptions,
+
+    /** options for csrf cookie manager */
+    knownDeviceCookieOptions? : KnownDeviceCookie,
 
     /** If true, users will have to verify their email address before account is created or when changing their email address.
      * See class description for details.. Default true
@@ -72,6 +75,12 @@ export interface SessionManagerOptions extends TokenEmailerOptions {
      * See `authentiators` in {@link SessionManager.constructor}.
      */
     allowedFactor2? : string[],
+
+    /**
+     * If true, cookies will be sent to flag device as being known.
+     * This is used to supress 2DFA
+     */
+    enableKnownDevices? : boolean,
 }
 
 /**
@@ -82,9 +91,11 @@ export class SessionManager {
     keyStorage : KeyStorage;
     emailTokenStorage : KeyStorage;
     readonly csrfTokens : DoubleSubmitCsrfToken;
+    readonly knownDeviceCookie : KnownDeviceCookie|undefined;
     private session : SessionCookie;
     readonly authenticators : {[key:string] : Authenticator};
     //readonly authenticator : UsernamePasswordAuthenticator;
+    readonly enableKnownDevices = false;
 
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = false;
@@ -110,8 +121,13 @@ export class SessionManager {
         }
 
 
+        setParameter("enableKnownDevices", ParamType.JsonArray, this, options, "ENABLE_KNOWN_DEVICES");
+
         this.session = new SessionCookie(this.keyStorage, {...options?.sessionCookieOptions, ...options??{}});
         this.csrfTokens = new DoubleSubmitCsrfToken({...options?.doubleSubmitCookieOptions, ...options??{}});
+        if (this.enableKnownDevices) {
+            this.knownDeviceCookie = new KnownDeviceCookie(keyStorage, {...options?.knownDeviceCookieOptions, ...options??{}});
+        }
 
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
@@ -156,6 +172,27 @@ export class SessionManager {
      * Returns the name used for CSRF token cookies.
      */
     get csrfHeaderName() : string {
+        return this.csrfTokens.headerName;
+    }
+
+    /**
+     * Returns the name used for CSRF token cookies.
+     */
+    get knownDeviceCookieName() : string {
+        return this.csrfTokens.cookieName;
+    }
+
+    /**
+     * Returns the name used for CSRF token cookies.
+     */
+    get knownDeviceCookiePath() : string {
+        return this.csrfTokens.path;
+    }
+
+    /**
+     * Returns the name used for CSRF token cookies.
+     */
+    get knownDeviceHeaderName() : string {
         return this.csrfTokens.headerName;
     }
 
@@ -445,6 +482,25 @@ export class SessionManager {
      */
     validateCsrfCookie(csrfCookieValue : string) {
         this.csrfTokens.validateCsrfCookie(csrfCookieValue);
+    }
+
+    /**
+     * If known devices not enabled, returned undefined.
+     * If there is no known device, return undefined.
+     * If there is but there is no user id or the user doesn't exist, throw an exception
+     * 
+     * @param cookieValue 
+     * @returns user and key or undefined
+     */
+    async getUsersForKnownDeviceKey(cookieValue: string) : Promise<{[key:string|number]:Date}|undefined> {
+        if (!this.knownDeviceCookie) return undefined;
+        return this.knownDeviceCookie.getUsersForKnownDeviceKey(cookieValue);
+    }
+
+    async removeUserFromKnownDevice(cookieValue: string, userid: string|number) {
+        if (this.enableKnownDevices && this.knownDeviceCookie) {
+            await this.knownDeviceCookie.removeUser(cookieValue, userid)
+        }
     }
 
     /**

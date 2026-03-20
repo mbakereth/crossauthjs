@@ -11,6 +11,7 @@ import { CookieSerializeOptions } from 'cookie';
 
 const CSRF_LENGTH = 16;
 const SESSIONID_LENGTH = 16;
+const KNOWNDEVICE_LENGTH = 16;
 
 /**
  * Optional parameters when setting cookies,
@@ -248,8 +249,11 @@ export class DoubleSubmitCsrfToken {
     }
 }
 
+//////////////
+// Session cookie
+
 /**
- * Options for double-submit csrf tokens
+ * Options for session cookies
  */
 export interface SessionCookieOptions extends CookieOptions, TokenEmailerOptions {
 
@@ -258,11 +262,8 @@ export interface SessionCookieOptions extends CookieOptions, TokenEmailerOptions
      */
     userStorage? : UserStorage,
 
-    /** Name of cookie.  Defaults to "CSRFTOKEN" */
+    /** Name of cookie.  Defaults to "SESSIONID" */
     cookieName? : string,
-
-    /** If true, session IDs are stored in hashed form in the key storage.  Default false. */
-    hashSessionId? : boolean;
 
     /** If non zero, sessions will time out after this number of seconds have elapsed without activity.  Default 0 (no timeout) */
     idleTimeout? : number;
@@ -586,3 +587,304 @@ export class SessionCookie {
         await this.keyStorage.deleteAllForUser(userid, KeyPrefix.session, except);
     }
 }
+
+/////////////
+// Known Device Cookie
+
+/**
+ * Options for known device cookies
+ */
+export interface KnownDeviceCookieOptions extends CookieOptions {
+
+    /** Name of cookie.  Defaults to "KNOWNDEVICE" */
+    cookieName? : string,
+
+    /** App secret  */
+    secret? : string;
+}
+
+/**
+ * Class for creating and validating cookies to prevent 2FA on known devices
+ */
+export class KnownDeviceCookie {
+
+    private keyStorage : KeyStorage;
+
+    // cookie settings
+    /** Name of the CSRF Cookie, set from input options */
+    readonly cookieName : string = "KNOWNDEVICE";
+    readonly maxAge : number = 60*60*24*30; // 30 days
+    readonly domain : string | undefined = undefined;
+    readonly httpOnly : boolean = true;
+    readonly path : string = "/";
+    readonly secure : boolean = true;
+    readonly sameSite : boolean | "lax" | "strict" | "none" | undefined = "lax";
+
+    // hasher settings
+    private secret : string = "";
+
+    /**
+     * Constructor.
+     * 
+     * @param keyStorage where to put session IDs
+     * @param options configurable options.  See {@link SessionCookieOptions}.  The 
+     *                expires option is ignored (cookies are session-only).
+     */
+    constructor(keyStorage : KeyStorage, 
+        options : KnownDeviceCookieOptions = {}) {
+
+        this.keyStorage = keyStorage;
+
+        // cookie options
+        setParameter("cookieName", ParamType.String, this, options, "KNOWNDEVICE_COOKIE_NAME");
+        setParameter("maxAge", ParamType.String, this, options, "KNOWNDEVICE_COOKIE_MAX_AGE");
+        setParameter("domain", ParamType.String, this, options, "KNOWNDEVICE_COOKIE_DOMAIN");
+        setParameter("httpOnly", ParamType.Boolean, this, options, "KNOWNDEVICE_COOKIE_HTTPONLY"); 
+        setParameter("path", ParamType.String, this, options, "KNOWNDEVICE_COOKIE_PATH");
+        setParameter("secure", ParamType.Boolean, this, options, "KNOWNDEVICE_COOKIE_SECURE");
+        setParameter("sameSite", ParamType.String, this, options, "KNOWNDEVICE_COOKIE_SAMESITE");
+
+        // hasher options
+        setParameter("secret", ParamType.String, this, options, "SECRET", true);
+    }
+
+    private expiry(dateCreated : Date) : Date  {
+        let expires : Date | undefined = undefined;
+        expires = new Date();
+        expires.setTime(dateCreated.getTime() + this.maxAge*1000);
+        return expires;
+    }
+
+    /**
+     * Returns a hash of a session ID, with the session ID prefix for storing
+     * in the storage table.
+     * @param value the value to hash
+     * @returns a base64-url-encoded string that can go into the storage
+     */
+    static hashValue(value : string) : string {
+        return KeyPrefix.knownDevice + Crypto.hash(value);
+    }
+
+    /**
+     * Creates a cookie value and saves in storage
+     * 
+     * Date created is the current date/time on the server.
+     * 
+     * In the unlikely event of the key already existing, it is retried up to 10 times before throwing
+     * an error with ErrorCode.KeyExists
+     * 
+     * @param userid the user ID to store with the value.
+     * @returns the new cookie value
+     * @throws {@link @crossauth/common!CrossauthError} with 
+     *         {@link @crossauth/common!ErrorCode} `KeyExists` if maximum
+     *          attempts exceeded trying to create a unique session id
+     */
+    async createValue(userid: string | number) : Promise<Key> {
+        const maxTries = 10;
+        let numTries = 0;
+        let value = Crypto.randomValue(KNOWNDEVICE_LENGTH);
+        const dateCreated = new Date();
+        let expires = this.expiry(dateCreated);
+        let succeeded = false;
+        while (numTries < maxTries && !succeeded) {
+            const hashedValue = KnownDeviceCookie.hashValue(value);
+            try {
+                // save the new session - if it exists, an error will be thrown
+                await this.keyStorage.saveKey(undefined, hashedValue, dateCreated, expires, undefined, {users: {userid: expires}});
+                succeeded = true;
+            } catch (e) {
+                let ce = CrossauthError.asCrossauthError(e);
+                if (ce.code == ErrorCode.KeyExists || ce.code == ErrorCode.InvalidKey) {
+                    numTries++;
+                    value = Crypto.randomValue(KNOWNDEVICE_LENGTH);
+                    if (numTries > maxTries) {
+                        CrossauthLogger.logger.error(j({msg: "Max attempts exceeded trying to create session ID"}))
+                        throw new CrossauthError(ErrorCode.KeyExists)
+                    }
+                } else {
+                    CrossauthLogger.logger.debug(j({err: e}));
+                    throw e;
+                }
+            }   
+        }
+        return {
+            userid : userid,
+            value : value,
+            created : dateCreated,
+            expires : expires
+        }
+    }
+
+    async updateUser(cookieValue: string, userid: string|number) {
+        let key = await this.getKnownDeviceKey(cookieValue);
+        let data = key.data ? JSON.parse(key.data) : {}
+        if (!data.users) data.users = {}
+        const dateCreated = new Date();
+        let expires = this.expiry(dateCreated);
+        data.users[userid] = expires;
+        await this.keyStorage.saveKey(undefined, KnownDeviceCookie.hashValue(cookieValue), key.created, key.expire.getTime() > expires?.getTime() ? key.expires : expires, data)
+    }
+
+    async removeUser(cookieValue: string, userid: string|number) {
+        let key = await this.getKnownDeviceKey(cookieValue);
+        let data = key.data ? JSON.parse(key.data) : {}
+        if (!data.users) data.users = {}
+        if (userid in data.users) delete data.users.userid
+        await this.keyStorage.saveKey(undefined, KnownDeviceCookie.hashValue(cookieValue), key.created, key.expires, data)
+    }
+
+    /**
+     * Returns a {@link Cookie } object with the given session key.
+     * 
+     * This class is compatible, for example, with Express.
+     * 
+     * @param knownDeviceKey the value of the known device cookie
+     * @returns a {@link Cookie } object,
+     */
+    makeCookie(knownDeviceKey : Key) : Cookie {
+        //let signedValue = Crypto.sign({v: sessionKey.value}, this.secret, "");
+        let signedValue = Crypto.signSecureToken(knownDeviceKey.value, this.secret);
+        let options : CookieOptions = {}
+        const persist = true;
+        if (this.domain) {
+            options.domain = this.domain;
+        }
+        if (knownDeviceKey.expires && persist) {
+            options.expires = knownDeviceKey.expires;
+        }
+        if (this.path) {
+            options.path = this.path;
+        }
+        options.sameSite = this.sameSite;
+        if (this.httpOnly) {
+            options.httpOnly = this.httpOnly;
+        } else if (this.httpOnly === false) {
+            options.httpOnly = this.httpOnly;
+        }
+        if (this.secure) {
+            options.secure = this.secure;
+        } else if (this.secure === false) {
+            options.secure = this.secure;
+        }
+        CrossauthLogger.logger.debug(j({msg: `Setting known device cookie ${this.cookieName} options ${JSON.stringify(options)}`}))
+        return {
+            name : this.cookieName,
+            value : signedValue,
+            options: options
+        }
+    }
+
+    /**
+     * Takes a session ID and creates a string representation of the cookie
+     * (value of the HTTP `Cookie` header).
+     * 
+     * @param cookie the cookie vlaues to make a string from
+     * @returns a string representation of the cookie and options.
+     */
+    makeCookieString(cookie : Cookie) : string {
+        let cookieString = cookie.name + "=" + cookie.value;
+        if (this.sameSite) cookieString += "; SameSite=" + this.sameSite;
+        if (cookie.options.expires) {
+            cookieString += "; expires=" + new Date(cookie.options.expires).toUTCString();
+        }
+        if (this.domain) {
+            cookieString += "; domain=" + this.domain;
+        }
+        if (this.path) {
+            cookieString += "; path=" + this.path;
+        }
+        if (this.httpOnly) {
+            cookieString += "; httpOnly";
+        }
+        if (this.secure) {
+            cookieString += "; secure";
+        }
+        return cookieString;
+    }
+    
+    /**
+     * Updates a session record in storage
+     * @param knownDeviceKey the fields to update.  `value` must be set, and
+     *        will not be updated.  All other defined fields will be updated.
+     * @throws {@link @crossauth/common!CrossauthError} if the session does
+     *         not exist. 
+     */
+    async updateKnownDeviceKey(knownDeviceKey : Partial<Key>) : Promise<void> {
+        if (!knownDeviceKey.value) throw new CrossauthError(ErrorCode.InvalidKey, "No known device key when updating key");
+        knownDeviceKey.value = SessionCookie.hashSessionId(knownDeviceKey.value);
+        await this.keyStorage.updateKey(knownDeviceKey);
+    }
+
+    /**
+     * Unsigns a cookie and returns the original value.
+     * @param cookieValue the signed cookie value
+     * @returns the unsigned value
+     * @throws {@link @crossauth/common!CrossauthError} if the signature
+     *         is invalid. 
+     */
+    unsignCookie(cookieValue : string) : string {
+        //return Crypto.unsign(cookieValue, this.secret).v;
+        return Crypto.unsignSecureToken(cookieValue, this.secret);
+    }
+
+    /**
+     * Returns the user matching the given session key in session storage, or throws an exception.
+     * 
+     * Looks the user up in the {@link UserStorage} instance passed to the constructor.
+     * 
+     * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
+     * 
+     * @param sessionId the value in the session cookie
+     * @param options See {@link UserStorageGetOptions}
+     * @returns a {@link @crossauth/common!User } object, with the password hash removed, and the {@link @crossauth/common!Key } with the unhashed
+     *          sessionId
+     * @throws a {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to `InvalidSessionId` or `Expired`.
+     */
+    async getUsersForKnownDeviceKey(knownDeviceKey: string) : Promise<{[key:string|number]:Date}> {
+        const key = await this.getKnownDeviceKey(knownDeviceKey);
+        let data = key.data ? JSON.parse(key.data) : {}
+        if (!data.users) data.users = {}
+        return data.users;
+    }
+
+    /**
+     * Returns the user matching the given session key in session storage, or throws an exception.
+     * 
+     * Looks the user up in the {@link UserStorage} instance passed to the constructor.
+     * 
+     * Undefined will also fail is CookieAuthOptions.filterFunction is defined and returns false,
+     * 
+     * @param sessionId the unsigned value of the session cookie
+     * @returns a {@link User } object, with the password hash removed.
+     * @throws a {@link @crossauth/common!CrossauthError } with 
+     *         {@link @crossauth/common!ErrorCode } set to `InvalidSessionId`,
+     *         `Expired` or `UserNotExist`.
+     */
+    async getKnownDeviceKey(value: string) : Promise<Key> {
+        //const sessionId = this.unsignCookie(cookieValue);
+        const now = Date.now();
+        const hash = KnownDeviceCookie.hashValue(value);
+        const key = await this.keyStorage.getKey(hash);
+        key.value = value; // storage only has hashed version
+        if (key.expires) {
+            if (now > key.expires.getTime()) {
+                CrossauthLogger.logger.warn(j({msg: "Known device cookie expired in key storage", hashedKnownDeviceCookie: Crypto.hash(value)}));
+                throw new CrossauthError(ErrorCode.Expired);
+            }
+        }
+        return key;
+    }
+
+    /**
+     * Deletes all keys for the given user
+     * @param userid the user to delete keys for
+     * @param except if defined, don't delete this key
+     */
+    async deleteAllForUser(userid : string | number, except: string|undefined) {
+        if (except) {
+            except = SessionCookie.hashSessionId(except);
+        }
+        await this.keyStorage.deleteAllForUser(userid, KeyPrefix.session, except);
+    }
+}
+

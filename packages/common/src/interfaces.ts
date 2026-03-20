@@ -320,4 +320,7 @@ export class KeyPrefix {
 
     /** Device code flow user code */
     static readonly userCode = "uc:"
+
+    /** Device code flow user code */
+    static readonly knownDevice = "kd:"
 }

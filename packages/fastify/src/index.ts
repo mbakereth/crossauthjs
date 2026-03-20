@@ -29,6 +29,7 @@ declare module 'fastify' {
       user: User|undefined,
       csrfToken: string|undefined,
       sessionId : string|undefined,
+      knownDevice: boolean,
       apiKey: ApiKey,
       authType : "cookie" | "oauth" | "oidc" | "apiKey" | undefined,
       scope: string[] | undefined,
