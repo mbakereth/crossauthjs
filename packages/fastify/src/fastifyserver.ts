@@ -664,7 +664,7 @@ export class FastifyServer {
      * @param port the port to listen on
      */
     start(port : number = 3000, hostname : string = "0.0.0.0") {
-        this.app.listen({ port: port}, () =>
+        this.app.listen({ port: port, host: hostname}, () =>
             CrossauthLogger.logger.info(j({
                 msg: "Starting fastify server",
                 port: port,
