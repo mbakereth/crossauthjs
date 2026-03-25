@@ -102,8 +102,8 @@ export class CrossauthLogger {
      */
     constructor(level?: 0 | 1 | 2 | 3 | 4) {
         if (level) this.level = level;
-        else if (typeof process !== 'undefined' && "CROSSAUTH_LOG_LEVEL" in process.env) {
-            const levelName = (process.env["CROSSAUTH_LOG_LEVEL"]??"ERROR").toUpperCase();
+        else if (typeof process !== 'undefined' && process?.env.CROSSAUTH_LOG_LEVEL) {
+            const levelName = (process.env.CROSSAUTH_LOG_LEVEL??"ERROR").toUpperCase();
             if (CrossauthLogger.levelName.includes(levelName)) {
                 // @ts-ignore
                 this.level = CrossauthLogger.levelName.indexOf(levelName);

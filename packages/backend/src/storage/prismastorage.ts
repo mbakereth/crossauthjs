@@ -361,7 +361,7 @@ export class PrismaUserStorage extends UserStorage {
                     username_normalized
                 }
             }
-            if (this.normalizeEmail) {
+            if (this.normalizeEmail && email_normalized) {
                 data = {
                     ...data,
                     email_normalized
