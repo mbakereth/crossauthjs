@@ -463,11 +463,11 @@ export class SvelteKitAdminEndpoints {
             const oldFactor2 = user.factor2;
             const oldState = user.state;
             user.state = formData.state ?? "active";
-            user = this.sessionServer.updateUserFn(user,
+            user = this.sessionServer.updateUserFn(user, 
                 event,
                 formData,
-                {...this.sessionServer.userStorage.userEditableFields,
-                    ...this.sessionServer.userStorage.adminEditableFields});
+                [...this.sessionServer.userStorage.userEditableFields,
+                    ...this.sessionServer.userStorage.adminEditableFields]);
             const factor2ResetNeeded = user.factor2 && user.factor2 != "none" && user.factor2 != oldFactor2;
             if (factor2ResetNeeded && !(user.state == oldState || user.state == "factor2ResetNeeded")) {
                 throw new CrossauthError(ErrorCode.BadRequest, "Cannot change both factor2 and state at the same time");
@@ -706,8 +706,8 @@ export class SvelteKitAdminEndpoints {
             // call implementor-provided function to create the user object (or our default)
             user = 
                 this.sessionServer.createUserFn(event, formData, 
-                    {...this.sessionServer.userStorage.userEditableFields,
-                    ...this.sessionServer.userStorage.adminEditableFields},
+                    [...this.sessionServer.userStorage.userEditableFields,
+                    ...this.sessionServer.userStorage.adminEditableFields],
                 this.sessionServer.adminAllowedFactor1);
 
             const secretNames = this.sessionServer.authenticators[user.factor1].secretNames();
@@ -854,7 +854,7 @@ export class SvelteKitAdminEndpoints {
         }
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
-            const resp = await this.sessionServer.userStorage.getUserById(userid, {skipEmailVerifiedCheck: true, skipActiveCheck: true});
+            const resp = await this.sessionServer.userStorage.getUserById(userid, {skipEmailVerifiedCheck: true, skipActiveCheck: true, skipIncludes: true});
             return {user: resp.user};
         } catch (e) {
             return {exception: CrossauthError.asCrossauthError(e)};

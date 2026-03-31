@@ -1170,6 +1170,14 @@ export class FastifyUserEndpoints {
                 try {
                     if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call delete user unless a user storage is provided");
                     const resp = await this.sessionServer.userStorage.getUserById(request.user.id);
+                    if (this.sessionServer.sessionManager.loginUserFilter) {
+                        const user = await this.sessionServer.sessionManager.loginUserFilter(resp.user);
+                        if (!user) {
+                            throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                        }
+                        resp.user = user;
+
+                    }
                     user = resp.user;
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
@@ -1369,6 +1377,14 @@ export class FastifyUserEndpoints {
                         skipActiveCheck: true,
                         skipEmailVerifiedCheck: true,
                     });
+                    if (this.sessionServer.sessionManager.loginUserFilter) {
+                        const user = await this.sessionServer.sessionManager.loginUserFilter(resp.user);
+                        if (!user) {
+                            throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                        }
+                        resp.user = user;
+
+                    }
                 user = resp.user;
             } else {
                 throw new CrossauthError(ErrorCode.Unauthorized);
@@ -1441,6 +1457,14 @@ export class FastifyUserEndpoints {
                         skipActiveCheck: true,
                         skipEmailVerifiedCheck: true,
                     });
+                    if (this.sessionServer.sessionManager.loginUserFilter) {
+                        const user = await this.sessionServer.sessionManager.loginUserFilter(resp.user);
+                        if (!user) {
+                            throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                        }
+                        resp.user = user;
+
+                    }
                 user = resp.user;
                 required = true;
                 if (!request.csrfToken) {

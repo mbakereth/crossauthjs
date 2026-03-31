@@ -1039,6 +1039,14 @@ export class SvelteKitUserEndpoints {
             await this.loginWithUser(user, true, event);
             if (event.locals.user) {
                 const resp = await this.sessionServer.userStorage.getUserById(event.locals.user?.id);
+                if (this.sessionServer.sessionManager.loginUserFilter) {
+                    const user = await this.sessionServer.sessionManager.loginUserFilter(resp.user);
+                    if (!user) {
+                        throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                    }
+                    resp.user = user;
+
+                }
                 event.locals.user = resp.user;
             }
 
@@ -1324,7 +1332,7 @@ export class SvelteKitUserEndpoints {
             if (!token) throw new CrossauthError(ErrorCode.InvalidToken, "Invalid email verification token");
 
             // validate the token and log the user in
-            const user = 
+            let user = 
                 await this.sessionServer.sessionManager.userForPasswordResetToken(token);
 
             return {
@@ -1761,6 +1769,14 @@ export class SvelteKitUserEndpoints {
                 await this.sessionServer.sessionManager.updateUser(event.locals.user, user);
             if (!emailVerificationTokenSent) {
                 const resp = await this.sessionServer.userStorage.getUserById(event.locals.user.id);
+                if (this.sessionServer.sessionManager.loginUserFilter) {
+                    const user = await this.sessionServer.sessionManager.loginUserFilter(resp.user);
+                    if (!user) {
+                        throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                    }
+                    resp.user = user;
+
+                }
                 event.locals.user = resp.user;
             }
             return {

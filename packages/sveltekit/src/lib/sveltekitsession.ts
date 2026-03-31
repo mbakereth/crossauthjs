@@ -431,7 +431,7 @@ function defaultUpdateUser(user: User,
         for (let field in data) {
         let name = field.replace(/^user_/, ""); 
         if (field.startsWith("user_") && 
-            (callerIsAdmin || userEditableFields.includes(name))) {
+            (/*callerIsAdmin || */ userEditableFields.includes(name))) {
             if ("type_" + name in data) {
                 if (data["type_" + name] == "string") {
                     user[name] = data[field];
@@ -807,6 +807,14 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
 
                     CrossauthLogger.logger.debug(j({msg: "Session cookie is for user " + user}));
                     if (user) { // XXX
+                        if (this.sessionManager.loginUserFilter) {
+                            const user1 = await this.sessionManager.loginUserFilter(user);
+                            if (!user1) {
+                                throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                            } else
+                            user = user1;
+                        }
+
                         if (this.allowedFactor2.length > 0 && 
                             (user.state == UserState.factor2ResetNeeded || 
                             !this.allowedFactor2Names.includes(user.factor2?user.factor2:"none"))) {

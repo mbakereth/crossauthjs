@@ -81,6 +81,11 @@ export interface SessionManagerOptions extends TokenEmailerOptions {
      * This is used to supress 2DFA
      */
     enableKnownDevices? : boolean,
+
+    /**
+     * During login, this is called to modify the user object
+     */
+    loginUserFilter? : (user: User) => Promise<User|undefined>;
 }
 
 /**
@@ -102,6 +107,8 @@ export class SessionManager {
     private tokenEmailer? : TokenEmailer;
     allowedFactor2 : string[] = [];
 
+    readonly loginUserFilter? : (user: User) => Promise<User|undefined>;
+
     /**
      * Constructor
      * @param keyStorage  the {@link KeyStorage} instance to use, eg {@link PrismaKeyStorage}.
@@ -120,7 +127,6 @@ export class SessionManager {
             this.authenticators[authenticationName].factorName = authenticationName;
         }
 
-
         setParameter("enableKnownDevices", ParamType.JsonArray, this, options, "ENABLE_KNOWN_DEVICES");
 
         this.session = new SessionCookie(this.keyStorage, {...options?.sessionCookieOptions, ...options??{}});
@@ -138,6 +144,7 @@ export class SessionManager {
             if (options.emailTokenStorage) this.emailTokenStorage = options.emailTokenStorage;
             this.tokenEmailer = new TokenEmailer(this.userStorage, keyStorage, options);
         }
+        if (options.loginUserFilter) this.loginUserFilter = options.loginUserFilter;
     }
 
     /**
@@ -241,7 +248,13 @@ export class SessionManager {
                 let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
                 secrets = userAndSecrets.secrets;
                 user = userAndSecrets.user;    
-                userInputFields = userAndSecrets.user;
+                if (this.loginUserFilter) {
+                    user = await this.loginUserFilter(user);
+                    if (!user) {
+                        throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                    }
+                }
+                userInputFields = user;
             } catch (e) {
                 CrossauthLogger.logger.debug(j({msg: "Failed.  Checking for authenticators that don't require user entry", err: e}))
                 const ce = CrossauthError.asCrossauthError(e);
@@ -252,15 +265,26 @@ export class SessionManager {
                         defaultAuth = auth;
                     }
                 }
-                CrossauthLogger.logger.debug(j({msg: "User " + user?.username + " factor1 " + user?.factor1 + " Default auth", defaultAuth}))
+                CrossauthLogger.logger.debug(j({msg: "User " + user?.username + " factor1 " + user?.factor1 + " Default auth", defaultAuth}));
+
+                // moved up from below
+                let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+                secrets = userAndSecrets.secrets;
+                user = userAndSecrets.user;  
             }
             if (userInputFields.username == "") throw new CrossauthError(ErrorCode.UserNotExist);
             CrossauthLogger.logger.debug(j({msg: "Authenticating with " + (user?.factor1??defaultAuth)}))
             await this.authenticators[user?.factor1??defaultAuth].authenticateUser(userInputFields, secrets, params);
-            let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
+            /*let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             secrets = userAndSecrets.secrets;
-            user = userAndSecrets.user;    
+            user = userAndSecrets.user;*/    
         } else {
+            if (this.loginUserFilter) {
+                user = await this.loginUserFilter(user);
+                if (!user) {
+                    throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                }
+            }
             let userAndSecrets = await this.userStorage.getUserByUsername(user.username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             secrets = userAndSecrets.secrets;
 
@@ -370,7 +394,15 @@ export class SessionManager {
      */
     async userForSessionId(sessionId : string) : 
         Promise<{key: Key, user: User|undefined}> {
-        return await this.session.getUserForSessionId(sessionId);
+        const resp = await this.session.getUserForSessionId(sessionId);
+        if (resp.user && this.loginUserFilter) {
+            const user1 = await this.loginUserFilter(resp.user);
+            if (!user1) {
+                throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+            } else
+            resp.user = user1;
+        }
+        return resp;
     }
 
     /**
@@ -967,7 +999,15 @@ export class SessionManager {
         //let data = getJsonData(key)["2fa"];
         let username = data.username;
         let factor2 = data.factor2;
-        const {user, secrets} = await this.userStorage.getUserByUsername(username);
+        let {user, secrets} = await this.userStorage.getUserByUsername(username);
+            if (this.loginUserFilter) {
+                const user1 = await this.loginUserFilter(user);
+                if (!user1) {
+                    throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+                } else
+                user = user1;
+
+            }
         const authenticator = this.authenticators[factor2];
         if (!authenticator) throw new CrossauthError(ErrorCode.Configuration, "Second factor " + factor2 + " not enabled");
         await authenticator.authenticateUser(user, {...secrets, ...data}, params);
@@ -1059,7 +1099,15 @@ export class SessionManager {
     async userForPasswordResetToken(token : string) : Promise<User> {
         CrossauthLogger.logger.debug(j({msg:"userForPasswordResetToken"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
-        return await this.tokenEmailer.verifyPasswordResetToken(token);
+        const resp =  await this.tokenEmailer.verifyPasswordResetToken(token);
+        if (resp.user && this.loginUserFilter) {
+            const user = await this.loginUserFilter(resp.user);
+            if (!user) {
+                throw new CrossauthError(ErrorCode.UserNotExist, "Not a valid user");
+            }
+            resp.user = user;
+        }
+        return resp;
     }
 
     async changeSecrets(username: string,

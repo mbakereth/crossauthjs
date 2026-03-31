@@ -356,12 +356,12 @@ export class SvelteKitServer {
 
             const newEvent = await this.unresolvedHooks(event);            
             if (newEvent  instanceof Response) return newEvent;
-            return await resolve(newEvent);
+            return await resolve(newEvent as RequestEvent);
 
         }
     }
 
-    async unresolvedHooks(event : RequestEvent) {
+    async unresolvedHooks(event : RequestEvent) : Promise<Response|undefined|RequestEvent> {
 
         // reset all locals
         event.locals.user = undefined;

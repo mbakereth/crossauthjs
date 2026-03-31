@@ -70,6 +70,9 @@ export interface PrismaUserStorageOptions extends UserStorageOptions {
  * 
  * If `normalizeEmail` is true, getting a user by username will matched on normalized, lowercase username.
 */
+
+type Include = boolean | {[key:string]:Include}
+
 export class PrismaUserStorage extends UserStorage {
     private userTable : string = "user";
     private userSecretsTable : string = "userSecrets";
@@ -77,7 +80,7 @@ export class PrismaUserStorage extends UserStorage {
     private useridForeignKeyColumn : string = "userid";
     private prismaClient : PrismaClient;
     private includes : string[] = ["secrets"];
-    private includesObject : {[key:string]:boolean} = {};
+    private includesObject : {[key:string]:Include} = {};
     private forceIdToNumber : boolean = true;
 
     /**
@@ -92,7 +95,18 @@ export class PrismaUserStorage extends UserStorage {
         setParameter("useridForeignKeyColumn", ParamType.String, this, options, "USER_ID_FOREIGN_KEY_COLUMN");
         setParameter("includes", ParamType.String, this, options, "USER_INCLUDES");
         setParameter("forceIdToNumber", ParamType.String, this, options, "USER_FORCE_ID_TO_NUMBER");
-	    this.includes.forEach((item) => {this.includesObject[item] = true});
+	    this.includes.forEach((item) => {
+            const parts = item.split(".");
+            if (parts.length == 1) {
+                this.includesObject[item] = true
+            } else {
+                let include: Include = {[parts[parts.length-1]]: true};
+                for (let i=parts.length-2; i>=1; i--) {
+                    include = {include: {[parts[i]]: include}}
+                }
+                this.includesObject[parts[0]] = {include: include};
+            }
+        });
 
         if (options && options.prismaClient) {
             this.prismaClient = options.prismaClient;
@@ -117,16 +131,19 @@ export class PrismaUserStorage extends UserStorage {
         const res1 = await this.prismaClient[this.userTable].findMany({})
         console.log(res1)*/
 
+        let include = options?.skipIncludes === true ? {} : this.includesObject
+
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
             prismaUser = await this.prismaClient[this.userTable].findUniqueOrThrow({
                 where: {
                     [normalizedKey]: normalizedValue
                 },
-                include: this.includesObject,
+                include,
             });
 
         }  catch (e) {
+            console.log(e)
             //if (e instanceof Prisma.PrismaClientKnownRequestError) {
             if (typeof(e) == "object" && e?.constructor.name == "PrismaClientInitializationError") {
                 CrossauthLogger.logger.debug(j({err: e, constructor: e?.constructor.name}))
