@@ -1038,11 +1038,13 @@ export class SessionManager {
      * Sends a password reset token
      * @param email the user's email (where the token will be sent)
 .     */
-    async requestPasswordReset(email : string) : Promise<void> {
+    async requestPasswordReset(email : string, column = "email") : Promise<void> {
         if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call requestPasswordReset if no user storage provided");
-        const {user} = await this.userStorage.getUserByEmail(email, {
+        const {user} = column == "email" ? await this.userStorage.getUserByEmail(email, {
             skipActiveCheck: true
-        });
+        }) : await this.userStorage.getUserByUsername(email, {
+            skipActiveCheck: true
+        }) ;
         if (user.state != UserState.active && user.state != UserState.passwordResetNeeded && user.state != UserState.passwordAndFactor2ResetNeeded) {
             throw new CrossauthError(ErrorCode.UserNotActive);
         }

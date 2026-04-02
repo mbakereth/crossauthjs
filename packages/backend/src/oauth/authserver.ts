@@ -33,6 +33,7 @@ import { OAuthFlows } from '@crossauth/common';
 import { createPublicKey, type JsonWebKey } from 'crypto'
 import fs from 'node:fs';
 //import fs, { access } from 'node:fs';
+import { type LocalPasswordAuthenticatorOptions } from '../..';
 
 function algorithm(value : string) : Algorithm {
     switch (value) {
@@ -261,6 +262,7 @@ export interface OAuthAuthorizationServerOptions extends OAuthClientManagerOptio
     upstreamClients? : {
         [key:string]: UpstreamClientOptions
     }
+
 }
 
 /**

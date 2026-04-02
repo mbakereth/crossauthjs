@@ -9,6 +9,11 @@ import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@cross
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 
+interface AdminProxy {
+    skipAdminCheck?: boolean,
+    additionalEditableFields? : string[],
+    additionalFields? : {[key:string]:any}
+}
 /**
  * Return type for {@link SvelteKitAdminEndpoints.updateUser}
  * {@link SvelteKitAdminEndpoints.updateUserEndpoint} load. 
@@ -19,6 +24,7 @@ export interface AdminUpdateUserPageData {
     user? : User,
     csrfToken?: string,
     error?: string,
+    errors?: string[],
     errorCode?: number,
     errorCodeName?: string,
     allowedFactor2: {
@@ -38,6 +44,7 @@ export interface AdminUpdateUserPageData {
 export interface AdminUpdateUserActionData {
     user? : User,
     error?: string,
+    errors?: string[],
     errorCode?: number,
     errorCodeName?: string,
     formData?: {[key:string]:string},
@@ -55,6 +62,7 @@ export interface AdminChangePasswordPageData {
     user? : User,
     csrfToken? : string,
     error?: string,
+    errors?: string[],
     errorCode?: number,
     errorCodeName?: string,
 };
@@ -68,6 +76,7 @@ export interface AdminChangePasswordPageData {
 export interface AdminChangePasswordActionData {
     user? : User,
     error?: string,
+    errors?: string[],
     errorCode?: number,
     errorCodeName?: string,
     formData?: {[key:string]:string},
@@ -84,6 +93,7 @@ export interface AdminCreateUserPageData {
     user? : User,
     csrfToken? : string,
     error?: string,
+    errors?: string[],
     errorCode?: number,
     errorCodeName?: string,
     allowedFactor2: {
@@ -108,6 +118,7 @@ export interface AdminCreateUserActionData {
         factor2: string,
     },
     error?: string,
+    errors? : string[]
     errorCode?: number,
     errorCodeName?: string,
     formData?: {[key:string]:string|undefined},
@@ -124,6 +135,7 @@ export interface AdminDeleteUserPageData {
     user? : User,
     csrfToken? : string,
     error?: string,
+    errors?: string[],
     errorCode?: number,
     errorCodeName?: string,
     username? : string,
@@ -138,6 +150,7 @@ export interface AdminDeleteUserPageData {
 export interface AdminDeleteUserActionData {
     user? : User,
     error?: string,
+    errors?: string[],
     errorCode?: number,
     errorCodeName?: string,
     ok: boolean
@@ -154,6 +167,7 @@ export interface SearchUsersPageData {
     editUser? : User,
     csrfToken? : string,
     error? : string,
+    errors?: string[],
     errorCode?: number,
     errorCodeName?: string,
 };
@@ -171,6 +185,7 @@ export interface SearchUsersActionData {
     take : number,
     search? : string,
     error? : string,
+    errors? : string[],
     errorCode?: number,
     errorCodeName?: string,
     hasPrevious : boolean,
@@ -398,6 +413,7 @@ export class SvelteKitAdminEndpoints {
             return {
                 ok: false,
                 error: ce.message,
+                errors: ce.messages,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName,
                 hasPrevious: false,
@@ -441,7 +457,7 @@ export class SvelteKitAdminEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-    async updateUser(user : User, event: RequestEvent) : Promise<AdminUpdateUserActionData> {
+    async updateUser(user : User, event: RequestEvent, adminProxy? : AdminProxy) : Promise<AdminUpdateUserActionData> {
 
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -453,7 +469,7 @@ export class SvelteKitAdminEndpoints {
             formData = data.toObject();
 
             // can only call this if logged in as admin
-            if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) {
+            if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) {
                 this.sessionServer.error(401);
             }
 
@@ -463,11 +479,22 @@ export class SvelteKitAdminEndpoints {
             const oldFactor2 = user.factor2;
             const oldState = user.state;
             user.state = formData.state ?? "active";
+            let editableFields = [...this.sessionServer.userStorage.userEditableFields];
+            if (event.locals.user && SvelteKitServer.isAdminFn(event.locals.user)) {
+                editableFields = [...editableFields, ...this.sessionServer.userStorage.adminEditableFields]
+            } else if (adminProxy?.additionalEditableFields) {
+                editableFields = [...editableFields, ...adminProxy?.additionalEditableFields]
+            }
             user = this.sessionServer.updateUserFn(user, 
                 event,
                 formData,
-                [...this.sessionServer.userStorage.userEditableFields,
-                    ...this.sessionServer.userStorage.adminEditableFields]);
+                editableFields);
+            if (adminProxy?.additionalFields) {
+                user = {
+                    ...user,
+                    ...adminProxy?.additionalFields
+                }
+            }
             const factor2ResetNeeded = user.factor2 && user.factor2 != "none" && user.factor2 != oldFactor2;
             if (factor2ResetNeeded && !(user.state == oldState || user.state == "factor2ResetNeeded")) {
                 throw new CrossauthError(ErrorCode.BadRequest, "Cannot change both factor2 and state at the same time");
@@ -505,6 +532,7 @@ export class SvelteKitAdminEndpoints {
             CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
+                errors: ce.messages,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName,
                 ok: false,
@@ -533,7 +561,7 @@ export class SvelteKitAdminEndpoints {
      *     exception was raised
      *   - `formData` the form fields extracted from the request
      */
-    async changePassword(user : User, event : RequestEvent) : Promise<AdminChangePasswordActionData> {
+    async changePassword(user : User, event : RequestEvent, adminProxy? : AdminProxy) : Promise<AdminChangePasswordActionData> {
         CrossauthLogger.logger.debug(j({msg:"changePassword"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
@@ -543,7 +571,7 @@ export class SvelteKitAdminEndpoints {
             formData = data.toObject();
 
             // can only call this if logged in as admin
-            if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) {
+            if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) {
                 this.sessionServer.error(401);
             }
 
@@ -574,13 +602,20 @@ export class SvelteKitAdminEndpoints {
                     if (secretNames.includes(name)) repeatSecrets[name] = formData[field];
                 }
             }
+            for (let name in secretNames) {
+                if ((newSecrets[name] && repeatSecrets[name] && newSecrets[name] != repeatSecrets[name]) || 
+                    (newSecrets[name] && !repeatSecrets[name]) || 
+                    (!newSecrets[name] && repeatSecrets[name])) {
+                        throw new CrossauthError(ErrorCode.PasswordMatch, ["Passwords do not match"])
+                    }
+            }
             if (Object.keys(repeatSecrets).length === 0) repeatSecrets = undefined;
             if (Object.keys(oldSecrets).length === 0) oldSecrets = undefined;
 
             // validate the new secret - this is through an implementor-supplied function
             let errors = authenticator.validateSecrets(newSecrets);
             if (errors.length > 0) {
-                throw new CrossauthError(ErrorCode.PasswordFormat);
+                throw new CrossauthError(ErrorCode.PasswordFormat, errors);
             }
 
             // validate the old secrets, check the new and repeat ones match and 
@@ -613,6 +648,7 @@ export class SvelteKitAdminEndpoints {
             CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
+                errors: ce.messages,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName,
                 ok: false,
@@ -666,7 +702,7 @@ export class SvelteKitAdminEndpoints {
      *   - `emailVerificationRequired` if true, the user needs to click on
      *     the link emailed to them to complete signup.
      */
-    async createUser(event : RequestEvent) : Promise<AdminCreateUserActionData> {
+    async createUser(event : RequestEvent, adminProxy? : AdminProxy) : Promise<AdminCreateUserActionData> {
 
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         try {
@@ -680,7 +716,7 @@ export class SvelteKitAdminEndpoints {
             let user : UserInputFields|undefined;
 
             // can only call this if logged in as admin
-            if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) {
+            if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) {
                 this.sessionServer.error(401);
             }
             
@@ -703,12 +739,25 @@ export class SvelteKitAdminEndpoints {
                 formData.factor2 = undefined;
             }
     
+            let editableFields = [...this.sessionServer.userStorage.userEditableFields];
+            if (event.locals.user && SvelteKitServer.isAdminFn(event.locals.user)) {
+                editableFields = [...editableFields, ...this.sessionServer.userStorage.adminEditableFields]
+            } else if (adminProxy?.additionalEditableFields) {
+                editableFields = [...editableFields, ...adminProxy?.additionalEditableFields]
+            }
+
             // call implementor-provided function to create the user object (or our default)
             user = 
                 this.sessionServer.createUserFn(event, formData, 
-                    [...this.sessionServer.userStorage.userEditableFields,
-                    ...this.sessionServer.userStorage.adminEditableFields],
+                    editableFields,
                 this.sessionServer.adminAllowedFactor1);
+
+            if (adminProxy?.additionalFields) {
+                user = {
+                    ...user,
+                    ...adminProxy?.additionalFields
+                }
+            }
 
             const secretNames = this.sessionServer.authenticators[user.factor1].secretNames();
             let hasSecrets = true;
@@ -752,12 +801,16 @@ export class SvelteKitAdminEndpoints {
     
             if (!hasSecrets) {
                 let email = formData.username;
-                if ("user_email" in formData) email = formData.user_email;
+                let column = "username"
+                if ("user_email" in formData) {
+                    email = formData.user_email;
+                    column = "email"
+                }
                 TokenEmailer.validateEmail(email);
                 if (!email) throw new CrossauthError(ErrorCode.FormEntry, "No password given but no email address found either");
-                await this.sessionServer.sessionManager.requestPasswordReset(email);
+                await this.sessionServer.sessionManager.requestPasswordReset(email, column);
             }
-            
+
             return { ok: true, user: newUser,  formData};
 
         } catch (e) {
@@ -766,6 +819,7 @@ export class SvelteKitAdminEndpoints {
             CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
+                errors: ce.messages,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName,
                 ok: false,
@@ -787,8 +841,8 @@ export class SvelteKitAdminEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-        async deleteUser(event : RequestEvent) : Promise<AdminDeleteUserActionData> {
-            CrossauthLogger.logger.debug(j({msg:"deleteUser"}));
+        async deleteUser(event : RequestEvent, adminProxy? : AdminProxy) : Promise<AdminDeleteUserActionData> {
+            if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) this.sessionServer.error(event, 401);
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             try {
     
@@ -817,6 +871,7 @@ export class SvelteKitAdminEndpoints {
                 CrossauthLogger.logger.error(j({cerr: ce}));
                     return {
                     error: ce.message,
+                    errors: ce.messages,
                     errorCode: ce.code,
                     errorCodeName: ce.codeName,
                     ok: false,
@@ -863,22 +918,23 @@ export class SvelteKitAdminEndpoints {
 
     readonly updateUserEndpoint  = {
         actions : {
-            default: async ( event : RequestEvent ) =>  {
+            default: async ( event : RequestEvent, adminProxy? : AdminProxy ) =>  {
                 const getUserResp = await this.getUserFromParam(event);
                 if (getUserResp.exception || !getUserResp.user) {
                     return {
                         ok: false,
                         error: getUserResp.exception?.message ?? "Couldn't get user",
+                        errors: getUserResp.exception?.messages ?? ["Couldn't get user"],
                         errorCode: getUserResp.exception?.code,
                         errorCodeName: getUserResp.exception?.codeName,
                     }
                 }
-                const resp = await this.updateUser(getUserResp.user, event);
+                const resp = await this.updateUser(getUserResp.user, event, adminProxy);
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) : Promise<AdminUpdateUserPageData> => {
-            if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
+        load: async ( event : RequestEvent, adminProxy? : AdminProxy ) : Promise<AdminUpdateUserPageData> => {
+            if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) this.sessionServer.error(event, 401);
             let allowedFactor2 = this.sessionServer.allowedFactor2 ??
                 [{name: "none", friendlyName: "None"}];
             const getUserResp = await this.getUserFromParam(event);
@@ -900,22 +956,23 @@ export class SvelteKitAdminEndpoints {
 
     readonly changePasswordEndpoint = {
         actions : {
-            default: async ( event : RequestEvent ) => {
+            default: async ( event : RequestEvent, adminProxy? : AdminProxy ) => {
                 const getUserResp = await this.getUserFromParam(event);
                 if (getUserResp.exception || !getUserResp.user) {
                     return {
                         ok: false,
                         error: getUserResp.exception?.message ?? "Couldn't get user",
+                        errors: getUserResp.exception?.messages ?? ["Couldn't get user"],
                         errorCode: getUserResp.exception?.code,
                         errorCodeName: getUserResp.exception?.codeName,
                     }
                 }
-                const resp = await this.changePassword(getUserResp.user, event);
+                const resp = await this.changePassword(getUserResp.user, event, adminProxy);
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) : Promise<SearchUsersPageData> => {
-            if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
+        load: async ( event : RequestEvent, adminProxy? : AdminProxy ) : Promise<SearchUsersPageData> => {
+            if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) this.sessionServer.error(event, 401);
             const getUserResp = await this.getUserFromParam(event);
             if (getUserResp.exception || !getUserResp.user) {
                 return {
@@ -935,8 +992,8 @@ export class SvelteKitAdminEndpoints {
     };
 
     readonly createUserEndpoint = {
-        load: async (event : RequestEvent) : Promise<AdminCreateUserPageData> => {
-            if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) this.sessionServer.error(event, 401);
+        load: async (event : RequestEvent, adminProxy? : AdminProxy) : Promise<AdminCreateUserPageData> => {
+            if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user)) && !adminProxy?.skipAdminCheck) this.sessionServer.error(event, 401);
             let allowedFactor2 = this.sessionServer?.allowedFactor2 ??
                 [{name: "none", friendlyName: "None"}];
             return {
@@ -946,8 +1003,8 @@ export class SvelteKitAdminEndpoints {
         },
 
         actions: {
-            default: async ( event : RequestEvent ) => {
-                const resp = await this.createUser(event);
+            default: async ( event : RequestEvent, adminProxy? : AdminProxy ) => {
+                const resp = await this.createUser(event, adminProxy);
                 return resp;
             }        
         }
@@ -955,12 +1012,12 @@ export class SvelteKitAdminEndpoints {
 
     readonly deleteUserEndpoint  = {
         actions : {
-            default: async ( event : RequestEvent ) => {
-                const resp = await this.deleteUser(event);
+            default: async ( event : RequestEvent, adminProxy? : AdminProxy ) => {
+                const resp = await this.deleteUser(event, adminProxy);
                 return resp;
             }
         },
-        load: async ( event : RequestEvent ) : Promise<AdminDeleteUserPageData> => {
+        load: async ( event : RequestEvent, adminProxy? : AdminProxy ) : Promise<AdminDeleteUserPageData> => {
             const getUserResp = await this.getUserFromParam(event);
             if (getUserResp.exception || !getUserResp.user) {
                 return {

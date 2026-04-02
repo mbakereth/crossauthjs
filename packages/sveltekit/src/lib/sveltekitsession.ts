@@ -384,11 +384,10 @@ function defaultCreateUser(event : RequestEvent,
         username: data.username ?? "",
         state: state,
     }
-    const callerIsAdmin = event.locals.user && SvelteKitServer.isAdminFn(event.locals.user);
     for (let field in data) {
         let name = field.replace(/^user_/, ""); 
         if (field.startsWith("user_") && 
-            (callerIsAdmin || userEditableFields.includes(name))) {
+            (userEditableFields.includes(name))) {
             if ("type_" + name in data) {
                 if (data["type_" + name] == "string") {
                     user[name] = data[field];
@@ -427,7 +426,6 @@ function defaultUpdateUser(user: User,
     event: RequestEvent,
     data : {[key:string]:string|undefined},
     userEditableFields: string[]) : User {
-        const callerIsAdmin = event.locals.user && SvelteKitServer.isAdminFn(event.locals.user);
         for (let field in data) {
         let name = field.replace(/^user_/, ""); 
         if (field.startsWith("user_") && 
