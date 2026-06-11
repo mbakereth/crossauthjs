@@ -59,6 +59,7 @@ export interface AdminUpdateUserActionData {
  * See class documentation for {@link SvelteKitUserEndpoints} for more details.
  */
 export interface AdminChangePasswordPageData {
+    editUser? : User,
     user? : User,
     csrfToken? : string,
     error?: string,
@@ -971,7 +972,7 @@ export class SvelteKitAdminEndpoints {
                 return resp;
             }
         },
-        load: async ( event : RequestEvent, adminProxy? : AdminProxy ) : Promise<SearchUsersPageData> => {
+        load: async ( event : RequestEvent, adminProxy? : AdminProxy ) : Promise<AdminChangePasswordPageData> => {
             if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) this.sessionServer.error(event, 401);
             const getUserResp = await this.getUserFromParam(event);
             if (getUserResp.exception || !getUserResp.user) {

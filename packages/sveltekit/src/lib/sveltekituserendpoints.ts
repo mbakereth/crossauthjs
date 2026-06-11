@@ -280,6 +280,7 @@ export interface ChangePasswordPageData {
 export interface ChangePasswordActionData {
     user? : User,
     error?: string,
+    errors?: string[],
     formData?: {[key:string]:string},
     ok: boolean
     errorCode? : number,
@@ -1596,7 +1597,7 @@ export class SvelteKitUserEndpoints {
             // validate the new secret - this is through an implementor-supplied function
             let errors = authenticator.validateSecrets(newSecrets);
             if (errors.length > 0) {
-                throw new CrossauthError(ErrorCode.PasswordFormat);
+                throw new CrossauthError(ErrorCode.PasswordFormat, errors);
             }
 
             // validate the old secrets, check the new and repeat ones match and 
@@ -1642,6 +1643,7 @@ export class SvelteKitUserEndpoints {
             CrossauthLogger.logger.error(j({cerr: ce}));
             return {
                 error: ce.message,
+                errors: ce.messages,
                 ok: false,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName,
