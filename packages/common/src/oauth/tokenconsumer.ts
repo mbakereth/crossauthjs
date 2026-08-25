@@ -217,6 +217,7 @@ export abstract class OAuthTokenConsumerBase {
                     try {
                         let kid : string = "_default";
                         let thisKey = {...body.keys[i]}
+                        CrossauthLogger.logger.debug(j({msg: "Received Key", ...thisKey}))
                         if ("kid" in thisKey && typeof (thisKey.kid) == "string") kid = String(thisKey.kid);
                         if (thisKey && !thisKey.alg && !thisKey.jwk_alg && defaultAlg) {
                             if (defaultAlg.startsWith("RS") && thisKey.kty == "RSA") {

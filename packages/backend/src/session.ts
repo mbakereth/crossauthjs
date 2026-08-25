@@ -51,6 +51,11 @@ export interface SessionManagerOptions extends TokenEmailerOptions {
      */
     enablePasswordReset? : boolean,
 
+    /** If true, allow password reset by email token.
+     * See class description for details.. Default true
+     */
+    passwordResetColumn? : string,
+
     /** Server secret.  Needed for emailing tokens and for csrf tokens */
     secret? : string;
 
@@ -104,6 +109,7 @@ export class SessionManager {
 
     private enableEmailVerification : boolean = false;
     private enablePasswordReset : boolean = false;
+    private passwordResetColumn : string = "email";
     private tokenEmailer? : TokenEmailer;
     allowedFactor2 : string[] = [];
 
@@ -138,6 +144,7 @@ export class SessionManager {
         setParameter("allowedFactor2", ParamType.JsonArray, this, options, "ALLOWED_FACTOR2");
         setParameter("enableEmailVerification", ParamType.Boolean, this, options, "ENABLE_EMAIL_VERIFICATION");
         setParameter("enablePasswordReset", ParamType.Boolean, this, options, "ENABLE_PASSWORD_RESET");
+        setParameter("passwordResetColumn", ParamType.String, this, options, "PASSWOR_RESET_COLUMN");
         this.emailTokenStorage = this.keyStorage;
         if (this.userStorage && (this.enableEmailVerification || this.enablePasswordReset)) {
             let keyStorage = this.keyStorage;
@@ -1038,8 +1045,10 @@ export class SessionManager {
      * Sends a password reset token
      * @param email the user's email (where the token will be sent)
 .     */
-    async requestPasswordReset(email : string, column = "email") : Promise<void> {
+    async requestPasswordReset(email : string, column = "") : Promise<void> {
         if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call requestPasswordReset if no user storage provided");
+        if (column == "") column = this.passwordResetColumn;
+        if (column == "") column = "email";
         const {user} = column == "email" ? await this.userStorage.getUserByEmail(email, {
             skipActiveCheck: true
         }) : await this.userStorage.getUserByUsername(email, {
