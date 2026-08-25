@@ -1856,6 +1856,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     readonly authorizationCodeFlowEndpoint = {
 
         get: async (event : RequestEvent) => {
+            CrossauthLogger.logger.debug(j({msg:"authorizationCodeFlowEndpoint.get"}))
             if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use load not get");
                 CrossauthLogger.logger.debug(j({err: ce}))
@@ -1884,6 +1885,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 // if we have an upstream client, this call will save the original /authorize call and redirect to
                 // the upstream auth server's /authorize endpoint
                 if ((upstream  || this.server.oAuthAuthServer?.authServer.upstreamClient) && next && this.server.oAuthAuthServer) {
+                    CrossauthLogger.logger.debug(j({msg:"Saving flow parameters for upstream client"}))
                     const resp = await this.server.oAuthAuthServer.saveDownstreamAuthzCodeFlow(event, new URL(next, event.url), upstream);
                     if (resp?.error) {
                         return json(resp ? resp : {error: "server_error", error_description: "Unknown error"}, {status: 500});
@@ -2156,6 +2158,7 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
     readonly redirectUriEndpoint = {
 
         get: async (event : RequestEvent) => {
+            CrossauthLogger.logger.debug(j({msg: "redirectUriEndpoint.get"}))
             if (this.tokenResponseType == "saveInSessionAndLoad" || this.tokenResponseType == "sendInPage") {
                 const ce = new CrossauthError(ErrorCode.Configuration, "If tokenResponseType is " + this.tokenResponseType + ", use load not get");
                 return this.errorFn(this.server, event, ce);
