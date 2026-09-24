@@ -1074,14 +1074,12 @@ export class SessionManager {
         CrossauthLogger.logger.debug(j({msg: "applyEmailVerificationToken"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Email verification not enabled");
         try {
+            let column = "email";
+            if (this.passwordResetColumn) column = this.passwordResetColumn;
+
             let { userid, newEmail} = await this.tokenEmailer.verifyEmailVerificationToken(token);
             let {user} = await this.userStorage.getUserById(userid, {skipEmailVerifiedCheck: true});
-            let oldEmail;
-            if ("email" in user && user.email != undefined) {
-                oldEmail = user.email;
-            } else {
-                oldEmail = user.username;
-            }
+            let oldEmail = user[column];
             let newUser : Partial<User> = {
                 id: user.id,
             }
@@ -1089,7 +1087,7 @@ export class SessionManager {
                 newUser.state = "active";
             }
             if (newEmail != "") {
-                newUser.email = newEmail;
+                newUser[column] = newEmail;
             } else {
                 oldEmail = undefined;
             }
@@ -1169,17 +1167,21 @@ export class SessionManager {
         rest.id = currentUser.id;
         let hasEmail = false;
         if (email) {
-            newEmail = email;
-            TokenEmailer.validateEmail(newEmail);
-            hasEmail = true;
+            if (currentUser.email != email) {
+                newEmail = email;
+                TokenEmailer.validateEmail(newEmail);
+                hasEmail = true;
+            }
         } else if (username) {
             newEmail = username;
-            try {
-                TokenEmailer.validateEmail(currentUser.username);
-                hasEmail = true;
-            } catch {} // not in email format - can ignore
-            if (hasEmail) {
-                TokenEmailer.validateEmail(newEmail);
+            if (username != currentUser.username) {
+                try {
+                    TokenEmailer.validateEmail(currentUser.username);
+                    hasEmail = true;
+                } catch {} // not in email format - can ignore
+                if (hasEmail) {
+                    TokenEmailer.validateEmail(newEmail);
+                }
             }
         }
         if (!skipEmailVerification && this.enableEmailVerification && hasEmail) {
