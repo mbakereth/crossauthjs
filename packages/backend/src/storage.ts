@@ -225,6 +225,8 @@ export abstract class KeyStorage {
      */
     abstract getKey(key : string) : Promise<Key>;
 
+    abstract getKeyWithId(id : number, userid? : string|number|null|undefined, prefix?: string) : Promise<Key>;
+
     /**
      * Saves a session key in the session storage (eg database).
      * 
@@ -286,7 +288,7 @@ export abstract class KeyStorage {
      * @param userid user to return keys for
      * @returns an array of keys
      */
-    abstract getAllForUser(userid : string|number|undefined) : Promise<Key[]>;
+    abstract getAllForUser(userid : string|number|undefined, prefix? : string|undefined) : Promise<Key[]>;
 
     /**
      * The `data` field in a key entry is a JSON string.  This class should

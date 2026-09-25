@@ -280,6 +280,23 @@ export class InMemoryKeyStorage extends KeyStorage {
         throw err;
     }
 
+    async getKeyWithId(id : number, userid? : string|number|null|undefined, prefix?: string) : Promise<Key> {
+        let key : Key|undefined = undefined;
+        for (let k in this.keys) {
+            if (this.keys[k].id == id) {
+                key = this.keys[k];
+                if (userid !== undefined && userid != key.userid) {
+                    throw new CrossauthError(ErrorCode.InvalidKey, "Wrong userid")
+                }
+                if (prefix && !(key.value.startsWith(prefix))) {
+                    throw new CrossauthError(ErrorCode.InvalidKey, "Wrong prefix")
+                }
+                return key;
+            }
+        }
+        throw new CrossauthError(ErrorCode.InvalidKey, "Key not found")
+    }
+
     /**
      * Saves a session key in the session table.
      * 
@@ -349,10 +366,11 @@ export class InMemoryKeyStorage extends KeyStorage {
         }
     }
 
-    async getAllForUser(userid : string|number|undefined) : Promise<Key[]> {
-        if (!userid) return this.nonUserKeys;
-        if (userid in this.keysByUserId) return this.keysByUserId[userid];
-        return [];
+    async getAllForUser(userid : string|number|undefined, prefix? : string|undefined) : Promise<Key[]> {
+        if (userid && !(userid in this.keysByUserId)) return [];
+        let allKeys = userid ? this.keysByUserId[userid] : this.nonUserKeys;
+        if (!prefix) return allKeys;
+        return allKeys.filter((k) => k.value.startsWith(prefix));
     }
 
     async deleteMatching(key : Partial<Key>) : Promise<void> {

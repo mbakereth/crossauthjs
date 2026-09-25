@@ -100,12 +100,12 @@ export class ApiKeyManager {
         const expires = expiry ? new Date(created.getTime()+expiry*1000) : undefined;
         const hashedKey = ApiKeyManager.hashApiKeyValue(value);
         const key = {
-            name : name,
             value : value,
             userid : userid,
             data : KeyStorage.encodeData(data),
             expires : expires,
             created : created,
+            name: name,
             ...extraFields,
         }
         await this.apiKeyStorage.saveKey(
@@ -155,6 +155,15 @@ export class ApiKeyManager {
         const key = await this.apiKeyStorage.getKey(this.prefix+hashedValue);
         if (!("name" in key)) throw new CrossauthError(ErrorCode.InvalidKey, "Not a valid API key");
         return {...key, name: key.name};
+    }
+
+    async getKeyWithId(id : number, userid? : string|number|null) {
+        return this.apiKeyStorage.getKeyWithId(id, userid, this.prefix);
+    }
+
+    async getAllKeysForUser(userid : string|number|undefined) : Promise<ApiKey[]> {
+        let keys = await this.apiKeyStorage.getAllForUser(userid, this.prefix);
+        return keys.map((k) => {return {...k, name: k.name}})
     }
 
     /**

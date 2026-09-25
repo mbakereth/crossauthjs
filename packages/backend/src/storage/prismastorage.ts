@@ -587,7 +587,44 @@ export class PrismaKeyStorage extends KeyStorage {
         }
         return returnKey;
     }
-    
+
+    /**
+     * Returns the key with the given Id, optionally also with the given
+     * user id and prefix
+     * @param id the key id to return
+     * @param userid if given, only return a key if it matches the userid (null to match only null userid)
+     * @param prefux if given, only return a key if it starts with that prefix
+     * @returns the {@link Key } object 
+     * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey` or `Connection`
+     */
+     async getKeyWithId(id : number, userid? : string|number|null|undefined, prefix?: string) : Promise<Key> {
+        try {
+
+            let ret = await ((this.prismaClient as any)[this.keyTable] as typeof this.prismaClient.key).findUniqueOrThrow({
+                where: {id}
+            });
+            let key : Key = {
+                ...ret,
+                userid: (ret as any)[this.useridForeignKeyColumn] as number|null,
+                expires: ret.expires ?? undefined,
+                lastactive: ret.lastactive ?? undefined,
+                data: ret.data ?? undefined
+            }
+            if (userid !== undefined) {
+                if (userid == null && !(key.userid === null || key.userid === undefined)) throw new CrossauthError(ErrorCode.InvalidKey, "Wrong userid");
+                if (userid !== null && key.userid != userid) throw new CrossauthError(ErrorCode.InvalidKey, "Wrong userid");
+            }
+            if (prefix) {
+                if (!(key.value.startsWith(prefix))) throw new CrossauthError(ErrorCode.InvalidKey, "Wrong prefix");
+            }
+
+            return key;
+        } catch (e) {
+            CrossauthLogger.logger.debug(j({err: e}));
+            throw new CrossauthError(ErrorCode.InvalidKey);
+        }
+    }
+
     /**
      * Saves a key in the session table.
      * 
@@ -606,7 +643,8 @@ export class PrismaKeyStorage extends KeyStorage {
         let error : CrossauthError|undefined = undefined;
         try {
             let prismaData : {[key : string] : any} = {
-                [this.useridForeignKeyColumn] : userid,
+                //[this.useridForeignKeyColumn] : userid,
+                user: {connect: {id: userid}},
                 value : value,
                 created : created,
                 expires : expires??null,
@@ -615,8 +653,8 @@ export class PrismaKeyStorage extends KeyStorage {
             };
 
             // @ts-ignore  (because types only exist when do prismaClient.table...)
-            await this.prismaClient[this.keyTable].create({
-                data: prismaData
+            await ((this.prismaClient as any)[this.keyTable] as typeof this.prismaClient.key).create({
+                data: (prismaData as Prisma.KeyCreateInput)
             })
         } catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
@@ -745,17 +783,25 @@ export class PrismaKeyStorage extends KeyStorage {
         if (error) throw error;
     }     
 
-    async getAllForUser(userid : string|number|undefined) : Promise<Key[]> {
+    async getAllForUser(userid : string|number|undefined, prefix? : string|undefined) : Promise<Key[]> {
         let returnKeys : Key[] = [];
         let error : CrossauthError|undefined = undefined;
         try {
             // @ts-ignore  (because types only exist when do prismaClient.table...)
-            let prismaKeys =  await this.prismaClient[this.keyTable].findMany({
-                where: {
-                    [this.useridForeignKeyColumn]: userid??null
-                }
-            });
-            returnKeys = prismaKeys.map((v : Partial<Key>) => { 
+            let prismaKeys : Key[] =  prefix ? 
+                await ((this.prismaClient as any)[this.keyTable] as typeof this.prismaClient.key).findMany({
+                    where: {
+                        [this.useridForeignKeyColumn]: userid??null,
+                        value: { startsWith: prefix}
+                    }
+                }) :
+                
+                await ((this.prismaClient as any)[this.keyTable] as typeof this.prismaClient.key).findMany({
+                    where: {
+                        [this.useridForeignKeyColumn]: userid??null
+                    }
+                });
+            returnKeys = prismaKeys.map((v) => { 
                 let ret = {...v, userid: v[this.useridForeignKeyColumn]}; 
                 if (this.useridForeignKeyColumn!="userid") {
                     // @ts-ignore

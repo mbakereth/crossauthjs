@@ -663,6 +663,27 @@ export class DbKeyStorage extends KeyStorage {
         
         return this.makeKey(res[0]);
     }
+    async getKeyWithId(id : number, userid? : string|number|null|undefined, prefix?: string) : Promise<Key> {
+        const dbClient = await this.dbPool.connect();
+        const params = this.dbPool.parameters();
+        let query = `select * from ${this.keyTable} where id = ` + params.nextParameter();
+        let res = await dbClient.execute(query, [id]);
+            if (res.length == 0) {
+            throw new CrossauthError(ErrorCode.InvalidKey);
+        }
+        
+        let key = this.makeKey(res[0]);
+        if (userid !== undefined) {
+            if (userid == null && !(key.userid === null || key.userid === undefined)) throw new CrossauthError(ErrorCode.InvalidKey, "Wrong userid");
+            if (userid !== null && key.userid != userid) throw new CrossauthError(ErrorCode.InvalidKey, "Wrong userid");
+        }
+        if (prefix) {
+            if (!(key.value.startsWith(prefix))) throw new CrossauthError(ErrorCode.InvalidKey, "Wrong prefix");
+        }
+        return key;
+    }
+
+
 
     private makeKey(fields: {[key:string]:any}) : Key {
         fields = {...fields};
@@ -857,7 +878,7 @@ export class DbKeyStorage extends KeyStorage {
         }
     }
 
-    async getAllForUser(userid : string|number|undefined) : Promise<Key[]> {
+    async getAllForUser(userid : string|number|undefined, prefix? : string|undefined) : Promise<Key[]> {
         const dbClient = await this.dbPool.connect();
 
         try {
@@ -871,6 +892,10 @@ export class DbKeyStorage extends KeyStorage {
                 values = [userid]
             } else {
                 query = `select * from ${this.keyTable} where ${this.useridForeignKeyColumn} is null`;
+            }
+            if (prefix) {
+                query += `and value like ` + params.nextParameter();
+                values.push(prefix + "%")
             }
             CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
             let res = await dbClient.execute(query, values);
