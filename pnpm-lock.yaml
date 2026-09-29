@@ -1063,7 +1063,7 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0
       minimatch:
-        specifier: ^10.0.1
+        specifier: 10.1.1
         version: 10.1.1
       publint:
         specifier: 0.3.15

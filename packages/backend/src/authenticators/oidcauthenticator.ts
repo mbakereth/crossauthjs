@@ -5,7 +5,7 @@ import { UserStorage } from '../storage.ts'
 import { Authenticator, type AuthenticationParameters , type AuthenticationOptions} from '../auth.ts';
 
 /** 
- * Optional parameters to pass to {@link OidcPasswordAuthenticator} 
+ * Optional parameters to pass to {@link OidcAuthenticator} 
  * constructor. 
  */
 export interface OidcAuthenticatorOptions extends AuthenticationOptions {
@@ -50,9 +50,9 @@ export class OidcAuthenticator extends Authenticator {
      * these will be included in the returned User object.  `hashedPassword`, if present in the User object,
      * will be removed.
      * 
-     * @param user the `username` field should contain the username
-     * @param secrets from the `UserSecrets` table.  `password` is expected to be present
-     * @param params the user input.  `password` is expected to be present
+     * @param _user the `username` field should contain the username
+     * @param _secrets from the `UserSecrets` table.  `password` is expected to be present
+     * @param _params the user input.  `password` is expected to be present
      * @throws {@link @crossauth/common!CrossauthError} with
      *         {@link @crossauth/common!ErrorCode} of `Connection`, 
      *         `UserNotExist`or `PasswordInvalid`, `TwoFactorIncomplete`,
@@ -66,8 +66,8 @@ export class OidcAuthenticator extends Authenticator {
     /**
      * This will return p hash of the passed password.
      * @param _username ignored
-     * @param params expected to contain `password`
-     * @param repeatParams if defined, this is expected to also contain 
+     * @param _params expected to contain `password`
+     * @param _repeatParams if defined, this is expected to also contain 
      *        `password` and is checked to match the one in `params`
      * @returns the newly created password in the `password` field.
      */

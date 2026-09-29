@@ -167,7 +167,9 @@ export class InMemoryUserStorage extends UserStorage {
     /**
      * Returns a {@link User } and {@link UserSecrets } instance matching the given email address, or throws an Exception.
      * 
-     * @param email the emaila ddress to look up
+     * @param _field the the field name to look user up by 
+     * @param _value The value of _field 
+     * @param _options options to match on
      * @returns a {@link User } and {@link UserSecrets } instance, ie including the password hash.
      * @throws {@link @crossauth/common!CrossauthError } with {@link @crossauth/common!ErrorCode } set to either `UserNotExist`.
      */
