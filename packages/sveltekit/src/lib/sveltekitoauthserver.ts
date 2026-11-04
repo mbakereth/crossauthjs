@@ -939,7 +939,7 @@ export class SvelteKitAuthorizationServer {
                     upstreamClient = this.authServer.upstreamClients[upstreamLabel]
                     upstreamClientOptions = this.authServer.upstreamClientOptionss[upstreamLabel]
                 } else {
-                    CrossauthLogger.logger.error(j({"msg": "No upstream client defined for " + upstreamLabel}))
+                    CrossauthLogger.logger.error(j({"message": "No upstream client defined for " + upstreamLabel}))
                     return {
                         ok: false,
                         error: "server_error",
@@ -948,7 +948,7 @@ export class SvelteKitAuthorizationServer {
                 }
             } else {
                 // this may be legitimate, if the request is to log in with a local account
-                CrossauthLogger.logger.warn(j({"msg": "upstreamClients defined but no upstream parameter given in authorize request"}))
+                CrossauthLogger.logger.warn(j({"message": "upstreamClients defined but no upstream parameter given in authorize request"}))
             }
         }
 
@@ -959,7 +959,7 @@ export class SvelteKitAuthorizationServer {
             if (!resp.query) return resp.error ?? { error: "server_error", error_description: "Unknown error"}
             let query : AuthorizeQueryType = resp.query;
 
-            CrossauthLogger.logger.debug(j({"msg": `Have upstream client.  Downstream redirect_uri ${query.redirect_uri}`}))
+            CrossauthLogger.logger.debug(j({"message": `Have upstream client.  Downstream redirect_uri ${query.redirect_uri}`}))
             if (query.response_type == "code") {
 
                 // validate client
@@ -1068,7 +1068,7 @@ export class SvelteKitAuthorizationServer {
                         upstreamClient = this.authServer.upstreamClients[upstreamLabel]
                         upstreamClientOptions = this.authServer.upstreamClientOptionss[upstreamLabel]
                     } else {
-                        CrossauthLogger.logger.error(j({"msg": "No upstream client defined for " + upstreamLabel}))
+                        CrossauthLogger.logger.error(j({"message": "No upstream client defined for " + upstreamLabel}))
                         return {
                             ok: false,
                             error: "server_error",
@@ -1076,7 +1076,7 @@ export class SvelteKitAuthorizationServer {
                         }
                     }
                 } else {
-                    CrossauthLogger.logger.warn(j({"msg": "2 upstreamClients defined but no upstream parameter given in authorize request"}))
+                    CrossauthLogger.logger.warn(j({"message": "2 upstreamClients defined but no upstream parameter given in authorize request"}))
                 }
             }
             if (upstreamClient && upstreamClientOptions) {
@@ -1086,7 +1086,7 @@ export class SvelteKitAuthorizationServer {
                 if (!resp.query) return resp.error
                 let query : AuthorizeQueryType = resp.query;
 
-                CrossauthLogger.logger.debug(j({"msg": `Have upstream client.  Downstream redirect_uri ${query.redirect_uri}`}))
+                CrossauthLogger.logger.debug(j({"message": `Have upstream client.  Downstream redirect_uri ${query.redirect_uri}`}))
                 if (query.response_type == "code") {
 
                     // validate client

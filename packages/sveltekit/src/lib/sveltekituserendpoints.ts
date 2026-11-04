@@ -12,6 +12,7 @@ import type { User, UserInputFields } from '@crossauth/common';
 import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
+import { KeyStorage } from '@crossauth/backend';
 
 //////////////////////////////////////////////////////////////////////
 // Return types
@@ -1220,6 +1221,7 @@ export class SvelteKitUserEndpoints {
         }
 
         let formData : {[key:string]:string}|undefined = undefined;
+        let username = "";
         try {
             // get form data
             var data = new JsonOrFormData();
@@ -1232,6 +1234,11 @@ export class SvelteKitUserEndpoints {
             // valid session
             const oldSessionId = event.locals.sessionId;
             if (!oldSessionId) throw new CrossauthError(ErrorCode.Unauthorized);
+
+            let {key} = await this.sessionServer.sessionManager.session.getUserForSessionId(oldSessionId);
+            if (!key || !key.data || key.data == "") throw new CrossauthError(ErrorCode.Unauthorized);
+            let keydata = KeyStorage.decodeData(key.data)["2fa"];
+            username = keydata.username;
 
             // validate CSRF token - throw an exception if it is not valid
             //await this.validateCsrfToken(request);
@@ -1266,6 +1273,7 @@ export class SvelteKitUserEndpoints {
                     await this.sessionServer.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
             event.locals.user = user;
 
+            CrossauthLogger.logger.info(j({message: "Login successful with factor2", user: user.username, userid: user.id}));
             return {
                 user: user,
                 ok: true,
@@ -1275,7 +1283,14 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({cerr: e}));
+            CrossauthLogger.logger.error(j({
+                message: "Login unsuccessful with factor2",
+                user: username,
+                errorMessage: ce.message,
+                errorMessages: ce.messages,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
+            }));
             return {
                 ok: false,
                 error: ce.message,
@@ -1288,12 +1303,13 @@ export class SvelteKitUserEndpoints {
 
     async requestPasswordReset(event : RequestEvent) : Promise<RequestPasswordActionData> {
         let formData : {[key:string]:string|undefined}|undefined = undefined;
+        let email = "";
         try {
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
-            const email = data.get('email') ?? "";
+            email = data.get('email') ?? "";
             if (email == "") throw new CrossauthError(ErrorCode.InvalidUsername, "Email field may not be empty");
             // throw an error if the CSRF token is invalid
             if (this.isSessionUser(event) && this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) 
@@ -1314,7 +1330,10 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
             CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({cerr: e}));
+            CrossauthLogger.logger.error(j({message: "Request password reset failed",
+                email,
+                cerr: e
+            }));
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -1396,6 +1415,8 @@ export class SvelteKitUserEndpoints {
     async resetPassword(event : RequestEvent) : Promise<ResetPasswordActionData> {
         CrossauthLogger.logger.debug(j({message:"resetPassword"}));
         let formData : {[key:string]:string|undefined}|undefined = undefined;
+        let username = "";
+        let userid: string|number|undefined = undefined;
         try {
             // get form data
             var data = new JsonOrFormData();
@@ -1416,6 +1437,8 @@ export class SvelteKitUserEndpoints {
             const token = event.params.token ?? "";
             if (token == "") throw new CrossauthError(ErrorCode.InvalidUsername, "No token provided");
             const user = await this.sessionServer.sessionManager.userForPasswordResetToken(token);
+            username = user.username;
+            userid = user.id;
 
             // get secrets from the request body 
             // there should be new_{secret} and repeat_{secret}
@@ -1445,24 +1468,30 @@ export class SvelteKitUserEndpoints {
             // check new and repeat secrets are valid and update the user
             const user1 = await this.sessionServer.sessionManager.resetSecret(token, 1, newSecrets, repeatSecrets);
             // log the user in
-            if (user1.state == UserState.active)
+            if (user1.state == UserState.active) {
+                CrossauthLogger.logger.info(j({message: "Password reset successful", user: username, userid: userid}))
                 return await this.loginWithUser(user1, true, event);
-            else {
+            } else {
                 if (!this.changeFactor2Url) {
                     throw new CrossauthError(ErrorCode.Configuration, "Must set changeFactor2Url in session server")
                 }
                 const sessionCookieValue = this.sessionServer.getSessionCookieValue(event);
                 const sessionId = this.sessionServer.sessionManager.getSessionId(sessionCookieValue??"");
                 await this.sessionServer.sessionManager.updateSessionData(sessionId, "factor2change", {username: user.username});
+                CrossauthLogger.logger.info(j({message: "Password reset successful. Factor2 change needed", user: username, userid: userid}))
                 throw this.sessionServer.redirect(302, this.changeFactor2Url + "?required=true");
 
             }
+
 
         } catch (e) {
             if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            CrossauthLogger.logger.error(j({
+                message: "Password reset unsuccessful",
+                cerr: ce
+            }));
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -1547,6 +1576,8 @@ export class SvelteKitUserEndpoints {
     async changePassword(event : RequestEvent) : Promise<ChangePasswordActionData> {
         CrossauthLogger.logger.debug(j({message:"changePassword"}));
         let formData : {[key:string]:string}|undefined = undefined;
+        let username = "";
+        let userid : string|number|undefined = undefined;
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
             // get form data
@@ -1571,6 +1602,8 @@ export class SvelteKitUserEndpoints {
                             skipEmailVerifiedCheck: true,
                         });
                     user = resp.user;
+                    username = user.username;
+                    userid = user.id;
                     required = true;
                     if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
                         throw new CrossauthError(ErrorCode.InvalidCsrf);
@@ -1650,6 +1683,8 @@ export class SvelteKitUserEndpoints {
                 return await this.loginWithUser(user, false, event);
             }
 
+            CrossauthLogger.logger.info(j({message: "Password change successful", user: username, userid: userid}))
+
             return {
                 ok: true,
                 formData: formData,
@@ -1658,7 +1693,12 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't change password");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            CrossauthLogger.logger.error(j({
+                message: "Password change unsuccessful",
+                user: username,
+                userid: userid,
+                cerr: ce
+            }));
             return {
                 error: ce.message,
                 errors: ce.messages,
@@ -1685,6 +1725,7 @@ export class SvelteKitUserEndpoints {
      */
     async deleteUser(event : RequestEvent) : Promise<DeleteUserActionData> {
         CrossauthLogger.logger.debug(j({message:"deleteUser"}));
+        let user = event.locals.user;
         try {
 
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
@@ -1703,6 +1744,8 @@ export class SvelteKitUserEndpoints {
             event.cookies.delete(this.sessionServer.sessionManager.sessionCookieName, {path: "/"});
             event.locals.sessionId = undefined;
             event.locals.user = undefined;
+
+            CrossauthLogger.logger.info(j({message: "Delete user successful", user: user?.username, userid: user?.id}))
             return {
                 ok: true,
 
@@ -1711,7 +1754,10 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't delete account");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            CrossauthLogger.logger.error(j({
+                message: "Delete user successful", user: user?.username, userid: user?.id,
+                cerr: ce
+            }));
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -1799,6 +1845,7 @@ export class SvelteKitUserEndpoints {
                 }
                 event.locals.user = resp.user;
             }
+            CrossauthLogger.logger.info(j({message: "Update user successful", user: event.locals.user?.username, userid: event.locals.user?.id}))
             return {
                 ok: true,
                 formData: formData,
@@ -1808,7 +1855,9 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            CrossauthLogger.logger.error(j({message: "Update user unsuccessful", user: event.locals.user?.username, userid: event.locals.user?.id,
+                cerr: ce
+            }))
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -1924,6 +1973,7 @@ export class SvelteKitUserEndpoints {
                     }
                 };    
             } 
+            CrossauthLogger.logger.info(j({message: "Change factor2 successful", user: event.locals.user?.username, userid: event.locals.user?.id}))
             return {
                 ok: true,
                 formData: formData,
@@ -1932,7 +1982,9 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            CrossauthLogger.logger.error(j({message: "Change factor2 unsuccessful", user: event.locals.user?.username, userid: event.locals.user?.id,
+                cerr: ce
+            }))
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -2033,6 +2085,7 @@ export class SvelteKitUserEndpoints {
                     factor2,
                     event.locals.sessionId);
 
+            CrossauthLogger.logger.info(j({message: "Reconfigure factor2 successful", user: event.locals.user?.username, userid: event.locals.user?.id}))
             return {
                 ok: true,
                 formData: formData,
@@ -2045,9 +2098,9 @@ export class SvelteKitUserEndpoints {
         };
 
         } catch (e) {
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't update account");
+            let ce = CrossauthError.asCrossauthError(e, "Reconfigure factor2 unsuccessful");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            CrossauthLogger.logger.error(j({message: "Reconfigure factor2 unsuccessful", user: event.locals.user?.username, userid: event.locals.user?.id, cerr: ce}))
             return {
                 error: ce.message,
                 errorCode: ce.code,

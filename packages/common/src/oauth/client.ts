@@ -1264,7 +1264,7 @@ export abstract class OAuthClientBase {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e)
             body = await resp.text()
-            CrossauthLogger.logger.debug(j({"msg": "Response is not JSON", "response": body}))
+            CrossauthLogger.logger.debug(j({"message": "Response is not JSON", "response": body}))
             throw(ce)
         }
     }

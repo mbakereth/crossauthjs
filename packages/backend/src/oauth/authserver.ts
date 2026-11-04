@@ -993,7 +993,7 @@ export class OAuthAuthorizationServer {
                     // token is not an upstream one - fetch local data
                     refreshData = await this.getRefreshTokenData(refreshToken);
                     if (!refreshToken || !refreshData || !this.userStorage) {
-                        CrossauthLogger.logger.warn(j({"msg": "Received refresh token that is not for upstream client but also has not data"}))
+                        CrossauthLogger.logger.warn(j({"message": "Received refresh token that is not for upstream client but also has not data"}))
                         return {
                             error: "access_denied",
                             error_description: "Refresh token is invalid",

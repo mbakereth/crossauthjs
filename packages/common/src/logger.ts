@@ -28,9 +28,9 @@ export interface CrossauthLoggerInterface {
  * 
  * All Crossauth log messages are JSON (or stringified JSON, depending on whether the logger supports
  * JSON input - this one does).  The following fields may be present depending on context
- * (`msg` is always present):
+ * (`message` is always present):
  * 
- * - `msg` : main contents of the log
+ * - `message` : main contents of the log
  * - `err` : an error object.  If a subclass of Error, it wil contain at least `message` and
  *           a stack trace in `stack`.  If the error is of type {@link @crossauth/common!CrossauthError} 
  *           it also will also contain `code` and `httpStatus`.
@@ -206,10 +206,10 @@ export function j(arg : {[key: string]: any}|string) : string|{[key: string]: an
     if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object")) {
         stack = arg.err.stack;
     }
-    try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object") && arg.err && ("message" in arg.err) && !("msg" in arg)) arg["msg"] = arg.err.message;} catch {}
+    try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object") && arg.err && ("message" in arg.err) && !("message" in arg)) arg["message"] = arg.err.message;} catch {}
     try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object")) arg.err = {...arg.err, stack: stack}; } catch {}
-    try {if (typeof arg == "object" && ("err" in arg) && !("msg" in arg)) arg["msg"] = arg.msg = "An unknown error occurred";} catch {}
-    try {if (typeof arg == "object" && ("cerr" in arg) && ("isCrossauthError" in arg.cerr) && arg.cerr ) {arg["errorCode"] = arg.cerr.code; arg["errorCodeName"] = arg.cerr.codeName; arg["httpStatus"] = arg.cerr.httpStatus; if (!("msg" in arg)) arg["msg"] = arg.cerr.message; delete arg.cerr;}} catch {}
+    try {if (typeof arg == "object" && ("err" in arg) && !("message" in arg)) arg["message"] = arg.message = "An unknown error occurred";} catch {}
+    try {if (typeof arg == "object" && ("cerr" in arg) && ("isCrossauthError" in arg.cerr) && arg.cerr ) {arg["errorCode"] = arg.cerr.code; arg["errorCodeName"] = arg.cerr.codeName; arg["httpStatus"] = arg.cerr.httpStatus; if (!("message" in arg)) arg["message"] = arg.cerr.message; delete arg.cerr;}} catch {}
     return (typeof arg == "string" || globalThis.crossauthLoggerAcceptsJson) ? arg : JSON.stringify(arg);
 }
 

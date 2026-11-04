@@ -542,7 +542,7 @@ export class FastifyServer {
      * by default) with the following data parameters:
      * - `errorCode` See {@link @crossauth/common!ErrorCode}.
      * - `errorCodeName` the text version of `errorCode`.
-     * - `msg` the error message
+     * - `message` the error message
      * - `httpStatus` the HTTP status code.
      * 
      * @param reply the Fastify reply object

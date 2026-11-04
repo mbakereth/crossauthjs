@@ -102,7 +102,7 @@ export class SessionManager {
     emailTokenStorage : KeyStorage;
     readonly csrfTokens : DoubleSubmitCsrfToken;
     readonly knownDeviceCookie : KnownDeviceCookie|undefined;
-    private session : SessionCookie;
+    session : SessionCookie;
     readonly authenticators : {[key:string] : Authenticator};
     //readonly authenticator : UsernamePasswordAuthenticator;
     readonly enableKnownDevices = false;
