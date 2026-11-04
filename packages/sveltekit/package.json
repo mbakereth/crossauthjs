@@ -15,7 +15,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "dotenv -e .env.unittest vitest --exclude src/demo.spec.ts",
-		"testonce": "dotenv -e .env.unittest vitest run"
+		"testonce": "dotenv -e .env.unittest vitest run",
+		"doc": "typedoc"
 	},
 	"svelte": "./dist/index.js",
 	"types": "./dist/index.d.ts",

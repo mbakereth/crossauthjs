@@ -367,10 +367,13 @@ export abstract class OAuthClientBase {
      * 
      * Doesn't actually call the endpoint but rather returns its URL
      * 
-     * @param scope optionally specify the scopes to ask the user to
+     * @param state random state string 
+     * @param param1
+     *   - scope scope optionally specify the scopes to ask the user to
      *        authorize (space separated, non URL-encoded)
-     * @param pkce if true, initiate the Authorization Code Flow with PKCE,
+     *   - pkce if true, initiate the Authorization Code Flow with PKCE,
      *        otherwiswe without PKCE.
+     *   - codeChallenge random code challenge string
      * @returns an object with
      *          - `url` - the full `authorize` URL to fetch, if there was no
      *            error, undefined otherwise
@@ -513,11 +516,12 @@ export abstract class OAuthClientBase {
      * an error, this is just passed through without calling and further
      * endpoints.
      * 
-     * @param code the authorization code
-     * @param state the random state variable
-     * @param error if defined, it will be returned as an error.  This is
+     * @paran param1
+     *    - code the authorization code
+     *    - state the random state variable
+     *    -  error if defined, it will be returned as an error.  This is
      *              for cascading errors from previous requests.
-     * @param errorDescription if error is defined, this text is returned
+     *    -  errorDescription if error is defined, this text is returned
      *        as the `error_description`  It is set to `Unknown error` 
      *        otherwise
      * @returns The {@link OAuthTokenResponse} from the `token` endpoint

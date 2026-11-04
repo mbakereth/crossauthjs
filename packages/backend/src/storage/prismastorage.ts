@@ -593,7 +593,7 @@ export class PrismaKeyStorage extends KeyStorage {
      * user id and prefix
      * @param id the key id to return
      * @param userid if given, only return a key if it matches the userid (null to match only null userid)
-     * @param prefux if given, only return a key if it starts with that prefix
+     * @param prefix if given, only return a key if it starts with that prefix
      * @returns the {@link Key } object 
      * @throws a {@link @crossauth/common!CrossauthError } instance with {@link @crossauth/common!ErrorCode} of `InvalidKey` or `Connection`
      */
