@@ -407,7 +407,7 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: "Couldn't decode id token", cerr: ce}));
+            CrossauthLogger.logger.error(j({message: "Couldn't decode id token", cerr: ce}));
         }
     }
     return payload;
@@ -434,7 +434,7 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
                 const decoded : JwtPayload&{sid?:string} = jwtDecode(oauthResponse.access_token);
                 const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
                 const hash = jti ? Crypto.hash(jti) : undefined;
-                CrossauthLogger.logger.debug(j({msg: "Got access token", 
+                CrossauthLogger.logger.debug(j({message: "Got access token", 
                     accessTokenHash: hash}));
             }
         } catch (e) {
@@ -448,7 +448,7 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
                 if (decoded) {
                     const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
                     const hash = jti ? Crypto.hash(jti) : undefined;
-                    CrossauthLogger.logger.debug(j({msg: "Got id token", 
+                    CrossauthLogger.logger.debug(j({message: "Got id token", 
                         idTokenHash: hash}));
     
                 }
@@ -462,7 +462,7 @@ function logTokens(oauthResponse: OAuthTokenResponse, jwtTokens : string[]) {
             if (oauthResponse.refresh_token) {
                 const jti = jwtDecode(oauthResponse.refresh_token)?.jti;
                 const hash = jti ? Crypto.hash(jti) : undefined;
-                CrossauthLogger.logger.debug(j({msg: "Got refresh token", 
+                CrossauthLogger.logger.debug(j({message: "Got refresh token", 
                     refreshTokenHash: hash}));
             }
         } catch (e) {
@@ -555,7 +555,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
     } catch (e) {
         const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
-        CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
+        CrossauthLogger.logger.debug(j({cerr: ce, message: "Error receiving tokens"}));
         if (reply) {
             return reply.status(ce.httpStatus)
                 .view(client.errorPage, {
@@ -644,7 +644,7 @@ async function saveInSessionAndRedirect(oauthResponse: OAuthTokenResponse,
     } catch (e) {
         const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
-        CrossauthLogger.logger.debug(j({cerr: ce, msg: "Error receiving tokens"}));
+        CrossauthLogger.logger.debug(j({cerr: ce, message: "Error receiving tokens"}));
         if (reply) {
             return reply.status(ce.httpStatus)
                 .view(client.errorPage, {
@@ -938,7 +938,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Querystring: ClientAuthorizeQueryType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'GET',
                         url: this.prefix + 'authzcodeflow',
                         ip: request.ip,
@@ -965,10 +965,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     return await this.errorFn(this.server, request, reply, ce)
                 }
                 if (this.oauthLogFetch) {
-                    CrossauthLogger.logger.debug(j({msg: "OAuth redirect", url: url}))
+                    CrossauthLogger.logger.debug(j({message: "OAuth redirect", url: url}))
                 } else {
                     CrossauthLogger.logger.debug(j({
-                        msg: `OAuth redirect`,
+                        message: `OAuth redirect`,
                     }));    
                 }
                 return reply.redirect(url);
@@ -1017,7 +1017,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Querystring: ClientAuthorizeQueryType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'GET',
                         url: this.prefix + 'authzcodeflowpkce',
                         ip: request.ip,
@@ -1040,10 +1040,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     return await this.errorFn(this.server, request, reply, ce);
                 }
                 if (this.oauthLogFetch) {
-                    CrossauthLogger.logger.debug(j({msg: "OAuth redirect", url: url}))
+                    CrossauthLogger.logger.debug(j({message: "OAuth redirect", url: url}))
                 } else {
                     CrossauthLogger.logger.debug(j({
-                        msg: `OAuth redirect`,
+                        message: `OAuth redirect`,
                     }));    
                 }
                 return reply.redirect(url);
@@ -1059,14 +1059,14 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     async (request : FastifyRequest<{ Querystring: RedirectUriQueryType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'GET',
                         url: this.prefix + 'authzcode',
                         ip: request.ip,
                         user: request.user?.username
                     }));
                     if (this.oauthLogFetch) {
-                        CrossauthLogger.logger.debug(j({msg: "Received OAuth redirect", url: request.url}))
+                        CrossauthLogger.logger.debug(j({message: "Received OAuth redirect", url: request.url}))
                     }
                     if (!request.user &&
                      (this.loginProtectedFlows.includes(OAuthFlows.AuthorizationCodeWithPKCE) || 
@@ -1101,7 +1101,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Error receiving token",
+                        message: "Error receiving token",
                         cerr: ce,
                         user: request.user?.user
                     }));
@@ -1118,7 +1118,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: ClientCredentialsBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + 'clientcredflow',
                         ip: request.ip,
@@ -1135,7 +1135,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 if (!request.user && 
                     (this.loginProtectedFlows.includes(OAuthFlows.ClientCredentials))) {
                     return reply.status(401).header(...JSONHDR)
-                        .send({ok: false, msg: "Access denied"});                }               
+                        .send({ok: false, message: "Access denied"});                }               
                 try {
                     const resp = await this.clientCredentialsFlow(request.body?.scope);
                     if (resp.error) {
@@ -1150,7 +1150,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Error receiving token",
+                        message: "Error receiving token",
                         cerr: ce,
                         user: request.user?.user
                     }));
@@ -1167,7 +1167,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: RefreshTokenBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + 'refreshtokenflow',
                         ip: request.ip,
@@ -1213,7 +1213,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 if (!request.user && 
                     (this.loginProtectedFlows.includes(OAuthFlows.RefreshToken))) {
                     return reply.status(401).header(...JSONHDR)
-                        .send({ok: false, msg: "Access denied"});                }               
+                        .send({ok: false, message: "Access denied"});                }               
                 try {
                     const resp = 
                         await this.refreshTokenFlow(refreshToken);
@@ -1229,7 +1229,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Error receiving token",
+                        message: "Error receiving token",
                         cerr: ce,
                         user: request.user?.user
                     }));
@@ -1241,7 +1241,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             this.server.app.post(this.prefix+"refreshtokensifexpired", 
                 async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + "refreshtokensifexpired",
                         ip: request.ip,
@@ -1252,7 +1252,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             this.server.app.post(this.prefix+"api/refreshtokensifexpired", 
                 async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + "refreshtokens",
                         ip: request.ip,
@@ -1264,7 +1264,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             this.server.app.post(this.prefix+"refreshtokens", 
                 async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + "refreshtokens",
                         ip: request.ip,
@@ -1275,7 +1275,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             this.server.app.post(this.prefix+"api/refreshtokens", 
                 async (request : FastifyRequest<{Body: CsrfBodyType}>, reply : FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + "refreshtokens",
                         ip: request.ip,
@@ -1294,7 +1294,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                                                   Body: PasswordBodyType }>, 
                        reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'GET',
                         url: this.prefix + this.passwordFlowUrl,
                         ip: request.ip,
@@ -1316,7 +1316,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: PasswordBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + this.passwordFlowUrl,
                         ip: request.ip,
@@ -1332,7 +1332,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: PasswordOtpType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + this.passwordOtpUrl,
                         ip: request.ip,
@@ -1345,7 +1345,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: PasswordOobType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + this.passwordOobUrl,
                         ip: request.ip,
@@ -1363,7 +1363,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: DeviceCodeBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + this.deviceCodeFlowPage,
                         ip: request.ip,
@@ -1376,7 +1376,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: DeviceCodeBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + "api/" + this.deviceCodeFlowPage,
                         ip: request.ip,
@@ -1389,7 +1389,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: DeviceCodePollBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + this.deviceCodePollUrl,
                         ip: request.ip,
@@ -1402,7 +1402,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest<{ Body: DeviceCodePollBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + this.deviceCodePollUrl,
                         ip: request.ip,
@@ -1420,7 +1420,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest, 
                     reply : FastifyReply) =>  {
                         CrossauthLogger.logger.info(j({
-                            msg: "Page visit",
+                            message: "Page visit",
                             method: 'GET',
                             url: this.prefix + this.deleteTokensGetUrl,
                             ip: request.ip,
@@ -1440,7 +1440,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + this.deleteTokensPostUrl,
                         ip: request.ip,
@@ -1457,7 +1457,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.debug(j({err: ce}));
-                    CrossauthLogger.logger.error(j({msg: "Couldn't delete oauth tokens", cerr: ce}));
+                    CrossauthLogger.logger.error(j({message: "Couldn't delete oauth tokens", cerr: ce}));
                     return reply.view(this.deleteTokensPage, 
                         {
                             ok: false,
@@ -1477,7 +1477,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 async (request : FastifyRequest, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + this.apiDeleteTokensPostUrl,
                         ip: request.ip,
@@ -1489,7 +1489,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.debug(j({err: ce}));
-                    CrossauthLogger.logger.error(j({msg: "Couldn't delete oauth tokens", cerr: ce}));
+                    CrossauthLogger.logger.error(j({message: "Couldn't delete oauth tokens", cerr: ce}));
                     return reply.header(...JSONHDR).status(ce.httpStatus)
                         .send(JSON.stringify({
                             ok: false,
@@ -1508,14 +1508,14 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             this.server.app.post(this.prefix+tokenType, 
                 async (request : FastifyRequest<{Body: TokensBodyType}>, reply : FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + tokenType,
                         ip: request.ip,
                         user: request.user?.username
                     }));
                 if (!request.csrfToken) {
-                    return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
+                    return reply.header(...JSONHDR).status(401).send({ok: false, message: "No csrf token given"});
                 }
                 let isHave = false;
                 let tokenName : string = tokenType;
@@ -1558,14 +1558,14 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         this.server.app.post(this.prefix+"tokens", 
             async (request : FastifyRequest<{Body: TokensBodyType}>, reply : FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + "tokens",
                     ip: request.ip,
                     user: request.user?.username
                 }));
             if (!request.csrfToken) {
-                return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
+                return reply.header(...JSONHDR).status(401).send({ok: false, message: "No csrf token given"});
             }
             if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
                 "Cannot get session data if sessions not enabled");
@@ -1640,7 +1640,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     handler: async (request : FastifyRequest<{Body: CsrfBodyType}>, 
                         reply : FastifyReply) =>  {
                         CrossauthLogger.logger.info(j({
-                            msg: "Page visit",
+                            message: "Page visit",
                             method: request.method,
                             url: request.url,
                             ip: request.ip,
@@ -1648,7 +1648,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         }));
                         const url = request.url.substring(this.prefix.length +
                             this.bffEndpointName.length);
-                        CrossauthLogger.logger.debug(j({msg: "Resource server URL " + url}))
+                        CrossauthLogger.logger.debug(j({message: "Resource server URL " + url}))
                         const csrfRequired = 
                             (methods[i] != "GET" && methods[i] != "HEAD" && methods[i] != "OPTIONS");
                         if (this.server.sessionAdapter && csrfRequired) {
@@ -1788,7 +1788,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.error(j({
-                msg: "Error receiving token",
+                message: "Error receiving token",
                 cerr: ce,
                 user: request.user?.user
             }));
@@ -1890,7 +1890,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             const ce = CrossauthError.fromOAuthError(resp.error,
                 resp.error_description??"Error completing MFA");
             CrossauthLogger.logger.warn(j({
-                msg: "Error completing MFA",
+                message: "Error completing MFA",
                 cerr: ce,
                 user: request.user?.user,
                 hashedMfaToken: Crypto.hash(request.body.mfa_token),
@@ -1926,7 +1926,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
             const ce = CrossauthError.fromOAuthError(resp.error,
                 resp.error_description??"Error completing MFA");
             CrossauthLogger.logger.warn(j({
-                msg: "Error completing MFA",
+                message: "Error completing MFA",
                 cerr: ce,
                 user: request.user?.user,
                 hashedMfaToken: Crypto.hash(request.body.mfa_token),
@@ -2001,7 +2001,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     })
                     .catch((err) => {
                         CrossauthLogger.logger.debug(j({err: err}));
-                        CrossauthLogger.logger.warn(j({msg: "Couldn't generate verification URL QR Code"}))
+                        CrossauthLogger.logger.warn(j({message: "Couldn't generate verification URL QR Code"}))
                     });
         
             }
@@ -2021,7 +2021,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.error(j({
-                msg: "Error receiving token",
+                message: "Error receiving token",
                 cerr: ce,
                 user: request.user?.user
             }));
@@ -2072,7 +2072,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.error(j({
-                msg: "Error receiving token",
+                message: "Error receiving token",
                 cerr: ce,
                 user: request.user?.user
             }));
@@ -2151,7 +2151,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.error(j({
                     cerr: e,
-                    msg: "Failed refreshing access token"
+                    message: "Failed refreshing access token"
                 }));
                 if (!silent) {
                     const ce = CrossauthError.asCrossauthError(e);
@@ -2171,7 +2171,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
         silent: boolean,
         onlyIfExpired : boolean) {
         if (!request.csrfToken) {
-            return reply.header(...JSONHDR).status(401).send({ok: false, msg: "No csrf token given"});
+            return reply.header(...JSONHDR).status(401).send({ok: false, message: "No csrf token given"});
         }
         if (!this.server.sessionAdapter) throw new CrossauthError(ErrorCode.Configuration, 
             "Cannot get session data if sessions not enabled");

@@ -452,16 +452,16 @@ importers:
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^3.0.0
-        version: 3.3.1(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))
+        version: 3.3.1(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))
       '@sveltejs/adapter-node':
         specifier: ^5.2.0
-        version: 5.4.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))
+        version: 5.4.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))
       '@sveltejs/kit':
         specifier: ^2.5.22
-        version: 2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
+        version: 2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^3.0.0
-        version: 3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
+        version: 3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
@@ -509,7 +509,7 @@ importers:
         version: 5.4.21(@types/node@25.0.3)
       vitest:
         specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.0.3)(supports-color@5.5.0)
+        version: 1.6.1(@types/node@25.0.3)
 
   examples/sveltekitpasswordandldap:
     dependencies:
@@ -591,7 +591,7 @@ importers:
         version: 5.4.21(@types/node@25.0.3)
       vitest:
         specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.0.3)(supports-color@5.5.0)
+        version: 1.6.1(@types/node@25.0.3)
 
   examples/sveltekitserverexample:
     dependencies:
@@ -679,7 +679,7 @@ importers:
         version: 1.17.9(supports-color@5.5.0)(vite@5.4.21(@types/node@25.0.3))
       vitest:
         specifier: ^1.2.0
-        version: 1.6.1(@types/node@25.0.3)(supports-color@5.5.0)
+        version: 1.6.1(@types/node@25.0.3)
 
   examples/vanillaoauthclient:
     devDependencies:
@@ -848,7 +848,7 @@ importers:
         version: 3.9.1(@types/node@20.19.27)(rollup@4.54.0)(supports-color@5.5.0)(typescript@5.3.3)(vite@5.4.21(@types/node@20.19.27))
       vitest:
         specifier: ^1.1.0
-        version: 1.6.1(@types/node@20.19.27)
+        version: 1.6.1(@types/node@20.19.27)(supports-color@5.5.0)
       vitest-fetch-mock:
         specifier: ^0.2.2
         version: 0.2.2(encoding@0.1.13)(vitest@1.6.1(@types/node@20.19.27))
@@ -860,7 +860,7 @@ importers:
         version: 5.10.0
     devDependencies:
       '@types/node':
-        specifier: ^20.10.8
+        specifier: ^20.19.27
         version: 20.19.27
       typedoc:
         specifier: ^0.25.4
@@ -876,7 +876,7 @@ importers:
         version: 3.9.1(@types/node@20.19.27)(rollup@4.54.0)(supports-color@5.5.0)(typescript@5.3.3)(vite@5.4.21(@types/node@20.19.27))
       vitest:
         specifier: ^1.1.0
-        version: 1.6.1(@types/node@20.19.27)
+        version: 1.6.1(@types/node@20.19.27)(supports-color@5.5.0)
 
   packages/fastify:
     dependencies:
@@ -1003,7 +1003,7 @@ importers:
         version: 3.9.1(@types/node@20.19.27)(rollup@4.54.0)(supports-color@5.5.0)(typescript@5.3.3)(vite@5.4.21(@types/node@20.19.27))
       vitest:
         specifier: ^1.1.0
-        version: 1.6.1(@types/node@20.19.27)
+        version: 1.6.1(@types/node@20.19.27)(supports-color@5.5.0)
       vitest-fetch-mock:
         specifier: ^0.2.2
         version: 0.2.2(encoding@0.1.13)(vitest@1.6.1(@types/node@20.19.27))
@@ -1037,7 +1037,7 @@ importers:
         version: 3.9.1(@types/node@20.19.27)(rollup@4.54.0)(supports-color@5.5.0)(typescript@5.3.3)(vite@5.4.21(@types/node@20.19.27))
       vitest:
         specifier: ^1.1.0
-        version: 1.6.1(@types/node@20.19.27)
+        version: 1.6.1(@types/node@20.19.27)(supports-color@5.5.0)
 
   packages/sveltekit:
     dependencies:
@@ -1074,16 +1074,16 @@ importers:
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^3.0.0
-        version: 3.3.1(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))
+        version: 3.3.1(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))
       '@sveltejs/kit':
         specifier: ^2.5.22
-        version: 2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
+        version: 2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
       '@sveltejs/package':
         specifier: ^2.5.7
         version: 2.5.7(svelte@4.2.20)(typescript@5.3.3)
       '@sveltejs/vite-plugin-svelte':
         specifier: ^3.0.0
-        version: 3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
+        version: 3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
       '@types/node':
         specifier: ^25.0.3
         version: 25.0.3
@@ -1125,7 +1125,7 @@ importers:
         version: 3.9.1(@types/node@25.0.3)(rollup@4.54.0)(typescript@5.3.3)(vite@5.4.21(@types/node@25.0.3))
       vitest:
         specifier: ^1.6.1
-        version: 1.6.1(@types/node@25.0.3)(supports-color@5.5.0)
+        version: 1.6.1(@types/node@25.0.3)
       vitest-fetch-mock:
         specifier: ^0.2.2
         version: 0.2.2(encoding@0.1.13)(vitest@1.6.1(@types/node@25.0.3))
@@ -7760,14 +7760,6 @@ snapshots:
       '@sveltejs/kit': 2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
       import-meta-resolve: 4.2.0
 
-  '@sveltejs/adapter-node@5.4.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))':
-    dependencies:
-      '@rollup/plugin-commonjs': 28.0.9(rollup@4.54.0)
-      '@rollup/plugin-json': 6.1.0(rollup@4.54.0)
-      '@rollup/plugin-node-resolve': 16.0.3(rollup@4.54.0)
-      '@sveltejs/kit': 2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(supports-color@5.5.0)(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3))
-      rollup: 4.54.0
-
   '@sveltejs/adapter-node@5.4.0(@sveltejs/kit@2.49.2(@sveltejs/vite-plugin-svelte@3.1.2(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))(svelte@4.2.20)(vite@5.4.21(@types/node@25.0.3)))':
     dependencies:
       '@rollup/plugin-commonjs': 28.0.9(rollup@4.54.0)
@@ -11531,7 +11523,7 @@ snapshots:
       core-util-is: 1.0.2
       extsprintf: 1.4.1
 
-  vite-node@1.6.1(@types/node@20.19.27):
+  vite-node@1.6.1(@types/node@20.19.27)(supports-color@5.5.0):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3(supports-color@5.5.0)
@@ -11549,7 +11541,7 @@ snapshots:
       - supports-color
       - terser
 
-  vite-node@1.6.1(@types/node@25.0.3)(supports-color@5.5.0):
+  vite-node@1.6.1(@types/node@25.0.3):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3(supports-color@5.5.0)
@@ -11676,7 +11668,41 @@ snapshots:
       tinybench: 2.9.0
       tinypool: 0.8.4
       vite: 5.4.21(@types/node@20.19.27)
-      vite-node: 1.6.1(@types/node@20.19.27)
+      vite-node: 1.6.1(@types/node@20.19.27)(supports-color@5.5.0)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 20.19.27
+    transitivePeerDependencies:
+      - less
+      - lightningcss
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+
+  vitest@1.6.1(@types/node@20.19.27)(supports-color@5.5.0):
+    dependencies:
+      '@vitest/expect': 1.6.1
+      '@vitest/runner': 1.6.1
+      '@vitest/snapshot': 1.6.1
+      '@vitest/spy': 1.6.1
+      '@vitest/utils': 1.6.1
+      acorn-walk: 8.3.4
+      chai: 4.5.0
+      debug: 4.4.3(supports-color@5.5.0)
+      execa: 8.0.1
+      local-pkg: 0.5.1
+      magic-string: 0.30.21
+      pathe: 1.1.2
+      picocolors: 1.1.1
+      std-env: 3.10.0
+      strip-literal: 2.1.1
+      tinybench: 2.9.0
+      tinypool: 0.8.4
+      vite: 5.4.21(@types/node@20.19.27)
+      vite-node: 1.6.1(@types/node@20.19.27)(supports-color@5.5.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 20.19.27
@@ -11710,41 +11736,7 @@ snapshots:
       tinybench: 2.9.0
       tinypool: 0.8.4
       vite: 5.4.21(@types/node@25.0.3)
-      vite-node: 1.6.1(@types/node@25.0.3)(supports-color@5.5.0)
-      why-is-node-running: 2.3.0
-    optionalDependencies:
-      '@types/node': 25.0.3
-    transitivePeerDependencies:
-      - less
-      - lightningcss
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-
-  vitest@1.6.1(@types/node@25.0.3)(supports-color@5.5.0):
-    dependencies:
-      '@vitest/expect': 1.6.1
-      '@vitest/runner': 1.6.1
-      '@vitest/snapshot': 1.6.1
-      '@vitest/spy': 1.6.1
-      '@vitest/utils': 1.6.1
-      acorn-walk: 8.3.4
-      chai: 4.5.0
-      debug: 4.4.3(supports-color@5.5.0)
-      execa: 8.0.1
-      local-pkg: 0.5.1
-      magic-string: 0.30.21
-      pathe: 1.1.2
-      picocolors: 1.1.1
-      std-env: 3.10.0
-      strip-literal: 2.1.1
-      tinybench: 2.9.0
-      tinypool: 0.8.4
-      vite: 5.4.21(@types/node@25.0.3)
-      vite-node: 1.6.1(@types/node@25.0.3)(supports-color@5.5.0)
+      vite-node: 1.6.1(@types/node@25.0.3)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.0.3

@@ -226,27 +226,27 @@ export class DbUserStorage extends UserStorage {
                 await dbClient.commit();
 
                 if (options?.skipActiveCheck!=true && user["state"]==UserState.awaitingTwoFactorSetup) {
-                    CrossauthLogger.logger.debug(j({msg: "2FA setup is not complete"}));
+                    CrossauthLogger.logger.debug(j({message: "2FA setup is not complete"}));
                     throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
                 }
                 if (options?.skipActiveCheck!=true && user["state"]==UserState.disabled) {
-                    CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
+                    CrossauthLogger.logger.debug(j({message: "User is deactivated"}));
                     throw new CrossauthError(ErrorCode.UserNotActive);
                 }
                 if (options?.skipEmailVerifiedCheck!=true && user["state"]==UserState.awaitingEmailVerification) {
-                    CrossauthLogger.logger.debug(j({msg: "User has not verified email"}));
+                    CrossauthLogger.logger.debug(j({message: "User has not verified email"}));
                     throw new CrossauthError(ErrorCode.EmailNotVerified);
                 }
                 if (options?.skipActiveCheck!=true && user["state"] == UserState.passwordChangeNeeded) {
-                    CrossauthLogger.logger.debug(j({msg: "User must change password"}));
+                    CrossauthLogger.logger.debug(j({message: "User must change password"}));
                     throw new CrossauthError(ErrorCode.PasswordChangeNeeded);
                 }
                 if (options?.skipActiveCheck!=true && (user["state"] == UserState.passwordResetNeeded || user["state"] == UserState.passwordAndFactor2ResetNeeded)) {
-                    CrossauthLogger.logger.debug(j({msg: "User must reset password"}));
+                    CrossauthLogger.logger.debug(j({message: "User must reset password"}));
                     throw new CrossauthError(ErrorCode.PasswordResetNeeded);
                 }
                 if (options?.skipActiveCheck!=true && user["state"]==UserState.factor2ResetNeeded) {
-                    CrossauthLogger.logger.debug(j({msg: "2FA reset required"}));
+                    CrossauthLogger.logger.debug(j({message: "2FA reset required"}));
                     throw new CrossauthError(ErrorCode.Factor2ResetNeeded);
                 }
 
@@ -484,7 +484,7 @@ export class DbUserStorage extends UserStorage {
                     let fieldsString = fields.join(", ");
                     let placeholdersString = placeholders.join(", ");
                     const query = `insert into ${this.userSecretsTable} (${fieldsString}) values (${placeholdersString})`;
-                    CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
+                    CrossauthLogger.logger.debug(j({message: "Executing query", query: query}));
                     await dbClient.execute(query, values);
                 }
     
@@ -540,7 +540,7 @@ export class DbUserStorage extends UserStorage {
             try {
                 return await this.deleteUserById_internal(Number(id));
             } catch (e) {
-                CrossauthLogger.logger.debug(j({msg: "Failed forcing id to number when deleting user"}));
+                CrossauthLogger.logger.debug(j({message: "Failed forcing id to number when deleting user"}));
             }
         }
         return await this.deleteUserById_internal(id);
@@ -758,7 +758,7 @@ export class DbKeyStorage extends KeyStorage {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             if (ce.code == ErrorCode.ConstraintViolation) {
-                CrossauthLogger.logger.warn(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+                CrossauthLogger.logger.warn(j({message: "Attempt to create key that already exists. Stack trace follows"}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 error = new CrossauthError(ErrorCode.KeyExists);
             } else {
@@ -780,7 +780,7 @@ export class DbKeyStorage extends KeyStorage {
             let params = this.dbPool.parameters();
             let query = `delete from ${this.keyTable} where value=`;
             query += params.nextParameter();
-            CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
+            CrossauthLogger.logger.debug(j({message: "Executing query", query: query}));
             await dbClient.execute(query, [value]);
         } finally {
             dbClient.release();
@@ -811,7 +811,7 @@ export class DbKeyStorage extends KeyStorage {
             }
             query += " " + exceptClause;
 
-            CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
+            CrossauthLogger.logger.debug(j({message: "Executing query", query: query}));
             await dbClient.execute(query, values);
     
 
@@ -897,7 +897,7 @@ export class DbKeyStorage extends KeyStorage {
                 query += `and value like ` + params.nextParameter();
                 values.push(prefix + "%")
             }
-            CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
+            CrossauthLogger.logger.debug(j({message: "Executing query", query: query}));
             let res = await dbClient.execute(query, values);
                 if (res.length == 0) {
                 return [];
@@ -968,7 +968,7 @@ export class DbKeyStorage extends KeyStorage {
             if (setFields.length > 0) {
                 let setString = setFields.join(", ");
                 let query = `update ${this.keyTable} set ${setString} where value = ` + params.nextParameter();
-                CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
+                CrossauthLogger.logger.debug(j({message: "Executing query", query: query}));
                 await dbClient.execute(query, values);
             }
     }
@@ -1335,7 +1335,7 @@ export class DbOAuthClientStorage extends OAuthClientStorage {
         let res = await this.getClientWithTransaction(dbClient, "client_id", client.client_id, client.userid);
 
         if (res.length == 0) {
-            CrossauthLogger.logger.error(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+            CrossauthLogger.logger.error(j({message: "Attempt to create key that already exists. Stack trace follows"}));
             throw new CrossauthError(ErrorCode.KeyExists);    
         }
         let newClient = res[0];

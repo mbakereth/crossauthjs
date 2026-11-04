@@ -213,12 +213,12 @@ export class OAuthClient extends OAuthClientBase {
                     this.startAutoRefresh(options.autoRefresh)
                         .then()
                         .catch(err => {
-                        CrossauthLogger.logger.debug(j({err: err, msg: "Couldn't start auto refresh"}));
+                        CrossauthLogger.logger.debug(j({err: err, message: "Couldn't start auto refresh"}));
                     });
                 }
             })
             .catch(err => {
-                CrossauthLogger.logger.debug(j({err: err, msg: "Couldn't validate ID token"}));
+                CrossauthLogger.logger.debug(j({err: err, message: "Couldn't validate ID token"}));
             });
 
         // if we don't have the ID token but we do have the access and
@@ -228,7 +228,7 @@ export class OAuthClient extends OAuthClientBase {
             this.startAutoRefresh(options.autoRefresh)
                 .then()
                 .catch(err => {
-                CrossauthLogger.logger.debug(j({err: err, msg: "Couldn't start auto refresh"}));
+                CrossauthLogger.logger.debug(j({err: err, message: "Couldn't start auto refresh"}));
             });
 
         // otherwise, if we have the refresh token but neither access nor
@@ -236,19 +236,19 @@ export class OAuthClient extends OAuthClientBase {
         } else if (refreshToken && !accessToken) {
             this.refreshTokenFlow(refreshToken)
                 .then(_resp => {
-                    CrossauthLogger.logger.debug(j({msg: "Refreshed tokens"}));
+                    CrossauthLogger.logger.debug(j({message: "Refreshed tokens"}));
                     if (options.autoRefresh) {
                         this.startAutoRefresh(options.autoRefresh)
                         .then()
                         .catch(err => {
-                        CrossauthLogger.logger.debug(j({err: err, msg: "Couldn't start auto refresh"}));
+                        CrossauthLogger.logger.debug(j({err: err, message: "Couldn't start auto refresh"}));
                     });    
                 }
                 })
                 .catch(err => {
                     const ce = CrossauthError.asCrossauthError(err);
                     CrossauthLogger.logger.debug(j({err: ce}));
-                    CrossauthLogger.logger.error(j({msg: "failed refreshing tokens", cerr: ce}));
+                    CrossauthLogger.logger.error(j({message: "failed refreshing tokens", cerr: ce}));
                 })
         }
         
@@ -295,7 +295,7 @@ export class OAuthClient extends OAuthClientBase {
         if (error) {
             const cerr = CrossauthError.fromOAuthError(error, error_description);
             CrossauthLogger.logger.debug(j({err: cerr}));
-            CrossauthLogger.logger.error(j({cerr: cerr, msg: "Error from authorize endpoint: " + error}));
+            CrossauthLogger.logger.error(j({cerr: cerr, message: "Error from authorize endpoint: " + error}));
             throw cerr;
         }
         if (this.#state && state != this.#state) {
@@ -313,7 +313,7 @@ export class OAuthClient extends OAuthClientBase {
         if (resp.error) {
             const cerr = CrossauthError.fromOAuthError(resp.error, error_description);
             CrossauthLogger.logger.debug(j({err: cerr}));
-            CrossauthLogger.logger.error(j({cerr: cerr, msg: "Error from redirect endpoint: " + resp.error}));
+            CrossauthLogger.logger.error(j({cerr: cerr, message: "Error from redirect endpoint: " + resp.error}));
             throw cerr;
         }
 

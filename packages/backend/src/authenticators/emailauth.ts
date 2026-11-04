@@ -200,7 +200,7 @@ export class EmailAuthenticator extends Authenticator {
         }
         const messageId = this.sendToken(email, otp);
         CrossauthLogger.logger.info(j({
-            msg: "Sent factor otp email",
+            message: "Sent factor otp email",
             emailMessageId: messageId,
             email: email
         }));
@@ -228,7 +228,7 @@ export class EmailAuthenticator extends Authenticator {
                 1000*this.emailAuthenticatorTokenExpires).getTime();
         const messageId = this.sendToken(data.email, otp);
         CrossauthLogger.logger.info(j({
-            msg: "Sent factor otp email",
+            message: "Sent factor otp email",
             emailMessageId: messageId,
             email: data.email
         }));
@@ -292,7 +292,7 @@ export class EmailAuthenticator extends Authenticator {
         const email = user.email || user.username;
         const messageId = this.sendToken(email, otp);
         CrossauthLogger.logger.info(j({
-            msg: "Sent factor otp email",
+            message: "Sent factor otp email",
             emailMessageId: messageId,
             email: email
         }));

@@ -345,7 +345,7 @@ export class OAuthBffClient {
                     refresh : refreshTokenExpiry
                 };
             } catch (e) {
-                CrossauthLogger.logger.error(j({msg: "getTokenExpiries received non JSON response " + tokens}))
+                CrossauthLogger.logger.error(j({message: "getTokenExpiries received non JSON response " + tokens}))
                 return {
                     id : 0,
                     access : 0,

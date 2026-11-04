@@ -1156,7 +1156,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 if (haveKnownDevice && request.user && request.user.userid in knownDeviceUsers && knownDeviceCookieValue) {
                     const now = Date.now();
                     if (now > knownDeviceUsers[request.user.userid].getTime()) {
-                        CrossauthLogger.logger.info(j({msg: "Known device has expired for user", username: request.user.username}));
+                        CrossauthLogger.logger.info(j({message: "Known device has expired for user", username: request.user.username}));
                         await this.sessionManager.removeUserFromKnownDevice(knownDeviceCookieValue, request.user.userid)
                     } else {
                         request.knownDevice = true;
@@ -1619,6 +1619,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 });
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
+                CrossauthLogger.logger.error(j({message: "Login unsuccessful", user: request.body.username}))
                 return this.handleError(e, request, reply, (reply, error) => {
                     return reply.view(this.loginPage, {
                         errorMessage: error.message,
@@ -1654,16 +1655,28 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 });
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
+                const ce = CrossauthError.asCrossauthError(e)
                 let factor2 : string|undefined;
+                let username : string|undefined = undefined;
                 try {
                     const data = request.sessionId ? 
                         await this.sessionManager.dataForSessionId(request.sessionId) : 
                         undefined;
                     factor2 = data?.factor2;
+                    username = data?.username;
                 } catch (e) {
                     CrossauthLogger.logger.error(j({err: e}));
                 }
                 if (factor2 && factor2 in this.authenticators) {
+                    CrossauthLogger.logger.error(j({
+                        message: "Login unsuccessful at factor2 - invalid factor2", 
+                        user: username, 
+                        factor2: factor2,
+                        errorMessage: ce.message,
+                        errorMessages: ce.messages, 
+                        errorCode: ce.code, 
+                        errorCodeName: ErrorCode[ce.code], 
+                    }))
                     return this.handleError(e, request, reply, (reply, error) => {
                         return reply.view(this.factor2Page, {
                             errorMessage: error.message,
@@ -1679,6 +1692,15 @@ export class FastifySessionServer implements FastifySessionAdapter {
                         });                      
                     });                        
                 } else {
+                    CrossauthLogger.logger.error(j({
+                        message: "Login unsuccessful at factor2", 
+                        user: username, 
+                        factor2: factor2,
+                        errorMessage: ce.message,
+                        errorMessages: ce.messages, 
+                        errorCode: ce.code, 
+                        errorCodeName: ErrorCode[ce.code], 
+                    }))
                     return this.handleError(e, request, reply, (reply, error) => {
                         return reply.view(this.loginPage, {
                             errorMessage: error.message,
@@ -1797,8 +1819,10 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    message: "Signup failure",
+                    message: "Signup unsuccessful",
                     user: request.body.username,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
                 }));
@@ -1846,10 +1870,12 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    message: "Logout failure",
+                    message: "Logout unsuccessful",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    errorCode: ce.code,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, request, reply, (reply, error) => {
@@ -1939,10 +1965,12 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    message: "Login failure",
+                    message: "Login unsuccessful",
                     user: request.body.username,
                     errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    errorCode: ce.code,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, request, reply, (reply, error) => {
@@ -1985,7 +2013,9 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     message: "Cancel 2FA failure",
                     user: username,
                     errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    errorCode: ce.code,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, request, reply, (reply, error) => {
@@ -2023,10 +2053,12 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    message: "Login failure",
+                    message: "Login unsuccessful",
                     hashOfSessionId: this.getHashOfSessionId(request),
                     errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    errorCode: ce.code,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e,request,  reply, (reply, error) => {
@@ -2063,10 +2095,12 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    message: "Logout failure",
+                    message: "Logout unsuccessful",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    errorCode: ce.code,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.handleError(e, request, reply, (reply, error) => {
@@ -2105,10 +2139,12 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    message: "Signup failure",
+                    message: "Signup unsuccessful",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    errorCode: ce.code,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 this.handleError(e, request, reply, (reply, error) => {
@@ -2204,11 +2240,13 @@ export class FastifySessionServer implements FastifySessionAdapter {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    message: "getcsrftoken failure",
+                    message: "getcsrftoken unsuccessful",
                     user: request.user?.username,
                     hashedCsrfCookie: this.getHashOfCsrfCookie(request),
                     errorCode: ce.code,
-                    errorCodeName: ce.codeName
+                    errorCodeName: ce.codeName,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return reply.status(this.errorStatus(e)).header(...JSONHDR)
@@ -2281,6 +2319,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             }
         }
 
+        CrossauthLogger.logger.info(j({message: "Login successful", user: user.username, userid: user.userid}))
         return successFn(reply, user);
     }
 
@@ -2324,6 +2363,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
         reply.cookie(csrfCookie.name, csrfCookie.value, csrfCookie.options);
         request.csrfToken = 
             await this.sessionManager.createCsrfFormOrHeaderValue(csrfCookie.value);
+        CrossauthLogger.logger.info(j({message: "Login successful with factor2", user: user?.username}))
         return successFn(reply, user);
     }
 
@@ -2482,9 +2522,9 @@ export class FastifySessionServer implements FastifySessionAdapter {
                 request.body,
                 repeatSecrets);
                 if (!this.enableEmailVerification) {
-                return await this.login(request, reply, (request, user) => {
-                    return successFn(request, {}, user)});
-            }
+                    return await this.login(request, reply, (request, user) => {
+                        return successFn(request, {}, user)});
+                }
             return successFn(reply, {}, undefined);
         } else {
             // also enabling 2FA
@@ -2522,10 +2562,20 @@ export class FastifySessionServer implements FastifySessionAdapter {
                     next: next??this.loginRedirect,
                     csrfToken: request.csrfToken,
                 };
+                CrossauthLogger.logger.info(j({message: "Signup successful", user: username}))
                 return successFn(reply, data)
             } catch (e) {
                 // if there is an error, make sure we delete the user before returning
-                CrossauthLogger.logger.error(j({err: e}));
+                CrossauthLogger.logger.debug(j({err: e}));
+                const ce = CrossauthError.asCrossauthError(e); 
+                CrossauthLogger.logger.error(j({
+                    message: "Signup unsuccessful",
+                    user: username,
+                    errorCodeName: ce.codeName,
+                    errorCode: ce.code,
+                    errorMessage: ce.message,
+                    errorMessages: ce.messages,
+                }));
                 try {
                     await this.sessionManager.deleteUserByUsername(username);
                 } catch (e) {
@@ -2561,6 +2611,7 @@ export class FastifySessionServer implements FastifySessionAdapter {
             }
         }
 
+        CrossauthLogger.logger.info(j({message: "Logout successful", user: request.user?.username, userid: request.user?.id}))
         return successFn(reply);
 
     }

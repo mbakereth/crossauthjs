@@ -129,7 +129,7 @@ export abstract class SmsAuthenticator extends Authenticator {
             nunjucks.render(this.smsAuthenticatorBody, data);
         const messageId = this.sendSms(number, body);
         CrossauthLogger.logger.info(j({
-            msg: "Sent factor otp sms",
+            message: "Sent factor otp sms",
             smsMessageId: messageId,
             phone: number
         }));
@@ -157,7 +157,7 @@ export abstract class SmsAuthenticator extends Authenticator {
                 1000*this.smsAuthenticatorTokenExpires).getTime();
         const messageId = this.sendSms(data.phone, otp);
         CrossauthLogger.logger.info(j({
-            msg: "Sent factor otp sms",
+            message: "Sent factor otp sms",
             smsMessageId: messageId,
             phone: data.phone
         }));
@@ -220,7 +220,7 @@ export abstract class SmsAuthenticator extends Authenticator {
         const phone = user.phone;
         const messageId = this.sendSms(phone, otp);
         CrossauthLogger.logger.info(j({
-            msg: "Sent factor otp sms",
+            message: "Sent factor otp sms",
             smsMessageId: messageId,
             phone: phone
         }));

@@ -220,7 +220,7 @@ export class DoubleSubmitCsrfToken {
         }
 
         if (cookieToken != formOrHeaderToken) {
-            CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token received - form/header value does not match", csrfCookieHash: Crypto.hash(cookieValue)}));
+            CrossauthLogger.logger.warn(j({message: "Invalid CSRF token received - form/header value does not match", csrfCookieHash: Crypto.hash(cookieValue)}));
             throw new CrossauthError(ErrorCode.InvalidCsrf);
         }
 
@@ -400,7 +400,7 @@ export class SessionCookie {
                     numTries++;
                     sessionId = Crypto.randomValue(SESSIONID_LENGTH);
                     if (numTries > maxTries) {
-                        CrossauthLogger.logger.error(j({msg: "Max attempts exceeded trying to create session ID"}))
+                        CrossauthLogger.logger.error(j({message: "Max attempts exceeded trying to create session ID"}))
                         throw new CrossauthError(ErrorCode.KeyExists)
                     }
                 } else {
@@ -451,7 +451,7 @@ export class SessionCookie {
         } else if (this.secure === false) {
             options.secure = this.secure;
         }
-        CrossauthLogger.logger.debug(j({msg: `Setting session cookie ${this.cookieName} options ${JSON.stringify(options)}`}))
+        CrossauthLogger.logger.debug(j({message: `Setting session cookie ${this.cookieName} options ${JSON.stringify(options)}`}))
         return {
             name : this.cookieName,
             value : signedValue,
@@ -557,18 +557,18 @@ export class SessionCookie {
         key.value = sessionId; // storage only has hashed version
         if (key.expires) {
             if (now > key.expires.getTime()) {
-                CrossauthLogger.logger.warn(j({msg: "Session id in cookie expired in key storage", hashedSessionCookie: Crypto.hash(sessionId)}));
+                CrossauthLogger.logger.warn(j({message: "Session id in cookie expired in key storage", hashedSessionCookie: Crypto.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.Expired);
             }
         }
         if (key.userid && this.idleTimeout > 0 && key.lastactive 
             && now > key.lastactive.getTime() + this.idleTimeout*1000) {
-                CrossauthLogger.logger.warn(j({msg: "Session cookie with expired idle time received", hashedSessionCookie: Crypto.hash(sessionId)}));
+                CrossauthLogger.logger.warn(j({message: "Session cookie with expired idle time received", hashedSessionCookie: Crypto.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.Expired);
         }
         if (this.filterFunction) {
             if (!this.filterFunction(key)) {
-                CrossauthLogger.logger.warn(j({msg: "Filter function on session id in cookie failed", hashedSessionCookie: Crypto.hash(sessionId)}));
+                CrossauthLogger.logger.warn(j({message: "Filter function on session id in cookie failed", hashedSessionCookie: Crypto.hash(sessionId)}));
                 throw new CrossauthError(ErrorCode.InvalidKey);
             }
         }
@@ -698,7 +698,7 @@ export class KnownDeviceCookie {
                     numTries++;
                     value = Crypto.randomValue(KNOWNDEVICE_LENGTH);
                     if (numTries > maxTries) {
-                        CrossauthLogger.logger.error(j({msg: "Max attempts exceeded trying to create session ID"}))
+                        CrossauthLogger.logger.error(j({message: "Max attempts exceeded trying to create session ID"}))
                         throw new CrossauthError(ErrorCode.KeyExists)
                     }
                 } else {
@@ -766,7 +766,7 @@ export class KnownDeviceCookie {
         } else if (this.secure === false) {
             options.secure = this.secure;
         }
-        CrossauthLogger.logger.debug(j({msg: `Setting known device cookie ${this.cookieName} options ${JSON.stringify(options)}`}))
+        CrossauthLogger.logger.debug(j({message: `Setting known device cookie ${this.cookieName} options ${JSON.stringify(options)}`}))
         return {
             name : this.cookieName,
             value : signedValue,
@@ -868,7 +868,7 @@ export class KnownDeviceCookie {
         key.value = value; // storage only has hashed version
         if (key.expires) {
             if (now > key.expires.getTime()) {
-                CrossauthLogger.logger.warn(j({msg: "Known device cookie expired in key storage", hashedKnownDeviceCookie: Crypto.hash(value)}));
+                CrossauthLogger.logger.warn(j({message: "Known device cookie expired in key storage", hashedKnownDeviceCookie: Crypto.hash(value)}));
                 throw new CrossauthError(ErrorCode.Expired);
             }
         }

@@ -307,7 +307,7 @@ export abstract class OAuthClientBase {
      */
     async loadConfig(oidcConfig? : OpenIdConfiguration) : Promise<void> {
         if (oidcConfig) {
-            CrossauthLogger.logger.debug(j({msg: "Reading OIDC config locally"}))
+            CrossauthLogger.logger.debug(j({message: "Reading OIDC config locally"}))
             this.oidcConfig = oidcConfig;
             return;
         }
@@ -316,7 +316,7 @@ export abstract class OAuthClientBase {
         try {
             const url = new URL(
                 this.authServerBaseUrl + "/.well-known/openid-configuration");
-            CrossauthLogger.logger.debug(j({msg: `Fetching OIDC config from ${url}`}))
+            CrossauthLogger.logger.debug(j({message: `Fetching OIDC config from ${url}`}))
             let options : {[key:string]:any} = {headers: this.authServerHeaders};
             if (this.authServerMode) options.mode = this.authServerMode;
             if (this.authServerCredentials) options.credentials = this.authServerCredentials;
@@ -397,7 +397,7 @@ export abstract class OAuthClientBase {
             error?: string,
             error_description?: string
         }> {
-        CrossauthLogger.logger.debug(j({msg: "Starting authorization code flow, scope "+scope}));
+        CrossauthLogger.logger.debug(j({message: "Starting authorization code flow, scope "+scope}));
         if (!this.oidcConfig) await this.loadConfig();      
         if (!this.oidcConfig?.response_types_supported.includes("code")
             || !this.oidcConfig?.response_modes_supported.includes("query")) {
@@ -476,7 +476,7 @@ export abstract class OAuthClientBase {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: "Couldn't get user info", cerr: ce}));
+            CrossauthLogger.logger.error(j({message: "Couldn't get user info", cerr: ce}));
             error = ce.oauthErrorCode;
             error_description = "Couldn't get user info: " + ce.message;
             return {error, error_description};
@@ -499,7 +499,7 @@ export abstract class OAuthClientBase {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: "Couldn't get user info", cerr: ce}));
+            CrossauthLogger.logger.error(j({message: "Couldn't get user info", cerr: ce}));
             error = ce.oauthErrorCode;
             error_description = "Couldn't get user info: " + ce.message;
             return {error, error_description};
@@ -612,7 +612,7 @@ export abstract class OAuthClientBase {
      */
     async clientCredentialsFlow(scope? : string) : 
         Promise<OAuthTokenResponse> {
-        CrossauthLogger.logger.debug(j({msg: "Starting client credentials flow"}));
+        CrossauthLogger.logger.debug(j({message: "Starting client credentials flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("client_credentials")) {
             return {
@@ -681,7 +681,7 @@ export abstract class OAuthClientBase {
         password: string,
         scope?: string) : 
         Promise<OAuthTokenResponse> {
-        CrossauthLogger.logger.debug(j({msg: "Starting password flow"}));
+        CrossauthLogger.logger.debug(j({message: "Starting password flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("password")) {
             return {
@@ -745,7 +745,7 @@ export abstract class OAuthClientBase {
             error?: string,
             error_description?: string
         }> {
-        CrossauthLogger.logger.debug(j({msg: "Getting valid MFA authenticators"}));
+        CrossauthLogger.logger.debug(j({message: "Getting valid MFA authenticators"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-otp") &&
@@ -811,7 +811,7 @@ export abstract class OAuthClientBase {
             challenge_type? : string, 
             error? : string, 
             error_description? : string}> {
-        CrossauthLogger.logger.debug(j({msg: "Making MFA OTB request"}));
+        CrossauthLogger.logger.debug(j({message: "Making MFA OTB request"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
@@ -873,7 +873,7 @@ export abstract class OAuthClientBase {
         token_type?: string, 
         error? : string, 
         error_description? : string}> {
-        CrossauthLogger.logger.debug(j({msg: "Completing MFA OTP request"}));
+        CrossauthLogger.logger.debug(j({message: "Completing MFA OTP request"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
@@ -941,7 +941,7 @@ export abstract class OAuthClientBase {
         binding_method?: string, 
         error? : string, 
         error_description? : string}> {
-        CrossauthLogger.logger.debug(j({msg: "Making MFA OOB request"}));
+        CrossauthLogger.logger.debug(j({message: "Making MFA OOB request"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-otp")) {
@@ -992,7 +992,7 @@ export abstract class OAuthClientBase {
         oobCode: string,
         bindingCode: string,
         scope?: string) : Promise<OAuthTokenResponse> {
-        CrossauthLogger.logger.debug(j({msg: "Completing MFA OOB request"}));
+        CrossauthLogger.logger.debug(j({message: "Completing MFA OOB request"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported
             .includes("http://auth0.com/oauth/grant-type/mfa-oob")) {
@@ -1046,7 +1046,7 @@ export abstract class OAuthClientBase {
     async refreshTokenFlow(refreshToken : string) : 
         //Promise<{[key:string]:any}> {
         Promise<OAuthTokenResponse> {
-        CrossauthLogger.logger.debug(j({msg: "Starting refresh token flow"}));
+        CrossauthLogger.logger.debug(j({message: "Starting refresh token flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("refresh_token")) {
             return {
@@ -1102,7 +1102,7 @@ export abstract class OAuthClientBase {
      * @returns See {@link OAuthDeviceAuthorizationResponse}
      */
     async startDeviceCodeFlow(url : string, scope?: string) : Promise<OAuthDeviceAuthorizationResponse> {
-        CrossauthLogger.logger.debug(j({msg: "Starting device code flow"}));
+        CrossauthLogger.logger.debug(j({message: "Starting device code flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("urn:ietf:params:oauth:grant-type:device_code")) {
             return {
@@ -1141,7 +1141,7 @@ export abstract class OAuthClientBase {
      * @returns See {@link OAuthDeviceResponse}
      */
     async pollDeviceCodeFlow(deviceCode : string) : Promise<OAuthTokenResponse> {
-        CrossauthLogger.logger.debug(j({msg: "Starting device code flow"}));
+        CrossauthLogger.logger.debug(j({message: "Starting device code flow"}));
         if (!this.oidcConfig) await this.loadConfig();
         if (!this.oidcConfig?.grant_types_supported.includes("urn:ietf:params:oauth:grant-type:device_code")) {
             return {
@@ -1209,7 +1209,7 @@ export abstract class OAuthClientBase {
     protected async post(url : string, params : {[key:string]:any}, headers : {[key:string]:any} = {}, credentials? : string, urlEncoded? : boolean) : 
         Promise<{[key:string]:any}>{
         CrossauthLogger.logger.debug(j({
-            msg: "Fetch POST",
+            message: "Fetch POST",
             url: url,
             params: Object.keys(params)
         }));
@@ -1231,7 +1231,7 @@ export abstract class OAuthClientBase {
             contentType = "application/x-www-form-urlencoded";
         }
         if (this.oauthLogFetch) {
-            CrossauthLogger.logger.debug(j({msg: "OAuth fetch", method: "POST", url: url, body: body}))
+            CrossauthLogger.logger.debug(j({message: "OAuth fetch", method: "POST", url: url, body: body}))
         }
 
         let credentialsParanm = {};
@@ -1256,7 +1256,7 @@ export abstract class OAuthClientBase {
             const json = await resp.clone().json();
 
             if (this.oauthLogFetch) {
-                CrossauthLogger.logger.debug(j({msg: "OAuth fetch response", body: JSON.stringify(json)}))
+                CrossauthLogger.logger.debug(j({message: "OAuth fetch response", body: JSON.stringify(json)}))
             }
             await resp.json(); // consume
             return json;
@@ -1279,12 +1279,12 @@ export abstract class OAuthClientBase {
      */
     protected async get(url : string, headers : {[key:string]:any} = {}) : 
         Promise<{[key:string]:any}|{[key:string]:any}[]>{
-        CrossauthLogger.logger.debug(j({msg: "Fetch GET", url: url}));
+        CrossauthLogger.logger.debug(j({message: "Fetch GET", url: url}));
         let options : {[key:string]:any} = {};
         if ( this.authServerCredentials) options.credentials = this.authServerCredentials;
         if ( this.authServerMode) options.mode = this.authServerMode;
         if (this.oauthLogFetch) {
-            CrossauthLogger.logger.debug(j({msg: "OAuth fetch", method: "GET", url: url}))
+            CrossauthLogger.logger.debug(j({message: "OAuth fetch", method: "GET", url: url}))
         }
         const resp = await fetch(url, {
             method: 'GET',
@@ -1296,7 +1296,7 @@ export abstract class OAuthClientBase {
         });
         const json = await resp.json();
         if (this.oauthLogFetch) {
-            CrossauthLogger.logger.debug(j({msg: "OAuth fetch response", body: JSON.stringify(json)}))
+            CrossauthLogger.logger.debug(j({message: "OAuth fetch response", body: JSON.stringify(json)}))
         }
         return json;
     }
@@ -1316,7 +1316,7 @@ export abstract class OAuthClientBase {
             return await this.tokenConsumer.tokenAuthorized(token, "id");
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}))
-            CrossauthLogger.logger.error(j({msg: "Id token invalid", cerr: e}))
+            CrossauthLogger.logger.error(j({message: "Id token invalid", cerr: e}))
             return undefined;
         }
     }
@@ -1336,7 +1336,7 @@ export abstract class OAuthClientBase {
             return await this.tokenConsumer.tokenAuthorized(token, "access", checkAudience);
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}))
-            CrossauthLogger.logger.error(j({msg: "Access token invalid", cerr: e}))
+            CrossauthLogger.logger.error(j({message: "Access token invalid", cerr: e}))
             return undefined;
         }
     }

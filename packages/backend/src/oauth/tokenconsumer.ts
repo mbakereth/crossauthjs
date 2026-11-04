@@ -153,11 +153,11 @@ export class OAuthTokenConsumer extends OAuthTokenConsumerBase {
                     const now = new Date();
                     if (tokenInStorage.expires && 
                         tokenInStorage.expires?.getTime() < now.getTime()) {
-                        CrossauthLogger.logger.error(j({msg: "Access token expired in storage but not in JWT"}));
+                        CrossauthLogger.logger.error(j({message: "Access token expired in storage but not in JWT"}));
                         return undefined;
                     }
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({msg: "Couldn't get token from database - is it valid?", 
+                    CrossauthLogger.logger.warn(j({message: "Couldn't get token from database - is it valid?", 
                         hashedAccessToken: Crypto.hash(payload.jti ? payload.jti : (payload.sid? payload.sid : ""))}))
                     CrossauthLogger.logger.debug(j({err: e}));
                     return undefined;

@@ -200,7 +200,7 @@ export class LdapUserStorage extends UserStorage {
             const sanitizedUsername = LdapUserStorage.sanitizeLdapDnForSearch(username);
             const userDn = [this.ldapUsernameAttribute+"="+sanitizedUsername, this.ldapUserSearchBase].join(",");
             if (!password) throw new CrossauthError(ErrorCode.PasswordInvalid);
-            CrossauthLogger.logger.debug(j({msg: "LDAP search "+userDn}));
+            CrossauthLogger.logger.debug(j({message: "LDAP search "+userDn}));
             ldapClient = await this.ldapBind(userDn, password);
             return await this.searchUser(ldapClient, userDn);
               

@@ -390,12 +390,12 @@ export class FastifyAuthorizationServer {
             this.authServer.validFlows.includes(OAuthFlows.OidcAuthorizationCode)) {
 
             app.get(this.prefix+'authorize', async (request : FastifyRequest<{ Querystring: AuthorizeQueryType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'GET', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
+                CrossauthLogger.logger.info(j({message: "Page visit", method: 'GET', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
                 return await this.authorizeEndpoint(request, reply, request.query);
             });
 
             app.post(this.prefix+'authorize', async (request : FastifyRequest<{ Body: AuthorizeQueryType }>, reply : FastifyReply) =>  {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
+                CrossauthLogger.logger.info(j({message: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
                 return await this.authorizeEndpoint(request, reply, request.body);
             });
 
@@ -403,7 +403,7 @@ export class FastifyAuthorizationServer {
             this.app.post(this.prefix+'userauthorize', 
                 async (request: FastifyRequest<{ Body: UserAuthorizeBodyType }>,
                     reply: FastifyReply) => {
-                CrossauthLogger.logger.info(j({msg: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
+                CrossauthLogger.logger.info(j({message: "Page visit", method: 'POST', url: this.prefix+'authorize', ip: request.ip, user: request.user?.username}));
 
                 // this should not be called if a user is not logged in
                     if (!request.user) return FastifyServer.sendPageError(reply,
@@ -418,7 +418,7 @@ export class FastifyAuthorizationServer {
                     ce = CrossauthError.asCrossauthError(e);
                     ce.message = "Invalid csrf cookie received";
                     CrossauthLogger.logger.error(j({
-                        msg: ce.message,
+                        message: ce.message,
                         hashedCsrfCookie: csrfCookie ? 
                         Crypto.hash(csrfCookie) : undefined,
                         user: request.user?.username,
@@ -475,7 +475,7 @@ export class FastifyAuthorizationServer {
                 async (request: FastifyRequest<{ Body: TokenBodyType }>,
                     reply: FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + 'token',
                         ip: request.ip,
@@ -501,7 +501,7 @@ export class FastifyAuthorizationServer {
                     }
                     if (client_id1 == undefined || client_secret1 == undefined) {
                         CrossauthLogger.logger.warn(j({
-                            msg: "Ignoring malform authenization header " + 
+                            message: "Ignoring malform authenization header " + 
                                 request.headers.authorization}));
                     } else {
                         client_id = client_id1;
@@ -532,7 +532,7 @@ export class FastifyAuthorizationServer {
                         this.csrfTokens.validateDoubleSubmitCsrfToken(csrfCookie, csrfHeader)
                     } catch (e) {
                         CrossauthLogger.logger.debug(j({err: e}));
-                        CrossauthLogger.logger.warn(j({cerr: e, msg: "Invalid csrf token", client_id: request.body.client_id}));
+                        CrossauthLogger.logger.warn(j({cerr: e, message: "Invalid csrf token", client_id: request.body.client_id}));
                         return {
                             error: "access_denied",
                             error_description: "Invalid csrf token",
@@ -587,7 +587,7 @@ export class FastifyAuthorizationServer {
                 async (request : FastifyRequest, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'GET',
                         url: this.prefix + 'mfa/authenticators',
                         ip: request.ip,
@@ -600,7 +600,7 @@ export class FastifyAuthorizationServer {
                 async (request : FastifyRequest, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + 'mfa/authenticators',
                         ip: request.ip,
@@ -613,7 +613,7 @@ export class FastifyAuthorizationServer {
                 async (request : FastifyRequest<{ Body: MfaChallengeBodyType }>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + 'mfa/challenge',
                         ip: request.ip,
@@ -632,7 +632,7 @@ export class FastifyAuthorizationServer {
                 async (request: FastifyRequest<{ Body: DeviceAuthorizationBodyType }>,
                     reply: FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + 'device_authorization',
                         ip: request.ip,
@@ -658,7 +658,7 @@ export class FastifyAuthorizationServer {
                     }
                     if (client_id1 == undefined || client_secret1 == undefined) {
                         CrossauthLogger.logger.warn(j({
-                            msg: "Ignoring malform authenization header " + 
+                            message: "Ignoring malform authenization header " + 
                                 request.headers.authorization}));
                     } else {
                         client_id = client_id1;
@@ -689,7 +689,7 @@ export class FastifyAuthorizationServer {
                 async (request : FastifyRequest<{Querystring: DeviceQueryType}>, 
                     reply : FastifyReply) =>  {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'GET',
                         url: this.prefix + 'device',
                         ip: request.ip,
@@ -704,7 +704,7 @@ export class FastifyAuthorizationServer {
                     async (request : FastifyRequest<{Querystring: DeviceQueryType}>, 
                         reply : FastifyReply) =>  {
                         CrossauthLogger.logger.info(j({
-                            msg: "Page visit",
+                            message: "Page visit",
                             method: 'GET',
                             url: this.prefix + 'device',
                             ip: request.ip,
@@ -727,7 +727,7 @@ export class FastifyAuthorizationServer {
                 async (request: FastifyRequest<{ Body: DeviceBodyType }>,
                     reply: FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + 'device',
                         ip: request.ip,
@@ -743,7 +743,7 @@ export class FastifyAuthorizationServer {
                 async (request: FastifyRequest<{ Body: DeviceBodyType }>,
                     reply: FastifyReply) => {
                     CrossauthLogger.logger.info(j({
-                        msg: "Page visit",
+                        message: "Page visit",
                         method: 'POST',
                         url: this.prefix + 'device',
                         ip: request.ip,
@@ -780,7 +780,7 @@ export class FastifyAuthorizationServer {
             async (request: FastifyRequest,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'getcsrftoken',
                     ip: request.ip,
@@ -801,7 +801,7 @@ export class FastifyAuthorizationServer {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    msg: "getcsrftoken failure",
+                    message: "getcsrftoken failure",
                     user: request.user?.username,
                     hashedCsrfCookie: Crypto.hash(csrfCookieValue.split(".")[0]),
                     errorCode: ce.code,
@@ -827,20 +827,20 @@ export class FastifyAuthorizationServer {
 
         // this just checks they are valid strings and not empty if required, 
         // to avoid XSR vulnerabilities
-        CrossauthLogger.logger.debug(j({msg: "validating authorize parameters"}))
+        CrossauthLogger.logger.debug(j({message: "validating authorize parameters"}))
         let {error_description} = 
             this.authServer.validateAuthorizeParameters(query);
         let ce : CrossauthError|undefined = undefined;
         if (error_description) {
             ce = new CrossauthError(ErrorCode.BadRequest, error_description);
             CrossauthLogger.logger.error(j({
-                msg: "authorize parameter invalid",
+                message: "authorize parameter invalid",
                 cerr: ce,
                 user: request.user?.username
             }));
         }  else {
             CrossauthLogger.logger.error(j({
-                msg: "authorize parameter valid",
+                message: "authorize parameter valid",
                 user: request.user?.username
             }));
 
@@ -867,7 +867,7 @@ export class FastifyAuthorizationServer {
         }
         let hasAllScopes = false;
         CrossauthLogger.logger.debug(j({
-            msg: `Checking scopes have been authorized`,
+            message: `Checking scopes have been authorized`,
             scope: query.scope }))
         if (query.scope) {
             hasAllScopes = await this.authServer.hasAllScopes(query.client_id,
@@ -882,7 +882,7 @@ export class FastifyAuthorizationServer {
         }
         if (hasAllScopes) {
             CrossauthLogger.logger.debug(j({
-                msg: `All scopes authorized`,
+                message: `All scopes authorized`,
                 scope: query.scope
             }))
             // all scopes have been previously authorized 
@@ -900,7 +900,7 @@ export class FastifyAuthorizationServer {
         } else {
             // requesting new scopes - redirect to page to ask user for it
             CrossauthLogger.logger.debug(j({
-                msg: `Not all scopes authorized`,
+                message: `Not all scopes authorized`,
                 scope: query.scope
             }))
             try {
@@ -1016,7 +1016,7 @@ export class FastifyAuthorizationServer {
             const ce = new CrossauthError(ErrorCode.Unauthorized,  
                 "You have not granted access");
             CrossauthLogger.logger.error(j({
-                msg: errorDescription,
+                message: errorDescription,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName
             }));
@@ -1025,7 +1025,7 @@ export class FastifyAuthorizationServer {
                 return reply.redirect(redirect_uri); 
             } catch (e) {
                 CrossauthLogger.logger.error(j({
-                    msg: `Couldn't send error message ${ce.codeName} to ${redirect_uri}}`}));
+                    message: `Couldn't send error message ${ce.codeName} to ${redirect_uri}}`}));
             }
         }
     }
@@ -1120,7 +1120,7 @@ export class FastifyAuthorizationServer {
                 }
             }
             if (!ret.client_id) {
-                CrossauthLogger.logger.error(j({msg: "No client id found for user code", userCodeHash: Crypto.hash(userCode), ip: request.ip, username: request.user?.username}));
+                CrossauthLogger.logger.error(j({message: "No client id found for user code", userCodeHash: Crypto.hash(userCode), ip: request.ip, username: request.user?.username}));
                 return {
                     ok: false,
                     completed: false,
@@ -1130,7 +1130,7 @@ export class FastifyAuthorizationServer {
                 }
             }
             if (ret.error == "access_denied") {
-                CrossauthLogger.logger.error(j({msg: "Incorrect user code given", userCodeHash: Crypto.hash(userCode), ip: request.ip, username: request.user?.username}));
+                CrossauthLogger.logger.error(j({message: "Incorrect user code given", userCodeHash: Crypto.hash(userCode), ip: request.ip, username: request.user?.username}));
                 if (this.authServer.userCodeThrottle > 0) {
                     let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
                     await wait(this.authServer.userCodeThrottle);    
@@ -1143,7 +1143,7 @@ export class FastifyAuthorizationServer {
                     error_description: ret.error_description,
                 }
             } else if (ret.error == "expired_token") {
-                CrossauthLogger.logger.error(j({msg: "Expired user code", userCodeHash: Crypto.hash(userCode), ip: request.ip, username: request.user?.username}));
+                CrossauthLogger.logger.error(j({message: "Expired user code", userCodeHash: Crypto.hash(userCode), ip: request.ip, username: request.user?.username}));
                 return {
                     ok: false,
                     completed: false,
@@ -1189,7 +1189,7 @@ export class FastifyAuthorizationServer {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: ce.message, cerr: ce}));
+            CrossauthLogger.logger.error(j({message: ce.message, cerr: ce}));
             return {
                 ok: false,
                 completed: false,

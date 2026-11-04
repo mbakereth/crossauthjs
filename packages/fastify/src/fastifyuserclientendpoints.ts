@@ -104,7 +104,7 @@ export class FastifyUserClientEndpoints {
             async (request: FastifyRequest<{ Querystring: SelectClientQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'selectclient',
                     ip: request.ip
@@ -174,7 +174,7 @@ export class FastifyUserClientEndpoints {
             async (request: FastifyRequest<{ Querystring: CreateClientQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'createclient',
                     ip: request.ip
@@ -200,7 +200,7 @@ export class FastifyUserClientEndpoints {
             async (request: FastifyRequest<{ Body: CreateClientBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'createclient',
                     ip: request.ip,
@@ -231,7 +231,7 @@ export class FastifyUserClientEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Failed creating OAuth client",
+                        message: "Failed creating OAuth client",
                         user: request.user?.username,
                     
                         errorCodeName: ce.codeName,
@@ -272,7 +272,7 @@ export class FastifyUserClientEndpoints {
             async (request: FastifyRequest<{ Body: CreateClientBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/createclient',
                     ip: request.ip,
@@ -291,7 +291,7 @@ export class FastifyUserClientEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Create client failure",
+                    message: "Create client failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -321,7 +321,7 @@ export class FastifyUserClientEndpoints {
                 reply: FastifyReply)  => {
                 if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'updateclient',
                     ip: request.ip
@@ -392,7 +392,7 @@ export class FastifyUserClientEndpoints {
                 reply: FastifyReply) => {
                 if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateclient unless a user storage is provided ");
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'updateclient',
                     ip: request.ip,
@@ -429,7 +429,7 @@ export class FastifyUserClientEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Failed updating OAuth client",
+                        message: "Failed updating OAuth client",
                         user: request.user?.username,
                     
                         errorCodeName: ce.codeName,
@@ -477,7 +477,7 @@ export class FastifyUserClientEndpoints {
             async (request: FastifyRequest<{Params: UpdateClientParamType, Body: UpdateClientBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'api/updateclient',
                     ip: request.ip,
@@ -501,7 +501,7 @@ export class FastifyUserClientEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Failed updating OAuth client",
+                        message: "Failed updating OAuth client",
                         user: request.user?.username,
                     
                         errorCodeName: ce.codeName,
@@ -533,7 +533,7 @@ export class FastifyUserClientEndpoints {
             async (request: FastifyRequest<{ Params: DeleteClientParamType, Querystring: DeleteClientQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.prefix + 'deleteclient',
                     ip: request.ip
@@ -574,7 +574,7 @@ export class FastifyUserClientEndpoints {
             async (request: FastifyRequest<{ Params: DeleteClientParamType, Body: DeleteClientQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.prefix + 'deleteclient',
                     ip: request.ip,
@@ -600,7 +600,7 @@ export class FastifyUserClientEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Failed deleting OAuth client",
+                        message: "Failed deleting OAuth client",
                         user: request.user?.username,
                     
                         errorCodeName: ce.codeName,
@@ -639,7 +639,7 @@ export class FastifyUserClientEndpoints {
             async (request: FastifyRequest<{ Params: DeleteClientParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.prefix + 'api/deleteclient',
                     ip: request.ip,
@@ -658,7 +658,7 @@ export class FastifyUserClientEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
                     CrossauthLogger.logger.error(j({
-                        msg: "Delete client failure",
+                        message: "Delete client failure",
                         user: request.user?.username,
                         errorCodeName: ce.codeName,
                         errorCode: ce.code

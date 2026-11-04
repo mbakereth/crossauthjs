@@ -126,7 +126,7 @@ export class LocalPasswordAuthenticator extends PasswordAuthenticator {
         if (!params.password) throw new CrossauthError(ErrorCode.PasswordInvalid, "Password not provided");
         if (!secrets.password) throw new CrossauthError(ErrorCode.PasswordInvalid);
         if (!await Crypto.passwordsEqual(params.password, secrets.password, this.secret)) {
-            CrossauthLogger.logger.debug(j({msg: "Invalid password hash", user: user.username}));
+            CrossauthLogger.logger.debug(j({message: "Invalid password hash", user: user.username}));
             throw new CrossauthError(ErrorCode.PasswordInvalid);
         }
         if (user.state == UserState.awaitingTwoFactorSetup) throw new CrossauthError(ErrorCode.TwoFactorIncomplete);

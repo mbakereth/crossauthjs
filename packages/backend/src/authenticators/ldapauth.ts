@@ -63,7 +63,7 @@ export class LdapAuthenticator extends PasswordAuthenticator {
                     localUser = resp.user;
                     localUser.factor1 = this.ldapAutoCreateFactor1;
                 } catch (e) {
-                    CrossauthLogger.logger.debug(j({msg: "Creating user", user: user.username}))
+                    CrossauthLogger.logger.debug(j({message: "Creating user", user: user.username}))
                     localUser = await this.ldapStorage.createUser({factor1: this.ldapAutoCreateFactor1, ...user}, params);
                 }
             } else {

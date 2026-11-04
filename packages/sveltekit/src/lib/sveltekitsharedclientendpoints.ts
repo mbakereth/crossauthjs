@@ -329,7 +329,7 @@ export class SvelteKitSharedClientEndpoints {
                     const str = event.url.searchParams.get("skip");
                     if (str) skip = parseInt(str);
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({cerr: e, msg: "skip parameter is not an integer"}))
+                    CrossauthLogger.logger.warn(j({cerr: e, message: "skip parameter is not an integer"}))
                 }
 
             }
@@ -339,7 +339,7 @@ export class SvelteKitSharedClientEndpoints {
                     const str = event.url.searchParams.get("take");
                     if (str) take = parseInt(str);
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({cerr: e, msg: "take parameter is not an integer"}))
+                    CrossauthLogger.logger.warn(j({cerr: e, message: "take parameter is not an integer"}))
                 }
             }
             if (!take) take = 10;

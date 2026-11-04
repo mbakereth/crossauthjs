@@ -256,7 +256,7 @@ export class TokenEmailer {
         const token = await this.createAndSaveEmailVerificationToken(userid, newEmail);
         const messageId = await this._sendEmailVerificationToken(token, email, extraData);
     
-        CrossauthLogger.logger.info(j({msg: "Sent email verification email", emailMessageId: messageId, email: email}));
+        CrossauthLogger.logger.info(j({message: "Sent email verification email", emailMessageId: messageId, email: email}));
         
     }
 
@@ -429,7 +429,7 @@ export class TokenEmailer {
         }
         const token = await this.createAndSavePasswordResetToken(userid);
         const messageId = await this._sendPasswordResetToken(token, email, extraData);
-        CrossauthLogger.logger.info(j({msg: "Sent password reset email", emailMessageId: messageId, email: email}));
+        CrossauthLogger.logger.info(j({message: "Sent password reset email", emailMessageId: messageId, email: email}));
         
     }
 

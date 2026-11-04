@@ -716,7 +716,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         this.adminClientEndpoints = new SvelteKitAdminClientEndpoints(this, options);
 
         this.sessionHook = async ({ event}/*, response*/) => {
-            CrossauthLogger.logger.debug(j({msg:"Session hook"}));
+            CrossauthLogger.logger.debug(j({message:"Session hook"}));
 
             let headers : Header[] = [];
             let status : number|undefined = undefined;
@@ -733,19 +733,19 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             // we are not checking it matches the CSRF token in the header or
             // body at this stage - just removing invalid cookies
             if (this.enableCsrfProtection) {
-                CrossauthLogger.logger.debug(j({msg: "Getting csrf cookie"}));
+                CrossauthLogger.logger.debug(j({message: "Getting csrf cookie"}));
                 let cookieValue : string|undefined;
                 try {
                     cookieValue = this.getCsrfCookieValue(event);
                     if (cookieValue) this.sessionManager.validateCsrfCookie(cookieValue);
                }
                catch (e) {
-                   CrossauthLogger.logger.warn(j({msg: "Invalid csrf cookie received", cerr: e, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
+                   CrossauthLogger.logger.warn(j({message: "Invalid csrf cookie received", cerr: e, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
                    try {
                        this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, event);
                    } catch (e2) {
                        CrossauthLogger.logger.debug(j({err: e2}));
-                       CrossauthLogger.logger.error(j({cerr: e2, msg: "Couldn't delete CSRF cookie", ip: event.request.referrer, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
+                       CrossauthLogger.logger.error(j({cerr: e2, message: "Couldn't delete CSRF cookie", ip: event.request.referrer, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
                    }
                    cookieValue = undefined;
                    event.locals.csrfToken = undefined;
@@ -755,19 +755,19 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                    // for get methods, create a CSRF token in the request object and response header
                    try {
                        if (!cookieValue) {
-                           CrossauthLogger.logger.debug(j({msg: "Invalid CSRF cookie - recreating"}));
+                           CrossauthLogger.logger.debug(j({message: "Invalid CSRF cookie - recreating"}));
                            const { csrfCookie, csrfFormOrHeaderValue } = await this.sessionManager.createCsrfToken();
                            this.setCsrfCookie(csrfCookie, event );
                            event.locals.csrfToken = csrfFormOrHeaderValue;
                        } else {
-                           CrossauthLogger.logger.debug(j({msg: "Valid CSRF cookie - creating token"}));
+                           CrossauthLogger.logger.debug(j({message: "Valid CSRF cookie - creating token"}));
                            const csrfFormOrHeaderValue = await this.sessionManager.createCsrfFormOrHeaderValue(cookieValue);
                            event.locals.csrfToken = csrfFormOrHeaderValue;
                        }
                        this.setHeader(CSRFHEADER, event.locals.csrfToken, headers);
                        //response.headers.set(CSRFHEADER, event.locals.csrfToken);
                    } catch (e) {
-                       CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                       CrossauthLogger.logger.error(j({message: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                        CrossauthLogger.logger.debug(j({err: e}));
                        this.clearCookie(csrfCookieName, this.sessionManager.csrfCookiePath, event);
                        event.locals.csrfToken = undefined;
@@ -778,7 +778,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                        try {
                            await this.csrfToken(event, headers);
                        } catch (e) {
-                           CrossauthLogger.logger.error(j({msg: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                           CrossauthLogger.logger.error(j({message: "Couldn't create CSRF token", cerr: e, user: event.locals.user?.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                            CrossauthLogger.logger.debug(j({err: e}));
                        }
                    }
@@ -794,7 +794,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             event.locals.user = undefined;
             event.locals.authType = undefined;
             const sessionCookieValue = this.getSessionCookieValue(event);
-            CrossauthLogger.logger.debug(j({msg: "Getting session cookie"}));
+            CrossauthLogger.logger.debug(j({message: "Getting session cookie"}));
             if (sessionCookieValue) {
                 try {
                     const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
@@ -803,7 +803,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     
                     const endpoint = event.url.pathname;
 
-                    CrossauthLogger.logger.debug(j({msg: "Session cookie is for user " + user}));
+                    CrossauthLogger.logger.debug(j({message: "Session cookie is for user " + user}));
                     if (user) { // XXX
                         if (this.sessionManager.loginUserFilter) {
                             const user1 = await this.sessionManager.loginUserFilter(user);
@@ -836,11 +836,11 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                     event.locals.sessionId = sessionId;
                     event.locals.user = user;
                     event.locals.authType = "cookie";
-                    CrossauthLogger.logger.debug(j({msg: "Valid session id", user: user?.username}));
+                    CrossauthLogger.logger.debug(j({message: "Valid session id", user: user?.username}));
 
 
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({msg: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                    CrossauthLogger.logger.warn(j({message: "Invalid session cookie received", hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                     this.clearCookie(sessionCookieName, this.sessionManager.sessionCookiePath, event);
                 }
             }
@@ -849,7 +849,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             } catch (e) {
                 let ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug(j({err: ce}))
-                CrossauthLogger.logger.error(j({msg: "Error in oauth client hook", cerr: ce}))
+                CrossauthLogger.logger.error(j({message: "Error in oauth client hook", cerr: ce}))
             }
 
 
@@ -858,7 +858,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         }
 
         this.twoFAHook = async ({ event }) => {
-            CrossauthLogger.logger.debug(j({msg: "twoFAHook" , username: event.locals.user?.username}) );
+            CrossauthLogger.logger.debug(j({message: "twoFAHook" , username: event.locals.user?.username}) );
 
             if (!this.userStorage) throw this.error(500, "No user storage defined"); // shouldn't happen as checked in SvelteKitServer
             const sessionCookieValue = this.getSessionCookieValue(event);
@@ -878,13 +878,13 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             }
             if (user && sessionCookieValue && user.factor2 != "" && (
                 isFactor2PageProtected || isFactor2ApiProtected)) {
-                    CrossauthLogger.logger.debug(j({msg:"Factor2-protected endpoint visited"}));
+                    CrossauthLogger.logger.debug(j({message:"Factor2-protected endpoint visited"}));
                     if (!(["GET", "OPTIONS", "HEAD"].includes(event.request.method))) {
                     const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                     const sessionData = await this.sessionManager.dataForSessionId(sessionId);
                     if (("pre2fa") in sessionData) {
                         // 2FA has started - validate it
-                        CrossauthLogger.logger.debug(j({msg:"Completing 2FA"}));
+                        CrossauthLogger.logger.debug(j({message:"Completing 2FA"}));
 
                         // get secrets from the request body 
                         const authenticator = this.authenticators[sessionData.pre2fa.factor2];
@@ -905,17 +905,17 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                             error1 = CrossauthError.asCrossauthError(e);
                             CrossauthLogger.logger.debug(j({err: e}));
                             const ce = CrossauthError.asCrossauthError(e);
-                            CrossauthLogger.logger.error(j({msg: error1.message, cerr: e, user: bodyData.get("username"), errorCode: ce.code, errorCodeName: ce.codeName}));
+                            CrossauthLogger.logger.error(j({message: error1.message, cerr: e, user: bodyData.get("username"), errorCode: ce.code, errorCodeName: ce.codeName}));
                         }
                         if (error1) {
                             if (error1.code == ErrorCode.Expired) {
                                 // user will not be able to complete this process - delete 
-                                CrossauthLogger.logger.debug(j({msg:"Error - cancelling 2FA"}));
+                                CrossauthLogger.logger.debug(j({message:"Error - cancelling 2FA"}));
                                 // the 2FA data and start again
                                 try {
                                     await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
                                 } catch (e) {
-                                    CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: user.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                                    CrossauthLogger.logger.error(j({message: "Failed cancelling 2FA", cerr: e, user: user.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                                     CrossauthLogger.logger.debug(j({err:e}))
                                 }
                                 this.error(401, {message: "Sorry, your code has expired"});
@@ -955,7 +955,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                         return {twofa: true, ok: true};
                     } else {
                         // 2FA has not started - start it
-                        CrossauthLogger.logger.debug(j({msg:"Starting 2FA", username: user.username}));
+                        CrossauthLogger.logger.debug(j({message:"Starting 2FA", username: user.username}));
                         if (this.enableCsrfProtection && !event.locals.csrfToken) {
                             const error = new CrossauthError(ErrorCode.Forbidden, "CSRF token missing");
                             return {
@@ -1002,7 +1002,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                         }
                     }
                 } else {
-                    CrossauthLogger.logger.debug(j({msg:"Factor2-protected GET endpoint - cancelling 2FA"}));
+                    CrossauthLogger.logger.debug(j({message:"Factor2-protected GET endpoint - cancelling 2FA"}));
 
                     // if we have a get request to one of the protected urls, cancel any pending 2FA
                     const sessionCookieValue = this.getSessionCookieValue(event);
@@ -1010,12 +1010,12 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                         const sessionId = this.sessionManager.getSessionId(sessionCookieValue);
                         const sessionData = await this.sessionManager.dataForSessionId(sessionId);
                         if (("pre2fa") in sessionData) {
-                            CrossauthLogger.logger.debug(j({msg:"Cancelling 2FA"}));
+                            CrossauthLogger.logger.debug(j({message:"Cancelling 2FA"}));
                             try {
                                 await this.sessionManager.cancelTwoFactorPageVisit(sessionCookieValue);
                             } catch (e) {
                                 CrossauthLogger.logger.debug(j({err:e}));
-                                CrossauthLogger.logger.error(j({msg: "Failed cancelling 2FA", cerr: e, user: user.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
+                                CrossauthLogger.logger.error(j({message: "Failed cancelling 2FA", cerr: e, user: user.username, hashedSessionCookie: this.getHashOfSessionCookie(event)}));
                             }      
                         }
                     }
@@ -1150,7 +1150,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         // if not in header, try in body
         if (!token) {
             if (!event.request?.body) {
-                CrossauthLogger.logger.warn(j({msg: "Received CSRF header but not token", ip: event.request.referrerPolicy, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
+                CrossauthLogger.logger.warn(j({message: "Received CSRF header but not token", ip: event.request.referrerPolicy, hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
                 return;
             }
             const contentType = event.request.headers.get("content-type")
@@ -1171,7 +1171,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
                 this.setHeader(CSRFHEADER, token, headers)
             }
             catch (e) {
-                CrossauthLogger.logger.warn(j({msg: "Invalid CSRF token", hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
+                CrossauthLogger.logger.warn(j({message: "Invalid CSRF token", hashedCsrfCookie: this.getHashOfCsrfCookie(event)}));
                 this.clearCookie(this.sessionManager.csrfCookieName, this.sessionManager.csrfCookiePath, event);
                 event.locals.csrfToken = undefined;
             }
@@ -1243,7 +1243,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce, msg: "Couldn't get pre2fa data from session"}));
+            CrossauthLogger.logger.error(j({cerr: ce, message: "Couldn't get pre2fa data from session"}));
             return false;
         }
 
@@ -1436,7 +1436,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
      */
     async createAnonymousSession(event : RequestEvent, 
         data? : {[key:string]:any}) : Promise<string> {
-        CrossauthLogger.logger.debug(j({msg: "Creating anonympous session ID  "}));
+        CrossauthLogger.logger.debug(j({message: "Creating anonympous session ID  "}));
 
         // get custom fields from implentor-provided function
         const formData = new JsonOrFormData();
@@ -1520,7 +1520,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
             if (data && name in data) return data[name];
         } catch (e) {
             CrossauthLogger.logger.error(j({
-                msg: "Couldn't get " + name + "from session",
+                message: "Couldn't get " + name + "from session",
                 cerr: e
             }))
             CrossauthLogger.logger.debug(j({err: e}));
@@ -1563,7 +1563,7 @@ export class SvelteKitSessionServer implements SvelteKitSessionAdapter {
     async deleteSessionData(event : RequestEvent, 
         name : string) {
         if (!event.locals.sessionId)  {
-            CrossauthLogger.logger.debug(j({msg: `Attempting to delete session data ${name} when no session is present`}))
+            CrossauthLogger.logger.debug(j({message: `Attempting to delete session data ${name} when no session is present`}))
         } else {
             await this.sessionManager.deleteSessionData(event.locals.sessionId, name);
         }

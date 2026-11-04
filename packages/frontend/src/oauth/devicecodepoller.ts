@@ -43,7 +43,7 @@ export class OAuthDeviceCodePoller {
 
         if (!this.pollingActive) {
             this.pollingActive = true;
-            CrossauthLogger.logger.debug(j({msg: "Starting auto refresh"}));
+            CrossauthLogger.logger.debug(j({message: "Starting auto refresh"}));
             await this.poll(deviceCode, interval, pollResultFn);
         }
     }
@@ -51,16 +51,16 @@ export class OAuthDeviceCodePoller {
 
     stopPolling() {
         this.pollingActive = false;
-        CrossauthLogger.logger.debug(j({msg: "Stopping auto refresh"}));
+        CrossauthLogger.logger.debug(j({message: "Stopping auto refresh"}));
     }
 
     private async poll(deviceCode: string, interval : number, pollResultFn : (status: ("complete"|"completeAndRedirect"|"authorization_pending"|"expired_token"|"error"), error? : string, location? : string) => void) {
         if (!deviceCode) {
-            CrossauthLogger.logger.debug(j({msg: "device code poll: no device code provided"}));
+            CrossauthLogger.logger.debug(j({message: "device code poll: no device code provided"}));
             pollResultFn("error",  "Error waiting for authorization");
         } else {
             try {
-                CrossauthLogger.logger.debug(j({msg: "device code poll: poll"}));
+                CrossauthLogger.logger.debug(j({message: "device code poll: poll"}));
                 if (!this.deviceCodePollUrl && this.oauthClient) {
                     if (!this.oauthClient.getOidcConfig()) await this.oauthClient.loadConfig();
                     if (!this.oauthClient.getOidcConfig()?.grant_types_supported
@@ -101,7 +101,7 @@ export class OAuthDeviceCodePoller {
                     pollResultFn("error",  "Received an error from the authorization server");
                 } else {
                     const body = await resp.json();
-                    CrossauthLogger.logger.debug(j({msg:"device code poll: received"+JSON.stringify(body)}));
+                    CrossauthLogger.logger.debug(j({message:"device code poll: received"+JSON.stringify(body)}));
                     if (body.error == "expired_token") {
                         this.pollingActive = false;
                         pollResultFn("expired_token", "Timeout waiting for authorization");
@@ -109,7 +109,7 @@ export class OAuthDeviceCodePoller {
                         if (body.error == "slow_down") interval += 5;
                         let waitseconds = (body.interval ?? interval);
                         let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
-                        CrossauthLogger.logger.debug(j({msg:"device code poll: waiting " + String(waitseconds)+ " seconds"}))
+                        CrossauthLogger.logger.debug(j({message:"device code poll: waiting " + String(waitseconds)+ " seconds"}))
                         await wait(waitseconds*1000);
                         if (this.pollingActive) this.poll(deviceCode, interval, pollResultFn);
                     } else if (body.error) {
@@ -125,7 +125,7 @@ export class OAuthDeviceCodePoller {
                 this.pollingActive = false;
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug(j({err: ce}));
-                CrossauthLogger.logger.error(j({msg: "Polling failed", cerr: ce}));
+                CrossauthLogger.logger.error(j({message: "Polling failed", cerr: ce}));
                 pollResultFn("error", ce.message);
             }
 

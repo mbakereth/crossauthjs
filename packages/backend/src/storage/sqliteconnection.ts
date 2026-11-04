@@ -72,7 +72,7 @@ export class SqliteConnection extends DbConnection {
                     return v;
                 }
             });
-            CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
+            CrossauthLogger.logger.debug(j({message: "Executing query", query: query}));
             let ret :{[key:string]: any}[] = await new Promise((resolve,reject)=>{
                 this.database.all(query, convertedValues,
                     (err:any, rows:{[key:string]: any}[]|undefined)=>{
@@ -104,12 +104,12 @@ export class SqliteConnection extends DbConnection {
     }
 
     release() : void {
-        CrossauthLogger.logger.debug(j({msg: "DB release"}));
+        CrossauthLogger.logger.debug(j({message: "DB release"}));
 
     }
 
     async startTransaction() : Promise<void> {
-        CrossauthLogger.logger.debug(j({msg: "DB start transaction"}));
+        CrossauthLogger.logger.debug(j({message: "DB start transaction"}));
         await new Promise((resolve,reject)=>{
             this.database.run("BEGIN", [],
                 (err:any, rows:{[key:string]: any}[]|undefined)=>{
@@ -121,7 +121,7 @@ export class SqliteConnection extends DbConnection {
     }
 
     async commit() : Promise<void> {
-        CrossauthLogger.logger.debug(j({msg: "DB commit"}));
+        CrossauthLogger.logger.debug(j({message: "DB commit"}));
         await new Promise((resolve,reject)=>{
             this.database.run("COMMIT", [],
                 (err:any, rows:{[key:string]: any}[]|undefined)=>{
@@ -133,7 +133,7 @@ export class SqliteConnection extends DbConnection {
     }
 
     async rollback() : Promise<void> {
-        CrossauthLogger.logger.debug(j({msg: "DB rollback"}));
+        CrossauthLogger.logger.debug(j({message: "DB rollback"}));
         await new Promise((resolve,reject)=>{
             this.database.run("ROLLBACK", [],
                 (err:any, rows:{[key:string]: any}[]|undefined)=>{

@@ -96,6 +96,8 @@ export class CrossauthLogger {
     level : 0 | 1 | 2 | 3 | 4;
     static levelName = ["NONE", "ERROR", "WARN", "INFO", "DEBUG"];
 
+    extraFields: {[key:string]:any} = {}
+
     /**
      * Create a logger with the given level
      * @param level the level to report to
@@ -119,12 +121,16 @@ export class CrossauthLogger {
         this.level = level;
     }
 
+    setExtraFields(extraFields: {[key:string]:any}) {
+        this.extraFields = {...extraFields}
+    }
+
     private log(level: 0 | 1 | 2 | 3 | 4 , output: any) {
         if (level <= this.level) {
             if (typeof output == "string") {
                 console.log("Crossauth " + CrossauthLogger.levelName[level] + " " + new Date().toISOString(), output);
             } else {
-                console.log(JSON.stringify({level: CrossauthLogger.levelName[level], time: new Date().toISOString(), ...output}));
+                console.log(JSON.stringify({...this.extraFields, level: CrossauthLogger.levelName[level], time: new Date().toISOString(), ...output}));
             }
         }
     }

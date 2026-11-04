@@ -478,7 +478,7 @@ export class SvelteKitAuthorizationServer {
                 CrossauthLogger.logger.debug(j({err: ce}));
                 CrossauthLogger.logger.error(j({cerr: ce}));
                         CrossauthLogger.logger.error(j({
-                msg: errorDescription,
+                message: errorDescription,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName
             }));
@@ -488,7 +488,7 @@ export class SvelteKitAuthorizationServer {
             } catch (e) {
                 if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                 CrossauthLogger.logger.error(j({
-                    msg: `Couldn't send error message ${ce.codeName} to ${redirect_uri}}`}));
+                    message: `Couldn't send error message ${ce.codeName} to ${redirect_uri}}`}));
                 return {
                     ok: false,
                     error: "server_error",
@@ -673,7 +673,7 @@ export class SvelteKitAuthorizationServer {
             }
             if (client_id1 == undefined || client_secret1 == undefined) {
                 CrossauthLogger.logger.warn(j({
-                    msg: "Ignoring malform authenization header " + 
+                    message: "Ignoring malform authenization header " + 
                         authorizationHeader}));
             } else {
                 client_id = client_id1;
@@ -700,7 +700,7 @@ export class SvelteKitAuthorizationServer {
                 }
             }
             if (!ret.client_id) {
-                CrossauthLogger.logger.error(j({msg: "No client id found for user code", userCodeHash: Crypto.hash(userCode), ip: event.request.referrer, username: event.locals.user?.username}));
+                CrossauthLogger.logger.error(j({message: "No client id found for user code", userCodeHash: Crypto.hash(userCode), ip: event.request.referrer, username: event.locals.user?.username}));
                 return {
                     ok: false,
                     completed: false,
@@ -710,7 +710,7 @@ export class SvelteKitAuthorizationServer {
                 }
             }
             if (ret.error == "access_denied") {
-                CrossauthLogger.logger.error(j({msg: "Incorrect user code given", userCodeHash: Crypto.hash(userCode), ip: event.request.referrer, username: event.locals.user?.username}));
+                CrossauthLogger.logger.error(j({message: "Incorrect user code given", userCodeHash: Crypto.hash(userCode), ip: event.request.referrer, username: event.locals.user?.username}));
                 if (this.authServer.userCodeThrottle > 0) {
                     let wait = (ms : number) => new Promise(resolve => setTimeout(resolve, ms));
                     await wait(this.authServer.userCodeThrottle);    
@@ -723,7 +723,7 @@ export class SvelteKitAuthorizationServer {
                     error_description: ret.error_description,
                 }
             } else if (ret.error == "expired_token") {
-                CrossauthLogger.logger.error(j({msg: "Expired user code", userCodeHash: Crypto.hash(userCode), ip: event.request.referrer, username: event.locals.user?.username}));
+                CrossauthLogger.logger.error(j({message: "Expired user code", userCodeHash: Crypto.hash(userCode), ip: event.request.referrer, username: event.locals.user?.username}));
                 return {
                     ok: false,
                     completed: false,
@@ -769,7 +769,7 @@ export class SvelteKitAuthorizationServer {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: ce.message, cerr: ce}));
+            CrossauthLogger.logger.error(j({message: ce.message, cerr: ce}));
             return {
                 ok: false,
                 completed: false,
@@ -865,7 +865,7 @@ export class SvelteKitAuthorizationServer {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    msg: "getcsrftoken failure",
+                    message: "getcsrftoken failure",
                     user: event.locals.user?.username,
                     hashedCsrfCookie: Crypto.hash(csrfCookieValue.split(".")[0]),
                     error: ce.code,
@@ -978,7 +978,7 @@ export class SvelteKitAuthorizationServer {
                 // construct a url to call the /authorize endpoint on the upstream auth server
                 const resp = await upstreamClient.startAuthorizationCodeFlow(state, { scope: query.scope, codeChallenge: query.code_challenge, pkce: query.code_challenge!=undefined});
                 if (resp.error) {
-                    CrossauthLogger.logger.error(j({msg: "Failed starting upstream authorization code flow: " + (resp.error_description??"")}))
+                    CrossauthLogger.logger.error(j({message: "Failed starting upstream authorization code flow: " + (resp.error_description??"")}))
                     return {
                         ok: false,
                         error: resp.error,
@@ -988,7 +988,7 @@ export class SvelteKitAuthorizationServer {
                     // create an authorization code
                     const codeResp = await this.authServer.getAuthorizationCode(client, query.redirect_uri, scopes, state, query.code_challenge, query.code_challenge_method);
                     if (!codeResp.code) {
-                        CrossauthLogger.logger.error(j({msg: "Error creating authorization code: " + (codeResp.error_description??"")}))
+                        CrossauthLogger.logger.error(j({message: "Error creating authorization code: " + (codeResp.error_description??"")}))
                         return { 
                             ok: false,
                             error: "server_error", 
@@ -1017,12 +1017,12 @@ export class SvelteKitAuthorizationServer {
                         }
     
                     }
-                    CrossauthLogger.logger.debug(j({msg: "Saving data for call to upstream client"}))
+                    CrossauthLogger.logger.debug(j({message: "Saving data for call to upstream client"}))
                     const sessionDataName = upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
                     await this.storeSessionData(event, sessionData, sessionDataName);
                     let url = resp.url;
-                    CrossauthLogger.logger.debug(j({msg: "upstream url " + url}))
-                    //CrossauthLogger.logger.debug(j({msg: "upstream base url " + this.authServer.upstreamAuthServerBaseUrl}))
+                    CrossauthLogger.logger.debug(j({message: "upstream url " + url}))
+                    //CrossauthLogger.logger.debug(j({message: "upstream base url " + this.authServer.upstreamAuthServerBaseUrl}))
 
                     // Redirect to the /authorize endpoint on the upstream server
                     throw this.redirect(302, url);
@@ -1146,8 +1146,8 @@ export class SvelteKitAuthorizationServer {
                         const sessionDataName = upstreamClientOptions.sessionDataName ?? DEFAULT_UPSTREAM_SESSION_DATA_NAME;
                         await this.storeSessionData(event, sessionData, sessionDataName);
                         let url = resp.url;
-                        CrossauthLogger.logger.debug(j({msg: "upstream url " + url}))
-                        //CrossauthLogger.logger.debug(j({msg: "upstream base url " + this.authServer.upstreamAuthServerBaseUrl}))
+                        CrossauthLogger.logger.debug(j({message: "upstream url " + url}))
+                        //CrossauthLogger.logger.debug(j({message: "upstream base url " + this.authServer.upstreamAuthServerBaseUrl}))
                         
                         throw this.redirect(302, url);
                     }
@@ -1171,20 +1171,20 @@ export class SvelteKitAuthorizationServer {
 
             // this just checks they are valid strings and not empty if required, 
             // to avoid XSR vulnerabilities
-            CrossauthLogger.logger.debug(j({msg: "validating authorize parameters"}))
+            CrossauthLogger.logger.debug(j({message: "validating authorize parameters"}))
             let {error_description} = 
                 this.authServer.validateAuthorizeParameters(query);
             let ce : CrossauthError|undefined = undefined;
             if (error_description) {
                 ce = new CrossauthError(ErrorCode.BadRequest, error_description);
                 CrossauthLogger.logger.error(j({
-                    msg: "authorize parameter invalid",
+                    message: "authorize parameter invalid",
                     cerr: ce,
                     user: event.locals.user?.username
                 }));
             }  else {
                 CrossauthLogger.logger.error(j({
-                    msg: "authorize parameter invalid",
+                    message: "authorize parameter invalid",
                     user: event.locals.user?.username
                 }));
 
@@ -1202,7 +1202,7 @@ export class SvelteKitAuthorizationServer {
 
             let hasAllScopes = false;
             CrossauthLogger.logger.debug(j({
-                msg: `Checking scopes have been authorized`,
+                message: `Checking scopes have been authorized`,
                 scope: query.scope }))
             if (query.scope) {
                 hasAllScopes = await this.authServer.hasAllScopes(query.client_id,
@@ -1217,7 +1217,7 @@ export class SvelteKitAuthorizationServer {
             }
             if (hasAllScopes) {
                 CrossauthLogger.logger.debug(j({
-                    msg: `All scopes authorized`,
+                    message: `All scopes authorized`,
                     scope: query.scope
                 }))
                 // all scopes have been previously authorized 
@@ -1242,7 +1242,7 @@ export class SvelteKitAuthorizationServer {
                 // requesting new scopes - signal caller to show authorization
                 // page to user
                 CrossauthLogger.logger.debug(j({
-                    msg: `Not all scopes authorized`,
+                    message: `Not all scopes authorized`,
                     scope: query.scope
                 }))
                 try {
@@ -1483,7 +1483,7 @@ export class SvelteKitAuthorizationServer {
                         this.csrfTokens.validateDoubleSubmitCsrfToken(csrfCookie, csrfHeader)
                     } catch (e) {
                         CrossauthLogger.logger.debug(j({err: e}));
-                        CrossauthLogger.logger.warn(j({cerr: e, msg: "Invalid csrf token", client_id: formData.client_id}));
+                        CrossauthLogger.logger.warn(j({cerr: e, message: "Invalid csrf token", client_id: formData.client_id}));
                         return json({
                             ok: false,
                             error: "access_denied",
@@ -1547,14 +1547,14 @@ export class SvelteKitAuthorizationServer {
             let oauthData : {[key:string]:any} = {};
             try {
                 if (!this.authServer.upstreamClientOptions && !this.authServer.upstreamClientOptionss) {
-                    CrossauthLogger.logger.error(j({msg: "Cannot call upstreamRedirectUriEndpoint if upstreamClient not defined"}))
+                    CrossauthLogger.logger.error(j({message: "Cannot call upstreamRedirectUriEndpoint if upstreamClient not defined"}))
                     return json({
                         ok: false,
                         error: "server_error",
                         error_description: "Cannot call upstreamRedirectUriEndpoint if upstreamClient not defined"
                     });
                 }
-                CrossauthLogger.logger.debug(j({msg: "upstreamRedirectUriEndpoint", upstream}))
+                CrossauthLogger.logger.debug(j({message: "upstreamRedirectUriEndpoint", upstream}))
 
                 // find which upstream client was used
                 let upstreamClient : OAuthClientBackend|undefined = undefined;
@@ -1564,14 +1564,14 @@ export class SvelteKitAuthorizationServer {
                     upstreamClientOptions = this.authServer.upstreamClientOptions
                 } else if (this.authServer.upstreamClients && this.authServer.upstreamClientOptionss) {
                     if (!upstream) {
-                        CrossauthLogger.logger.warn(j({msg: "Have multiple upstream clients but upstream redirect uri not passed the upstream identifier"}));
+                        CrossauthLogger.logger.warn(j({message: "Have multiple upstream clients but upstream redirect uri not passed the upstream identifier"}));
                         return this.redirectError(oauthData.orig_redirect_uri, "server_error",  "Have multiple upstream clients but upstream redirect uri not passed the upstream identifier")
                     }
                     upstreamClient = this.authServer.upstreamClients[upstream]
                     upstreamClientOptions = this.authServer.upstreamClientOptionss[upstream]
                 }
                 if (!upstreamClient || !upstreamClientOptions) {
-                    CrossauthLogger.logger.error(j({msg: "upstreamRedirectUri endpoint called but no upstreamClient or merge function set"}));
+                    CrossauthLogger.logger.error(j({message: "upstreamRedirectUri endpoint called but no upstreamClient or merge function set"}));
                     return this.redirectError(oauthData.orig_redirect_uri, "server_error",  "upstreamRedirectUri endpoint called but no upstreamClient or merge function set")
                 } 
 
@@ -1590,7 +1590,7 @@ export class SvelteKitAuthorizationServer {
                     upstreamClient = this.authServer.upstreamClients[oauthData.upstream_label]
                 }
                 if (oauthData?.state != state) {
-                    CrossauthLogger.logger.error(j({msg: "State does not match"}))
+                    CrossauthLogger.logger.error(j({message: "State does not match"}))
                     throw new CrossauthError(ErrorCode.Unauthorized, "State does not match");
                 }
 
@@ -1602,7 +1602,7 @@ export class SvelteKitAuthorizationServer {
                     error,
                     errorDescription: error_description});
                     if (resp.error) {
-                    CrossauthLogger.logger.error(j({msg: resp.error_description}));
+                    CrossauthLogger.logger.error(j({message: resp.error_description}));
                     return this.redirectError(oauthData.orig_redirect_uri, resp.error, resp.error_description ?? "unknown error")
                 }
 
@@ -1614,7 +1614,7 @@ export class SvelteKitAuthorizationServer {
                     if (resp1.error) return json(resp1);
                     else if (resp1.payload) access_token =resp1.payload;
                     else {
-                        CrossauthLogger.logger.error(j({msg: "No error or access payload received when querying access token"}));
+                        CrossauthLogger.logger.error(j({message: "No error or access payload received when querying access token"}));
                         return this.redirectError(oauthData.orig_redirect_uri, "server_error", "No error or access payload received when querying access token")
                     }   
                 }
@@ -1662,7 +1662,7 @@ export class SvelteKitAuthorizationServer {
                             oauthData.orig_state
                         ));                        
                 } else {
-                    CrossauthLogger.logger.error(j({msg: mergeResponse.error_description ?? "Error merging tokens"}));
+                    CrossauthLogger.logger.error(j({message: mergeResponse.error_description ?? "Error merging tokens"}));
                     return this.redirectError(oauthData.orig_redirect_uri, mergeResponse.error ?? "server_error", mergeResponse.error_description ?? "Error merging tokens")
                 }
 

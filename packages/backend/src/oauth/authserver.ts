@@ -704,7 +704,7 @@ export class OAuthAuthorizationServer {
                 const updatedScopes = 
                     [...new Set([...existingScopes, ...newScopes])];
                 CrossauthLogger.logger.debug(j({
-                    msg: "Updating authorizations for " + client_id + " to " + updatedScopes}));
+                    message: "Updating authorizations for " + client_id + " to " + updatedScopes}));
                 await this.authStorage.updateAuthorizations(client_id,
                     user?.id ?? null,
                     updatedScopes);
@@ -1024,10 +1024,10 @@ export class OAuthAuthorizationServer {
 
             if (refreshToken) {
                 // we have at least one refresh token
-                CrossauthLogger.logger.debug(j({msg: "token endpoint: refresh token flow"}))
+                CrossauthLogger.logger.debug(j({message: "token endpoint: refresh token flow"}))
 
                 if (refreshData && upstreamRefreshToken && upstreamClient && upstreamClientOptions) { 
-                    CrossauthLogger.logger.debug(j({msg: "token endpoint: refreshing locally and upstream"}))
+                    CrossauthLogger.logger.debug(j({message: "token endpoint: refreshing locally and upstream"}))
 
                     // we have both.  Refresh upstream and make new tokens, merging
                     // user data, create a new refresh token and store it
@@ -1040,7 +1040,7 @@ export class OAuthAuthorizationServer {
                         } catch (e) {
                             CrossauthLogger.logger.error(j({
                                 err: e,
-                                msg: "Couldn't get user for refresh token.  Doesn't exist?",
+                                message: "Couldn't get user for refresh token.  Doesn't exist?",
                                 username: refreshData.username
                             }))
                             return {
@@ -1058,11 +1058,11 @@ export class OAuthAuthorizationServer {
                     } catch (e) {
                         const ce = CrossauthError.asCrossauthError(e);
                         CrossauthLogger.logger.debug(j({err: e}));
-                        CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
+                        CrossauthLogger.logger.warn(j({message: "Cannot delete refresh token", cerr: ce}))
                     }
 
                     // refresh upstream token
-                    CrossauthLogger.logger.debug(j({msg: "token endpoint: refresh token flow: refreshing from upstream client"}))
+                    CrossauthLogger.logger.debug(j({message: "token endpoint: refresh token flow: refreshing from upstream client"}))
                     let upstream_resp = await upstreamClient.refreshTokenFlow(upstreamRefreshToken);
                     if (!upstream_resp.access_token) {
                         return {
@@ -1116,7 +1116,7 @@ export class OAuthAuthorizationServer {
                     }
 
                     } else {
-                        CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
+                        CrossauthLogger.logger.warn(j({message: mergeResponse.error_description}));
                         return {
                             error: mergeResponse.error,
                             error_description: mergeResponse.error_description
@@ -1124,7 +1124,7 @@ export class OAuthAuthorizationServer {
                     }                            
                 } else if (upstreamRefreshToken && upstreamClient && upstreamClientOptions) {
 
-                    CrossauthLogger.logger.debug(j({msg: "token endpoint: refreshing upstream"}))
+                    CrossauthLogger.logger.debug(j({message: "token endpoint: refreshing upstream"}))
                     // we only have upstreamn token.  We refresh upstream but don't
                     // create one ourselves or store data locally.  Merge received
                     // token with local User data
@@ -1158,7 +1158,7 @@ export class OAuthAuthorizationServer {
                         upstream_resp.id_payload = ret.id_payload;
                         return upstream_resp;
                     } else {
-                        CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
+                        CrossauthLogger.logger.warn(j({message: mergeResponse.error_description}));
                         return {
                             error: mergeResponse.error,
                             error_description: mergeResponse.error_description
@@ -1167,7 +1167,7 @@ export class OAuthAuthorizationServer {
 
                 } else {
 
-                    CrossauthLogger.logger.debug(j({msg: "token endpoint: refreshing locally"}))
+                    CrossauthLogger.logger.debug(j({message: "token endpoint: refreshing locally"}))
                     // we have only our own refresh token.  
                     refreshData = await this.getRefreshTokenData(refreshToken);
                     if (!refreshToken || !refreshData || !this.userStorage) {
@@ -1187,7 +1187,7 @@ export class OAuthAuthorizationServer {
                         } catch (e) {
                             CrossauthLogger.logger.error(j({
                                 err: e,
-                                msg: "Couldn't get user for refresh token.  Doesn't exist?",
+                                message: "Couldn't get user for refresh token.  Doesn't exist?",
                                 username: refreshData.username
                             }))
                             return {
@@ -1203,7 +1203,7 @@ export class OAuthAuthorizationServer {
                     } catch (e) {
                         const ce = CrossauthError.asCrossauthError(e);
                         CrossauthLogger.logger.debug(j({err: e}));
-                        CrossauthLogger.logger.warn(j({msg: "Cannot delete refresh token", cerr: ce}))
+                        CrossauthLogger.logger.warn(j({message: "Cannot delete refresh token", cerr: ce}))
                     }
 
                     if (upstreamAccessToken && upstreamClientOptions && upstreamClient) {
@@ -1247,7 +1247,7 @@ export class OAuthAuthorizationServer {
                                 
                             }
                         } else {
-                            CrossauthLogger.logger.warn(j({msg: mergeResponse.error_description}));
+                            CrossauthLogger.logger.warn(j({message: mergeResponse.error_description}));
                             return {
                                 error: mergeResponse.error,
                                 error_description: mergeResponse.error_description
@@ -1438,7 +1438,7 @@ export class OAuthAuthorizationServer {
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.warn(j({
                     cerr: e,
-                    msg: "Couldn't delete mfa token",
+                    message: "Couldn't delete mfa token",
                     hashedMfaToken: mfa.key.value
                 }))
             }
@@ -1528,7 +1528,7 @@ export class OAuthAuthorizationServer {
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.warn(j({
                     cerr: e,
-                    msg: "Couldn't delete mfa token",
+                    message: "Couldn't delete mfa token",
                     hashedMfaToken: mfa.key.value
                 }))
             }
@@ -1556,7 +1556,7 @@ export class OAuthAuthorizationServer {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug(j({err: ce}));
-                CrossauthLogger.logger.error(j({msg: "Couldn't get device code", cerr: ce}));
+                CrossauthLogger.logger.error(j({message: "Couldn't get device code", cerr: ce}));
                 return {
                     error: "accerss_denied",
                     error_description: "Invalid device code"
@@ -1594,7 +1594,7 @@ export class OAuthAuthorizationServer {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug(j({err: ce}));
-                CrossauthLogger.logger.error(j({msg: "Couldn't get device code", cerr: ce}));
+                CrossauthLogger.logger.error(j({message: "Couldn't get device code", cerr: ce}));
                 await this.deleteDeviceCode(deviceCode);
                 return {
                     error: "accerss_denied",
@@ -1620,7 +1620,7 @@ export class OAuthAuthorizationServer {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: "Couldn't delete device code", cerr: ce}));
+            CrossauthLogger.logger.error(j({message: "Couldn't delete device code", cerr: ce}));
         }
     }
 
@@ -1630,7 +1630,7 @@ export class OAuthAuthorizationServer {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: "Couldn't delete user code", cerr: ce}));
+            CrossauthLogger.logger.error(j({message: "Couldn't delete user code", cerr: ce}));
         }
     }
 
@@ -1718,7 +1718,7 @@ export class OAuthAuthorizationServer {
                     JSON.stringify({scope: scope, client_id: client_id}));
                 ok = true;
             } catch (e) {
-                CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
+                CrossauthLogger.logger.debug(j({message: `Attempt number${i} at creating a unique authozation code failed`}));
             }
         }
         if (!ok || !deviceCode) {
@@ -1741,7 +1741,7 @@ export class OAuthAuthorizationServer {
                     JSON.stringify({deviceCode: deviceCode}));
                 ok = true;
             } catch (e) {
-                CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
+                CrossauthLogger.logger.debug(j({message: `Attempt number${i} at creating a unique authozation code failed`}));
             }
         }
         if (!ok || !userCode) {
@@ -1805,7 +1805,7 @@ export class OAuthAuthorizationServer {
 
         if (!userCodeData.deviceCode) {
             // there is no device code in the user code data - delete
-            CrossauthLogger.logger.error(j({msg: "No device code for user code", userCodeHash: Crypto.hash(userCode)}));
+            CrossauthLogger.logger.error(j({message: "No device code for user code", userCodeHash: Crypto.hash(userCode)}));
             await this.deleteUserCode(userCode);
             return {
                 ok: false,
@@ -1821,7 +1821,7 @@ export class OAuthAuthorizationServer {
             // there is an invalid device code in the user code data - delete
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: "Invalid device code for user code", 
+            CrossauthLogger.logger.error(j({message: "Invalid device code for user code", 
                 userCodeHash: Crypto.hash(userCode), 
                 deviceCodeHash: Crypto.hash(userCodeData.deviceCode), 
                 cerr: ce}));
@@ -1883,7 +1883,7 @@ export class OAuthAuthorizationServer {
         // but tell the caller to request authority
         let hasAllScopes = false;
         CrossauthLogger.logger.debug(j({
-            msg: `Checking scopes have been authorized`,
+            message: `Checking scopes have been authorized`,
             scope: scope }))
         if (scope) {
             hasAllScopes = await this.hasAllScopes(client_id,
@@ -1903,7 +1903,7 @@ export class OAuthAuthorizationServer {
                 // error updating device code data, so delete both device code and user code
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.debug(j({err: ce}));
-                CrossauthLogger.logger.warn(j({msg: "Couldn't update user id on user code entry - deleting", cerr: ce}));
+                CrossauthLogger.logger.warn(j({message: "Couldn't update user id on user code entry - deleting", cerr: ce}));
                 await this.deleteUserCode(userCode);
                 await this.deleteDeviceCode(userCodeData.deviceCode);
                 return {
@@ -1930,7 +1930,7 @@ export class OAuthAuthorizationServer {
             // error updating device code data, so delete both device code and user code
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.warn(j({msg: "Couldn't update status on user code entry - deleting", cerr: ce}));
+            CrossauthLogger.logger.warn(j({message: "Couldn't update status on user code entry - deleting", cerr: ce}));
             await this.deleteUserCode(userCode);
             await this.deleteDeviceCode(userCodeData.deviceCode);
             return {
@@ -1974,7 +1974,7 @@ export class OAuthAuthorizationServer {
 
         if (!userCodeData.deviceCode) {
             // there is no device code in the user code data - delete
-            CrossauthLogger.logger.error(j({msg: "No device code for user code", userCodeHash: Crypto.hash(userCode)}));
+            CrossauthLogger.logger.error(j({message: "No device code for user code", userCodeHash: Crypto.hash(userCode)}));
             await this.deleteUserCode(userCode);
             return {
                 ok: false,
@@ -1990,7 +1990,7 @@ export class OAuthAuthorizationServer {
             // there is an invalid device code in the user code data - delete
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({msg: "Invalid device code for user code", 
+            CrossauthLogger.logger.error(j({message: "Invalid device code for user code", 
                 userCodeHash: Crypto.hash(userCode), 
                 deviceCodeHash: Crypto.hash(userCodeData.deviceCode), 
                 cerr: ce}));
@@ -2026,7 +2026,7 @@ export class OAuthAuthorizationServer {
             // error updating device code data, so delete both device code and user code
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.warn(j({msg: "Couldn't update status on user code entry - deleting", cerr: ce}));
+            CrossauthLogger.logger.warn(j({message: "Couldn't update status on user code entry - deleting", cerr: ce}));
             await this.deleteUserCode(userCode);
             await this.deleteDeviceCode(userCodeData.deviceCode);
             return {
@@ -2071,7 +2071,7 @@ export class OAuthAuthorizationServer {
             CrossauthLogger.logger.debug(j({err: ce}));
             CrossauthLogger.logger.error(j({
                 cerr: ce,
-                msg: "Couldn't save MFA token",
+                message: "Couldn't save MFA token",
             }));
         }
         return {
@@ -2112,7 +2112,7 @@ export class OAuthAuthorizationServer {
             } catch (e) {
                 CrossauthLogger.logger.debug(j({err: e}));
                 CrossauthLogger.logger.error(j({cerr: e, 
-                    msg: "Invalid MFA token"}));
+                    message: "Invalid MFA token"}));
                 return {
                     error: "access_denied",
                     error_description: "Invalid MFA token",
@@ -2436,7 +2436,7 @@ export class OAuthAuthorizationServer {
                     authzDataString);
                 success = true;
             } catch (e) {
-                CrossauthLogger.logger.debug(j({msg: `Attempt number${i} at creating a unique authozation code failed`}));
+                CrossauthLogger.logger.debug(j({message: `Attempt number${i} at creating a unique authozation code failed`}));
             }
         }
         if (!success) {
@@ -2468,7 +2468,7 @@ export class OAuthAuthorizationServer {
         } catch (e) {
             CrossauthLogger.logger.warn(j({
                 err: e,
-                msg: "Couldn't delete authorization code from storage",
+                message: "Couldn't delete authorization code from storage",
             }));
         }
 }
@@ -2549,7 +2549,7 @@ export class OAuthAuthorizationServer {
             } catch (e) {
                 CrossauthLogger.logger.warn(j({
                     err: e,
-                    msg: "Couldn't delete authorization code from storatge",
+                    message: "Couldn't delete authorization code from storatge",
                     client_id: client?.client_id
                 }));
             }

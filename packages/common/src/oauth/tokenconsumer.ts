@@ -217,13 +217,13 @@ export abstract class OAuthTokenConsumerBase {
                     try {
                         let kid : string = "_default";
                         let thisKey = {...body.keys[i]}
-                        CrossauthLogger.logger.debug(j({msg: "Received Key", ...thisKey}))
+                        CrossauthLogger.logger.debug(j({message: "Received Key", ...thisKey}))
                         if ("kid" in thisKey && typeof (thisKey.kid) == "string") kid = String(thisKey.kid);
                         if (thisKey && !thisKey.alg && !thisKey.jwk_alg && defaultAlg) {
                             if (defaultAlg.startsWith("RS") && thisKey.kty == "RSA") {
                                 thisKey.alg = defaultAlg;    
                             } else {
-                                CrossauthLogger.logger.debug(j({msg: "Skipping key with " + thisKey.kty}))
+                                CrossauthLogger.logger.debug(j({message: "Skipping key with " + thisKey.kty}))
                                 continue; // cannot load a key if it doesn't have alg and it doesn't match what is in the token
                             }
                         }
@@ -263,19 +263,19 @@ export abstract class OAuthTokenConsumerBase {
         const decoded = await this.validateToken(token);
         if (!decoded) return undefined;
         /*if (decoded.type != tokenType) {
-            CrossauthLogger.logger.error(j({msg: tokenType + " expected but got " + decoded.type}));
+            CrossauthLogger.logger.error(j({message: tokenType + " expected but got " + decoded.type}));
             return undefined;
         }*/
         if (decoded.iss != this.authServerBaseUrl) {
             const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
-            CrossauthLogger.logger.error(j({msg: `Invalid issuer ${decoded.iss} ${tokenType} token`, hashedAccessToken: await this.hash(jti)}));
+            CrossauthLogger.logger.error(j({message: `Invalid issuer ${decoded.iss} ${tokenType} token`, hashedAccessToken: await this.hash(jti)}));
             return undefined;
         }
         if (checkAudience != false && decoded.aud) {
             const jti = decoded.jti ? decoded.jti : (decoded.sid ? decoded.sid : "");
             if ((Array.isArray(decoded.aud) && !decoded.aud.includes(this.audience)) ||
                 (!Array.isArray(decoded.aud) && decoded.aud != this.audience)) {
-                    CrossauthLogger.logger.error(j({msg: `Invalid audience ${decoded.aud} in ${tokenType} token`, hashedAccessToken: await this.hash(jti)}));
+                    CrossauthLogger.logger.error(j({message: `Invalid audience ${decoded.aud} in ${tokenType} token`, hashedAccessToken: await this.hash(jti)}));
                     return undefined;    
                 }
         }
@@ -293,7 +293,7 @@ export abstract class OAuthTokenConsumerBase {
             kid = header.kid;
             //defaultAlg = header.alg;
         } catch {
-            CrossauthLogger.logger.warn(j({msg: "Invalid access token format"}))
+            CrossauthLogger.logger.warn(j({message: "Invalid access token format"}))
             return undefined;
         }
         // find key matching header KID and validate signature (and expiry)
@@ -306,21 +306,21 @@ export abstract class OAuthTokenConsumerBase {
         }
         if (!key && "_default" in this.keys) key = this.keys["_default"];
         if (!key) {
-            CrossauthLogger.logger.warn(j({msg: "No matching keys found for access token"}));
+            CrossauthLogger.logger.warn(j({message: "No matching keys found for access token"}));
             return undefined;
         }
         try {
             const { payload } = await jose.compactVerify(accessToken, key);
             const decodedPayload = JSON.parse(new TextDecoder().decode(payload));
             if (decodedPayload.exp*1000 < Date.now()+this.clockTolerance) {
-                CrossauthLogger.logger.warn(j({msg: "Access token has expired"}));
+                CrossauthLogger.logger.warn(j({message: "Access token has expired"}));
                 return undefined;     
             }
             return decodedPayload;
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e)
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.warn(j({msg: "Access token did not validate", cerr: ce}));
+            CrossauthLogger.logger.warn(j({message: "Access token did not validate", cerr: ce}));
             return undefined;
         }
     }

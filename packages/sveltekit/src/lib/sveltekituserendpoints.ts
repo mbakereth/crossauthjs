@@ -552,12 +552,13 @@ export class SvelteKitUserEndpoints {
     async login(event : RequestEvent) : Promise<LoginActionData> {
 
         let formData : {[key:string]:string}|undefined = undefined;
+        let username: string = "";
         try {
             // get form data
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
-            const username = data.get('username') ?? "";
+            username = data.get('username') ?? "";
             const persist = data.getAsBoolean('persist') ?? false;
             if (formData.next && formData.next.includes("/__data.json")) {
                 formData.next = formData.next.substring(0, formData.next.indexOf("/__data.json"));
@@ -581,14 +582,14 @@ export class SvelteKitUserEndpoints {
                 await this.sessionServer.sessionManager.login(username, data.toObject(), extraFields, persist);
             // Set the new cookies in the reply
             CrossauthLogger.logger.debug(j({
-                msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+                message: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
                 user: username
             }));
             event.cookies.set(sessionCookie.name,
                 sessionCookie.value,
                 toCookieSerializeOptions(sessionCookie.options));
             CrossauthLogger.logger.debug(j({
-                msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+                message: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
                 user: username
             }));
             if (this.sessionServer.enableCsrfProtection) {
@@ -605,7 +606,7 @@ export class SvelteKitUserEndpoints {
                     await this.sessionServer.sessionManager.deleteSession(oldSessionId);
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({
-                        msg: "Couldn't delete session ID from database",
+                        message: "Couldn't delete session ID from database",
                         hashOfSessionId: this.sessionServer.getHashOfSessionId(event)
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
@@ -635,6 +636,7 @@ export class SvelteKitUserEndpoints {
                 if (!user.factor2 || user.factor2 == "")
                     event.locals.user = user;
             }
+            CrossauthLogger.logger.info(j({message: "Login successful", user: user.username, userid: user.id}))
             return { 
                 user, 
                 formData, 
@@ -645,9 +647,16 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             // hack - let Sveltekit redirect through
             if (typeof e == "object" && e != null && "status" in e && "location" in e) throw e
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
+            let ce = CrossauthError.asCrossauthError(e, "Login unsuccessful");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            CrossauthLogger.logger.error(j({
+                message: "Login unsuccessful",
+                user: username,
+                errorMessage: ce.message,
+                errorMessages: ce.messages,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
+            }));
             return {
                 error: ce.message,
                 ok: false,
@@ -679,14 +688,14 @@ export class SvelteKitUserEndpoints {
 
         // set the cookies
         CrossauthLogger.logger.debug(j({
-            msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            message: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
             user: user.username
         }));
         event.cookies.set(sessionCookie.name,
             sessionCookie.value,
             toCookieSerializeOptions(sessionCookie.options));
         CrossauthLogger.logger.debug(j({
-            msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+            message: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
             user: user.username
         }));
         if (this.sessionServer.enableCsrfProtection)
@@ -705,7 +714,7 @@ export class SvelteKitUserEndpoints {
                 await this.sessionServer.sessionManager.deleteSession(oldSessionId);
             } catch (e) {
                 CrossauthLogger.logger.warn(j({
-                    msg: "Couldn't delete session ID from database",
+                    message: "Couldn't delete session ID from database",
                     hashOfSessionId: this.sessionServer.getHashOfSessionId(event)
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
@@ -743,7 +752,7 @@ export class SvelteKitUserEndpoints {
             }
 
             // clear cookies
-            CrossauthLogger.logger.debug(j({msg: "Logout: clear cookie " 
+            CrossauthLogger.logger.debug(j({message: "Logout: clear cookie " 
                 + this.sessionServer.sessionManager.sessionCookieName}));
             event.cookies.delete(this.sessionServer.sessionManager.sessionCookieName, {path: "/"});
             if (this.sessionServer.enableCsrfProtection)
@@ -753,12 +762,14 @@ export class SvelteKitUserEndpoints {
                     await this.sessionServer.sessionManager.deleteSession(event.locals.sessionId);
                 } catch (e) {
                     CrossauthLogger.logger.warn(j({
-                        msg: "Couldn't delete session ID from database",
+                        message: "Couldn't delete session ID from database",
                         hashOfSessionId: this.sessionServer.getHashOfSessionId(event)
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                 }
             }
+
+            CrossauthLogger.logger.info(j({message: "Logout successful", user: event.locals.user?.username, userid: event.locals.user?.id}))
 
             // delete locals
             event.locals.sessionId = undefined;
@@ -777,8 +788,15 @@ export class SvelteKitUserEndpoints {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
-            return {
+            CrossauthLogger.logger.error(j({
+                message: "Login unsuccessful",
+                user: event.locals.user?.username,
+                userid: event.locals.user?.id,
+                errorMessage: ce.message,
+                errorMessages: ce.messages,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
+            }));            return {
                 ok: false,
                 error: ce.message,
                 errorCode: ce.code,
@@ -1228,7 +1246,7 @@ export class SvelteKitUserEndpoints {
                 extraFields, 
                 persist);
             CrossauthLogger.logger.debug(j({
-                msg: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+                message: "Login: set session cookie " + sessionCookie.name + " opts " + JSON.stringify(sessionCookie.options),
                 user: user?.username
             }));
             event.cookies.set(
@@ -1236,7 +1254,7 @@ export class SvelteKitUserEndpoints {
                 sessionCookie.value,
                 toCookieSerializeOptions(sessionCookie.options));
             CrossauthLogger.logger.debug(j({
-                msg: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
+                message: "Login: set csrf cookie " + csrfCookie.name + " opts " + JSON.stringify(sessionCookie.options),
                 user: user?.username
             }));
             event.cookies.set(
@@ -1326,7 +1344,7 @@ export class SvelteKitUserEndpoints {
      *   - `formData` the form fields extracted from the request
      */
     async validatePasswordResetToken(event : RequestEvent) : Promise<ResetPasswordActionData> {
-        CrossauthLogger.logger.debug(j({msg:"validatePasswordResetToken " + event.request.method}))
+        CrossauthLogger.logger.debug(j({message:"validatePasswordResetToken " + event.request.method}))
         try {
 
             const token = event.params.token;
@@ -1376,7 +1394,7 @@ export class SvelteKitUserEndpoints {
      *   - `formData` the form fields extracted from the request
      */
     async resetPassword(event : RequestEvent) : Promise<ResetPasswordActionData> {
-        CrossauthLogger.logger.debug(j({msg:"resetPassword"}));
+        CrossauthLogger.logger.debug(j({message:"resetPassword"}));
         let formData : {[key:string]:string|undefined}|undefined = undefined;
         try {
             // get form data
@@ -1527,7 +1545,7 @@ export class SvelteKitUserEndpoints {
      *   - `formData` the form fields extracted from the request
      */
     async changePassword(event : RequestEvent) : Promise<ChangePasswordActionData> {
-        CrossauthLogger.logger.debug(j({msg:"changePassword"}));
+        CrossauthLogger.logger.debug(j({message:"changePassword"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
@@ -1666,7 +1684,7 @@ export class SvelteKitUserEndpoints {
      *     exception was raised
      */
     async deleteUser(event : RequestEvent) : Promise<DeleteUserActionData> {
-        CrossauthLogger.logger.debug(j({msg:"deleteUser"}));
+        CrossauthLogger.logger.debug(j({message:"deleteUser"}));
         try {
 
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
@@ -1728,7 +1746,7 @@ export class SvelteKitUserEndpoints {
      *     the link emailed to them to complete signup.
      */
     async updateUser(event : RequestEvent) : Promise<UpdateUserActionData> {
-        CrossauthLogger.logger.debug(j({msg:"updateUser"}));
+        CrossauthLogger.logger.debug(j({message:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
@@ -1823,7 +1841,7 @@ export class SvelteKitUserEndpoints {
      *   - `factor2Data` the data to pass to the factor2 configuration page.
      */
     async changeFactor2(event : RequestEvent) : Promise<ChangeFactor2ActionData> {
-        CrossauthLogger.logger.debug(j({msg:"updateUser"}));
+        CrossauthLogger.logger.debug(j({message:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
@@ -1944,7 +1962,7 @@ export class SvelteKitUserEndpoints {
      *   - `factor2Data` the data to pass to the factor2 configuration page.
      */
     async reconfigureFactor2(event : RequestEvent) : Promise<ChangeFactor2ActionData> {
-        CrossauthLogger.logger.debug(j({msg:"updateUser"}));
+        CrossauthLogger.logger.debug(j({message:"updateUser"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");

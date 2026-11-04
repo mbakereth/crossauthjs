@@ -462,7 +462,7 @@ export class FastifyServer {
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
             CrossauthLogger.logger.warn(j({
-                msg: `Attempt to access url without csrf token`,
+                message: `Attempt to access url without csrf token`,
                 url: request.url
             }));
             try {
@@ -506,7 +506,7 @@ export class FastifyServer {
         errorFn?: FastifyErrorFn) : Promise<FastifyReply|undefined> {
         if (!request.user) {
             CrossauthLogger.logger.warn(j({
-                msg: `Attempt to access url without csrf token`,
+                message: `Attempt to access url without csrf token`,
                 url: request.url
             }));
             try {
@@ -561,7 +561,7 @@ export class FastifyServer {
         e?: any) {
         if (!error || !e) {
             CrossauthLogger.logger.warn(j({
-                msg: error,
+                message: error,
                 errorCode: ErrorCode.UnknownError,
                 errorCodeName: ErrorCode[ErrorCode.UnknownError],
                 httpStatus: status
@@ -598,7 +598,7 @@ export class FastifyServer {
                 }
             }         
             CrossauthLogger.logger.warn(j({
-                msg: error,
+                message: error,
                 errorCode: code,
                 errorCodeName: codeName,
                 httpStatus: status
@@ -648,7 +648,7 @@ export class FastifyServer {
         data?: { [key: string]: any }) : Promise<string>  {
         if (!this.sessionServer) throw new CrossauthError(ErrorCode.Configuration, 
             "Sessions not enabled");
-        CrossauthLogger.logger.debug(j({msg: "Creating anonymous session"}));
+        CrossauthLogger.logger.debug(j({message: "Creating anonymous session"}));
         return await this.sessionServer.createAnonymousSession(request, reply, data);
     }
 
@@ -666,7 +666,7 @@ export class FastifyServer {
     start(port : number = 3000, hostname : string = "0.0.0.0") {
         this.app.listen({ port: port, host: hostname}, () =>
             CrossauthLogger.logger.info(j({
-                msg: "Starting fastify server",
+                message: "Starting fastify server",
                 port: port,
                 hostname: hostname,
         })),

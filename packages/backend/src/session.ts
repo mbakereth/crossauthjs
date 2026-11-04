@@ -251,7 +251,7 @@ export class SessionManager {
         if (!user) {
             let userInputFields : UserInputFields = {username: "", state: "active"};
             try {
-                CrossauthLogger.logger.debug(j({msg: "Fetching user " + username + " locally"}))
+                CrossauthLogger.logger.debug(j({message: "Fetching user " + username + " locally"}))
                 let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
                 secrets = userAndSecrets.secrets;
                 user = userAndSecrets.user;    
@@ -263,7 +263,7 @@ export class SessionManager {
                 }
                 userInputFields = user;
             } catch (e) {
-                CrossauthLogger.logger.debug(j({msg: "Failed.  Checking for authenticators that don't require user entry", err: e}))
+                CrossauthLogger.logger.debug(j({message: "Failed.  Checking for authenticators that don't require user entry", err: e}))
                 const ce = CrossauthError.asCrossauthError(e);
                 if (ce.code == ErrorCode.Connection) throw e;
                 for (let auth in this.authenticators) {
@@ -272,7 +272,7 @@ export class SessionManager {
                         defaultAuth = auth;
                     }
                 }
-                CrossauthLogger.logger.debug(j({msg: "User " + user?.username + " factor1 " + user?.factor1 + " Default auth", defaultAuth}));
+                CrossauthLogger.logger.debug(j({message: "User " + user?.username + " factor1 " + user?.factor1 + " Default auth", defaultAuth}));
 
                 // moved up from below
                 let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
@@ -280,7 +280,7 @@ export class SessionManager {
                 user = userAndSecrets.user;  
             }
             if (userInputFields.username == "") throw new CrossauthError(ErrorCode.UserNotExist);
-            CrossauthLogger.logger.debug(j({msg: "Authenticating with " + (user?.factor1??defaultAuth)}))
+            CrossauthLogger.logger.debug(j({message: "Authenticating with " + (user?.factor1??defaultAuth)}))
             await this.authenticators[user?.factor1??defaultAuth].authenticateUser(userInputFields, secrets, params);
             /*let userAndSecrets = await this.userStorage.getUserByUsername(username, {skipActiveCheck: true, skipEmailVerifiedCheck: true});
             secrets = userAndSecrets.secrets;
@@ -325,7 +325,7 @@ export class SessionManager {
             this.emailTokenStorage.deleteAllForUser(user.id, 
                 KeyPrefix.passwordResetToken);
         } catch (e) {
-            CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
+            CrossauthLogger.logger.warn(j({message: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
         }
 
@@ -572,7 +572,7 @@ export class SessionManager {
         value: { [key: string]: any }) : Promise<void> {
         //const sessionId = this.session.unsignCookie(sessionCookieValue);
         const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
-        CrossauthLogger.logger.debug(j({msg: `Updating session data value ${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
+        CrossauthLogger.logger.debug(j({message: `Updating session data value ${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
         await this.keyStorage.updateData(hashedSessionKey, name, value);
     }
 
@@ -588,7 +588,7 @@ export class SessionManager {
             dataArray: {dataName: string, value: any }[]) : Promise<void> {
             //const sessionId = this.session.unsignCookie(sessionCookieValue);
             const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
-            CrossauthLogger.logger.debug(j({msg: `Updating session data`, hashedSessionCookie: Crypto.hash(sessionId)}));
+            CrossauthLogger.logger.debug(j({message: `Updating session data`, hashedSessionCookie: Crypto.hash(sessionId)}));
             await this.keyStorage.updateManyData(hashedSessionKey, dataArray);
         }
     
@@ -606,7 +606,7 @@ export class SessionManager {
        name: string) : Promise<void> {
        //const sessionId = this.session.unsignCookie(sessionCookieValue);
        const hashedSessionKey = SessionCookie.hashSessionId(sessionId);
-       CrossauthLogger.logger.debug(j({msg: `Updating session data value ${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
+       CrossauthLogger.logger.debug(j({message: `Updating session data value ${name}`, hashedSessionCookie: Crypto.hash(sessionId)}));
        await this.keyStorage.deleteData(hashedSessionKey, name);
    }
     
@@ -1030,7 +1030,7 @@ export class SessionManager {
             this.emailTokenStorage.deleteAllForUser(user.id, 
                 KeyPrefix.passwordResetToken);
         } catch (e) {
-            CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
+            CrossauthLogger.logger.warn(j({message: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
         }
         return {
@@ -1071,7 +1071,7 @@ export class SessionManager {
      */
     async applyEmailVerificationToken(token : string) : Promise<User> {
         if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call applyEmailVerificationToken if no user storage provided");
-        CrossauthLogger.logger.debug(j({msg: "applyEmailVerificationToken"}));
+        CrossauthLogger.logger.debug(j({message: "applyEmailVerificationToken"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Email verification not enabled");
         try {
             let column = "email";
@@ -1106,7 +1106,7 @@ export class SessionManager {
      * @throws {@link @crossauth/common!CrossauthError} if the token is not valid.
      */
     async userForPasswordResetToken(token : string) : Promise<User> {
-        CrossauthLogger.logger.debug(j({msg:"userForPasswordResetToken"}));
+        CrossauthLogger.logger.debug(j({message:"userForPasswordResetToken"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
         const resp =  await this.tokenEmailer.verifyPasswordResetToken(token);
         if (resp.user && this.loginUserFilter) {
@@ -1140,7 +1140,7 @@ export class SessionManager {
             await this.emailTokenStorage.deleteAllForUser(user.id, 
                 KeyPrefix.passwordResetToken);
         } catch (e) {
-            CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: username}));
+            CrossauthLogger.logger.warn(j({message: "Couldn't delete password reset tokens while logging in", user: username}));
             CrossauthLogger.logger.debug(j({err: e}));
         }
 
@@ -1217,7 +1217,7 @@ export class SessionManager {
         params: AuthenticationParameters,
         repeatParams?: AuthenticationParameters) : Promise<User> {
             if (!this.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call resetSecret if no user storage provided");
-            CrossauthLogger.logger.debug(j({msg:"resetSecret"}));
+            CrossauthLogger.logger.debug(j({message:"resetSecret"}));
         if (!this.tokenEmailer) throw new CrossauthError(ErrorCode.Configuration, "Password reset not enabled");
         const user = await this.userForPasswordResetToken(token);
         const factor = factorNumber == 1 ? user.factor1 : user.factor2;
@@ -1234,7 +1234,7 @@ export class SessionManager {
             await this.emailTokenStorage.deleteAllForUser(user.id, 
                 KeyPrefix.passwordResetToken);
         } catch (e) {
-            CrossauthLogger.logger.warn(j({msg: "Couldn't delete password reset tokens while logging in", user: user.username}));
+            CrossauthLogger.logger.warn(j({message: "Couldn't delete password reset tokens while logging in", user: user.username}));
             CrossauthLogger.logger.debug(j({err: e}));
         }
 

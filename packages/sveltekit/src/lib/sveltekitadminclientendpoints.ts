@@ -167,7 +167,7 @@ export class SvelteKitAdminClientEndpoints extends SvelteKitSharedClientEndpoint
                 try {
                     userid = event.url.searchParams.get("userid") ? Number(event.url.searchParams.get("userid")) : undefined;
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({msg: "Invalid userid " + event.url.searchParams.get("userid")}));
+                    CrossauthLogger.logger.warn(j({message: "Invalid userid " + event.url.searchParams.get("userid")}));
                 }
             const resp = await this.searchClients(event, undefined, undefined, undefined, userid);
             return {

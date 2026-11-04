@@ -211,7 +211,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                         for (let scope of this.protectedEndpoints[matchingEndpoint].scope??[]) {
                             if (!request.scope || !(request.scope.includes(scope))
                                 && this.protectedEndpoints[matchingEndpoint].acceptSessionAuthorization!=true) {
-                                CrossauthLogger.logger.warn(j({msg: "Access token does not have sufficient scope",
+                                CrossauthLogger.logger.warn(j({message: "Access token does not have sufficient scope",
                                     username: request.user?.username, url: request.url}));
                                 request.scope = undefined;
                                 request.accessTokenPayload = undefined;
@@ -232,7 +232,7 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                         return reply.status(500).send(this.errorBody);
                     } 
                     request.authErrorDescription = authResponse?.error_description;
-                    CrossauthLogger.logger.debug(j({msg: "Resource server url", url: request.url, authorized: request.accessTokenPayload!= undefined}));
+                    CrossauthLogger.logger.debug(j({message: "Resource server url", url: request.url, authorized: request.accessTokenPayload!= undefined}));
                 }
             });
         }

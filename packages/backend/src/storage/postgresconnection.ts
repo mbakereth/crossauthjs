@@ -14,7 +14,7 @@ export class PostgresPool extends DbPool {
 
     async connect() : Promise<DbConnection> {
         const client = await this.pgPool.connect();
-        CrossauthLogger.logger.debug(j({msg: "DB connect"}));
+        CrossauthLogger.logger.debug(j({message: "DB connect"}));
         return new PostgresConnection(client);
     }
 
@@ -54,7 +54,7 @@ export class PostgresConnection extends DbConnection {
     async execute(query : string, values : any[] = []) : Promise<{[key:string]:any}[]> {
 
         try {
-            CrossauthLogger.logger.debug(j({msg: "Executing query", query: query}));
+            CrossauthLogger.logger.debug(j({message: "Executing query", query: query}));
             let ret = await this.pgClient.query({text: query, values: values});
             return ret.rows;
         } catch (e) {
@@ -64,25 +64,25 @@ export class PostgresConnection extends DbConnection {
     }
 
     release() : void {
-        CrossauthLogger.logger.debug(j({msg: "DB release"}));
+        CrossauthLogger.logger.debug(j({message: "DB release"}));
         this.pgClient.release();
 
     }
 
     async startTransaction() : Promise<void> {
-        CrossauthLogger.logger.debug(j({msg: "DB start transaction"}));
+        CrossauthLogger.logger.debug(j({message: "DB start transaction"}));
         await this.pgClient.query('BEGIN')
 
     }
 
     async commit() : Promise<void> {
-        CrossauthLogger.logger.debug(j({msg: "DB commit"}));
+        CrossauthLogger.logger.debug(j({message: "DB commit"}));
         await this.pgClient.query('COMMIT')
 
     }
 
     async rollback() : Promise<void> {
-        CrossauthLogger.logger.debug(j({msg: "DB rollback"}));
+        CrossauthLogger.logger.debug(j({message: "DB rollback"}));
         await this.pgClient.query('ROLLBACK')
 
     }

@@ -417,7 +417,7 @@ export class SvelteKitServer {
 
                 if (!event.locals.user) {
                     if (this.sessionServer.isLoginPageProtected(event))  {
-                        CrossauthLogger.logger.debug(j({msg: "Page is login protected and we don't have credentials"}))
+                        CrossauthLogger.logger.debug(j({message: "Page is login protected and we don't have credentials"}))
                         if (this.loginUrl) {
                             /*let redirect_uri = event.url.pathname;
                             if (event.url.searchParams) {
@@ -474,7 +474,7 @@ export class SvelteKitServer {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}))
-            CrossauthLogger.logger.error(j({msg: "Error in oauth client hook", cerr: ce}))
+            CrossauthLogger.logger.error(j({message: "Error in oauth client hook", cerr: ce}))
 
         }
         

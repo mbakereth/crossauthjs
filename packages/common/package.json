@@ -11,15 +11,14 @@
   "files": [
     "dist/*"
   ],
-        "exports": {
-          ".": {
-              "types": "./dist/index.d.ts",
-              "require": "./dist/index.cjs",
-              "import": "./dist/index.js",
-              "default": "./dist/index.js"
-          }
-        },
-
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -29,7 +28,7 @@
     "doc": "typedoc"
   },
   "devDependencies": {
-    "@types/node": "^20.10.8",
+    "@types/node": "^20.19.27",
     "typedoc": "^0.25.4",
     "typescript": ">=5.0.0 <=5.3.3",
     "vite": "^5.0.8",

@@ -197,7 +197,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{ Querystring: LoginQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.adminPrefix + 'createuser',
                     ip: request.ip
@@ -225,7 +225,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{ Body: AdminCreateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.adminPrefix + 'createuser',
                     ip: request.ip,
@@ -235,7 +235,7 @@ export class FastifyAdminEndpoints {
                 request.body.next && request.body.next.length > 0 ? 
                     request.body.next : this.adminPrefix;
             try {
-                CrossauthLogger.logger.debug(j({msg: "Next page " + next}));
+                CrossauthLogger.logger.debug(j({message: "Next page " + next}));
 
                 return await this.createUser(request, reply, 
                 (reply, _data, _user) => {
@@ -244,7 +244,7 @@ export class FastifyAdminEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    msg: "Signup failure",
+                    message: "Signup failure",
                     user: request.body.username,
                 
                     errorCodeName: ce.codeName,
@@ -283,7 +283,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{ Body: SignupBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.adminPrefix + 'api/createuser',
                     ip: request.ip,
@@ -300,7 +300,7 @@ export class FastifyAdminEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Create user failure",
+                    message: "Create user failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -328,7 +328,7 @@ export class FastifyAdminEndpoints {
                 reply: FastifyReply)  => {
                 if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call selectuser unless a user storage is provided");
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.adminPrefix + 'selectuser',
                     ip: request.ip
@@ -395,7 +395,7 @@ export class FastifyAdminEndpoints {
                 reply: FastifyReply)  => {
                 if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call updateuser unless a user storage is provided");
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.adminPrefix + 'updateuser',
                     ip: request.ip
@@ -429,7 +429,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{Params: UserParamType, Body: AdminUpdateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.adminPrefix + 'updateuser',
                     ip: request.ip,
@@ -458,7 +458,7 @@ export class FastifyAdminEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.error(j({msg: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
+                CrossauthLogger.logger.error(j({message: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
                     if (!user) {
@@ -493,7 +493,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{ Params: AdminDeleteUserParamType, Querystring: DeleteUserQueryType }>,
                 reply: FastifyReply)  => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.adminPrefix + 'deleteclient',
                     ip: request.ip
@@ -531,7 +531,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{ Params: AdminDeleteUserParamType, Body: DeleteUserQueryType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.adminPrefix + 'deleteuser',
                     ip: request.ip,
@@ -554,7 +554,7 @@ export class FastifyAdminEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.error(j({
-                        msg: "Failed deleting user",
+                        message: "Failed deleting user",
                         user: request.user?.username,
                     
                         errorCodeName: ce.codeName,
@@ -592,7 +592,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{Params: UserParamType, Body: AdminUpdateUserBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.adminPrefix + 'api/updateuser',
                     ip: request.ip,
@@ -616,7 +616,7 @@ export class FastifyAdminEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
                 CrossauthLogger.logger.error(j({
-                    msg: "Update user failure",
+                    message: "Update user failure",
                     user: request.user?.username,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -646,7 +646,7 @@ export class FastifyAdminEndpoints {
                 reply: FastifyReply) => {
                     if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Cannot call changepassword unless a user storage is provided");
                     CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'GET',
                     url: this.adminPrefix + 'changepassword',
                     ip: request.ip,
@@ -685,7 +685,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{Params: UserParamType, Body: AdminChangePasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "Page visit",
+                    message: "Page visit",
                     method: 'POST',
                     url: this.adminPrefix + 'changepassword',
                     ip: request.ip,
@@ -714,7 +714,7 @@ export class FastifyAdminEndpoints {
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
-                    msg: "Change password failure",
+                    message: "Change password failure",
                     userid: request.params.id,
                     errorCodeName: ce.codeName,
                     errorCode: ce.code
@@ -742,7 +742,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{Params: UserParamType, Body: AdminChangePasswordBodyType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.adminPrefix + 'api/changepassword',
                     ip: request.ip,
@@ -766,7 +766,7 @@ export class FastifyAdminEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
                     CrossauthLogger.logger.error(j({
-                        msg: "Update user failure",
+                        message: "Update user failure",
                         user: request.user?.username,
                         errorCodeName: ce.codeName,
                         errorCode: ce.code
@@ -796,7 +796,7 @@ export class FastifyAdminEndpoints {
             async (request: FastifyRequest<{ Params: AdminDeleteUserParamType }>,
                 reply: FastifyReply) => {
                 CrossauthLogger.logger.info(j({
-                    msg: "API visit",
+                    message: "API visit",
                     method: 'POST',
                     url: this.adminPrefix + 'api/deleteuser',
                     ip: request.ip,
@@ -812,7 +812,7 @@ export class FastifyAdminEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
                     CrossauthLogger.logger.error(j({
-                        msg: "Delete user failure",
+                        message: "Delete user failure",
                         user: request.user?.username,
                         errorCodeName: ce.codeName,
                         errorCode: ce.code
@@ -898,16 +898,16 @@ export class FastifyAdminEndpoints {
         if (!hasSecrets) {
             if (user.factor2 && user.factor2 != "none") {
                 user.state = UserState.passwordAndFactor2ResetNeeded;
-                CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.passwordAndFactor2ResetNeeded}`, 
+                CrossauthLogger.logger.warn(j({message: `Setting state for user to ${UserState.passwordAndFactor2ResetNeeded}`, 
                 username: user.username}));
             } else {
                 user.state = UserState.passwordResetNeeded;
-                CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.passwordResetNeeded}`, 
+                CrossauthLogger.logger.warn(j({message: `Setting state for user to ${UserState.passwordResetNeeded}`, 
                 username: user.username}));
             }
         } else if (user.factor2 && user.factor2 != "none") {
             user.state = UserState.factor2ResetNeeded;
-            CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.factor2ResetNeeded}`, 
+            CrossauthLogger.logger.warn(j({message: `Setting state for user to ${UserState.factor2ResetNeeded}`, 
             username: user.username}));
         } 
 
@@ -978,7 +978,7 @@ export class FastifyAdminEndpoints {
         }
         if (factor2ResetNeeded) {
             user.state = UserState.factor2ResetNeeded;
-            CrossauthLogger.logger.warn(j({msg: `Setting state for user ${user.id} to ${UserState.factor2ResetNeeded}`, 
+            CrossauthLogger.logger.warn(j({message: `Setting state for user ${user.id} to ${UserState.factor2ResetNeeded}`, 
             username: user.username}));
         } 
     

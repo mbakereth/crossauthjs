@@ -220,7 +220,7 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                         for (let scope of this.protectedEndpoints[matchingEndpoint].scope??[]) {
                             if (!event.locals.scope || !(event.locals.scope.includes(scope))
                                 && this.protectedEndpoints[matchingEndpoint].acceptSessionAuthorization!=true) {
-                                CrossauthLogger.logger.warn(j({msg: "Access token does not have sufficient scope",
+                                CrossauthLogger.logger.warn(j({message: "Access token does not have sufficient scope",
                                     username: event.locals.user?.username, url: event.request.url}));
                                     event.locals.scope = undefined;
                                     event.locals.accessTokenPayload = undefined;
@@ -250,7 +250,7 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                             status: 500});
                     } 
                     event.locals.authErrorDescription = authResponse?.error_description;
-                    CrossauthLogger.logger.debug(j({msg: "Resource server url", url: event.request.url, authorized: event.locals.accessTokenPayload!= undefined}));
+                    CrossauthLogger.logger.debug(j({message: "Resource server url", url: event.request.url, authorized: event.locals.accessTokenPayload!= undefined}));
                 }
             };
         }

@@ -161,27 +161,27 @@ export class PrismaUserStorage extends UserStorage {
         if (error) throw error;
         
         if (options?.skipActiveCheck!=true && prismaUser["state"]==UserState.awaitingTwoFactorSetup) {
-            CrossauthLogger.logger.debug(j({msg: "2FA setup is not complete"}));
+            CrossauthLogger.logger.debug(j({message: "2FA setup is not complete"}));
             throw new CrossauthError(ErrorCode.TwoFactorIncomplete);
         }
         if (options?.skipActiveCheck!=true && prismaUser["state"]==UserState.disabled) {
-            CrossauthLogger.logger.debug(j({msg: "User is deactivated"}));
+            CrossauthLogger.logger.debug(j({message: "User is deactivated"}));
             throw new CrossauthError(ErrorCode.UserNotActive);
         }
         if (options?.skipEmailVerifiedCheck!=true && prismaUser["state"]==UserState.awaitingEmailVerification) {
-            CrossauthLogger.logger.debug(j({msg: "User has not verified email"}));
+            CrossauthLogger.logger.debug(j({message: "User has not verified email"}));
             throw new CrossauthError(ErrorCode.EmailNotVerified);
         }
         if (options?.skipActiveCheck!=true && prismaUser["state"] == UserState.passwordChangeNeeded) {
-            CrossauthLogger.logger.debug(j({msg: "User must change password"}));
+            CrossauthLogger.logger.debug(j({message: "User must change password"}));
             throw new CrossauthError(ErrorCode.PasswordChangeNeeded);
         }
         if (options?.skipActiveCheck!=true && (prismaUser["state"] == UserState.passwordResetNeeded || prismaUser["state"] == UserState.passwordAndFactor2ResetNeeded)) {
-            CrossauthLogger.logger.debug(j({msg: "User must reset password"}));
+            CrossauthLogger.logger.debug(j({message: "User must reset password"}));
             throw new CrossauthError(ErrorCode.PasswordResetNeeded);
         }
         if (options?.skipActiveCheck!=true && prismaUser["state"]==UserState.factor2ResetNeeded) {
-            CrossauthLogger.logger.debug(j({msg: "2FA reset required"}));
+            CrossauthLogger.logger.debug(j({message: "2FA reset required"}));
             throw new CrossauthError(ErrorCode.Factor2ResetNeeded);
         }
         const secrets = prismaUser.secrets || {};
@@ -442,7 +442,7 @@ export class PrismaUserStorage extends UserStorage {
             try {
                 return await this.deleteUserById_internal(Number(id));
             } catch (e) {
-                CrossauthLogger.logger.debug(j({msg: "Failed forcing id to number when deleting user"}));
+                CrossauthLogger.logger.debug(j({message: "Failed forcing id to number when deleting user"}));
             }
         }
         return await this.deleteUserById_internal(id);
@@ -659,7 +659,7 @@ export class PrismaKeyStorage extends KeyStorage {
         } catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError || (e instanceof Object && "code" in e)) {
                 if (e.code == 'P2002') {
-                    CrossauthLogger.logger.warn(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+                    CrossauthLogger.logger.warn(j({message: "Attempt to create key that already exists. Stack trace follows"}));
                     CrossauthLogger.logger.debug(j({err: e}));
                     error = new CrossauthError(ErrorCode.KeyExists);
                 } else {
@@ -1068,7 +1068,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
         } catch (e) {
             if (!throwOnFailure) return [];
             CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({msg: "Invalid OAuth client", [field]: value, cerr: e}))
+            CrossauthLogger.logger.error(j({message: "Invalid OAuth client", [field]: value, cerr: e}))
             throw new CrossauthError(ErrorCode.InvalidClientId);
         }
     }
@@ -1146,7 +1146,7 @@ export class PrismaOAuthClientStorage extends OAuthClientStorage {
             }
         }
         if (!newClient) {
-            CrossauthLogger.logger.error(j({msg: "Attempt to create key that already exists. Stack trace follows"}));
+            CrossauthLogger.logger.error(j({message: "Attempt to create key that already exists. Stack trace follows"}));
             throw new CrossauthError(ErrorCode.KeyExists);    
         }
 
@@ -1502,7 +1502,7 @@ export class PrismaOAuthAuthorizationStorage extends OAuthAuthorizationStorage {
             return rows.map((row : {[key:string]:any}) => row.scope);
         } catch (e) {
             CrossauthLogger.logger.debug(j({err: e}));
-            //CrossauthLogger.logger.error(j({msg: "Couldn't get authorizations", client_id: client_id, userid: userid, cerr: e}))
+            //CrossauthLogger.logger.error(j({message: "Couldn't get authorizations", client_id: client_id, userid: userid, cerr: e}))
             throw new CrossauthError(ErrorCode.Connection);
         }
     }
