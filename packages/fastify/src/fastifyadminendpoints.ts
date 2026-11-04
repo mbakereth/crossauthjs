@@ -871,7 +871,7 @@ export class FastifyAdminEndpoints {
                 ...this.sessionServer.userStorage.adminEditableFields},
             this.sessionServer.adminAllowedFactor1,this.sessionServer.allowedFactor2);
 
-        // find out of password was gfiven
+        // find out of password was given
         const secretNames = this.sessionServer.authenticators[user.factor1].secretNames();
         let hasSecrets = true;
         for (let secret of secretNames) {
@@ -978,7 +978,7 @@ export class FastifyAdminEndpoints {
         }
         if (factor2ResetNeeded) {
             user.state = UserState.factor2ResetNeeded;
-            CrossauthLogger.logger.warn(j({msg: `Setting state for user to ${UserState.factor2ResetNeeded}`, 
+            CrossauthLogger.logger.warn(j({msg: `Setting state for user ${user.id} to ${UserState.factor2ResetNeeded}`, 
             username: user.username}));
         } 
     
