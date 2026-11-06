@@ -1,9 +1,10 @@
 // Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { ApiKeyManager, UserStorage, KeyStorage } from '@crossauth/backend';
 import type { ApiKeyManagerOptions } from '@crossauth/backend';
-import { CrossauthLogger, j } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, LoggedActionCode, loggedActionCode, logAsWarnOrError } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { type MaybePromise } from './tests/sveltemocks';
+import { logClient } from './sveltekitsession';
 
 /**
  * Options for {@link SvelteKitApiKeyServer }.
@@ -61,18 +62,21 @@ export class SvelteKitApiKeyServer {
         this.apiKeyManager = new ApiKeyManager(keyStorage, options);
     
         this.hook = async ({ event}/*, response*/) => {
-            CrossauthLogger.logger.debug("APIKey hook");
+            CrossauthLogger.logger.debug(j({message: "APIKey hook", ...logClient(event)}));
 
             const authzHeader = event.request.headers.get("authorization");
             if (authzHeader) {
                 try {
                     CrossauthLogger.logger.debug(j({
-                        message: "Received authorization header"}));
+                        message: "Received authorization header",
+                        ...logClient(event)
+                    }));
                     const key = 
                         await this.apiKeyManager.validateToken(
                             authzHeader);
                     CrossauthLogger.logger.debug(j({
                         message: "Valid API key",
+                        ...logClient(event),
                         hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)
                     }));
                     const data = KeyStorage.decodeData(key.data);
@@ -89,14 +93,25 @@ export class SvelteKitApiKeyServer {
                             const {user} = await this.userStorage.getUserById(key.userid);
                             event.locals.user = user;
                             event.locals.authType = "apiKey";
-                            CrossauthLogger.logger.debug(j({message: "API key is for user", userid: user.id, user: user.username, hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
+                            CrossauthLogger.logger.debug(j({
+                                message: "API key is for user", 
+                                userid: user.id, 
+                                user: user.username, 
+                                ip: event.getClientAddress(),
+                                hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                         } catch (e2) {
-                            CrossauthLogger.logger.error(j({message: "API key has invalid user", userid: key.userid,  hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
+                            CrossauthLogger.logger.warn(j({message: "API key has invalid user", userid: key.userid,  hashedApiKey: ApiKeyManager.hashSignedApiKeyValue(key.value)}));
                             CrossauthLogger.logger.debug(j({err: e2}));
                         }
                     }
                 } catch (e) {
-                    CrossauthLogger.logger.error(j({message: "Invalid authorization header received", header: authzHeader}));
+                    const ce = CrossauthError.asCrossauthError(e);
+                    logAsWarnOrError(ce, j({
+                        message: "Invalid authorization header received", 
+                        ...logClient(event), 
+                        ...loggedActionCode(LoggedActionCode.UnauthorizedPageOrAPICall),
+                        cerr: ce,
+                        header: authzHeader}));
                     CrossauthLogger.logger.debug(j({err: e}));
                 }
             };

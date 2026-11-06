@@ -9,6 +9,9 @@ import {
     OAuthFlows,
     type OAuthTokenResponse,
     j, 
+    loggedActionCode,
+    LoggedActionCode,
+    logAsWarnOrError,
     type MfaAuthenticatorsResponse,
     MfaAuthenticatorResponse,
     type OAuthDeviceAuthorizationResponse,
@@ -21,6 +24,7 @@ import {
 import type { OAuthClientOptions } from '@crossauth/backend';
 import { FastifyServer, type FastifyErrorFn } from './fastifyserver';
 import type { CsrfBodyType } from './fastifysession.ts';
+import { logClient } from "./fastifysession.ts";
 
 const JSONHDR : [string,string] = 
     ['Content-Type', 'application/json; charset=utf-8'];
@@ -1000,10 +1004,28 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                         request.user = user;
                         request.authType = user ? "oidc" : undefined;
                     } catch (e) {
-                        CrossauthLogger.logger.error(j({cerr: e}));
+                        const ce = CrossauthError.asCrossauthError(e);
+                        CrossauthLogger.logger.debug(j({err: e}));
+                        let message = {cerr: ce, ...logClient(request)}
+                        if ([
+                            ErrorCode.InvalidClientId,
+                            ErrorCode.ExpiredToken,
+                            ErrorCode.InvalidToken,
+                            ErrorCode.UserNotExist,
+                            ErrorCode.UserNotActive,
+                        ].includes(ce.code)) {
+                            message = {...message, ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken)}
+                        }
+                        logAsWarnOrError(ce, j(message))
                         request.user = undefined;
                         request.authType = undefined;
                     }
+                } else if (expiry && expiry <= Date.now()) {
+                    CrossauthLogger.logger.warn({
+                        message: "OAuth token expired",
+                        ...logClient(request),
+                        ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken),
+                    })
                 }
             }
 
@@ -1075,6 +1097,11 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 }               
                 const oauthData =  await this.server.sessionAdapter?.getSessionData(request, this.sessionDataName);
                 if (!oauthData?.state || oauthData?.state != request.query.state) {
+                    CrossauthLogger.logger.warn(j({
+                        message: "Unauthorized: OAuth state mismatch",
+                        ...logClient(request),
+                        ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken),
+                    }))
                     throw new CrossauthError(ErrorCode.Unauthorized, "State does not match");
                 }
 
@@ -1091,6 +1118,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     if (resp.error) {
                         const ce = CrossauthError.fromOAuthError(resp.error, 
                             resp.error_description);
+                        logAsWarnOrError(ce, j({
+                            cerr: ce,
+                            ...logClient(request),
+                        }))
                         return await this.errorFn(this.server,
                             request,
                             reply,
@@ -1103,7 +1134,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     CrossauthLogger.logger.error(j({
                         message: "Error receiving token",
                         cerr: ce,
-                        user: request.user?.user
+                        ...logClient(request)
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return await this.errorFn(this.server, request, reply, ce);
@@ -1152,7 +1183,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     CrossauthLogger.logger.error(j({
                         message: "Error receiving token",
                         cerr: ce,
-                        user: request.user?.user
+                        ...logClient(request),
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return await this.errorFn(this.server, request, reply, ce);
@@ -1204,6 +1235,10 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     // TODO: refresh token cookie - call with no refresh token?
                     const ce = new CrossauthError(ErrorCode.BadRequest,
                         "No refresh token supplied");
+                    CrossauthLogger.logger.error(j({
+                        message: "No refresh token supplied",
+                        ...logClient(request),
+                    }))
                     return await this.errorFn(this.server,
                         request,
                         reply,
@@ -1231,7 +1266,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                     CrossauthLogger.logger.error(j({
                         message: "Error receiving token",
                         cerr: ce,
-                        user: request.user?.user
+                        ...logClient(request),
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return await this.errorFn(this.server, request, reply, ce);
@@ -1457,7 +1492,7 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
                     CrossauthLogger.logger.debug(j({err: ce}));
-                    CrossauthLogger.logger.error(j({message: "Couldn't delete oauth tokens", cerr: ce}));
+                    CrossauthLogger.logger.error(j({message: "Couldn't delete oauth tokens", cerr: ce, ...logClient(request)}));
                     return reply.view(this.deleteTokensPage, 
                         {
                             ok: false,
@@ -1707,7 +1742,9 @@ export class FastifyOAuthClient extends OAuthClientBackend {
                             return reply.header(...JSONHDR).status(resp.status)
                                 .send(body);
                         } catch (e) {
-                            CrossauthLogger.logger.error(j({err: e}));
+                            const ce = CrossauthError.asCrossauthError(e)
+                            CrossauthLogger.logger.error(j({cerr: ce, ...logClient(request)}));
+                            CrossauthLogger.logger.debug(j({err: e}))
                             return reply.header(...JSONHDR).status(500).send({});
         
                         }

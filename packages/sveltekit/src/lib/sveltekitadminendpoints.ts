@@ -1,11 +1,11 @@
 // Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { SvelteKitServer } from './sveltekitserver';
-import { SvelteKitSessionServer } from './sveltekitsession';
+import { logClient, SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { TokenEmailer } from '@crossauth/backend';
 import type { UserStorage, AuthenticationParameters } from '@crossauth/backend';
 import type { User, UserInputFields } from '@crossauth/common';
-import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, ErrorCode, UserState, logAsWarnOrError } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 
@@ -280,6 +280,7 @@ async function defaultUserSearchFn(searchTerm: string,
  * | -------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
  * | deleteUser                 | Deletes a user                                             | - `error` error message if user ID doesn't exist                                 | `default`:                                                       | `default`:                                                  | `id`      |
  * |                            |                                                            |                                                                                  |  - see {@link SvelteKitAdminEndpoints.deleteUser} return          |  - see {@link SvelteKitAdminEndpoints.deleteUser} event      |           |
+ * @namespace
  */
 export class SvelteKitAdminEndpoints {
     private sessionServer : SvelteKitSessionServer;
@@ -356,7 +357,7 @@ export class SvelteKitAdminEndpoints {
                     const str = event.url.searchParams.get("skip");
                     if (str) skip = parseInt(str);
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({cerr: e, message: "skip parameter is not an integer"}))
+                    CrossauthLogger.logger.warn(j({cerr: e, message: "skip parameter is not an integer", ...logClient(event)}))
                 }
     
             }
@@ -366,7 +367,7 @@ export class SvelteKitAdminEndpoints {
                     const str = event.url.searchParams.get("take");
                     if (str) take = parseInt(str);
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({cerr: e, message: "take parameter is not an integer"}))
+                    CrossauthLogger.logger.warn(j({cerr: e, message: "take parameter is not an integer", ...logClient(event)}))
                 }
             }
             if (!take) take = 10;
@@ -410,7 +411,7 @@ export class SvelteKitAdminEndpoints {
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({cerr: ce, ...logClient(event)}));
             return {
                 ok: false,
                 error: ce.message,
@@ -503,7 +504,7 @@ export class SvelteKitAdminEndpoints {
             if (factor2ResetNeeded) {
                 user.state = UserState.factor2ResetNeeded;
                 CrossauthLogger.logger.warn(j({message: `Setting state for user to ${UserState.factor2ResetNeeded}`, 
-                username: user.username}));
+                username: user.username, userid: user.id, ip: event.getClientAddress()}));
             } 
 
             // validate the new user using the implementor-provided function
@@ -515,8 +516,29 @@ export class SvelteKitAdminEndpoints {
             // update the user
             const resp = await this.sessionServer.sessionManager.updateUser(user, user, true, true);
             let info: string|undefined = undefined;
-            if (resp.emailVerificationTokenSent) info = "An email verification token has been sent to the user";
-            else if (resp.passwordResetTokenSent) info = "A password reset token has been sent to the user";
+            if (resp.emailVerificationTokenSent) {
+                CrossauthLogger.logger.info(j({
+                    message: "Email verification message sent", 
+                    ...logClient(event),
+                    targetUser: user.username,
+                    targetUserid: user.id,
+                }))
+                info = "An email verification token has been sent to the user";
+            } else if (resp.passwordResetTokenSent) {
+                CrossauthLogger.logger.info(j({
+                    message: "Password reset token sent", 
+                    ...logClient(event),
+                    targetUser: user.username,
+                    targetUserid: user.id,
+                }))
+                info = "A password reset token has been sent to the user";
+            }
+            CrossauthLogger.logger.info(j({
+                message: "Update user as admin successful", 
+                ...logClient(event),
+                targetUser: user.username,
+                targetUserid: user.id,
+            }))
             return {
                 ok: true,
                 formData: formData,
@@ -530,7 +552,13 @@ export class SvelteKitAdminEndpoints {
 
             let ce = CrossauthError.asCrossauthError(e, "Couldn't log in");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({
+                message: "Update user as admin unsuccessful", 
+                ...logClient(event),
+                targetUser: user.username,
+                targetUserid: user.id,
+                cerr: ce
+            }))
             return {
                 error: ce.message,
                 errors: ce.messages,
@@ -563,7 +591,6 @@ export class SvelteKitAdminEndpoints {
      *   - `formData` the form fields extracted from the request
      */
     async changePassword(user : User, event : RequestEvent, adminProxy? : AdminProxy) : Promise<AdminChangePasswordActionData> {
-        CrossauthLogger.logger.debug(j({message:"changePassword"}));
         let formData : {[key:string]:string}|undefined = undefined;
         try {
             // get form data
@@ -634,6 +661,13 @@ export class SvelteKitAdminEndpoints {
                 throw ce; 
             }
     
+            CrossauthLogger.logger.info(j({
+                message: "Change password as admin successful", 
+                ...logClient(event),
+                targetUser: user.username,
+                targetUserid: user.id,
+            }))
+
             return {
                 ok: true,
                 formData: formData,
@@ -646,7 +680,13 @@ export class SvelteKitAdminEndpoints {
 
             let ce = CrossauthError.asCrossauthError(e, "Couldn't change password");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({
+                message: "Change password as admin unsuccessful", 
+                ...logClient(event),
+                targetUser: user.username,
+                targetUserid: user.id,
+                cerr: ce
+            }))
             return {
                 error: ce.message,
                 errors: ce.messages,
@@ -706,6 +746,7 @@ export class SvelteKitAdminEndpoints {
     async createUser(event : RequestEvent, adminProxy? : AdminProxy) : Promise<AdminCreateUserActionData> {
 
         let formData : {[key:string]:string|undefined}|undefined = undefined;
+        let username = "";
         try {
             if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
 
@@ -713,7 +754,7 @@ export class SvelteKitAdminEndpoints {
             var data = new JsonOrFormData();
             await data.loadData(event);
             formData = data.toObject();
-            const username = data.get('username') ?? "";
+            username = data.get('username') ?? "";
             let user : UserInputFields|undefined;
 
             // can only call this if logged in as admin
@@ -812,12 +853,24 @@ export class SvelteKitAdminEndpoints {
                 await this.sessionServer.sessionManager.requestPasswordReset(email, column);
             }
 
+            CrossauthLogger.logger.info(j({
+                message: "Create user as admin successful", 
+                ...logClient(event),
+                targetUser: user.username,
+                targetUserid: user.id,
+            }))
+
             return { ok: true, user: newUser,  formData};
 
         } catch (e) {
-            let ce = CrossauthError.asCrossauthError(e, "Couldn't create user");
+            let ce = CrossauthError.asCrossauthError(e, "Create user unsuccessful");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({
+                message: "Create user as admin unsuccessful", 
+                ...logClient(event),
+                targetUser: username,
+                cerr: ce,
+            }))
             return {
                 error: ce.message,
                 errors: ce.messages,
@@ -842,43 +895,60 @@ export class SvelteKitAdminEndpoints {
      *   - `exception` a {@link @crossauth/common!CrossauthError} if an
      *     exception was raised
      */
-        async deleteUser(event : RequestEvent, adminProxy? : AdminProxy) : Promise<AdminDeleteUserActionData> {
-            if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) this.sessionServer.error(event, 401);
-            if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
-            try {
-    
-                const userid = event.params.id;
-                if (!userid) throw new CrossauthError(ErrorCode.BadRequest, "User ID is undefined");
+    async deleteUser(event : RequestEvent, adminProxy? : AdminProxy) : Promise<AdminDeleteUserActionData> {
+        if (!event.locals.user || (!SvelteKitServer.isAdminFn(event.locals.user) && !adminProxy?.skipAdminCheck)) this.sessionServer.error(event, 401);
+        if (!this.sessionServer.userStorage) throw new CrossauthError(ErrorCode.Configuration, "Must provide user storage to use this function");
+        let userid : string|number|undefined = undefined;
+        let username = "";
+        try {
 
-                // throw an error if the CSRF token is invalid
-                if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
-                    throw new CrossauthError(ErrorCode.InvalidCsrf);
-                }
-            
-                // can only call this if logged in as admin
-                if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) {
-                    this.sessionServer.error(401);
-                }
-    
-                await this.sessionServer.userStorage.deleteUserById(userid);
-                return {
-                    ok: true,
-    
-                };
-    
-            } catch (e) {
-                let ce = CrossauthError.asCrossauthError(e, "Couldn't delete account");
-                CrossauthLogger.logger.debug(j({err: ce}));
-                CrossauthLogger.logger.error(j({cerr: ce}));
-                    return {
-                    error: ce.message,
-                    errors: ce.messages,
-                    errorCode: ce.code,
-                    errorCodeName: ce.codeName,
-                    ok: false,
-                }
+            userid = event.params.id;
+            if (!userid) throw new CrossauthError(ErrorCode.BadRequest, "User ID is undefined");
+            const ret = this.sessionServer.userStorage.getUserById(userid)
+            username = (await ret).user.username;
+
+            // throw an error if the CSRF token is invalid
+            if (this.sessionServer.enableCsrfProtection && !event.locals.csrfToken) {
+                throw new CrossauthError(ErrorCode.InvalidCsrf);
+            }
+        
+            // can only call this if logged in as admin
+            if (!event.locals.user || !SvelteKitServer.isAdminFn(event.locals.user)) {
+                this.sessionServer.error(401);
+            }
+
+            await this.sessionServer.userStorage.deleteUserById(userid);
+
+            CrossauthLogger.logger.info(j({
+                message: "Create user as admin successful", 
+                ...logClient(event),
+                targetUser: username,
+                targetUserid: userid,
+            }))
+
+            return {
+                ok: true,
+
+            };
+
+        } catch (e) {
+            let ce = CrossauthError.asCrossauthError(e, "Couldn't delete account");
+            logAsWarnOrError(ce, j({
+                message: "Create user as admin unsuccessful", 
+                ...logClient(event),
+                targetUser: username,
+                targetUserid: userid,
+                cerr: ce,
+            }))
+            return {
+                error: ce.message,
+                errors: ce.messages,
+                errorCode: ce.code,
+                errorCodeName: ce.codeName,
+                ok: false,
             }
         }
+    }
     
     
     ///////////////////////////////////////////////////////////////////

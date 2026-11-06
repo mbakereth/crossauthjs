@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
+
+import { ErrorCode, CrossauthError } from "./error";
 /**
  * You can implement your own logger.  Crossauth only needs these functions
  * and variables to be present.
@@ -209,7 +211,7 @@ export function j(arg : {[key: string]: any}|string) : string|{[key: string]: an
     try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object") && arg.err && ("message" in arg.err) && !("message" in arg)) arg["message"] = arg.err.message;} catch {}
     try {if (typeof arg == "object" && ("err" in arg) && (typeof arg.err == "object")) arg.err = {...arg.err, stack: stack}; } catch {}
     try {if (typeof arg == "object" && ("err" in arg) && !("message" in arg)) arg["message"] = arg.message = "An unknown error occurred";} catch {}
-    try {if (typeof arg == "object" && ("cerr" in arg) && ("isCrossauthError" in arg.cerr) && arg.cerr ) {arg["errorCode"] = arg.cerr.code; arg["errorCodeName"] = arg.cerr.codeName; arg["httpStatus"] = arg.cerr.httpStatus; if (!("message" in arg)) arg["message"] = arg.cerr.message; delete arg.cerr;}} catch {}
+    try {if (typeof arg == "object" && ("cerr" in arg) && ("isCrossauthError" in arg.cerr) && arg.cerr ) {arg["errorCode"] = arg.cerr.code; arg["errorCodeName"] = arg.cerr.codeName; arg["httpStatus"] = arg.cerr.httpStatus; if (!("message" in arg)) arg["message"] = arg.cerr.message; if (!("errorMessage" in arg)) arg["errorMessageßß"] = arg.cerr.message; delete arg.cerr;}} catch {}
     return (typeof arg == "string" || globalThis.crossauthLoggerAcceptsJson) ? arg : JSON.stringify(arg);
 }
 
@@ -234,3 +236,160 @@ globalThis.crossauthLogger = new CrossauthLogger();
  * {@link CrossauthLogger.setLogger()}.
  */
 globalThis.crossauthLoggerAcceptsJson = true;
+
+/**
+ * Used when logging user-instigated actions
+ */
+export enum LoggedActionCode {
+
+    /** A user attempted to log in */
+	Login = 0,
+
+    /** A user attempted to log out */
+	Logout = 1,
+
+    /** User attempted to log in when they have not verified their email */
+    LoginWithoutEmailVerification = 2,
+
+    /** User got redirected to mandatory password change*/
+    PasswordChangeRedirect = 3,
+
+    /** User logged in when password reset is needed */
+    LoginWhenPasswordResetNeeded = 4,
+
+    /** User logged in when factor2 reset is needed */
+    LoginWhenFactor2ResetNeeded = 5,
+
+    /** User logged in when password and factor2 reset is needed */
+    LoginWhenPasswordAndFactor2ResetNeeded = 6,
+
+    /** Email verification message sent */
+    EmailVerificationTokenSent = 7,
+
+    /** Email verified */
+    EmailVerificationTokenComplete = 8,
+
+    /** Invalid session or CSRF cookie */
+    InvalidCookieOrToken = 9,
+
+    /** User visited page they do not have permission to */
+    UnauthorizedPageOrAPICall = 10,
+
+    /** User attempted OAuth authorization */
+    OAuthAuthorize = 11,
+
+    /** A user attempted to change his or her password */
+	PasswordChange = 102,
+
+    /** A user attempted to get a password reset token */
+	StartPasswordReset = 103,
+
+    /** A user attempted to get a reset password using the token */
+	FinishPasswordReset = 104,
+
+    /** A user attempted to get a change their factor2 */
+	ChangeFactor2 = 105,
+
+    /** A user attempted to get a reset their factor2 */
+	ResetFactor2 = 106,
+
+    /** A user attempted to update their account */
+	UpdateUser = 107,
+
+    /** A user attempted to delete their account */
+	DeleteUser = 108,
+
+    /** A user attempted to create an ApiKey */
+	CreateApiKey = 109,
+
+    /** A user attempted to delete an ApiKey */
+	DeleteApiKey = 110,
+
+    /** A user attempted to update an ApiKey */
+	UpdateApiKey = 111,
+
+    /** A user attempted to create an OAuthClient */
+	CreateOAuthClient = 112,
+
+    /** A user attempted to delete an OAuthClient */
+	DeleteOAuthClient = 113,
+
+    /** A user attempted to update an OAuthClient */
+	UpdateOAuthClient = 114,
+
+    /** A user attempted signup */
+	CreateUser = 115,
+
+    /** A user attempted to get a configure their factor2 */
+	ConfigureFactor2 = 116,
+
+    /** Admin attempted to change user's password */
+	AdminPasswordChange = 202,
+
+    /** Admin attempted to get a password reset token for a user */
+	AdminStartPasswordReset = 203,
+
+    /** Admin attempted to get a change user's factor2 */
+	AdminChangeFactor2 = 205,
+
+    /** Admin attempted to get a reset user's factor2 */
+	AdminResetFactor2 = 206,
+
+    /** Admin attempted to update user's account */
+	AdminUpdateUser = 207,
+
+    /** Admin attempted to delete user's account */
+	AdminDeleteUser = 208,
+
+    /** Admin attempted to create an ApiKey for a user */
+	AdminCreateApiKey = 209,
+
+    /** Admin attempted to delete a user's ApiKey */
+	AdminDeleteApiKey = 210,
+
+    /** Admin attempted to update a user's ApiKey */
+	AdminUpdateApiKey = 211,
+
+    /** Admin attempted to create an OAuthClient for a user */
+	AdminCreateOAuthClient = 212,
+
+    /** Admin attempted to delete a user's OAuthClient */
+	AdminDeleteOAuthClient = 213,
+
+    /** Admin attempted to update a user's OAuthClient */
+	AdminUpdateOAuthClient = 214,
+
+    /** Admin attempted to create a user */
+    AdminCreateUser = 215,
+
+    /** Admin attempted to get a configure user's factor2 */
+	AdminConfigureFactor2 = 216,
+}
+
+export function loggedActionCode(code: LoggedActionCode): {actionCode: number, actionCodeName: string} {
+    return {actionCode: code, actionCodeName: LoggedActionCode[code]}
+}
+
+export function logAsWarnOrError(ce: CrossauthError, message: string|{[key:string]:any}) {
+    if ([
+        ErrorCode.InvalidCsrf,
+        ErrorCode.UserNotExist,
+        ErrorCode.UserNotActive,
+        ErrorCode.InvalidKey,
+        ErrorCode.InvalidToken,
+        ErrorCode.Forbidden,
+        ErrorCode.PasswordFormat,
+        ErrorCode.PasswordInvalid,
+        ErrorCode.PasswordMatch,
+        ErrorCode.Forbidden,
+        ErrorCode.Expired,
+        ErrorCode.ExpiredToken,
+    ].includes(ce.code)) {
+        // user did something illegal
+        CrossauthLogger.logger.warn(message)
+    } else {
+        // Something else
+        CrossauthLogger.logger.error(message)
+    }
+
+}

@@ -23,11 +23,15 @@ import {
     CrossauthLogger,
     type OpenIdConfiguration,
     j,
+    loggedActionCode,
+    logAsWarnOrError,
+    LoggedActionCode,
     OAuthFlows,
     ErrorCode,
     type MfaAuthenticatorResponse,
     type User } from '@crossauth/common';
 import { FastifyServer, ERROR_500, DEFAULT_ERROR } from './fastifyserver';
+import { logClient } from './fastifysession';
 
 export interface DevicePageData {
     authorizationNeeded?: {
@@ -417,11 +421,12 @@ export class FastifyAuthorizationServer {
                 catch (e) {
                     ce = CrossauthError.asCrossauthError(e);
                     ce.message = "Invalid csrf cookie received";
-                    CrossauthLogger.logger.error(j({
+                    logAsWarnOrError(ce, j({
                         message: ce.message,
                         hashedCsrfCookie: csrfCookie ? 
                         Crypto.hash(csrfCookie) : undefined,
-                        user: request.user?.username,
+                        ...logClient(request),
+                        ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken),
                         cerr: ce
                     }));
                 }
@@ -572,9 +577,38 @@ export class FastifyAuthorizationServer {
                     if (resp.error) error = resp.error;
                     if (resp.error_description) errorDescription = resp.error_description;
                     const ce = CrossauthError.fromOAuthError(error, errorDescription);
-                    CrossauthLogger.logger.error(j({cerr: ce}));
+                    let msg = {
+                        grant_type: request.body.grant_type,
+                        user: request.body.username,
+                        cerr: ce
+                    }
+                    if ([
+                        ErrorCode.InvalidKey,
+                        ErrorCode.InvalidToken,
+                        ErrorCode.InvalidSession,
+                        ErrorCode.InvalidCsrf
+                    ].includes(ce.code)) {
+                        msg = {...msg, ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken)}
+                    } else if ([
+                        ErrorCode.UserNotExist,
+                        ErrorCode.UserNotActive,
+                    ].includes(ce.code)) {
+                        msg = {...msg, ...loggedActionCode(LoggedActionCode.Login)}
+                    } else if ([
+                        ErrorCode.Forbidden,
+                        ErrorCode.Unauthorized
+                    ].includes(ce.code)) {
+                        msg = {...msg, ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken)}
+                    }
+                    logAsWarnOrError(ce, j(msg));
                     return reply.header(...JSONHDR).status(ce.httpStatus).send(resp);
                 }
+                CrossauthLogger.logger.info(j({
+                    message: "OAuth token endpointm successful",
+                    ...logClient(request),
+                    ...loggedActionCode(LoggedActionCode.OAuthAuthorize),
+                    grant_type: request.body.grant_type,
+                }))
                 return reply.header(...JSONHDR).send(resp);
             });
         }
@@ -802,10 +836,9 @@ export class FastifyAuthorizationServer {
                 const ce = CrossauthError.asCrossauthError(e);
                 CrossauthLogger.logger.error(j({
                     message: "getcsrftoken failure",
-                    user: request.user?.username,
+                    ...logClient(request),
                     hashedCsrfCookie: Crypto.hash(csrfCookieValue.split(".")[0]),
-                    errorCode: ce.code,
-                    errorCodeName: ce.codeName
+                    url: request.url,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return reply.status(ce.httpStatus).header(...JSONHDR)
@@ -834,9 +867,10 @@ export class FastifyAuthorizationServer {
         if (error_description) {
             ce = new CrossauthError(ErrorCode.BadRequest, error_description);
             CrossauthLogger.logger.error(j({
-                message: "authorize parameter invalid",
+                message: "OAuth authorize parameter invalid",
                 cerr: ce,
-                user: request.user?.username
+                ...logClient(request),
+                url: request.url,
             }));
         }  else {
             CrossauthLogger.logger.error(j({
@@ -923,6 +957,12 @@ export class FastifyAuthorizationServer {
             } catch (e) {
                 const ce = e as CrossauthError;
                 CrossauthLogger.logger.debug(j({err: ce}));
+                logAsWarnOrError(ce, j({
+                    message: "Invalid client given",
+                    ...logClient(request),
+                    ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken),
+                    cerr: ce,
+                }))
                 if (this.errorPage) {
                     return reply.status(ce.httpStatus).view(this.errorPage, {
                         status: ce.httpStatus, 

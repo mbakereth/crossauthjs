@@ -8,6 +8,7 @@
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,
+    "types": ["node"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",

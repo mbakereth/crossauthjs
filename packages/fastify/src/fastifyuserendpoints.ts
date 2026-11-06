@@ -7,13 +7,17 @@ import {
     ErrorCode,
     CrossauthLogger,
     j,
+    logAsWarnOrError,
+    loggedActionCode,
+    LoggedActionCode,
 } from '@crossauth/common';
 import { UserState } from '@crossauth/common';
 import type { User } from '@crossauth/common';
 import { FastifyServer } from './fastifyserver';
 import { FastifySessionServer,
     type FastifySessionServerOptions,
-    type CsrfBodyType} from './fastifysession';
+    type CsrfBodyType,
+    logClient} from './fastifysession';
 import {
     setParameter,
     ParamType,
@@ -249,7 +253,12 @@ export class FastifyUserEndpoints {
                     });
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.error(j({message: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
+                    logAsWarnOrError(ce, j({
+                        message: "Update user unsuccessful", 
+                        user: request.body.username, 
+                        cerr: ce,
+                        ip: request.ip,
+                    }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     let extraFields : { [key : string] : any }= {};
                     for (let field in request.body) {
@@ -299,11 +308,11 @@ export class FastifyUserEndpoints {
                 })});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Update user failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Update user unsuccessful",
+                    ...loggedActionCode(LoggedActionCode.UpdateUser),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -401,11 +410,11 @@ export class FastifyUserEndpoints {
                     });
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.error(j({
-                        message: "Change two factor authentication failure",
-                        user: request.user?.username,
-                        errorCodeName: ce.codeName,
-                        errorCode: ce.code
+                    logAsWarnOrError(ce, j({
+                        message: "Change two factor authentication unsuccessful",
+                        ...loggedActionCode(LoggedActionCode.ChangeFactor2),
+                        ...logClient(request),
+                        cerr: ce,
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -450,11 +459,11 @@ export class FastifyUserEndpoints {
                     })});
                 } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Change factor2 failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Change factor2 unsuccessful",
+                    ...loggedActionCode(LoggedActionCode.ChangeFactor2),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -540,11 +549,11 @@ export class FastifyUserEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.error(j({
-                    message: "Change password failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Change password unsuccessful",
+                    ...loggedActionCode(LoggedActionCode.PasswordChange),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -585,11 +594,11 @@ export class FastifyUserEndpoints {
                 })});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Change password failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Change password unsuccessful",
+                    ...loggedActionCode(LoggedActionCode.PasswordChange),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -628,11 +637,11 @@ export class FastifyUserEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.error(j({
-                    message: "Configure factor2 failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code              
+                logAsWarnOrError(ce, j({
+                    message: "Configure factor2 unsuccessful",
+                    ...loggedActionCode(LoggedActionCode.ConfigureFactor2),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -709,15 +718,26 @@ export class FastifyUserEndpoints {
                         // this shouldn't happen - user's cannot call this URL without having a session,
                         // user or anonymous.  However, just in case...
                         const ce = CrossauthError.asCrossauthError(e);
-                        CrossauthLogger.logger.error(j({message: "Signup second factor failure", errorCodeName: ce.codeName, errorCode: ce.code}));
-                        CrossauthLogger.logger.error(j({message: "Session not defined during two factor process"}));
+                        logAsWarnOrError(ce, j({
+                            message: "Signup second factor unsuccessful", 
+                            ...loggedActionCode(LoggedActionCode.CreateUser),
+                            ...logClient(request),
+                            cerr: ce,
+                        }));
+                        CrossauthLogger.logger.error(j({message: "Session not defined during two factor process", ...logClient(request)}));
                         return reply.status(500).view(this.sessionServer.errorPage, {status: 500, errorMessage: "An unknown error occurred", errorCode: ErrorCode.UnknownError, errorCodeName: "UnknownError"});
                     }
 
                     // normal error - wrong code, etc.  show the page again
                     let data = (await this.sessionServer.sessionManager.dataForSessionId(request.sessionId))["2fa"];
                     const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.error(j({message: "Signup two factor failure", user: data?.username, errorCodeName: ce.codeName, errorCode: ce.code}));
+                    logAsWarnOrError(ce, j({
+                        message: "Signup two factor unsuccessful", 
+                        user: data?.username, 
+                        cerr: ce,
+                        ip: request.ip,
+                        ...loggedActionCode(LoggedActionCode.CreateUser)
+                    }));
                     const { userData } = await this.sessionServer.sessionManager.repeatTwoFactorSignup(request.sessionId);
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
                             return reply.view(this.configureFactor2Page, {
@@ -770,11 +790,11 @@ export class FastifyUserEndpoints {
                 })});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Configure 2FA configuration failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Configure 2FA configuration unsuccessful",
+                    ...loggedActionCode(LoggedActionCode.ConfigureFactor2),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -814,11 +834,11 @@ export class FastifyUserEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Configure 2FA configuration failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Configure 2FA configuration unsuccessful",
+                    ...loggedActionCode(LoggedActionCode.ConfigureFactor2),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -878,10 +898,14 @@ export class FastifyUserEndpoints {
                         });
                     });
             } catch (e) {
-                    CrossauthLogger.logger.error(j({
-                        message: "Request password reset faiulure user failure",
-                        email: request.body.email
-                    }));
+                const ce = CrossauthError.asCrossauthError(e)
+                logAsWarnOrError(ce, j({
+                    message: "Request password reset unsuccessful",
+                    email: request.body.email,
+                    ...loggedActionCode(LoggedActionCode.StartPasswordReset),
+                    ...logClient(request),
+                    cerr: ce,
+                }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
                     if (error.code == ErrorCode.EmailNotExist) {
@@ -930,11 +954,12 @@ export class FastifyUserEndpoints {
                 })});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Reset password failure failure",
+                logAsWarnOrError(ce, j({
+                    message: "Reset password unsuccessful",
                     email: request.body.email,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    ...loggedActionCode(LoggedActionCode.FinishPasswordReset),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -1000,11 +1025,12 @@ export class FastifyUserEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Reset password failure",
+                logAsWarnOrError(ce, j({
+                    message: "Reset password unsuccessful",
                     hashedToken: Crypto.hash(request.body.token),
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    ...loggedActionCode(LoggedActionCode.FinishPasswordReset),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -1042,11 +1068,12 @@ export class FastifyUserEndpoints {
                 })});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Reset password failure",
+                logAsWarnOrError(ce, j({
+                    message: "Reset password unsuccessful",
                     hashedToken: Crypto.hash(request.body.token),
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    ...loggedActionCode(LoggedActionCode.FinishPasswordReset),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -1086,11 +1113,12 @@ export class FastifyUserEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Verify email failed",
+                logAsWarnOrError(ce, j({
+                    message: "Verify email unsuccessful",
                     hashedToken: Crypto.hash(request.params.token),
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    ...loggedActionCode(LoggedActionCode.EmailVerificationTokenComplete),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -1127,11 +1155,12 @@ export class FastifyUserEndpoints {
                 })});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Verify email failure",
+                logAsWarnOrError(ce, j({
+                    message: "Verify email unsuccessful",
                     hashedToken: Crypto.hash(request.params.token),
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                    ...loggedActionCode(LoggedActionCode.EmailVerificationTokenComplete),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -1231,12 +1260,11 @@ export class FastifyUserEndpoints {
                     });
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.error(j({
-                        message: "Failed deleting user",
-                        user: request.user?.username,
-                    
-                        errorCodeName: ce.codeName,
-                        errorCode: ce.code
+                    logAsWarnOrError(ce, j({
+                        message: "Delete user unsuccessful",
+                        ...loggedActionCode(LoggedActionCode.DeleteUser),
+                        ...logClient(request),
+                        cerr: ce,
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -1290,10 +1318,10 @@ export class FastifyUserEndpoints {
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
                     CrossauthLogger.logger.error(j({
-                        message: "Delete user failure",
-                        user: request.user?.username,
-                        errorCodeName: ce.codeName,
-                        errorCode: ce.code
+                        message: "Delete user unsuccessful",
+                        ...loggedActionCode(LoggedActionCode.DeleteUser),
+                        ...logClient(request),
+                        cerr: ce,
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -1346,6 +1374,11 @@ export class FastifyUserEndpoints {
         let resp = 
             await this.sessionServer.sessionManager.updateUser(request.user, user);
 
+        CrossauthLogger.logger.info({
+            message: "Update user successful",
+            ...loggedActionCode(LoggedActionCode.UpdateUser),
+            ...logClient(request),
+        })
         return successFn(reply, request.user, resp.emailVerificationTokenSent);
     }
 
@@ -1433,6 +1466,11 @@ export class FastifyUserEndpoints {
             next: request.body.next??this.sessionServer.loginRedirect,
             csrfToken: request.csrfToken,
         };
+        CrossauthLogger.logger.info({
+            message: "Change factor2 successful",
+            ...loggedActionCode(LoggedActionCode.ChangeFactor2),
+            ...logClient(request),
+        })
         return successFn(reply, data)
     }
 
@@ -1571,6 +1609,11 @@ export class FastifyUserEndpoints {
             return this.sessionServer.loginWithUser(user, true, request, reply, 
                 (request, user) => {return successFn(request, user)});
         }
+        CrossauthLogger.logger.info({
+            message: "Configure factor2 successful",
+            ...loggedActionCode(LoggedActionCode.ConfigureFactor2),
+            ...logClient(request),
+        })
         return successFn(reply, user);
     }
 
@@ -1602,6 +1645,11 @@ export class FastifyUserEndpoints {
             ...userData,
             csrfToken: request.csrfToken,
         };
+        CrossauthLogger.logger.info({
+            message: "Reconfigure factor2 successful",
+            ...loggedActionCode(LoggedActionCode.ConfigureFactor2),
+            ...logClient(request),
+        })
         return successFn(reply, data)
     }
 
@@ -1636,14 +1684,21 @@ export class FastifyUserEndpoints {
                     email: request.body.email
                 }))
             } else {
-                CrossauthLogger.logger.error(j({
-                    err: e,
+                logAsWarnOrError(ce, j({
+                    ...loggedActionCode(LoggedActionCode.StartPasswordReset),
+                    ...logClient(request),
+                    cerr: ce,
                     message: "Couldn't send password reset email"
                 }));
                 throw ce
             }
         }
 
+        CrossauthLogger.logger.info({
+            message: "Request password reset successful",
+            ...loggedActionCode(LoggedActionCode.StartPasswordReset),
+            ...logClient(request),
+        })
         return successFn(reply, undefined);
     }
 
@@ -1692,6 +1747,11 @@ export class FastifyUserEndpoints {
             // log the user in
             return this.sessionServer.loginWithUser(user1, true, request, reply, successFn);
         }
+        CrossauthLogger.logger.info({
+            message: "Reset password successful",
+            ...loggedActionCode(LoggedActionCode.FinishPasswordReset),
+            ...logClient(request),
+        })
         return successFn(reply);
     }
 
@@ -1709,6 +1769,11 @@ export class FastifyUserEndpoints {
         // validate the token and log the user in
         const user = 
             await this.sessionServer.sessionManager.applyEmailVerificationToken(token);
+        CrossauthLogger.logger.info({
+            message: "Verify email successful",
+            ...loggedActionCode(LoggedActionCode.EmailVerificationTokenComplete),
+            ...logClient(request),
+        })
         return await this.sessionServer.loginWithUser(user, true, request, reply, successFn);
     }
 
@@ -1728,5 +1793,10 @@ export class FastifyUserEndpoints {
         }
 
         await this.sessionServer.userStorage.deleteUserById(request.user.id);
+        CrossauthLogger.logger.info({
+            message: "Delete user successful",
+            ...loggedActionCode(LoggedActionCode.DeleteUser),
+            ...logClient(request),
+        })
         return successFn(reply);
     }}

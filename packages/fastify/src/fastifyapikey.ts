@@ -3,7 +3,8 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http'
 import { ApiKeyManager, UserStorage, KeyStorage } from '@crossauth/backend';
 import type { ApiKeyManagerOptions } from '@crossauth/backend';
-import { CrossauthLogger, j } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, logAsWarnOrError, loggedActionCode, LoggedActionCode } from '@crossauth/common';
+import { logClient } from './fastifysession';
 
 /**
  * Options for {@link FastifyApiKeyServer }.
@@ -93,7 +94,13 @@ export class FastifyApiKeyServer {
                         }
                     }
                 } catch (e) {
-                    CrossauthLogger.logger.error(j({message: "Invalid authorization header received", header: request.headers.authorization}));
+                    const ce = CrossauthError.asCrossauthError(e);
+                    CrossauthLogger.logger.error(j({
+                        message: "Invalid authorization header received",
+                        ...logClient(request),
+                        ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken),
+                        cerr: ce,
+                        header: request.headers.authorization}));
                     CrossauthLogger.logger.debug(j({err: e}));
                 }
 

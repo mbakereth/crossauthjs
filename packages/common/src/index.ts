@@ -13,7 +13,7 @@ export type {
     OAuthClient,
 } from './interfaces';
 export { CrossauthError, ErrorCode, httpStatus } from './error';
-export { CrossauthLogger, j, type CrossauthLoggerInterface } from './logger';
+export { CrossauthLogger, j, type CrossauthLoggerInterface, LoggedActionCode, loggedActionCode, logAsWarnOrError } from './logger';
 export type { TokenEndpointAuthMethod, ResponseMode, GrantType, SubjectType, ClaimType, OpenIdConfiguration, Jwks  } from './oauth/wellknown';
 export {  DEFAULT_OIDCCONFIG  } from './oauth/wellknown';
 export {

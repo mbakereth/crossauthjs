@@ -5,6 +5,9 @@ import {
     CrossauthError,
     CrossauthLogger,
     j,
+    loggedActionCode,
+    LoggedActionCode,
+    logAsWarnOrError,
     ErrorCode,
     type User } from '@crossauth/common';
 import {
@@ -15,6 +18,7 @@ import {
 import type { OAuthResourceServerOptions } from '@crossauth/backend';
 import { OAuthTokenConsumer } from '@crossauth/backend';
 import { FastifySessionAdapter } from './fastifysessionadapter';
+import { logClient } from './fastifysession';
 
 /**
  * Options for {@link FastifyOAuthResourceServer}
@@ -211,8 +215,11 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                         for (let scope of this.protectedEndpoints[matchingEndpoint].scope??[]) {
                             if (!request.scope || !(request.scope.includes(scope))
                                 && this.protectedEndpoints[matchingEndpoint].acceptSessionAuthorization!=true) {
-                                CrossauthLogger.logger.warn(j({message: "Access token does not have sufficient scope",
-                                    username: request.user?.username, url: request.url}));
+                                CrossauthLogger.logger.warn(j({
+                                    message: "Access token does not have sufficient scope",
+                                    ...loggedActionCode(LoggedActionCode.UnauthorizedPageOrAPICall),
+                                    ...logClient(request),
+                                    url: request.url}));
                                 request.scope = undefined;
                                 request.accessTokenPayload = undefined;
                                 request.user = undefined;
@@ -226,9 +233,18 @@ export class FastifyOAuthResourceServer extends OAuthResourceServer {
                     request.authType = "oauth";
                     request.authError = authResponse?.error
                     if (authResponse?.error == "access_denied") {
+                        CrossauthLogger.logger.warn(j({
+                            message: "OAuth access denied",
+                            ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken),
+                            ...logClient(request),
+                            url: request.url}));
                         const authenticateHeader = this.authenticateHeader(request);
                         return reply.header('WWW-Authenticate', authenticateHeader).status(401).send(this.errorBody);
                     } else if (authResponse?.error) {
+                        CrossauthLogger.logger.warn(j({
+                            message: this.errorBody,
+                            ...logClient(request),
+                            url: request.url}));
                         return reply.status(500).send(this.errorBody);
                     } 
                     request.authErrorDescription = authResponse?.error_description;

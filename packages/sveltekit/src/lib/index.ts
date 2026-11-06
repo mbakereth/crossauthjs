@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 // Sveltekit
 export { SvelteKitSessionServer, type Header } from './sveltekitsession';
-export type { SvelteKitSessionServerOptions } from './sveltekitsession';
+export type { SvelteKitSessionServerOptions, logClient } from './sveltekitsession';
 export type {
     LoginPageData,
     LoginActionData,

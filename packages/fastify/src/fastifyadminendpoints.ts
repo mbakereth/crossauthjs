@@ -8,10 +8,13 @@ import {
     CrossauthLogger,
     j,
     UserState,
+    loggedActionCode,
+    logAsWarnOrError,
+    LoggedActionCode
 } from '@crossauth/common';
 import type { User } from '@crossauth/common';
 import { FastifyServer } from './fastifyserver';
-import { FastifySessionServer } from './fastifysession';
+import { FastifySessionServer, logClient } from './fastifysession';
 import type { FastifySessionServerOptions,
     CsrfBodyType,
     LoginQueryType,
@@ -243,12 +246,12 @@ export class FastifyAdminEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.error(j({
-                    message: "Signup failure",
-                    user: request.body.username,
-                
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Create user unsuccessful as admion",
+                    ...logClient(request),
+                    ...loggedActionCode(LoggedActionCode.AdminCreateUser),
+                    targetUser: request.body.username,
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -299,11 +302,12 @@ export class FastifyAdminEndpoints {
                 })});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Create user failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Create user unsuccessful",
+                    ...logClient(request),
+                    ...loggedActionCode(LoggedActionCode.AdminCreateUser),
+                    targetUser: request.body.username,
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -458,7 +462,12 @@ export class FastifyAdminEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.error(j({message: "Update user failure", user: request.body.username, errorCodeName: ce.codeName, errorCode: ce.code}));
+                CrossauthLogger.logger.error(j({
+                    message: "Update user failure", 
+                    targetUser: request.body.username, 
+                    ...loggedActionCode(LoggedActionCode.AdminUpdateUser),
+                    ...logClient(request),
+                }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
                     if (!user) {
@@ -553,12 +562,13 @@ export class FastifyAdminEndpoints {
                     });
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e);
-                    CrossauthLogger.logger.error(j({
-                        message: "Failed deleting user",
-                        user: request.user?.username,
+                    logAsWarnOrError(ce, j({
+                        message: "Delete user as admin unsuccessful",
+                        ...loggedActionCode(LoggedActionCode.AdminDeleteUser),
+                        ...logClient(request),
+                        cerr: ce,
+                        targetUserId: request.params.id,
                     
-                        errorCodeName: ce.codeName,
-                        errorCode: ce.code
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -615,11 +625,12 @@ export class FastifyAdminEndpoints {
                 })});
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e); 
-                CrossauthLogger.logger.error(j({
-                    message: "Update user failure",
-                    user: request.user?.username,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Update user as admin unsuccessful",
+                    ...loggedActionCode(LoggedActionCode.AdminUpdateUser),
+                    ...logClient(request),
+                    targetUser: request.body.username,
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -713,11 +724,12 @@ export class FastifyAdminEndpoints {
                 });
             } catch (e) {
                 const ce = CrossauthError.asCrossauthError(e);
-                CrossauthLogger.logger.error(j({
-                    message: "Change password failure",
-                    userid: request.params.id,
-                    errorCodeName: ce.codeName,
-                    errorCode: ce.code
+                logAsWarnOrError(ce, j({
+                    message: "Change password as admin unsuccessful",
+                    targetUserid: request.params.id,
+                    ...loggedActionCode(LoggedActionCode.AdminPasswordChange),
+                    ...logClient(request),
+                    cerr: ce,
                 }));
                 CrossauthLogger.logger.debug(j({err: e}));
                 return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -765,11 +777,11 @@ export class FastifyAdminEndpoints {
                     })});
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
-                    CrossauthLogger.logger.error(j({
-                        message: "Update user failure",
-                        user: request.user?.username,
-                        errorCodeName: ce.codeName,
-                        errorCode: ce.code
+                    logAsWarnOrError(ce, j({
+                        message: "Update user as admin unbsuccessful",
+                        ...loggedActionCode(LoggedActionCode.AdminUpdateUser),
+                        ...logClient(request),
+                        targetUserid: request.params.id,
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     return this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -811,11 +823,12 @@ export class FastifyAdminEndpoints {
                     })});
                 } catch (e) {
                     const ce = CrossauthError.asCrossauthError(e); 
-                    CrossauthLogger.logger.error(j({
-                        message: "Delete user failure",
-                        user: request.user?.username,
-                        errorCodeName: ce.codeName,
-                        errorCode: ce.code
+                    logAsWarnOrError(ce, j({
+                        message: "Delete user as admin unsuccessful",
+                        ...loggedActionCode(LoggedActionCode.AdminDeleteUser),
+                        ...logClient(request),
+                        targetUserId: request.params.id,
+                        cerr: ce,
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
                     this.sessionServer.handleError(e, request, reply, (reply, error) => {
@@ -934,6 +947,13 @@ export class FastifyAdminEndpoints {
             await this.sessionServer.sessionManager.requestPasswordReset(email);
 
         }
+        CrossauthLogger.logger.info(j({
+            message: "Create user as admin successful",
+            ...loggedActionCode(LoggedActionCode.AdminCreateUser),
+            ...logClient(request),
+            targetUser: user.username,
+            targetUserid: user.id,
+        }))
         return successFn(reply, {}, newUser);
     }
 
@@ -994,6 +1014,13 @@ export class FastifyAdminEndpoints {
             //await this.sessionServer.sessionManager.updateUser(request.user, user,);
             await this.sessionServer.sessionManager.updateUser(user, user, true);
 
+        CrossauthLogger.logger.info(j({
+            message: "Update",
+            ...loggedActionCode(LoggedActionCode.AdminUpdateUser),
+            ...logClient(request),
+            targetUser: user.username,
+            targetUserid: user.id,
+        }))
         return successFn(reply, request.user, resp.emailVerificationTokenSent, resp.passwordResetTokenSent);
     }
 
@@ -1044,6 +1071,13 @@ export class FastifyAdminEndpoints {
             newSecrets,
             repeatSecrets);
         
+        CrossauthLogger.logger.info(j({
+            message: "Change password as admin successful",
+            ...loggedActionCode(LoggedActionCode.AdminPasswordChange),
+            ...logClient(request),
+            targetUser: user.username,
+            targetUserid: user.id,
+        }))
         return successFn(reply, undefined);
     }
 
@@ -1064,6 +1098,12 @@ export class FastifyAdminEndpoints {
         }
 
         await this.sessionServer.userStorage.deleteUserById(request.params.id);
+        CrossauthLogger.logger.info(j({
+            message: "Delete user as admin successful",
+            ...loggedActionCode(LoggedActionCode.AdminDeleteUser),
+            ...logClient(request),
+            targetUserid: request.params.id,
+        }))
         return successFn(reply);
     }
 }

@@ -5,7 +5,10 @@ import {
     CrossauthLogger,
     j,
     ErrorCode,
-    type User } from '@crossauth/common';
+    type User, 
+    loggedActionCode,
+    LoggedActionCode,
+    logAsWarnOrError} from '@crossauth/common';
 import {
     setParameter,
     ParamType,
@@ -15,6 +18,7 @@ import type { OAuthResourceServerOptions } from '@crossauth/backend';
 import { OAuthTokenConsumer } from '@crossauth/backend';
 import { SvelteKitSessionAdapter } from './sveltekitsessionadapter';
 import { type MaybePromise } from './tests/sveltemocks';
+import { logClient } from './sveltekitsession';
 
 /**
  * Options for {@link SvelteKitOAuthResourceServer}
@@ -191,6 +195,12 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                             status: 401});
                     }
                     if (!authResponse.authorized) {
+                        CrossauthLogger.logger.warn(j({
+                            message: "Unauthorized request to protected OAuth endpoint",
+                            ...logClient(event),
+                            ...loggedActionCode(LoggedActionCode.UnauthorizedPageOrAPICall),
+                            url: event.request.url,
+                        }))
                         const authenticateHeader = this.authenticateHeader(event);
                         return new Response(JSON.stringify(this.errorBody), {headers: {
                             "content-type": "application/json", 
@@ -228,6 +238,12 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                                     event.locals.authError = "access_denied";
                                     event.locals.authErrorDescription = "Access token does not have sufficient scope";
                                     const authenticateHeader = this.authenticateHeader(event);
+                                    CrossauthLogger.logger.warn(j({
+                                        message: "Unauthorized request to protected OAuth endpoint",
+                                        ...logClient(event),
+                                        ...loggedActionCode(LoggedActionCode.UnauthorizedPageOrAPICall),
+                                        url: event.request.url,
+                                    }))
                                     return new Response(JSON.stringify(this.errorBody), {headers: {
                                         "content-type": "application/json", 
                                         'WWW-Authenticate': authenticateHeader},
@@ -250,7 +266,7 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
                             status: 500});
                     } 
                     event.locals.authErrorDescription = authResponse?.error_description;
-                    CrossauthLogger.logger.debug(j({message: "Resource server url", url: event.request.url, authorized: event.locals.accessTokenPayload!= undefined}));
+                    CrossauthLogger.logger.debug(j({message: "Resource server url", url: event.request.url, authorized: event.locals.accessTokenPayload!= undefined, ...logClient(event)}));
                 }
             };
         }
@@ -330,7 +346,7 @@ export class SvelteKitOAuthResourceServer extends OAuthResourceServer {
         } catch (e) {
             const ce = e as CrossauthError;
             CrossauthLogger.logger.debug(j({err: e}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({cerr: ce, ...logClient(event)}));
             event.locals.authError = "server_error";
             event.locals.authErrorDescription = ce.message;
             return {authorized: false, error: "server_error", error_description: ce.message};

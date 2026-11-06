@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Matthew Baker.  All rights reserved.  Licenced under the Apache Licence 2.0.  See LICENSE file
 import { SvelteKitServer } from './sveltekitserver';
-import { SvelteKitSessionServer } from './sveltekitsession';
+import { logClient, SvelteKitSessionServer } from './sveltekitsession';
 import type { SvelteKitSessionServerOptions } from './sveltekitsession';
 import { 
     setParameter,
@@ -9,10 +9,19 @@ import {
  } from '@crossauth/backend';
 import type {  OAuthClientStorage } from '@crossauth/backend';
 import type { User, OAuthClient } from '@crossauth/common';
-import { CrossauthError, CrossauthLogger, j, ErrorCode, OAuthFlows } from '@crossauth/common';
+import { 
+    CrossauthError, 
+    CrossauthLogger, 
+    j, 
+    ErrorCode, 
+    OAuthFlows, 
+    loggedActionCode, 
+    LoggedActionCode, 
+    logAsWarnOrError } from '@crossauth/common';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { error, redirect } from '@sveltejs/kit';
+import { log } from 'node:console';
 
 //////////////////////////////////////////////////////////////////////
 // Return types
@@ -329,7 +338,10 @@ export class SvelteKitSharedClientEndpoints {
                     const str = event.url.searchParams.get("skip");
                     if (str) skip = parseInt(str);
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({cerr: e, message: "skip parameter is not an integer"}))
+                    CrossauthLogger.logger.warn(j({
+                        cerr: e, 
+                        ...logClient(event),
+                        message: "skip parameter is not an integer"}))
                 }
 
             }
@@ -339,7 +351,10 @@ export class SvelteKitSharedClientEndpoints {
                     const str = event.url.searchParams.get("take");
                     if (str) take = parseInt(str);
                 } catch (e) {
-                    CrossauthLogger.logger.warn(j({cerr: e, message: "take parameter is not an integer"}))
+                    CrossauthLogger.logger.warn(j({
+                        cerr: e, 
+                        ...logClient(event),
+                        message: "take parameter is not an integer"}))
                 }
             }
             if (!take) take = 10;
@@ -387,7 +402,7 @@ export class SvelteKitSharedClientEndpoints {
                 throw e;
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({cerr: ce}));
                     return {
                 ok: false,
                 error: ce.message,
@@ -430,8 +445,8 @@ export class SvelteKitSharedClientEndpoints {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't load client");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
-                    return {
+            logAsWarnOrError(ce, j({cerr: ce, ...logClient(event)}));
+            return {
                 error: ce.message,
                 errorCode: ce.code,
                 errorCodeName: ce.codeName,
@@ -458,6 +473,7 @@ export class SvelteKitSharedClientEndpoints {
     protected async updateClient_internal(event : RequestEvent, isAdmin: boolean) : Promise<UpdateClientActionData> {
         
         let formData : {[key:string]:string}|undefined = undefined;
+        const clientUpdate : Partial<OAuthClient> = {}
         try {
             const client_id = event.params.client_id;
             if (!client_id) throw new CrossauthError(ErrorCode.BadRequest, "No client ID given");
@@ -479,6 +495,10 @@ export class SvelteKitSharedClientEndpoints {
         const redirect_uri = !formData.redirect_uri || formData.redirect_uri.trim().length == 0 ? 
             [] : formData.redirect_uri.trim().split(/[, ][ \t\n]*/);
 
+        clientUpdate.client_name = formData.client_name;
+        clientUpdate.confidential = data.getAsBoolean("confidential") ?? false;
+        clientUpdate.redirect_uri = redirect_uri;
+
         // validate redirect uris
         let redirect_uriErrors : string[] = [];
         for (let uri of redirect_uri) {
@@ -486,7 +506,8 @@ export class SvelteKitSharedClientEndpoints {
                 OAuthClientManager.validateUri(uri);
             }
             catch (e) {
-                CrossauthLogger.logger.error(j({err: e}));
+                const ce = CrossauthError.asCrossauthError(e)
+                logAsWarnOrError(ce, j({cerr: ce, ...logClient(event)}));
                 redirect_uriErrors.push("["+uri+"]");
             }
         }
@@ -503,12 +524,8 @@ export class SvelteKitSharedClientEndpoints {
                 validFlows.push(flow);
             }
         }
-        
-        const clientUpdate : Partial<OAuthClient> = {}
-        clientUpdate.client_name = formData.client_name;
-        clientUpdate.confidential = data.getAsBoolean("confidential") ?? false;
         clientUpdate.valid_flow = validFlows;
-        clientUpdate.redirect_uri = redirect_uri;
+
         if (isAdmin) {
             let userid : string|number|undefined = formData.userid ?? undefined;
             if (userid && this.sessionServer?.userStorage) {
@@ -525,6 +542,14 @@ export class SvelteKitSharedClientEndpoints {
             await this.clientManager.updateClient(client_id,
                 clientUpdate,
                 resetSecret);
+        CrossauthLogger.logger.info(j({
+            message: "OAuth client update successful",
+            ...logClient(event),
+            clientId: newClient.client_id,
+            clientName: newClient.client_name,
+            clientUserid: newClient.userid,
+            ...loggedActionCode(isAdmin ? LoggedActionCode.AdminUpdateOAuthClient : LoggedActionCode.UpdateOAuthClient),
+        }))
         return {
             ok: true,
             client: newClient,
@@ -538,7 +563,15 @@ export class SvelteKitSharedClientEndpoints {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't update client");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({
+                message: "OAuth client update unsuccessful",
+                ...logClient(event),
+                ...loggedActionCode(isAdmin ? LoggedActionCode.AdminUpdateOAuthClient : LoggedActionCode.UpdateOAuthClient),
+                clientId: clientUpdate.client_id,
+                clientName: clientUpdate.client_name,
+                clientUserid: clientUpdate.userid,
+                cerr: ce,
+            }))
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -597,7 +630,7 @@ export class SvelteKitSharedClientEndpoints {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't initialize new client");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            CrossauthLogger.logger.error(j({cerr: ce, ...logClient(event)}));
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -695,6 +728,11 @@ export class SvelteKitSharedClientEndpoints {
                     validFlows,
                     data.getAsBoolean("confidential") ?? false,
                     clientUserId );
+            CrossauthLogger.logger.info(j({
+                message: "Create OAuth client successful",
+                ...loggedActionCode(isAdmin? LoggedActionCode.AdminCreateOAuthClient : LoggedActionCode.CreateOAuthClient),
+                ...logClient(event),
+            }))
             return {
                 ok: true,
                 client: newClient,
@@ -705,7 +743,12 @@ export class SvelteKitSharedClientEndpoints {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't create client");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({
+                message: "Create OAuth client unsuccessful",
+                ...loggedActionCode(isAdmin? LoggedActionCode.AdminCreateOAuthClient : LoggedActionCode.CreateOAuthClient),
+                ...logClient(event),
+                cerr: ce,
+                }));
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -740,7 +783,7 @@ export class SvelteKitSharedClientEndpoints {
         } catch (e) {
             let ce = CrossauthError.asCrossauthError(e, "Couldn't load client");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({cerr: ce, ...logClient(event)}));
             return {
                 error: ce.message,
                 errorCode: ce.code,
@@ -776,7 +819,12 @@ export class SvelteKitSharedClientEndpoints {
                 if (client.userid != event.locals.user?.id) throw this.error(401, "Unauthorized");
             }
         
-        await this.clientStorage.deleteClient(client_id);
+            await this.clientStorage.deleteClient(client_id);
+            CrossauthLogger.logger.info(j({
+                message: "Delete OAuth client successful",
+                ...loggedActionCode(isAdmin? LoggedActionCode.AdminDeleteOAuthClient : LoggedActionCode.DeleteOAuthClient),
+                ...logClient(event),
+            }))
         return {
             ok: true,
         }
@@ -785,7 +833,12 @@ export class SvelteKitSharedClientEndpoints {
             if (SvelteKitServer.isSvelteKitRedirect(e) || SvelteKitServer.isSvelteKitError(e)) throw e;
             let ce = CrossauthError.asCrossauthError(e, "Couldn't delete client");
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({cerr: ce}));
+            logAsWarnOrError(ce, j({
+                message: "Delete OAuth client unsuccessful",
+                ...loggedActionCode(isAdmin? LoggedActionCode.AdminDeleteOAuthClient : LoggedActionCode.DeleteOAuthClient),
+                ...logClient(event),
+                cerr: ce,
+            }))
             return {
                 error: ce.message,
                 errorCode: ce.code,

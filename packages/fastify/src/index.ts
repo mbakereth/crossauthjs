@@ -5,7 +5,7 @@ export { FastifyServer } from './fastifyserver';
 export type { FastifyServerOptions, FastifyErrorFn  } from './fastifyserver';
 export { FastifyApiKeyServer } from './fastifyapikey';
 export type { FastifyApiKeyServerOptions } from './fastifyapikey';
-export { FastifySessionServer } from './fastifysession';
+export { FastifySessionServer, logClient } from './fastifysession';
 export type { LoginBodyType, LoginFactor2BodyType, SignupBodyType, } from './fastifysession';
 export type { FastifySessionServerOptions, AuthenticatorDetails, CsrfBodyType } from './fastifysession';
 export { FastifyAuthorizationServer } from './fastifyoauthserver';

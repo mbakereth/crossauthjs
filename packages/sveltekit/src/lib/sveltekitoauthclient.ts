@@ -5,8 +5,11 @@ import {
     CrossauthError,
     ErrorCode,
     CrossauthLogger,
+    LoggedActionCode,
+    loggedActionCode,
     OAuthFlows,
-    j,} from '@crossauth/common';
+    j,
+    logAsWarnOrError} from '@crossauth/common';
 import type {
     OAuthTokenResponse,
     MfaAuthenticatorResponse,
@@ -19,11 +22,13 @@ import {
     OAuthClientBackend} from '@crossauth/backend';
 import type { OAuthClientOptions } from '@crossauth/backend';
 import { SvelteKitServer } from './sveltekitserver';
+import { logClient } from "./sveltekitsession";
 import { json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import { JsonOrFormData } from './utils';
 import { type MaybePromise } from './tests/sveltemocks';
 import { type AuthorizeQueryType } from './sveltekitoauthserver'
+import { log } from "node:console";
 
 export type SvelteKitErrorFn = (server: SvelteKitServer,
     event: RequestEvent,
@@ -233,7 +238,26 @@ async function jsonError(_server: SvelteKitServer,
     _event: RequestEvent,
     ce: CrossauthError) : Promise<Response> {
     CrossauthLogger.logger.debug(j({err: ce}));
-    CrossauthLogger.logger.error(j({cerr: ce}));
+    let msg = {cerr: ce}
+    if ([
+        ErrorCode.InvalidKey,
+        ErrorCode.InvalidToken,
+        ErrorCode.InvalidSession,
+        ErrorCode.InvalidCsrf
+    ].includes(ce.code)) {
+        msg = {...msg, ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken)}
+    } else if ([
+        ErrorCode.UserNotExist,
+        ErrorCode.UserNotActive,
+    ].includes(ce.code)) {
+        msg = {...msg, ...loggedActionCode(LoggedActionCode.Login)}
+    } else if ([
+        ErrorCode.Forbidden,
+        ErrorCode.Unauthorized
+    ].includes(ce.code)) {
+        msg = {...msg, ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken)}
+    }
+    logAsWarnOrError(ce, j(msg));
     return json({
             ok: false,
             status: ce.httpStatus,
@@ -247,6 +271,21 @@ async function jsonError(_server: SvelteKitServer,
 async function svelteKitError(server: SvelteKitServer,
     _event: RequestEvent,
     ce: CrossauthError) : Promise<Response> {
+    let msg = {cerr: ce}
+    if ([
+        ErrorCode.InvalidKey,
+        ErrorCode.InvalidToken,
+        ErrorCode.InvalidSession,
+        ErrorCode.InvalidCsrf
+    ].includes(ce.code)) {
+        msg = {...msg, ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken)}
+    } else if ([
+        ErrorCode.UserNotExist,
+        ErrorCode.UserNotActive,
+    ].includes(ce.code)) {
+        msg = {...msg, ...loggedActionCode(LoggedActionCode.Login)}
+    }
+    logAsWarnOrError(ce, j(msg));
         throw server.oAuthClient?.error(ce.httpStatus, ce.message);
 } 
 
@@ -258,7 +297,7 @@ function decodePayload(token : string|undefined) : {[key:string]: any}|undefined
         } catch (e) {
             const ce = CrossauthError.asCrossauthError(e);
             CrossauthLogger.logger.debug(j({err: ce}));
-            CrossauthLogger.logger.error(j({message: "Couldn't decode token", cerr: ce}));
+            logAsWarnOrError(ce, j({message: "Couldn't decode token", cerr: ce}));
         }
     }
     return payload;
@@ -465,7 +504,7 @@ async function saveInSessionAndLoad(oauthResponse: OAuthTokenResponse,
         if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
         const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
-        CrossauthLogger.logger.debug(j({cerr: ce, message: "Error receiving tokens"}));
+        CrossauthLogger.logger.error(j({cerr: ce, message: "Error receiving tokens"}));
         return {
             ok: false,
             error: ce.oauthErrorCode,
@@ -502,7 +541,7 @@ async function sendInPage(oauthResponse: OAuthTokenResponse,
             if (SvelteKitServer.isSvelteKitError(e) || SvelteKitServer.isSvelteKitRedirect(e)) throw e;
             const ce =CrossauthError.asCrossauthError(e);
         CrossauthLogger.logger.debug(j({err: ce}));
-        CrossauthLogger.logger.debug(j({cerr: ce, message: "Error receiving tokens"}));
+        CrossauthLogger.logger.error(j({cerr: ce, message: "Error receiving tokens"}));
         return {
             ok: false,
             error: ce.oauthErrorCode,
@@ -855,20 +894,24 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
                 if (sessionData && sessionData["id_payload"]) {
                     let expiry = sessionData["expires_at"]
                     if (expiry && expiry > Date.now() && sessionData["id_payload"].sub) {
-                        CrossauthLogger.logger.debug(j({message:"ID token is valid"}));
+                        CrossauthLogger.logger.warn(j({
+                            message: "Invalid ID token received",
+                            ...logClient(event),
+                            ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken),
+                        }))
                         await this.setEventLocalsUser(event, sessionData["id_payload"]);
                         if (event.locals.user) validIdToken = true;
                     }
                 } 
                 if (!validIdToken && sessionData && sessionData["refresh_token"]) {
-                    CrossauthLogger.logger.debug(j({message: "No ID token found but refresh token found - attemping refresh flow"}));
+                    CrossauthLogger.logger.debug(j({message: "No ID token found but refresh token found - attemping refresh flow", ...logClient(event)}));
                     const resp = await this.refreshTokens(event, "silent", false);
                     if (!resp?.ok) {
                         const error = resp instanceof Response || resp == undefined ? "server_error" : (resp.error ?? "server_error");
                         const error_description = resp instanceof Response || resp == undefined ? "Unknown error" : (resp.error_description ?? "Unknown error");
                         const ce = CrossauthError.fromOAuthError(error, error_description)
                         CrossauthLogger.logger.debug(j({err: ce}));
-                        CrossauthLogger.logger.warn(j({message: "Error refreshing token", cerr: ce}));
+                        CrossauthLogger.logger.warn(j({message: "Error refreshing token", cerr: ce, ...logClient(event)}));
                     } else {
                         await this.setEventLocalsUser(event, sessionData["id_payload"]);
                     }
@@ -1142,8 +1185,9 @@ export class SvelteKitOAuthClient extends OAuthClientBackend {
             } catch(e) {
                 if (SvelteKitServer.isSvelteKitRedirect(e)) throw e;
                 if (SvelteKitServer.isSvelteKitError(e)) throw e;
+                const ce = CrossauthError.asCrossauthError(e)
                 CrossauthLogger.logger.debug(j({err: e}));
-                CrossauthLogger.logger.error(j({
+                logAsWarnOrError(ce, j({
                     cerr: e,
                     message: "Failed refreshing access token"
                 }));
