@@ -97,8 +97,11 @@ export class CrossauthLogger {
     /** the log level. This can be set dynamically */
     level : 0 | 1 | 2 | 3 | 4;
     static levelName = ["NONE", "ERROR", "WARN", "INFO", "DEBUG"];
+    static ecsLevelName = ["none", "error", "warn", "info", "debug"];
 
     extraFields: {[key:string]:any} = {}
+
+    logAsEcs = false;
 
     /**
      * Create a logger with the given level
@@ -127,12 +130,77 @@ export class CrossauthLogger {
         this.extraFields = {...extraFields}
     }
 
-    private log(level: 0 | 1 | 2 | 3 | 4 , output: any) {
+    setLogAsEcs(value: boolean) {
+        this.logAsEcs = value;
+    }
+
+    private toEcs(level: 0 | 1 | 2 | 3 | 4, input: {[key:string]:any}) : any {
+        input["log.level"] = CrossauthLogger.ecsLevelName[level]; delete input.level;
+        input["@timestamp"] = input.time; delete input.time;
+        input.logger = "CrossauthLogger";
+        if (input.method) {
+            input["http.request.method"] = input.method;
+            delete input.method
+        }
+        if (input.responseCode) {
+            input["http.response.status_code"] = input.responseCode;
+            delete input.responseCode
+        }
+        if (input.ip) {
+            input["client.address"] = input.ip;
+            input["client.ip"] = input.ip;
+            delete input.ip
+        }
+            if (input.url) {
+            input["url.original"] = input.url;
+            delete input.url
+        }
+
+        if (input.email) {
+            input["user.email"] = input.email;
+            delete input.email
+        }
+        if (input.user) {
+            input["user.name"] = input.user;
+            delete input.user
+        }
+        if (input.userid) {
+            input["user.id"] = input.userid;
+            delete input.userid
+        }
+        if (input.userid) {
+            input["user.id"] = input.userid;
+            delete input.userid
+        }
+        if (input.errorMessage) {
+            input["error.message"] = input.errorMessage;
+            delete input.errorMessage;
+            if (input.errorMessages) delete  input.errorMessages
+        } else if (input.message && input.errorCode) {
+            input["error.message"] = input.message;
+            delete input.message;
+            if (input.messages) delete input.messages;
+        }
+        if (input.errorCodeName) {
+            input["error.code"] = input.errorCodeName;
+            delete input.errorCodeName;
+            if (input.errorCode) delete  input.errorCode
+        } 
+        if (input.stack) {
+            input["error.stack"] = input.stack;
+            delete input.stack;
+        } 
+
+        return input
+
+    }
+
+    private log(level: 0 | 1 | 2 | 3 | 4 , output: {[key:string]:any}|string) {
         if (level <= this.level) {
             if (typeof output == "string") {
                 console.log("Crossauth " + CrossauthLogger.levelName[level] + " " + new Date().toISOString(), output);
             } else {
-                console.log(JSON.stringify({...this.extraFields, level: CrossauthLogger.levelName[level], time: new Date().toISOString(), ...output}));
+                console.log(JSON.stringify(this.toEcs(level, {...this.extraFields, level: CrossauthLogger.levelName[level], time: new Date().toISOString(), ...output})));
             }
         }
     }
