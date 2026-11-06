@@ -284,6 +284,11 @@ async function svelteKitError(server: SvelteKitServer,
         ErrorCode.UserNotActive,
     ].includes(ce.code)) {
         msg = {...msg, ...loggedActionCode(LoggedActionCode.Login)}
+    } else if ([
+        ErrorCode.Forbidden,
+        ErrorCode.Unauthorized
+    ].includes(ce.code)) {
+        msg = {...msg, ...loggedActionCode(LoggedActionCode.InvalidCookieOrToken)}
     }
     logAsWarnOrError(ce, j(msg));
         throw server.oAuthClient?.error(ce.httpStatus, ce.message);
