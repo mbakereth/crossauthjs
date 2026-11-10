@@ -567,7 +567,7 @@ export class FastifyAdminEndpoints {
                         ...loggedActionCode(LoggedActionCode.AdminDeleteUser),
                         ...logClient(request),
                         cerr: ce,
-                        targetUserId: request.params.id,
+                        targetUserid: request.params.id,
                     
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
@@ -827,7 +827,7 @@ export class FastifyAdminEndpoints {
                         message: "Delete user as admin unsuccessful",
                         ...loggedActionCode(LoggedActionCode.AdminDeleteUser),
                         ...logClient(request),
-                        targetUserId: request.params.id,
+                        targetUserid: request.params.id,
                         cerr: ce,
                     }));
                     CrossauthLogger.logger.debug(j({err: e}));
