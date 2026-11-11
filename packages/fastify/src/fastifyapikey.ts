@@ -3,7 +3,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http'
 import { ApiKeyManager, UserStorage, KeyStorage } from '@crossauth/backend';
 import type { ApiKeyManagerOptions } from '@crossauth/backend';
-import { CrossauthError, CrossauthLogger, j, logAsWarnOrError, loggedActionCode, LoggedActionCode } from '@crossauth/common';
+import { CrossauthError, CrossauthLogger, j, loggedActionCode, LoggedActionCode } from '@crossauth/common';
 import { logClient } from './fastifysession';
 
 /**
